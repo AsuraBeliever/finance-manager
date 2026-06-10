@@ -33,3 +33,7 @@ La app de producción se sirve desde el protocolo custom de Tauri, donde no hay 
 ## 2026-06-10 — TanStack Query sin estado global adicional
 
 Todo el estado relevante es estado de servidor (la DB). Invalidación de queries tras cada mutación reemplaza cualquier store manual. Se reevaluará si aparece estado puramente de UI compartido.
+
+## 2026-06-10 — Tipos de cambio automáticos vía open.er-api.com (no Banxico SIE)
+
+El usuario pidió que el tipo de cambio se calcule solo. Banxico SIE es la fuente oficial del FIX pero requiere registrar un token y solo cubre pocas series; open.er-api.com es gratuito, sin llave, cubre 160+ monedas contra MXN en una sola petición y se actualiza a diario — suficiente para valuar carteras personales. La petición vive en Rust (reqwest, rustls) como el resto de la lógica de dinero: el quote llega como "unidades de CUR por 1 MXN" y se invierte a micros (`1e6 / quote`). Se consulta al arrancar la app (se omite si ya hay tasa 'api' con menos de 6 horas) y bajo demanda desde Ajustes; sin red se conserva la última tasa guardada. La edición manual permanece como override: la fila más reciente en `exchange_rates` gana, sin importar `source`.
