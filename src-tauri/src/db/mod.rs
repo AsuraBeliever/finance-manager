@@ -137,10 +137,11 @@ fn migrate(conn: &Connection) -> AppResult<()> {
            applied_at TEXT NOT NULL DEFAULT (datetime('now'))
          );",
     )?;
-    let applied: i64 =
-        conn.query_row("SELECT COALESCE(MAX(version), 0) FROM schema_migrations", [], |r| {
-            r.get(0)
-        })?;
+    let applied: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+        [],
+        |r| r.get(0),
+    )?;
 
     for (i, sql) in MIGRATIONS.iter().enumerate() {
         let version = (i + 1) as i64;
@@ -148,7 +149,10 @@ fn migrate(conn: &Connection) -> AppResult<()> {
             continue;
         }
         conn.execute_batch(&format!("BEGIN;\n{sql}\nCOMMIT;"))?;
-        conn.execute("INSERT INTO schema_migrations (version) VALUES (?1)", [version])?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version) VALUES (?1)",
+            [version],
+        )?;
     }
     Ok(())
 }
@@ -168,15 +172,18 @@ mod tests {
     #[test]
     fn migrations_apply_and_seed() {
         let conn = open_in_memory();
-        let currencies: i64 =
-            conn.query_row("SELECT COUNT(*) FROM currencies", [], |r| r.get(0)).unwrap();
+        let currencies: i64 = conn
+            .query_row("SELECT COUNT(*) FROM currencies", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(currencies, 2);
         let wallet_cats: i64 = conn
             .query_row("SELECT COUNT(*) FROM wallet_categories", [], |r| r.get(0))
             .unwrap();
         assert_eq!(wallet_cats, 6);
         let tx_cats: i64 = conn
-            .query_row("SELECT COUNT(*) FROM transaction_categories", [], |r| r.get(0))
+            .query_row("SELECT COUNT(*) FROM transaction_categories", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(tx_cats, 11);
     }
@@ -186,7 +193,9 @@ mod tests {
         let conn = open_in_memory();
         migrate(&conn).expect("second run is a no-op");
         let version: i64 = conn
-            .query_row("SELECT MAX(version) FROM schema_migrations", [], |r| r.get(0))
+            .query_row("SELECT MAX(version) FROM schema_migrations", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(version, MIGRATIONS.len() as i64);
     }

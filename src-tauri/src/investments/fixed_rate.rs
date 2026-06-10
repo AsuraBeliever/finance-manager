@@ -18,7 +18,8 @@ fn full_months_between(start: NaiveDate, as_of: NaiveDate) -> i32 {
     if as_of <= start {
         return 0;
     }
-    let mut months = (as_of.year() - start.year()) * 12 + (as_of.month() as i32 - start.month() as i32);
+    let mut months =
+        (as_of.year() - start.year()) * 12 + (as_of.month() as i32 - start.month() as i32);
     if as_of.day() < start.day() {
         months -= 1;
     }
@@ -91,7 +92,10 @@ mod tests {
             r#"{"annual_rate_bps": 1200, "compounding": "monthly"}"#,
         );
         let three_months = NaiveDate::from_ymd_opt(2026, 4, 1).unwrap();
-        assert_eq!(FixedRate.value_at(&inv, &conn, three_months).unwrap(), 1_030_301);
+        assert_eq!(
+            FixedRate.value_at(&inv, &conn, three_months).unwrap(),
+            1_030_301
+        );
         // one day short of the third month -> only 2 full months
         let almost = NaiveDate::from_ymd_opt(2026, 3, 31).unwrap();
         assert_eq!(FixedRate.value_at(&inv, &conn, almost).unwrap(), 1_020_100);

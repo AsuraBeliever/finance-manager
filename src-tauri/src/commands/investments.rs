@@ -57,20 +57,27 @@ const INVESTMENT_SELECT: &str = "
 
 fn fetch_investment(conn: &Connection, id: i64) -> AppResult<Investment> {
     let sql = format!("{INVESTMENT_SELECT} WHERE id = ?1");
-    conn.query_row(&sql, [id], investment_from_row).map_err(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => AppError::NotFound("inversión"),
-        other => other.into(),
-    })
+    conn.query_row(&sql, [id], investment_from_row)
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => AppError::NotFound("inversión"),
+            other => other.into(),
+        })
 }
 
 fn today() -> NaiveDate {
     Local::now().date_naive()
 }
 
-pub fn with_value(conn: &Connection, inv: Investment, as_of: NaiveDate) -> AppResult<InvestmentWithValue> {
+pub fn with_value(
+    conn: &Connection,
+    inv: Investment,
+    as_of: NaiveDate,
+) -> AppResult<InvestmentWithValue> {
     let calc = find(&inv.calculator)?;
     let current_value_cents = calc.value_at(&inv, conn, as_of)?;
-    let maturity_date = calc.maturity_date(&inv).map(|d| d.format("%Y-%m-%d").to_string());
+    let maturity_date = calc
+        .maturity_date(&inv)
+        .map(|d| d.format("%Y-%m-%d").to_string());
     Ok(InvestmentWithValue {
         gain_cents: current_value_cents - inv.principal_cents,
         current_value_cents,
@@ -87,7 +94,9 @@ fn validate_input(
 ) -> AppResult<()> {
     find(calculator)?;
     if principal_cents <= 0 {
-        return Err(AppError::InvalidInput("el monto invertido debe ser positivo".into()));
+        return Err(AppError::InvalidInput(
+            "el monto invertido debe ser positivo".into(),
+        ));
     }
     NaiveDate::parse_from_str(start_date, "%Y-%m-%d")
         .map_err(|_| AppError::InvalidInput("fecha inválida (se espera YYYY-MM-DD)".into()))?;
@@ -104,7 +113,9 @@ pub fn open_total_mxn(
     as_of: NaiveDate,
 ) -> AppResult<i64> {
     let mut stmt = conn.prepare(&format!("{INVESTMENT_SELECT} WHERE is_closed = 0"))?;
-    let invs = stmt.query_map([], investment_from_row)?.collect::<Result<Vec<_>, _>>()?;
+    let invs = stmt
+        .query_map([], investment_from_row)?
+        .collect::<Result<Vec<_>, _>>()?;
     let mut total: i64 = 0;
     for inv in invs {
         let value = find(&inv.calculator)?.value_at(&inv, conn, as_of)?;
@@ -123,14 +134,25 @@ pub fn list_calculators() -> Vec<&'static str> {
 }
 
 #[tauri::command]
-pub fn list_investments(db: State<Db>, include_closed: Option<bool>) -> AppResult<Vec<InvestmentWithValue>> {
+pub fn list_investments(
+    db: State<Db>,
+    include_closed: Option<bool>,
+) -> AppResult<Vec<InvestmentWithValue>> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-    let filter = if include_closed.unwrap_or(false) { "" } else { " WHERE is_closed = 0" };
+    let filter = if include_closed.unwrap_or(false) {
+        ""
+    } else {
+        " WHERE is_closed = 0"
+    };
     let sql = format!("{INVESTMENT_SELECT}{filter} ORDER BY created_at, id");
     let mut stmt = conn.prepare(&sql)?;
-    let invs = stmt.query_map([], investment_from_row)?.collect::<Result<Vec<_>, _>>()?;
+    let invs = stmt
+        .query_map([], investment_from_row)?
+        .collect::<Result<Vec<_>, _>>()?;
     let as_of = today();
-    invs.into_iter().map(|inv| with_value(&conn, inv, as_of)).collect()
+    invs.into_iter()
+        .map(|inv| with_value(&conn, inv, as_of))
+        .collect()
 }
 
 #[tauri::command]
@@ -178,13 +200,27 @@ pub fn update_investment(
     }
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let existing = fetch_investment(&conn, id)?;
-    validate_input(&existing.calculator, principal_cents, &start_date, &params_json)?;
+    validate_input(
+        &existing.calculator,
+        principal_cents,
+        &start_date,
+        &params_json,
+    )?;
     conn.execute(
         "UPDATE investments
          SET name = ?2, currency_code = ?3, principal_cents = ?4, start_date = ?5,
              params_json = ?6, linked_wallet_id = ?7, notes = ?8
          WHERE id = ?1",
-        params![id, name.trim(), currency_code, principal_cents, start_date, params_json, linked_wallet_id, notes],
+        params![
+            id,
+            name.trim(),
+            currency_code,
+            principal_cents,
+            start_date,
+            params_json,
+            linked_wallet_id,
+            notes
+        ],
     )?;
     let inv = fetch_investment(&conn, id)?;
     with_value(&conn, inv, today())
@@ -221,7 +257,9 @@ pub fn add_snapshot(
     as_of: String,
 ) -> AppResult<()> {
     if value_cents < 0 {
-        return Err(AppError::InvalidInput("el valor no puede ser negativo".into()));
+        return Err(AppError::InvalidInput(
+            "el valor no puede ser negativo".into(),
+        ));
     }
     NaiveDate::parse_from_str(&as_of, "%Y-%m-%d")
         .map_err(|_| AppError::InvalidInput("fecha inválida (se espera YYYY-MM-DD)".into()))?;
@@ -244,7 +282,9 @@ pub fn get_investment_detail(db: State<Db>, id: i64) -> AppResult<InvestmentDeta
 
     let start = NaiveDate::parse_from_str(&inv.start_date, "%Y-%m-%d")
         .map_err(|_| AppError::InvalidInput("fecha de inicio inválida".into()))?;
-    let end = calc.maturity_date(&inv).unwrap_or(as_of.max(start) + Duration::days(365));
+    let end = calc
+        .maturity_date(&inv)
+        .unwrap_or(as_of.max(start) + Duration::days(365));
 
     // Weekly points from start to maturity (or +1 year), endpoint included.
     let mut projection = Vec::new();
@@ -278,5 +318,9 @@ pub fn get_investment_detail(db: State<Db>, id: i64) -> AppResult<InvestmentDeta
         })?
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(InvestmentDetail { with_value: with_value(&conn, inv, as_of)?, projection, snapshots })
+    Ok(InvestmentDetail {
+        with_value: with_value(&conn, inv, as_of)?,
+        projection,
+        snapshots,
+    })
 }

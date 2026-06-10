@@ -25,7 +25,11 @@ fn wallet_exists(conn: &Connection, id: i64) -> AppResult<()> {
         [id],
         |r| r.get(0),
     )?;
-    if exists { Ok(()) } else { Err(AppError::NotFound("cartera")) }
+    if exists {
+        Ok(())
+    } else {
+        Err(AppError::NotFound("cartera"))
+    }
 }
 
 // Plain functions over &Connection so the semantics are unit-testable
@@ -91,9 +95,11 @@ pub fn insert_transfer(
 /// Deleting any leg of a transfer removes both legs.
 pub fn delete_tx(conn: &Connection, id: i64) -> AppResult<()> {
     let group: Option<Option<String>> = conn
-        .query_row("SELECT transfer_group_id FROM transactions WHERE id = ?1", [id], |r| {
-            r.get(0)
-        })
+        .query_row(
+            "SELECT transfer_group_id FROM transactions WHERE id = ?1",
+            [id],
+            |r| r.get(0),
+        )
         .map(Some)
         .or_else(|e| match e {
             rusqlite::Error::QueryReturnedNoRows => Ok(None),
@@ -103,7 +109,10 @@ pub fn delete_tx(conn: &Connection, id: i64) -> AppResult<()> {
     match group {
         None => Err(AppError::NotFound("transacción")),
         Some(Some(group_id)) => {
-            conn.execute("DELETE FROM transactions WHERE transfer_group_id = ?1", [group_id])?;
+            conn.execute(
+                "DELETE FROM transactions WHERE transfer_group_id = ?1",
+                [group_id],
+            )?;
             Ok(())
         }
         Some(None) => {
@@ -178,7 +187,10 @@ pub fn query_transactions(conn: &Connection, f: &TxFilter) -> AppResult<Vec<Tran
 
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
-        .query_map(rusqlite::params_from_iter(args.iter().map(|a| a.as_ref())), tx_from_row)?
+        .query_map(
+            rusqlite::params_from_iter(args.iter().map(|a| a.as_ref())),
+            tx_from_row,
+        )?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
@@ -195,7 +207,15 @@ pub fn add_income(
     occurred_at: String,
 ) -> AppResult<i64> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-    insert_simple(&conn, wallet_id, "income", amount_cents, category_id, description.as_deref(), &occurred_at)
+    insert_simple(
+        &conn,
+        wallet_id,
+        "income",
+        amount_cents,
+        category_id,
+        description.as_deref(),
+        &occurred_at,
+    )
 }
 
 #[tauri::command]
@@ -208,7 +228,15 @@ pub fn add_expense(
     occurred_at: String,
 ) -> AppResult<i64> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-    insert_simple(&conn, wallet_id, "expense", amount_cents, category_id, description.as_deref(), &occurred_at)
+    insert_simple(
+        &conn,
+        wallet_id,
+        "expense",
+        amount_cents,
+        category_id,
+        description.as_deref(),
+        &occurred_at,
+    )
 }
 
 #[tauri::command]
@@ -267,11 +295,7 @@ pub fn list_transaction_categories(db: State<Db>) -> AppResult<Vec<TransactionCa
 }
 
 #[tauri::command]
-pub fn create_transaction_category(
-    db: State<Db>,
-    name: String,
-    kind: String,
-) -> AppResult<i64> {
+pub fn create_transaction_category(db: State<Db>, name: String, kind: String) -> AppResult<i64> {
     if name.trim().is_empty() {
         return Err(AppError::InvalidInput("el nombre es obligatorio".into()));
     }
@@ -319,8 +343,26 @@ mod tests {
     fn income_and_expense_move_balance() {
         let conn = open_in_memory();
         let w = make_wallet(&conn, "Efectivo", 50_000); // $500.00
-        insert_simple(&conn, w, "income", 100_000, None, Some("sueldo"), "2026-06-01").unwrap();
-        insert_simple(&conn, w, "expense", 25_000, None, Some("comida"), "2026-06-02").unwrap();
+        insert_simple(
+            &conn,
+            w,
+            "income",
+            100_000,
+            None,
+            Some("sueldo"),
+            "2026-06-01",
+        )
+        .unwrap();
+        insert_simple(
+            &conn,
+            w,
+            "expense",
+            25_000,
+            None,
+            Some("comida"),
+            "2026-06-02",
+        )
+        .unwrap();
         // 500.00 + 1000.00 - 250.00 = 1250.00
         assert_eq!(balance(&conn, w), 125_000);
     }
@@ -342,11 +384,16 @@ mod tests {
         let b = make_wallet(&conn, "B", 0);
         insert_transfer(&mut conn, a, b, 10_000, 10_000, None, "2026-06-05").unwrap();
         let leg_id: i64 = conn
-            .query_row("SELECT id FROM transactions WHERE kind = 'transfer_in'", [], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM transactions WHERE kind = 'transfer_in'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         delete_tx(&conn, leg_id).unwrap();
-        let remaining: i64 =
-            conn.query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0)).unwrap();
+        let remaining: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(remaining, 0);
         assert_eq!(balance(&conn, a), 100_000);
         assert_eq!(balance(&conn, b), 0);
@@ -376,14 +423,20 @@ mod tests {
 
         let only_a = query_transactions(
             &conn,
-            &TxFilter { wallet_id: Some(a), ..Default::default() },
+            &TxFilter {
+                wallet_id: Some(a),
+                ..Default::default()
+            },
         )
         .unwrap();
         assert_eq!(only_a.len(), 2);
 
         let incomes = query_transactions(
             &conn,
-            &TxFilter { kind: Some("income".into()), ..Default::default() },
+            &TxFilter {
+                kind: Some("income".into()),
+                ..Default::default()
+            },
         )
         .unwrap();
         assert_eq!(incomes.len(), 2);

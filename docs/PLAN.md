@@ -32,7 +32,7 @@ App de finanzas personales de escritorio (Tauri 2 + React) para gestionar carter
 - [x] **M3 — Transacciones (`v0.4.0`)** `feat/transactions`: ingreso/gasto/transferencia (2 piernas atómicas), detalle de cartera con historial, filtros, borrado en par.
 - [x] **M4 — Dashboard (`v0.5.0`)** `feat/dashboard`: resumen con conversión a MXN, edición de tipos de cambio, gráficas (dona por cartera, barras 6 meses).
 - [x] **M5 — Inversiones (`v0.6.0`)** `feat/investments`: trait + 4 calculadoras con tests unitarios, páginas con proyección, integración al dashboard.
-- [ ] **M6 — Pulido (`v1.0.0`)** `feat/polish`: validaciones, confirmaciones, formato es-MX, ícono, clippy/fmt, bundle instalable.
+- [x] **M6 — Pulido (`v1.0.0`)** `feat/polish`: validaciones, confirmaciones, formato es-MX, ícono, clippy/fmt, bundle instalable. Nota: AppImage quedó fuera de los targets (linuxdeploy falla en Arch); se generan .deb y .rpm, y el binario directo vive en `src-tauri/target/release/finanzas`.
 
 Cada milestone se desarrolla en su branch `feat/*`, se mergea a `main` con `--no-ff` al verificar, y se etiqueta con su tag semver.
 
