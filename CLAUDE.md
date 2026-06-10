@@ -34,9 +34,9 @@ cargo fmt    --manifest-path src-tauri/Cargo.toml
 
 ## Estado actual
 
-- **Milestone**: M5 (inversiones) completado — v0.6.0.
-- **Siguiente**: M6 polish (`feat/polish`): validaciones, clippy/fmt, bundle v1.0.0.
-- Checklist completo de milestones en `docs/PLAN.md`.
+- **v1.0.0 liberada**: los 7 milestones (M0–M6) completados; checklist en `docs/PLAN.md`.
+- Targets de bundle: solo `deb` y `rpm` — AppImage se quitó porque `linuxdeploy` falla en Arch. El binario de release queda en `src-tauri/target/release/finanzas`.
+- Trabajo futuro: ver `docs/ROADMAP.md` (API Banxico, presupuestos, recurrentes, export/backup).
 
 ## Docs
 

@@ -113,8 +113,9 @@ pub fn summarize(conn: &Connection) -> AppResult<DashboardSummary> {
 
     let mut by_currency_map: HashMap<String, CurrencySubtotal> = HashMap::new();
     for w in &wallets {
-        let entry =
-            by_currency_map.entry(w.currency_code.clone()).or_insert_with(|| CurrencySubtotal {
+        let entry = by_currency_map
+            .entry(w.currency_code.clone())
+            .or_insert_with(|| CurrencySubtotal {
                 currency_code: w.currency_code.clone(),
                 balance_cents: 0,
                 balance_mxn_cents: 0,
@@ -153,12 +154,17 @@ pub fn summarize(conn: &Connection) -> AppResult<DashboardSummary> {
     })?;
     for row in rows {
         let (month, kind, currency_code, sum_cents) = row?;
-        let mxn = rates.get(&currency_code).map(|rate| to_mxn(sum_cents, *rate)).unwrap_or(0);
-        let entry = monthly_map.entry(month.clone()).or_insert_with(|| MonthlyFlow {
-            month,
-            income_mxn_cents: 0,
-            expense_mxn_cents: 0,
-        });
+        let mxn = rates
+            .get(&currency_code)
+            .map(|rate| to_mxn(sum_cents, *rate))
+            .unwrap_or(0);
+        let entry = monthly_map
+            .entry(month.clone())
+            .or_insert_with(|| MonthlyFlow {
+                month,
+                income_mxn_cents: 0,
+                expense_mxn_cents: 0,
+            });
         if kind == "income" {
             entry.income_mxn_cents += mxn;
         } else {
@@ -212,7 +218,7 @@ mod tests {
         let conn = open_in_memory();
         make_wallet(&conn, "Efectivo", "MXN", 100_000); // $1,000.00 MXN
         make_wallet(&conn, "USD cash", "USD", 10_000); // $100.00 USD
-        // stale rate then current rate: latest must win
+                                                       // stale rate then current rate: latest must win
         conn.execute(
             "INSERT INTO exchange_rates (currency_code, rate_to_mxn_micros) VALUES ('USD', 17000000)",
             [],

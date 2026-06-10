@@ -37,10 +37,11 @@ fn wallet_from_row(r: &Row) -> rusqlite::Result<Wallet> {
 
 fn fetch_wallet(conn: &Connection, id: i64) -> AppResult<Wallet> {
     let sql = format!("{WALLET_SELECT} WHERE w.id = ?1");
-    conn.query_row(&sql, [id], wallet_from_row).map_err(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => AppError::NotFound("cartera"),
-        other => other.into(),
-    })
+    conn.query_row(&sql, [id], wallet_from_row)
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => AppError::NotFound("cartera"),
+            other => other.into(),
+        })
 }
 
 fn validate(name: &str) -> AppResult<()> {
@@ -53,10 +54,16 @@ fn validate(name: &str) -> AppResult<()> {
 #[tauri::command]
 pub fn list_wallets(db: State<Db>, include_archived: Option<bool>) -> AppResult<Vec<Wallet>> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-    let filter = if include_archived.unwrap_or(false) { "" } else { " WHERE w.is_archived = 0" };
+    let filter = if include_archived.unwrap_or(false) {
+        ""
+    } else {
+        " WHERE w.is_archived = 0"
+    };
     let sql = format!("{WALLET_SELECT}{filter} ORDER BY w.created_at, w.id");
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map([], wallet_from_row)?.collect::<Result<Vec<_>, _>>()?;
+    let rows = stmt
+        .query_map([], wallet_from_row)?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -87,6 +94,7 @@ pub fn create_wallet(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn update_wallet(
     db: State<Db>,
     id: i64,
@@ -104,7 +112,15 @@ pub fn update_wallet(
          SET name = ?2, category_id = ?3, currency_code = ?4,
              initial_balance_cents = ?5, color = ?6, notes = ?7
          WHERE id = ?1",
-        params![id, name.trim(), category_id, currency_code, initial_balance_cents, color, notes],
+        params![
+            id,
+            name.trim(),
+            category_id,
+            currency_code,
+            initial_balance_cents,
+            color,
+            notes
+        ],
     )?;
     if updated == 0 {
         return Err(AppError::NotFound("cartera"));

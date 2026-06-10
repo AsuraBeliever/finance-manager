@@ -45,7 +45,10 @@ mod tests {
         // 1_000_000 * (1 + 0.15/365)^365 = 1_161_798.4 -> $11,617.98
         let inv = test_investment("nu_cajita", 1_000_000, r#"{"annual_rate_bps": 1500}"#);
         let a_year_later = NaiveDate::from_ymd_opt(2027, 1, 1).unwrap();
-        assert_eq!(NuCajita.value_at(&inv, &conn, a_year_later).unwrap(), 1_161_798);
+        assert_eq!(
+            NuCajita.value_at(&inv, &conn, a_year_later).unwrap(),
+            1_161_798
+        );
     }
 
     #[test]

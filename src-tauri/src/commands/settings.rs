@@ -70,10 +70,14 @@ pub fn set_exchange_rate(
     rate_to_mxn_micros: i64,
 ) -> AppResult<()> {
     if rate_to_mxn_micros <= 0 {
-        return Err(AppError::InvalidInput("el tipo de cambio debe ser positivo".into()));
+        return Err(AppError::InvalidInput(
+            "el tipo de cambio debe ser positivo".into(),
+        ));
     }
     if currency_code == "MXN" {
-        return Err(AppError::InvalidInput("MXN siempre vale 1.0; no se puede editar".into()));
+        return Err(AppError::InvalidInput(
+            "MXN siempre vale 1.0; no se puede editar".into(),
+        ));
     }
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let exists: bool = conn.query_row(
@@ -113,5 +117,10 @@ pub fn add_currency(
         "INSERT INTO currencies (code, name, symbol, decimals) VALUES (?1, ?2, ?3, 2)",
         rusqlite::params![code, name.trim(), symbol.trim()],
     )?;
-    Ok(Currency { code, name: name.trim().into(), symbol: symbol.trim().into(), decimals: 2 })
+    Ok(Currency {
+        code,
+        name: name.trim().into(),
+        symbol: symbol.trim().into(),
+        decimals: 2,
+    })
 }
