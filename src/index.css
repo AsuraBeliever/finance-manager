@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #0f1115;
+  --color-surface-raised: #171a21;
+  --color-surface-overlay: #1f2330;
+  --color-border-muted: #2a2f3d;
+  --color-accent: #34d399;
+  --color-accent-dim: #10b981;
+  --color-danger: #f87171;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-surface text-zinc-100 antialiased;
+  user-select: none;
+}
+
+input,
+textarea {
+  user-select: text;
+}
