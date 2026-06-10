@@ -60,6 +60,36 @@ export interface ExchangeRate {
   source: string;
 }
 
+export interface WalletBalance {
+  walletId: number;
+  name: string;
+  color: string | null;
+  currencyCode: string;
+  balanceCents: number;
+  balanceMxnCents: number;
+}
+
+export interface CurrencySubtotal {
+  currencyCode: string;
+  balanceCents: number;
+  balanceMxnCents: number;
+  hasRate: boolean;
+}
+
+export interface MonthlyFlow {
+  month: string;
+  incomeMxnCents: number;
+  expenseMxnCents: number;
+}
+
+export interface DashboardSummary {
+  totalMxnCents: number;
+  wallets: WalletBalance[];
+  byCurrency: CurrencySubtotal[];
+  monthly: MonthlyFlow[];
+  missingRates: string[];
+}
+
 export type CalculatorId = "nu_cajita" | "cetes" | "fixed_rate" | "manual";
 
 export interface Investment {

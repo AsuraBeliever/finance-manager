@@ -30,7 +30,7 @@ App de finanzas personales de escritorio (Tauri 2 + React) para gestionar carter
 - [x] **M1 — Capa de datos (`v0.2.0`)** `feat/db`: rusqlite (bundled), migraciones embebidas, seeds (monedas, categorías), modelos, `AppError`, comandos de lectura básicos.
 - [x] **M2 — Carteras (`v0.3.0`)** `feat/wallets`: CRUD completo + página Carteras con formulario modal y archivado.
 - [x] **M3 — Transacciones (`v0.4.0`)** `feat/transactions`: ingreso/gasto/transferencia (2 piernas atómicas), detalle de cartera con historial, filtros, borrado en par.
-- [ ] **M4 — Dashboard (`v0.5.0`)** `feat/dashboard`: resumen con conversión a MXN, edición de tipos de cambio, gráficas (dona por cartera, barras 6 meses).
+- [x] **M4 — Dashboard (`v0.5.0`)** `feat/dashboard`: resumen con conversión a MXN, edición de tipos de cambio, gráficas (dona por cartera, barras 6 meses).
 - [ ] **M5 — Inversiones (`v0.6.0`)** `feat/investments`: trait + 4 calculadoras con tests unitarios, páginas con proyección, integración al dashboard.
 - [ ] **M6 — Pulido (`v1.0.0`)** `feat/polish`: validaciones, confirmaciones, formato es-MX, ícono, clippy/fmt, bundle instalable.
 
