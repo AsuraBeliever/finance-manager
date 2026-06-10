@@ -34,8 +34,8 @@ cargo fmt    --manifest-path src-tauri/Cargo.toml
 
 ## Estado actual
 
-- **Milestone**: M2 (carteras) completado — v0.3.0.
-- **Siguiente**: M3 transacciones (`feat/transactions`): ingreso/gasto/transferencia atómica.
+- **Milestone**: M3 (transacciones) completado — v0.4.0.
+- **Siguiente**: M4 dashboard (`feat/dashboard`): get_dashboard_summary + tipos de cambio + gráficas.
 - Checklist completo de milestones en `docs/PLAN.md`.
 
 ## Docs

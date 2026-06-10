@@ -1,2 +1,3 @@
 pub mod settings;
+pub mod transactions;
 pub mod wallets;
