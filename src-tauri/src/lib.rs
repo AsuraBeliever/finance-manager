@@ -25,6 +25,11 @@ pub fn run() {
             commands::settings::get_exchange_rates,
             commands::settings::set_exchange_rate,
             commands::settings::add_currency,
+            commands::wallets::list_wallets,
+            commands::wallets::get_wallet,
+            commands::wallets::create_wallet,
+            commands::wallets::update_wallet,
+            commands::wallets::archive_wallet,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
