@@ -1,5 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Currency, ExchangeRate, Wallet, WalletCategory } from "./types";
+import type {
+  Currency,
+  ExchangeRate,
+  Transaction,
+  TransactionCategory,
+  TransactionKind,
+  Wallet,
+  WalletCategory,
+} from "./types";
 
 // One typed wrapper per Tauri command. Components never call invoke() directly.
 
@@ -38,3 +46,51 @@ export const updateWallet = (id: number, input: WalletInput) =>
 
 export const archiveWallet = (id: number, archived: boolean) =>
   invoke<void>("archive_wallet", { id, archived });
+
+export interface SimpleTxInput {
+  walletId: number;
+  amountCents: number;
+  categoryId: number | null;
+  description: string | null;
+  occurredAt: string;
+}
+
+export interface TransferInput {
+  fromWalletId: number;
+  toWalletId: number;
+  amountFromCents: number;
+  amountToCents: number;
+  description: string | null;
+  occurredAt: string;
+}
+
+export interface TxFilter {
+  walletId?: number;
+  kind?: TransactionKind;
+  categoryId?: number;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const addIncome = (input: SimpleTxInput) =>
+  invoke<number>("add_income", { ...input });
+
+export const addExpense = (input: SimpleTxInput) =>
+  invoke<number>("add_expense", { ...input });
+
+export const addTransfer = (input: TransferInput) =>
+  invoke<string>("add_transfer", { ...input });
+
+export const listTransactions = (filter: TxFilter = {}) =>
+  invoke<Transaction[]>("list_transactions", { filter });
+
+export const deleteTransaction = (id: number) =>
+  invoke<void>("delete_transaction", { id });
+
+export const listTransactionCategories = () =>
+  invoke<TransactionCategory[]>("list_transaction_categories");
+
+export const createTransactionCategory = (name: string, kind: "income" | "expense") =>
+  invoke<number>("create_transaction_category", { name, kind });

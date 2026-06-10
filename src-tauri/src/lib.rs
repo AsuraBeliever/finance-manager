@@ -30,6 +30,13 @@ pub fn run() {
             commands::wallets::create_wallet,
             commands::wallets::update_wallet,
             commands::wallets::archive_wallet,
+            commands::transactions::add_income,
+            commands::transactions::add_expense,
+            commands::transactions::add_transfer,
+            commands::transactions::list_transactions,
+            commands::transactions::delete_transaction,
+            commands::transactions::list_transaction_categories,
+            commands::transactions::create_transaction_category,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

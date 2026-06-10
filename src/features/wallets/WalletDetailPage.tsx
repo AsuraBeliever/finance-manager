@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, Pencil } from "lucide-react";
-import { useState } from "react";
+import { Archive, ArchiveRestore, ArrowLeftRight, Pencil, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button";
+import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
-import { archiveWallet, getWallet } from "../../lib/api";
+import { archiveWallet, getWallet, listTransactions } from "../../lib/api";
 import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
+import { TransactionFormModal } from "../transactions/TransactionFormModal";
+import { TransactionList } from "../transactions/TransactionList";
 import { WalletFormModal } from "./WalletFormModal";
 
 export function WalletDetailPage() {
@@ -15,12 +18,27 @@ export function WalletDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [txFormOpen, setTxFormOpen] = useState(false);
 
   const wallet = useQuery({
     queryKey: ["wallets", walletId],
     queryFn: () => getWallet(walletId),
     enabled: Number.isFinite(walletId),
   });
+
+  const transactions = useQuery({
+    queryKey: ["transactions", { walletId }],
+    queryFn: () => listTransactions({ walletId }),
+    enabled: Number.isFinite(walletId),
+  });
+
+  const currencyByWallet = useMemo(
+    () =>
+      wallet.data
+        ? new Map([[wallet.data.id, wallet.data.currencyCode]])
+        : undefined,
+    [wallet.data],
+  );
 
   const archive = useMutation({
     mutationFn: (archived: boolean) => archiveWallet(walletId, archived),
@@ -80,7 +98,37 @@ export function WalletDetailPage() {
         {w.notes && <p className="mt-2 text-sm text-zinc-400">{w.notes}</p>}
       </div>
 
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-medium">{es.transactions.title}</h3>
+        <Button variant="ghost" onClick={() => setTxFormOpen(true)}>
+          <span className="flex items-center gap-2">
+            <Plus size={15} /> {es.transactions.newTransaction}
+          </span>
+        </Button>
+      </div>
+
+      {transactions.data && transactions.data.length === 0 ? (
+        <EmptyState
+          icon={ArrowLeftRight}
+          title={es.transactions.emptyTitle}
+          description={es.transactions.emptyDescription}
+        />
+      ) : (
+        transactions.data && (
+          <TransactionList
+            transactions={transactions.data}
+            currencyByWallet={currencyByWallet}
+            showWallet={false}
+          />
+        )
+      )}
+
       <WalletFormModal open={editOpen} onClose={() => setEditOpen(false)} wallet={w} />
+      <TransactionFormModal
+        open={txFormOpen}
+        onClose={() => setTxFormOpen(false)}
+        defaultWalletId={walletId}
+      />
     </>
   );
 }
