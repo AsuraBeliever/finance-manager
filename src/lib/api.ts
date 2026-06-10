@@ -25,6 +25,9 @@ export const getExchangeRates = () => invoke<ExchangeRate[]>("get_exchange_rates
 export const setExchangeRate = (currencyCode: string, rateToMxnMicros: number) =>
   invoke<void>("set_exchange_rate", { currencyCode, rateToMxnMicros });
 
+/** Pulls fresh rates from the provider; resolves to how many were stored. */
+export const fetchExchangeRates = () => invoke<number>("fetch_exchange_rates");
+
 export const addCurrency = (code: string, name: string, symbol: string) =>
   invoke<Currency>("add_currency", { code, name, symbol });
 

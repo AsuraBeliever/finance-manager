@@ -21,6 +21,7 @@ cargo fmt    --manifest-path src-tauri/Cargo.toml
 - Saldo de cartera = calculado (initial + Σ transacciones), nunca almacenado.
 - Transferencia = 2 filas (`transfer_out`/`transfer_in`) con mismo `transfer_group_id`, insertadas/borradas atómicamente.
 - Router: `createHashRouter` (protocolo custom de Tauri no soporta history routing).
+- Tipos de cambio: auto-actualización al arrancar vía open.er-api.com (reqwest, silencioso si falla) + botón en Ajustes + override manual. NUNCA sostener el lock de la DB a través de un `await`.
 
 ## Convenciones
 
@@ -34,9 +35,9 @@ cargo fmt    --manifest-path src-tauri/Cargo.toml
 
 ## Estado actual
 
-- **v1.0.0 liberada**: los 7 milestones (M0–M6) completados; checklist en `docs/PLAN.md`.
+- **v1.1.0**: tipos de cambio automáticos (open.er-api.com) sobre la v1.0.0 completa (milestones M0–M6 en `docs/PLAN.md`).
 - Targets de bundle: solo `deb` y `rpm` — AppImage se quitó porque `linuxdeploy` falla en Arch. El binario de release queda en `src-tauri/target/release/finanzas`.
-- Trabajo futuro: ver `docs/ROADMAP.md` (API Banxico, presupuestos, recurrentes, export/backup).
+- Trabajo futuro: ver `docs/ROADMAP.md` (presupuestos, recurrentes, export/backup, tasas históricas de cajitas).
 
 ## Docs
 

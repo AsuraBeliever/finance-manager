@@ -18,6 +18,16 @@ pub fn run() {
             let conn = db::open(&data_dir.join("finanzas.db"))
                 .map_err(|e| format!("failed to open database: {e}"))?;
             app.manage(db::Db(Mutex::new(conn)));
+
+            // Refresh exchange rates in the background on startup; skipped when
+            // recent API rates exist, silent on failure (offline keeps last rates).
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let db = handle.state::<db::Db>();
+                if let Err(e) = commands::settings::fetch_and_store_rates(&db, false).await {
+                    eprintln!("exchange rate auto-update failed: {e}");
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -25,6 +35,7 @@ pub fn run() {
             commands::settings::list_wallet_categories,
             commands::settings::get_exchange_rates,
             commands::settings::set_exchange_rate,
+            commands::settings::fetch_exchange_rates,
             commands::settings::add_currency,
             commands::wallets::list_wallets,
             commands::wallets::get_wallet,
