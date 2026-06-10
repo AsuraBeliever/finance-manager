@@ -34,8 +34,8 @@ cargo fmt    --manifest-path src-tauri/Cargo.toml
 
 ## Estado actual
 
-- **Milestone**: M1 (capa de DB) completado — v0.2.0.
-- **Siguiente**: M2 carteras (`feat/wallets`): CRUD + página Carteras con modal.
+- **Milestone**: M2 (carteras) completado — v0.3.0.
+- **Siguiente**: M3 transacciones (`feat/transactions`): ingreso/gasto/transferencia atómica.
 - Checklist completo de milestones en `docs/PLAN.md`.
 
 ## Docs
