@@ -1,17 +1,14 @@
 [package]
-name = "tauri-app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+name = "finanzas"
+version = "0.2.0"
+description = "Personal finance desktop app"
+authors = ["AsuraBeliever"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "tauri_app_lib"
+# The `_lib` suffix is necessary so the lib name doesn't conflict with the bin
+# name on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "finanzas_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -22,4 +19,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
+rusqlite = { version = "0.37", features = ["bundled"] }
+chrono = "0.4"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "2"
