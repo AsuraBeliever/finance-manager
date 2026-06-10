@@ -34,8 +34,8 @@ cargo fmt    --manifest-path src-tauri/Cargo.toml
 
 ## Estado actual
 
-- **Milestone**: M4 (dashboard) completado — v0.5.0.
-- **Siguiente**: M5 inversiones (`feat/investments`): trait + 4 calculadoras con tests.
+- **Milestone**: M5 (inversiones) completado — v0.6.0.
+- **Siguiente**: M6 polish (`feat/polish`): validaciones, clippy/fmt, bundle v1.0.0.
 - Checklist completo de milestones en `docs/PLAN.md`.
 
 ## Docs

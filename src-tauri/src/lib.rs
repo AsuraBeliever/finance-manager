@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod error;
+mod investments;
 mod models;
 
 use std::fs;
@@ -38,6 +39,14 @@ pub fn run() {
             commands::transactions::list_transaction_categories,
             commands::transactions::create_transaction_category,
             commands::dashboard::get_dashboard_summary,
+            commands::investments::list_calculators,
+            commands::investments::list_investments,
+            commands::investments::create_investment,
+            commands::investments::update_investment,
+            commands::investments::close_investment,
+            commands::investments::delete_investment,
+            commands::investments::add_snapshot,
+            commands::investments::get_investment_detail,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

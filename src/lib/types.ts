@@ -88,6 +88,7 @@ export interface DashboardSummary {
   byCurrency: CurrencySubtotal[];
   monthly: MonthlyFlow[];
   missingRates: string[];
+  investmentsTotalMxnCents: number;
 }
 
 export type CalculatorId = "nu_cajita" | "cetes" | "fixed_rate" | "manual";
@@ -113,3 +114,20 @@ export interface InvestmentSnapshot {
   asOf: string;
   source: string;
 }
+
+/** Investment fields are flattened together with the computed values (serde flatten). */
+export type InvestmentWithValue = Investment & {
+  currentValueCents: number;
+  gainCents: number;
+  maturityDate: string | null;
+};
+
+export interface ProjectionPoint {
+  date: string;
+  valueCents: number;
+}
+
+export type InvestmentDetail = InvestmentWithValue & {
+  projection: ProjectionPoint[];
+  snapshots: InvestmentSnapshot[];
+};
