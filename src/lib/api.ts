@@ -1,8 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  CalculatorId,
   Currency,
   DashboardSummary,
   ExchangeRate,
+  InvestmentDetail,
+  InvestmentWithValue,
   Transaction,
   TransactionCategory,
   TransactionKind,
@@ -98,3 +101,36 @@ export const createTransactionCategory = (name: string, kind: "income" | "expens
 
 export const getDashboardSummary = () =>
   invoke<DashboardSummary>("get_dashboard_summary");
+
+export interface InvestmentInput {
+  name: string;
+  currencyCode: string;
+  principalCents: number;
+  startDate: string;
+  paramsJson: string;
+  linkedWalletId: number | null;
+  notes: string | null;
+}
+
+export const listCalculators = () => invoke<CalculatorId[]>("list_calculators");
+
+export const listInvestments = (includeClosed = false) =>
+  invoke<InvestmentWithValue[]>("list_investments", { includeClosed });
+
+export const createInvestment = (calculator: CalculatorId, input: InvestmentInput) =>
+  invoke<InvestmentWithValue>("create_investment", { calculator, ...input });
+
+export const updateInvestment = (id: number, input: InvestmentInput) =>
+  invoke<InvestmentWithValue>("update_investment", { id, ...input });
+
+export const closeInvestment = (id: number, closed: boolean) =>
+  invoke<void>("close_investment", { id, closed });
+
+export const deleteInvestment = (id: number) =>
+  invoke<void>("delete_investment", { id });
+
+export const addSnapshot = (investmentId: number, valueCents: number, asOf: string) =>
+  invoke<void>("add_snapshot", { investmentId, valueCents, asOf });
+
+export const getInvestmentDetail = (id: number) =>
+  invoke<InvestmentDetail>("get_investment_detail", { id });

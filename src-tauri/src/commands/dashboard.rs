@@ -47,6 +47,8 @@ pub struct DashboardSummary {
     /// Currencies with non-MXN wallets but no exchange rate configured;
     /// their balances are excluded from the MXN total.
     pub missing_rates: Vec<String>,
+    /// Current value of open investments, converted to MXN.
+    pub investments_total_mxn_cents: i64,
 }
 
 /// Latest rate per currency in micros; MXN is always 1.0.
@@ -166,7 +168,20 @@ pub fn summarize(conn: &Connection) -> AppResult<DashboardSummary> {
     let mut monthly: Vec<MonthlyFlow> = monthly_map.into_values().collect();
     monthly.sort_by(|a, b| a.month.cmp(&b.month));
 
-    Ok(DashboardSummary { total_mxn_cents, wallets, by_currency, monthly, missing_rates })
+    let investments_total_mxn_cents = crate::commands::investments::open_total_mxn(
+        conn,
+        &rates,
+        chrono::Local::now().date_naive(),
+    )?;
+
+    Ok(DashboardSummary {
+        total_mxn_cents,
+        wallets,
+        by_currency,
+        monthly,
+        missing_rates,
+        investments_total_mxn_cents,
+    })
 }
 
 #[tauri::command]

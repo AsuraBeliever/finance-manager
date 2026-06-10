@@ -38,7 +38,7 @@ export function DashboardPage() {
     return <p className="text-sm text-danger">{String(summary.error)}</p>;
 
   const s = summary.data;
-  const hasData = s.wallets.length > 0;
+  const hasData = s.wallets.length > 0 || s.investmentsTotalMxnCents > 0;
 
   const donutData = s.wallets
     .filter((w) => w.balanceMxnCents > 0)
@@ -69,8 +69,15 @@ export function DashboardPage() {
           <section className="rounded-xl border border-border-muted bg-surface-raised p-6">
             <p className="text-sm text-zinc-400">{es.dashboard.netWorth}</p>
             <p className="mt-1 text-4xl font-semibold tabular-nums text-accent">
-              {formatCents(s.totalMxnCents, "MXN")}
+              {formatCents(s.totalMxnCents + s.investmentsTotalMxnCents, "MXN")}
             </p>
+            {s.investmentsTotalMxnCents > 0 && (
+              <p className="mt-1 text-sm text-zinc-400">
+                {es.nav.wallets}: {formatCents(s.totalMxnCents, "MXN")} ·{" "}
+                {es.investments.total}:{" "}
+                {formatCents(s.investmentsTotalMxnCents, "MXN")}
+              </p>
+            )}
             {s.byCurrency.length > 1 && (
               <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1">
                 {s.byCurrency.map((c) => (

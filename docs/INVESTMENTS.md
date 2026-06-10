@@ -8,7 +8,8 @@ Vive completo en Rust (`src-tauri/src/investments/`). El frontend solo renderiza
 pub trait InvestmentCalculator: Send + Sync {
     fn id(&self) -> &'static str;
     /// Valor en centavos en la fecha `as_of` (fechas futuras = proyección).
-    fn value_at(&self, inv: &Investment, as_of: NaiveDate) -> Result<i64, CalcError>;
+    /// `conn` permite a calculadoras respaldadas por datos (manual) leer la DB.
+    fn value_at(&self, inv: &Investment, conn: &Connection, as_of: NaiveDate) -> AppResult<i64>;
     fn maturity_date(&self, inv: &Investment) -> Option<NaiveDate>;
 }
 
@@ -61,7 +62,7 @@ Ejemplo de referencia (test): $10,000.00 al 10.80 % a 91 días sin ISR → `1000
 Params: `{"annual_rate_bps": N, "compounding": "daily" | "monthly" | "simple"}`.
 
 - `daily`: igual que nu_cajita generalizado, `(1 + r/365)^días`.
-- `monthly`: `(1 + r/12)^meses` con meses = días/30.44 truncado… (definir exacto en implementación con chrono, meses calendario completos).
+- `monthly`: `(1 + r/12)^meses_completos`, donde `meses_completos` son meses calendario enteros transcurridos desde `start_date` (si el día del mes de `as_of` es menor que el día de inicio, ese mes aún no se completa).
 - `simple`: `principal × (1 + r × días/365)`.
 
 ### `manual` — valor manual
