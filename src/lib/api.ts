@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Currency,
+  DashboardSummary,
   ExchangeRate,
   Transaction,
   TransactionCategory,
@@ -94,3 +95,6 @@ export const listTransactionCategories = () =>
 
 export const createTransactionCategory = (name: string, kind: "income" | "expense") =>
   invoke<number>("create_transaction_category", { name, kind });
+
+export const getDashboardSummary = () =>
+  invoke<DashboardSummary>("get_dashboard_summary");
