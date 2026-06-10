@@ -34,8 +34,8 @@ cargo fmt    --manifest-path src-tauri/Cargo.toml
 
 ## Estado actual
 
-- **Milestone**: M0 (scaffold) completado — v0.1.0.
-- **Siguiente**: M1 capa de DB (`feat/db`): rusqlite + migraciones + seeds + modelos + AppError.
+- **Milestone**: M1 (capa de DB) completado — v0.2.0.
+- **Siguiente**: M2 carteras (`feat/wallets`): CRUD + página Carteras con modal.
 - Checklist completo de milestones en `docs/PLAN.md`.
 
 ## Docs

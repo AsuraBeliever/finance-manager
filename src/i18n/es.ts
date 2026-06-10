@@ -39,5 +39,8 @@ export const es = {
   },
   settings: {
     title: "Ajustes",
+    currencies: "Monedas",
+    walletCategories: "Categorías de cartera",
+    exchangeRates: "Tipos de cambio",
   },
 } as const;
