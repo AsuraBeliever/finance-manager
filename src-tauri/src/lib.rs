@@ -10,6 +10,13 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // WebKitGTK's DMABUF renderer is unstable on NVIDIA + Wayland: GBM
+    // buffer failures escalate to a Wayland protocol error (71) that kills
+    // the app at startup. Must be set before the webview is created.
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     tauri::Builder::default()
         // NOTE: tauri-plugin-single-instance was tried and removed — its DBus
         // signaling crashes the running instance under GTK3/Wayland (protocol
