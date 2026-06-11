@@ -10,6 +10,16 @@ import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
 
+/** "0.05 BTC" from a crypto investment's params. */
+function cryptoSub(paramsJson: string): string {
+  try {
+    const p = JSON.parse(paramsJson);
+    return `${(p.quantity_e8 / 1e8).toString()} ${p.symbol}`;
+  } catch {
+    return es.investments.calculators.crypto;
+  }
+}
+
 export function InvestmentsPage() {
   const [showClosed, setShowClosed] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -86,7 +96,9 @@ export function InvestmentsPage() {
                 {formatCents(inv.gainCents, inv.currencyCode)}
               </p>
               <p className="mt-2 text-xs text-zinc-500">
-                {es.investments.calculators[inv.calculator] ?? inv.calculator}
+                {inv.calculator === "crypto"
+                  ? cryptoSub(inv.paramsJson)
+                  : (es.investments.calculators[inv.calculator] ?? inv.calculator)}
                 {inv.maturityDate && (
                   <>
                     {" · "}

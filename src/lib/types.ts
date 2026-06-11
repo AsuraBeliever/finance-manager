@@ -82,6 +82,12 @@ export interface MonthlyFlow {
   expenseMxnCents: number;
 }
 
+export interface InvestmentSlice {
+  id: number;
+  name: string;
+  valueMxnCents: number;
+}
+
 export interface DashboardSummary {
   totalMxnCents: number;
   wallets: WalletBalance[];
@@ -89,9 +95,16 @@ export interface DashboardSummary {
   monthly: MonthlyFlow[];
   missingRates: string[];
   investmentsTotalMxnCents: number;
+  investments: InvestmentSlice[];
 }
 
-export type CalculatorId = "nu_cajita" | "cetes" | "fixed_rate" | "manual";
+export type CalculatorId =
+  | "nu_cajita"
+  | "cetes"
+  | "bonddia"
+  | "crypto"
+  | "fixed_rate"
+  | "manual";
 
 export interface Investment {
   id: number;

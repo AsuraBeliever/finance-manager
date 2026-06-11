@@ -133,6 +133,22 @@ const MIGRATIONS: &[&str] = &[
     );
     CREATE INDEX idx_inv_mov ON investment_movements(investment_id, occurred_at);
     "#,
+    // 4: cached Banxico rate histories + crypto prices
+    r#"
+    CREATE TABLE rate_history (
+      series TEXT NOT NULL,               -- banxico kind: 'objetivo', 'cetes_28', ...
+      date TEXT NOT NULL,                 -- 'YYYY-MM-DD' the rate took effect
+      rate_bps INTEGER NOT NULL,
+      PRIMARY KEY (series, date)
+    );
+
+    CREATE TABLE crypto_prices (
+      symbol TEXT PRIMARY KEY,            -- 'BTC', 'ETH', ...
+      price_mxn_cents INTEGER NOT NULL,
+      price_usd_cents INTEGER,
+      as_of TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    "#,
 ];
 
 pub fn open(path: &Path) -> AppResult<Connection> {
