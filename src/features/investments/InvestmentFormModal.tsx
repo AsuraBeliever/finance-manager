@@ -10,6 +10,7 @@ import {
   fetchBanxicoRate,
   getInvestmentCatalog,
   listCurrencies,
+  refreshMarketData,
   updateInvestment,
   type BanxicoSeriesKind,
   type CatalogItem,
@@ -20,8 +21,24 @@ import { parseToCents } from "../../lib/money";
 import type { CalculatorId, InvestmentWithValue } from "../../lib/types";
 import { es } from "../../i18n/es";
 
-const CALCULATORS: CalculatorId[] = ["nu_cajita", "cetes", "fixed_rate", "manual"];
+const CALCULATORS: CalculatorId[] = [
+  "nu_cajita",
+  "cetes",
+  "bonddia",
+  "crypto",
+  "fixed_rate",
+  "manual",
+];
 const PLAZOS = [28, 91, 182, 364];
+const COINS = ["BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "USDT", "USDC", "BNB", "LTC"];
+
+/** Quantity text ("0.05") -> integer units ×1e8, or null when invalid. */
+function parseQuantityE8(text: string): number | null {
+  const cleaned = text.replace(/,/g, "").trim();
+  if (!/^\d+(\.\d{1,8})?$/.test(cleaned)) return null;
+  const value = Math.round(parseFloat(cleaned) * 1e8);
+  return value > 0 ? value : null;
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -54,6 +71,8 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
   const [isrText, setIsrText] = useState("0");
   const [reinvest, setReinvest] = useState(false);
   const [compounding, setCompounding] = useState("daily");
+  const [symbol, setSymbol] = useState("BTC");
+  const [quantityText, setQuantityText] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [rateInfo, setRateInfo] = useState<string | null>(null);
@@ -77,6 +96,8 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
     setIsrText(params.isr_rate_bps !== undefined ? (params.isr_rate_bps / 100).toString() : "0");
     setReinvest(params.reinvest ?? false);
     setCompounding(params.compounding ?? "daily");
+    setSymbol(params.symbol ?? "BTC");
+    setQuantityText("");
     setRateInfo(
       item.rateBps !== null && item.rateDate
         ? `${es.investments.banxicoFetched} ${item.rateDate}`
@@ -119,13 +140,18 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
     setIsrText(params.isr_rate_bps !== undefined ? (params.isr_rate_bps / 100).toString() : "0");
     setReinvest(params.reinvest ?? false);
     setCompounding(params.compounding ?? "daily");
+    setSymbol(params.symbol ?? "BTC");
+    setQuantityText(
+      params.quantity_e8 !== undefined ? (params.quantity_e8 / 1e8).toString() : "",
+    );
     setNotes(investment?.notes ?? "");
     setError(null);
     setRateInfo(null);
     setStep(investment ? "form" : "catalog");
   }, [open, investment]);
 
-  const needsRate = calculator !== "manual";
+  // bonddia uses the cached historical series; crypto uses live prices.
+  const needsRate = !["manual", "crypto", "bonddia"].includes(calculator);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -149,6 +175,18 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
       if (calculator === "fixed_rate") {
         params.compounding = compounding;
       }
+      if (calculator === "bonddia") {
+        // keep the catalog's live rate as offline fallback if present
+        const existing = investment ? JSON.parse(investment.paramsJson) : null;
+        const fallback = existing?.annual_rate_bps ?? parseBps(rateText);
+        if (fallback) params.annual_rate_bps = fallback;
+      }
+      if (calculator === "crypto") {
+        const qty = parseQuantityE8(quantityText);
+        if (qty === null) throw new Error(es.investments.invalidQuantity);
+        params.symbol = symbol;
+        params.quantity_e8 = qty;
+      }
 
       const input: InvestmentInput = {
         name,
@@ -163,7 +201,15 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
         ? updateInvestment(investment.id, input)
         : createInvestment(calculator, input);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      if (calculator === "crypto") {
+        // pull the price for the new symbol right away, then refresh views
+        try {
+          await refreshMarketData();
+        } catch {
+          // offline: value falls back to what was paid until a price arrives
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["investments"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       onClose();
@@ -217,11 +263,11 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
                       </span>
                     )}
                   </span>
-                ) : (
+                ) : ["nu_cajita", "fixed_rate"].includes(item.id) ? (
                   <span className="text-xs text-zinc-500">
                     {es.investments.catalogNoRate}
                   </span>
-                )}
+                ) : null}
               </button>
             );
           })}
@@ -280,6 +326,11 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
             <DateInput value={startDate} onChange={setStartDate} />
           </Field>
         </div>
+        {calculator === "crypto" && (
+          <p className="-mt-2 text-xs text-zinc-500">
+            {es.investments.cryptoPrincipalHint}
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Field label={es.investments.currency}>
@@ -351,6 +402,38 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
               <span className="mt-1 block text-xs text-zinc-500">
                 {es.investments.isrHint}
               </span>
+            </Field>
+          </div>
+        )}
+
+        {calculator === "bonddia" && (
+          <p className="-mt-2 text-xs text-zinc-500">{es.investments.bonddiaHint}</p>
+        )}
+
+        {calculator === "crypto" && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={es.investments.cryptoSymbol}>
+              <select
+                className={inputClass}
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value)}
+              >
+                {COINS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={es.investments.cryptoQuantity}>
+              <input
+                className={inputClass}
+                value={quantityText}
+                onChange={(e) => setQuantityText(e.target.value)}
+                placeholder="0.05"
+                inputMode="decimal"
+                required
+              />
             </Field>
           </div>
         )}

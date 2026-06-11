@@ -48,6 +48,14 @@ export function DashboardPage() {
       color: w.color ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length],
     }));
 
+  const investmentsDonut = s.investments
+    .filter((inv) => inv.valueMxnCents > 0)
+    .map((inv, i) => ({
+      name: inv.name,
+      value: inv.valueMxnCents / 100,
+      color: FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+    }));
+
   const barData = s.monthly.map((m) => ({
     month: monthLabel(m.month),
     [es.dashboard.incomes]: m.incomeMxnCents / 100,
@@ -114,6 +122,38 @@ export function DashboardPage() {
                       stroke="none"
                     >
                       {donutData.map((d) => (
+                        <Cell key={d.name} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
+                      contentStyle={{
+                        backgroundColor: "#1f2330",
+                        border: "1px solid #2a2f3d",
+                        borderRadius: 8,
+                      }}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </section>
+            )}
+
+            {investmentsDonut.length > 0 && (
+              <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+                <h3 className="mb-2 font-medium">{es.dashboard.byInvestment}</h3>
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={investmentsDonut}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={60}
+                      outerRadius={95}
+                      paddingAngle={2}
+                      stroke="none"
+                    >
+                      {investmentsDonut.map((d) => (
                         <Cell key={d.name} fill={d.color} />
                       ))}
                     </Pie>

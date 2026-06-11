@@ -22,11 +22,8 @@ export const listWalletCategories = () =>
 
 export const getExchangeRates = () => invoke<ExchangeRate[]>("get_exchange_rates");
 
-export const setExchangeRate = (currencyCode: string, rateToMxnMicros: number) =>
-  invoke<void>("set_exchange_rate", { currencyCode, rateToMxnMicros });
-
-/** Pulls fresh rates from the provider; resolves to how many were stored. */
-export const fetchExchangeRates = () => invoke<number>("fetch_exchange_rates");
+/** Refresh market caches (Banxico rate history + crypto prices). */
+export const refreshMarketData = () => invoke<void>("refresh_market_data_cmd");
 
 export const addCurrency = (code: string, name: string, symbol: string) =>
   invoke<Currency>("add_currency", { code, name, symbol });
@@ -182,8 +179,3 @@ export interface BanxicoRate {
 export const fetchBanxicoRate = (kind: BanxicoSeriesKind) =>
   invoke<BanxicoRate>("fetch_banxico_rate", { kind });
 
-export const getSetting = (key: string) =>
-  invoke<string | null>("get_setting", { key });
-
-export const setSetting = (key: string, value: string) =>
-  invoke<void>("set_setting", { key, value });

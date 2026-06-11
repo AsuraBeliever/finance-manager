@@ -92,3 +92,15 @@ Todas las calculadoras excepto `manual` soportan movimientos posteriores al inic
 ## Proyecciones
 
 `get_investment_detail(id)` regresa valor actual, ganancia (valor − principal) y una serie `[{date, value_cents}]` con puntos semanales hasta el vencimiento (o +1 año si no hay vencimiento) para la gráfica de línea en Recharts.
+
+### `bonddia` — BONDDIA (cetesdirecto) con tasa histórica
+
+Params: `{"spread_bps": 0, "annual_rate_bps": 650}` (spread opcional sobre la tasa; annual_rate_bps solo como respaldo sin conexión).
+
+BONDDIA reinvierte diario a la tasa de fondeo vigente (≈ tasa objetivo de Banxico). Usar una sola tasa "actual" subvalúa depósitos antiguos (la tasa era ~11% en 2023-2024 vs ~6.5% en 2026), así que esta calculadora compone **día por día sobre la serie histórica** de la tasa objetivo, cacheada en la tabla `rate_history` (se refresca sola al arrancar). Cada aportación/retiro usa la tasa vigente de cada día desde su propia fecha (ACT/365).
+
+### `crypto` — Criptomonedas
+
+Params: `{"symbol": "BTC", "quantity_e8": 5000000}` (cantidad × 1e8, entero exacto; 0.05 BTC en el ejemplo).
+
+La inversión guarda la **cantidad** y se valúa en MXN con el último precio cacheado (`crypto_prices`, refrescado de CoinGecko al arrancar y al crear/editar). Los movimientos registran el MXN gastado/recibido en compras y ventas, así el rendimiento = valor actual − aportado neto; la cantidad se edita al comprar/vender. Sin historial de precios: proyecciones planas por diseño. Monedas soportadas: BTC, ETH, SOL, XRP, DOGE, ADA, USDT, USDC, BNB, LTC.

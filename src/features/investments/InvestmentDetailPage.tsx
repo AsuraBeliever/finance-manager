@@ -31,6 +31,7 @@ import {
   closeInvestment,
   deleteInvestment,
   deleteInvestmentMovement,
+  getExchangeRates,
   getInvestmentDetail,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
@@ -63,6 +64,8 @@ export function InvestmentDetailPage() {
     queryFn: () => getInvestmentDetail(invId),
     enabled: Number.isFinite(invId),
   });
+
+  const fxRates = useQuery({ queryKey: ["exchangeRates"], queryFn: getExchangeRates });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["investments"] });
@@ -131,6 +134,22 @@ export function InvestmentDetailPage() {
   }));
   const todayStr = today();
 
+  // crypto extras: quantity from params + USD equivalent via the USD fx rate
+  let cryptoParams: { symbol: string; quantity_e8: number } | null = null;
+  if (d.calculator === "crypto") {
+    try {
+      cryptoParams = JSON.parse(d.paramsJson);
+    } catch {
+      cryptoParams = null;
+    }
+  }
+  const usdRateMicros = fxRates.data?.find((r) => r.currencyCode === "USD")
+    ?.rateToMxnMicros;
+  const usdEquivalent =
+    cryptoParams && usdRateMicros && d.currencyCode === "MXN"
+      ? Math.round((d.currentValueCents * 1_000_000) / usdRateMicros)
+      : null;
+
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -165,6 +184,11 @@ export function InvestmentDetailPage() {
           <p className="mt-1 text-xl font-semibold tabular-nums">
             {formatCents(d.currentValueCents, d.currencyCode)}
           </p>
+          {usdEquivalent !== null && (
+            <p className="mt-0.5 text-xs tabular-nums text-zinc-500">
+              ≈ {formatCents(usdEquivalent, "USD")}
+            </p>
+          )}
         </div>
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
           <p className="text-xs text-zinc-500">{es.investments.gain}</p>
@@ -184,13 +208,25 @@ export function InvestmentDetailPage() {
           </p>
         </div>
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
-          <p className="text-xs text-zinc-500">
-            {d.maturityDate ? es.investments.maturity : es.investments.startDate}
-          </p>
-          <p className="mt-1 text-xl font-semibold">{d.maturityDate ?? d.startDate}</p>
+          {cryptoParams ? (
+            <>
+              <p className="text-xs text-zinc-500">{es.investments.quantity}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums">
+                {(cryptoParams.quantity_e8 / 1e8).toString()} {cryptoParams.symbol}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-zinc-500">
+                {d.maturityDate ? es.investments.maturity : es.investments.startDate}
+              </p>
+              <p className="mt-1 text-xl font-semibold">{d.maturityDate ?? d.startDate}</p>
+            </>
+          )}
         </div>
       </div>
 
+      {d.calculator !== "crypto" && (
       <section className="mb-4 rounded-xl border border-border-muted bg-surface-raised p-5">
         <h3 className="mb-2 font-medium">{es.investments.projection}</h3>
         <ResponsiveContainer width="100%" height={280}>
@@ -224,6 +260,7 @@ export function InvestmentDetailPage() {
           </LineChart>
         </ResponsiveContainer>
       </section>
+      )}
 
       {d.calculator !== "manual" && (
         <section className="mb-4 rounded-xl border border-border-muted bg-surface-raised p-5">

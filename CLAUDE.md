@@ -35,7 +35,7 @@ cargo fmt    --manifest-path src-tauri/Cargo.toml
 
 ## Estado actual
 
-- **v1.4.0**: catálogo de inversiones con tasas precargadas de Banxico. v1.3.x: borrar carteras, DateInput/ConfirmDialog propios (widgets nativos de WebKitGTK rotos/feos), tasas CETES/objetivo desde Banxico sin token (endpoint público de SieInternet; token SIE opcional como respaldo). Antes: v1.2.0 movimientos de inversión, v1.1.0 tipos de cambio automáticos, v1.0.0 base (M0–M6 en `docs/PLAN.md`).
+- **v1.5.0**: BONDDIA con serie histórica de tasas (rate_history), criptomonedas (CoinGecko), donut de inversiones en Resumen, Ajustes sin config manual, Field sin label (bug WebKitGTK). Antes — v1.4.x: catálogo de inversiones con tasas precargadas. v1.3.x: borrar carteras, DateInput/ConfirmDialog propios (widgets nativos de WebKitGTK rotos/feos), tasas CETES/objetivo desde Banxico sin token (endpoint público de SieInternet; token SIE opcional como respaldo). Antes: v1.2.0 movimientos de inversión, v1.1.0 tipos de cambio automáticos, v1.0.0 base (M0–M6 en `docs/PLAN.md`).
 - Targets de bundle: solo `deb` y `rpm` — AppImage se quitó porque `linuxdeploy` falla en Arch. El binario de release queda en `src-tauri/target/release/finanzas`.
 - Trabajo futuro: ver `docs/ROADMAP.md` (presupuestos, recurrentes, export/backup, tasas históricas de cajitas).
 

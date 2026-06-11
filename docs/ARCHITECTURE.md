@@ -44,7 +44,7 @@ Todos regresan `Result<T, AppError>`.
 | Transacciones | `add_income`, `add_expense`, `add_transfer`, `list_transactions` (filtros: wallet, kind, categoría, rango de fechas, paginado), `delete_transaction` (borra la pierna hermana de una transferencia), `list_transaction_categories`, `create_transaction_category` |
 | Dashboard | `get_dashboard_summary` (saldos por cartera, subtotales por moneda, total MXN, total inversiones, ingresos/gastos 6 meses) |
 | Inversiones | `list_investments`, `create_investment`, `update_investment`, `close_investment`, `get_investment_detail` (valor, ganancia, serie de proyección), `add_snapshot`, `list_calculators`, `get_investment_catalog` (async; catálogo con tasas vivas de Banxico) |
-| Ajustes | `list_currencies`, `add_currency`, `get_exchange_rates`, `set_exchange_rate`, `fetch_exchange_rates` (async; consulta open.er-api.com), `fetch_banxico_rate` (async; SIE con token del usuario), `get_setting`, `set_setting` |
+| Ajustes | `list_currencies`, `add_currency`, `get_exchange_rates`, `fetch_banxico_rate` (async), `refresh_market_data_cmd` (async; historial de tasa objetivo + precios cripto) |
 
 ## Estructura de carpetas
 

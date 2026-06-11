@@ -49,6 +49,8 @@ pub struct DashboardSummary {
     pub missing_rates: Vec<String>,
     /// Current value of open investments, converted to MXN.
     pub investments_total_mxn_cents: i64,
+    /// Per-investment values for the dashboard donut.
+    pub investments: Vec<crate::commands::investments::InvestmentSlice>,
 }
 
 /// Latest rate per currency in micros; MXN is always 1.0.
@@ -174,11 +176,12 @@ pub fn summarize(conn: &Connection) -> AppResult<DashboardSummary> {
     let mut monthly: Vec<MonthlyFlow> = monthly_map.into_values().collect();
     monthly.sort_by(|a, b| a.month.cmp(&b.month));
 
-    let investments_total_mxn_cents = crate::commands::investments::open_total_mxn(
+    let investments = crate::commands::investments::open_investments_mxn(
         conn,
         &rates,
         chrono::Local::now().date_naive(),
     )?;
+    let investments_total_mxn_cents = investments.iter().map(|s| s.value_mxn_cents).sum();
 
     Ok(DashboardSummary {
         total_mxn_cents,
@@ -187,6 +190,7 @@ pub fn summarize(conn: &Connection) -> AppResult<DashboardSummary> {
         monthly,
         missing_rates,
         investments_total_mxn_cents,
+        investments,
     })
 }
 

@@ -30,6 +30,7 @@ export const es = {
     netWorth: "Patrimonio total",
     byCurrency: "Por moneda",
     byWallet: "Por cartera",
+    byInvestment: "Por inversión",
     monthlyFlow: "Ingresos y gastos (6 meses)",
     incomes: "Ingresos",
     expenses: "Gastos",
@@ -100,6 +101,8 @@ export const es = {
     calculators: {
       nu_cajita: "Nu cajita (interés diario)",
       cetes: "CETES",
+      bonddia: "BONDDIA (tasa histórica de Banxico)",
+      crypto: "Criptomoneda",
       fixed_rate: "Tasa fija personalizada",
       manual: "Valor manual",
     } as Record<string, string>,
@@ -139,6 +142,14 @@ export const es = {
     movementDate: "Fecha",
     movementDeleteConfirm: "¿Eliminar este movimiento?",
     movementDeleteTitle: "Eliminar movimiento",
+    cryptoSymbol: "Criptomoneda",
+    cryptoQuantity: "Cantidad",
+    cryptoPrincipalHint: "Lo que has gastado en comprarla (MXN), para calcular tu rendimiento.",
+    bonddiaHint:
+      "El valor se calcula componiendo día a día la tasa objetivo histórica de Banxico (se actualiza sola).",
+    quantity: "Cantidad",
+    price: "Precio actual",
+    invalidQuantity: "Cantidad inválida",
     deleteConfirmTitle: "Eliminar inversión",
     banxicoCetes: "Usar la tasa de la última subasta de Banxico",
     banxicoObjetivo: "Usar la tasa objetivo de Banxico (referencia BONDDIA)",
@@ -168,11 +179,15 @@ export const es = {
       bonddia: {
         name: "BONDDIA",
         description:
-          "Fondo diario de cetesdirecto; referencia: tasa objetivo de Banxico",
+          "Fondo diario de cetesdirecto; se calcula con la tasa histórica de Banxico día por día",
       },
       nu_cajita: {
         name: "Nu Cajita",
         description: "Rendimiento diario de Nu; la tasa te la muestra su app",
+      },
+      crypto: {
+        name: "Criptomoneda",
+        description: "BTC, ETH y más; precio en vivo y equivalente en MXN/USD",
       },
       fixed_rate: {
         name: "Tasa fija personalizada",
@@ -199,29 +214,8 @@ export const es = {
   settings: {
     title: "Ajustes",
     currencies: "Monedas",
+    currenciesHint:
+      "Los tipos de cambio se obtienen y actualizan solos al usar cualquier moneda distinta de MXN.",
     walletCategories: "Categorías de cartera",
-    exchangeRates: "Tipos de cambio",
-    exchangeRatesHint:
-      "Se actualizan solos al abrir la app (1 unidad de cada moneda en MXN). También puedes corregirlos a mano.",
-    refreshRates: "Actualizar ahora",
-    refreshing: "Actualizando…",
-    refreshError: "No se pudo actualizar (¿sin internet?). Se usa la última tasa guardada.",
-    sourceApi: "automático",
-    sourceManual: "manual",
-    lastUpdate: "Última actualización",
-    rateUpdated: "Actualizado",
-    noRateYet: "Sin configurar",
-    addCurrency: "Agregar moneda",
-    banxico: "Banxico (tasas de CETES y BONDDIA)",
-    banxicoHint:
-      "Las tasas de CETES y la tasa objetivo se obtienen automáticamente del sitio público de Banxico — no necesitas configurar nada. El token es solo un respaldo opcional por si esa fuente fallara.",
-    banxicoToken: "Token de la API SIE (opcional)",
-    banxicoTokenPlaceholder: "Opcional: token de respaldo…",
-    banxicoGetToken: "Obtener token gratuito (solo si lo necesitas)",
-    banxicoSaved: "Guardado",
-    currencyCode: "Código (ISO)",
-    currencyName: "Nombre",
-    currencySymbol: "Símbolo",
-    invalidRate: "Tipo de cambio inválido",
   },
 } as const;

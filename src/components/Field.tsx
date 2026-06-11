@@ -5,13 +5,16 @@ interface FieldProps {
   children: ReactNode;
 }
 
-/** Form row: label above control, consistent spacing. */
+/** Form row: label above control, consistent spacing.
+ *  Deliberately NOT a <label>: WebKitGTK re-dispatches clicks on a label's
+ *  content to its first labelable descendant, which broke composite controls
+ *  like DateInput (clicking the month title re-toggled the popover). */
 export function Field({ label, children }: FieldProps) {
   return (
-    <label className="block">
+    <div>
       <span className="mb-1 block text-sm text-zinc-400">{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 

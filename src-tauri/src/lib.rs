@@ -19,13 +19,17 @@ pub fn run() {
                 .map_err(|e| format!("failed to open database: {e}"))?;
             app.manage(db::Db(Mutex::new(conn)));
 
-            // Refresh exchange rates in the background on startup; skipped when
-            // recent API rates exist, silent on failure (offline keeps last rates).
+            // Refresh market data in the background on startup, silent on
+            // failure (offline keeps the last cached values): fx rates,
+            // Banxico target-rate history (bonddia) and crypto prices.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let db = handle.state::<db::Db>();
                 if let Err(e) = commands::settings::fetch_and_store_rates(&db, false).await {
                     eprintln!("exchange rate auto-update failed: {e}");
+                }
+                if let Err(e) = commands::settings::refresh_market_data(&db).await {
+                    eprintln!("market data auto-update failed: {e}");
                 }
             });
             Ok(())
@@ -38,6 +42,7 @@ pub fn run() {
             commands::settings::fetch_exchange_rates,
             commands::settings::add_currency,
             commands::settings::fetch_banxico_rate,
+            commands::settings::refresh_market_data_cmd,
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::wallets::list_wallets,

@@ -57,3 +57,19 @@ El usuario no quería ni siquiera pegar un token. Se descubrió que el endpoint 
 ## 2026-06-10 — Catálogo de inversiones con tasas precargadas
 
 Al crear una inversión, el primer paso es un catálogo de productos conocidos (CETES 28/91/182/364, BONDDIA, Nu Cajita, tasa fija, manual) con la tasa actual ya puesta cuando existe fuente pública (Banxico vía el endpoint sin token). Elegir un producto precarga calculadora, plazo, tasa y demás parámetros. Nu Cajita va sin tasa automática: nu.com.mx es una SPA que carga la tasa por JS y Nu no publica API — el usuario la captura de la app de Nu. El catálogo degrada con gracia: si Banxico no responde, los productos aparecen sin tasa y se captura a mano. Los nombres/descripciones viven en el i18n del frontend; el backend solo regresa ids, params y tasas.
+
+## 2026-06-10 — BONDDIA con serie histórica de tasas (corrige subvaluación)
+
+El usuario comparó contra cetesdirecto: la app decía $6,564.73 y su cuenta real $6,824.75. Causa: valuar todo el historial con la tasa actual (6.5%) cuando sus depósitos de 2023-2025 rindieron a tasas de 10-11%. La calculadora `bonddia` compone día a día sobre la serie histórica de la tasa objetivo (cacheada en `rate_history` desde el endpoint público de Banxico, que regresa la serie completa). `fixed_rate` queda para instrumentos de tasa realmente fija.
+
+## 2026-06-10 — Criptomonedas como inversión por cantidad + precio CoinGecko
+
+Las cripto no caben en el modelo de centavos de las carteras (BTC necesita 8 decimales). Se modelan como inversión: params guardan `symbol` y `quantity_e8` (entero exacto), el valor sale del último precio en MXN cacheado de CoinGecko (API gratuita sin llave, `simple/price`), y los movimientos registran el MXN de compras/ventas para el rendimiento. Se muestra también el equivalente en USD vía el tipo de cambio ya automático.
+
+## 2026-06-10 — Ajustes sin configuración manual de mercado
+
+Se eliminaron la edición manual de tipos de cambio y el token de Banxico de Ajustes: todo dato de mercado (fx, tasas, precios cripto) se obtiene y refresca solo. Menos superficie de UI, cero configuración.
+
+## 2026-06-10 — Field sin <label> (bug de WebKitGTK)
+
+Clic en "elegir mes y año" del calendario no hacía nada en la app (en Chromium sí funcionaba). WebKitGTK re-despacha clics dentro de un <label> a su primer descendiente etiquetable — el botón que abre/cierra el popover — anulando el cambio de vista. `Field` ahora envuelve en <div>+<span>; regla: no anidar controles compuestos en labels implícitos.

@@ -111,25 +111,38 @@ fn validate_input(
     Ok(())
 }
 
-/// Total current value of open investments converted to MXN with the given
-/// rate lookup. Used by the dashboard.
-pub fn open_total_mxn(
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvestmentSlice {
+    pub id: i64,
+    pub name: String,
+    pub value_mxn_cents: i64,
+}
+
+/// Current value of every open investment converted to MXN with the given
+/// rate lookup. Used by the dashboard (total + donut slices).
+pub fn open_investments_mxn(
     conn: &Connection,
     rates: &std::collections::HashMap<String, i64>,
     as_of: NaiveDate,
-) -> AppResult<i64> {
+) -> AppResult<Vec<InvestmentSlice>> {
     let mut stmt = conn.prepare(&format!("{INVESTMENT_SELECT} WHERE is_closed = 0"))?;
     let invs = stmt
         .query_map([], investment_from_row)?
         .collect::<Result<Vec<_>, _>>()?;
-    let mut total: i64 = 0;
+    let mut slices = Vec::new();
     for inv in invs {
         let value = find(&inv.calculator)?.value_at(&inv, conn, as_of)?;
         if let Some(rate) = rates.get(&inv.currency_code) {
-            total += ((value as i128 * *rate as i128) / 1_000_000i128) as i64;
+            slices.push(InvestmentSlice {
+                id: inv.id,
+                name: inv.name,
+                value_mxn_cents: ((value as i128 * *rate as i128) / 1_000_000i128) as i64,
+            });
         }
     }
-    Ok(total)
+    slices.sort_by_key(|s| std::cmp::Reverse(s.value_mxn_cents));
+    Ok(slices)
 }
 
 // ---- investment catalog ----
@@ -172,13 +185,11 @@ const CATALOG: &[(&str, &str, Option<&str>, &str)] = &[
         Some("cetes_364"),
         r#"{"plazo_days":364,"isr_rate_bps":0,"reinvest":false}"#,
     ),
-    (
-        "bonddia",
-        "fixed_rate",
-        Some("objetivo"),
-        r#"{"compounding":"daily"}"#,
-    ),
+    // bonddia compounds over the cached historical target-rate series; the
+    // live rate merged here is only the offline fallback + catalog badge.
+    ("bonddia", "bonddia", Some("objetivo"), "{}"),
     ("nu_cajita", "nu_cajita", None, "{}"),
+    ("crypto", "crypto", None, "{}"),
     (
         "fixed_rate",
         "fixed_rate",

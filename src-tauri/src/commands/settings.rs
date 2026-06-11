@@ -291,21 +291,19 @@ mod tests {
 // semanal de CETES a 28/91/182/364 días; SF61745 = tasa objetivo de Banxico
 // (referencia para BONDDIA, que sigue la tasa de fondeo gubernamental).
 //
-// Primary source needs NO token: SieInternet's own chart endpoint
+// Source needs NO token: SieInternet's own chart endpoint
 // (consultaSerieGrafica.do) returns {titulo, valores: [[date, value]]} with
 // -989898.0 as the missing-value sentinel. The series id must be paired with
 // the cuadro context it appears in (e.g. "SF43936,CF107,5").
-// Fallback: official SIE API with the user's free token (settings key
-// 'banxico_token'), in case the public endpoint changes.
 
-/// (SIE API series id, SieInternet chart context)
-fn banxico_series(kind: &str) -> AppResult<(&'static str, &'static str)> {
+/// SieInternet chart context per series kind.
+fn banxico_series(kind: &str) -> AppResult<&'static str> {
     Ok(match kind {
-        "cetes_28" => ("SF43936", "SF43936,CF107,5"),
-        "cetes_91" => ("SF43939", "SF43939,CF107,9"),
-        "cetes_182" => ("SF43942", "SF43942,CF107,13"),
-        "cetes_364" => ("SF43945", "SF43945,CF107,17"),
-        "objetivo" => ("SF61745", "SF61745,CF101,2"),
+        "cetes_28" => "SF43936,CF107,5",
+        "cetes_91" => "SF43939,CF107,9",
+        "cetes_182" => "SF43942,CF107,13",
+        "cetes_364" => "SF43945,CF107,17",
+        "objetivo" => "SF61745,CF101,2",
         other => {
             return Err(AppError::InvalidInput(format!(
                 "serie desconocida: {other} (válidas: cetes_28/91/182/364, objetivo)"
@@ -323,30 +321,35 @@ pub struct BanxicoRate {
     pub date: String,
 }
 
-/// Parse SIE "oportuno" payload: bmx.series[0].datos[last] = {fecha, dato}.
-/// Pure function for offline tests.
-fn parse_banxico_body(body: &serde_json::Value) -> AppResult<BanxicoRate> {
-    let dato = body
-        .pointer("/bmx/series/0/datos")
-        .and_then(|d| d.as_array())
-        .and_then(|d| d.last())
-        .ok_or_else(|| AppError::Internal("Banxico no regresó datos para la serie".into()))?;
-    let rate: f64 = dato
-        .get("dato")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.replace(',', "").parse().ok())
-        .ok_or_else(|| {
-            AppError::Internal("dato de tasa inválido en la respuesta de Banxico".into())
-        })?;
-    let date = dato
-        .get("fecha")
-        .and_then(|v| v.as_str())
-        .unwrap_or_default()
-        .to_string();
-    Ok(BanxicoRate {
-        rate_bps: (rate * 100.0).round() as i64,
-        date,
-    })
+/// All (date, rate_bps) points of a SieInternet chart payload, sentinel rows
+/// skipped, in chronological order. Used to cache full rate histories.
+pub(crate) fn parse_sie_internet_history(body: &serde_json::Value) -> Vec<(String, i64)> {
+    body.get("valores")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|pair| {
+            let date = pair.get(0)?.as_str()?;
+            let value = pair.get(1)?.as_f64()?;
+            (value != SIE_SENTINEL && value > 0.0)
+                .then(|| (date.to_string(), (value * 100.0).round() as i64))
+        })
+        .collect()
+}
+
+/// Fetch the full history of a Banxico series (tokenless).
+pub(crate) async fn fetch_series_history(kind: &str) -> AppResult<Vec<(String, i64)>> {
+    let chart_context = banxico_series(kind)?;
+    let url = format!(
+        "https://www.banxico.org.mx/SieInternet/consultaSerieGrafica.do?s={chart_context}&versionSerie=LA-MAS-RECIENTE&l=es"
+    );
+    let history = parse_sie_internet_history(&get_json(&url).await?);
+    if history.is_empty() {
+        return Err(AppError::Internal(
+            "Banxico no regresó datos para la serie".into(),
+        ));
+    }
+    Ok(history)
 }
 
 /// Parse SieInternet chart payload: {valores: [[iso_date, value]]} where
@@ -384,7 +387,7 @@ async fn get_json(url: &str) -> AppResult<serde_json::Value> {
 
 /// Tokenless fetch from the public SieInternet chart endpoint.
 pub(crate) async fn fetch_rate_tokenless(kind: &str) -> AppResult<BanxicoRate> {
-    let (_series, chart_context) = banxico_series(kind)?;
+    let chart_context = banxico_series(kind)?;
     let url = format!(
         "https://www.banxico.org.mx/SieInternet/consultaSerieGrafica.do?s={chart_context}&versionSerie=LA-MAS-RECIENTE&l=es"
     );
@@ -392,34 +395,8 @@ pub(crate) async fn fetch_rate_tokenless(kind: &str) -> AppResult<BanxicoRate> {
 }
 
 #[tauri::command]
-pub async fn fetch_banxico_rate(db: State<'_, Db>, kind: String) -> AppResult<BanxicoRate> {
-    let (series, _) = banxico_series(&kind)?;
-
-    // Tokenless public endpoint first.
-    let primary_err = match fetch_rate_tokenless(&kind).await {
-        Ok(rate) => return Ok(rate),
-        Err(e) => e,
-    };
-
-    // Fallback: official SIE API if the user configured a token.
-    let token = {
-        let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-        conn.query_row(
-            "SELECT value FROM settings WHERE key = 'banxico_token'",
-            [],
-            |r| r.get::<_, String>(0),
-        )
-        .ok()
-        .filter(|t| !t.trim().is_empty())
-    };
-    let Some(token) = token else {
-        return Err(primary_err);
-    };
-    let url = format!(
-        "https://www.banxico.org.mx/SieAPIRest/service/v1/series/{series}/datos/oportuno?token={}",
-        token.trim()
-    );
-    parse_banxico_body(&get_json(&url).await?)
+pub async fn fetch_banxico_rate(kind: String) -> AppResult<BanxicoRate> {
+    fetch_rate_tokenless(&kind).await
 }
 
 #[tauri::command]
@@ -453,26 +430,21 @@ mod banxico_tests {
     use super::*;
 
     #[test]
-    fn parses_sie_oportuno_payload() {
-        let body: serde_json::Value = serde_json::from_str(
-            r#"{"bmx":{"series":[{"idSerie":"SF43939","titulo":"Cetes 91 días",
-                "datos":[{"fecha":"05/06/2026","dato":"7.89"}]}]}}"#,
-        )
-        .unwrap();
-        let rate = parse_banxico_body(&body).unwrap();
-        assert_eq!(rate.rate_bps, 789);
-        assert_eq!(rate.date, "05/06/2026");
+    fn rejects_unknown_series() {
+        assert!(banxico_series("cetes_90").is_err());
     }
 
     #[test]
-    fn rejects_empty_or_malformed_payload() {
-        let body: serde_json::Value =
-            serde_json::from_str(r#"{"bmx":{"series":[{"datos":[]}]}}"#).unwrap();
-        assert!(parse_banxico_body(&body).is_err());
-        let body: serde_json::Value =
-            serde_json::from_str(r#"{"error":"token inválido"}"#).unwrap();
-        assert!(parse_banxico_body(&body).is_err());
-        assert!(banxico_series("cetes_90").is_err());
+    fn parses_full_history() {
+        let body: serde_json::Value = serde_json::from_str(
+            r#"{"valores":[["2023-01-01",11.25],["2024-06-01",-989898.0],["2025-06-01",8.50]]}"#,
+        )
+        .unwrap();
+        let h = parse_sie_internet_history(&body);
+        assert_eq!(
+            h,
+            vec![("2023-01-01".into(), 1125), ("2025-06-01".into(), 850)]
+        );
     }
 
     #[test]
@@ -497,4 +469,80 @@ mod banxico_tests {
         let body: serde_json::Value = serde_json::from_str(r#"{}"#).unwrap();
         assert!(parse_sie_internet_body(&body).is_err());
     }
+}
+
+// ---- market data cache (rate history + crypto prices) ----
+
+/// Upsert the full 'objetivo' history used by the bonddia calculator, and
+/// refresh prices for every crypto symbol held in investments. Silent-fail
+/// friendly: callers decide whether errors matter.
+pub async fn refresh_market_data(db: &Db) -> AppResult<()> {
+    // 1) Banxico target-rate history.
+    let history = fetch_series_history("objetivo").await?;
+    {
+        let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        for (date, rate_bps) in &history {
+            conn.execute(
+                "INSERT INTO rate_history (series, date, rate_bps) VALUES ('objetivo', ?1, ?2)
+                 ON CONFLICT(series, date) DO UPDATE SET rate_bps = excluded.rate_bps",
+                rusqlite::params![date, rate_bps],
+            )?;
+        }
+    }
+
+    // 2) Crypto prices for held symbols.
+    let symbols: Vec<String> = {
+        let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT json_extract(params_json, '$.symbol') FROM investments
+             WHERE calculator = 'crypto' AND json_extract(params_json, '$.symbol') IS NOT NULL",
+        )?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+    if symbols.is_empty() {
+        return Ok(());
+    }
+    let ids: Vec<&str> = symbols
+        .iter()
+        .filter_map(|s| crate::investments::crypto::coingecko_id(s))
+        .collect();
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let url = format!(
+        "https://api.coingecko.com/api/v3/simple/price?ids={}&vs_currencies=mxn,usd",
+        ids.join(",")
+    );
+    let body = get_json(&url).await?;
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    for symbol in &symbols {
+        let Some(id) = crate::investments::crypto::coingecko_id(symbol) else {
+            continue;
+        };
+        let Some(mxn) = body.pointer(&format!("/{id}/mxn")).and_then(|v| v.as_f64()) else {
+            continue;
+        };
+        let usd = body.pointer(&format!("/{id}/usd")).and_then(|v| v.as_f64());
+        conn.execute(
+            "INSERT INTO crypto_prices (symbol, price_mxn_cents, price_usd_cents, as_of)
+             VALUES (?1, ?2, ?3, datetime('now'))
+             ON CONFLICT(symbol) DO UPDATE SET price_mxn_cents = excluded.price_mxn_cents,
+               price_usd_cents = excluded.price_usd_cents, as_of = excluded.as_of",
+            rusqlite::params![
+                symbol,
+                (mxn * 100.0).round() as i64,
+                usd.map(|u| (u * 100.0).round() as i64)
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+/// On-demand refresh (e.g. right after creating a crypto investment).
+#[tauri::command]
+pub async fn refresh_market_data_cmd(db: State<'_, Db>) -> AppResult<()> {
+    refresh_market_data(&db).await
 }

@@ -1,4 +1,6 @@
+pub mod bonddia;
 pub mod cetes;
+pub mod crypto;
 pub mod fixed_rate;
 pub mod manual;
 pub mod nu_cajita;
@@ -26,6 +28,8 @@ pub fn registry() -> &'static [&'static dyn InvestmentCalculator] {
     static CALCULATORS: &[&dyn InvestmentCalculator] = &[
         &nu_cajita::NuCajita,
         &cetes::Cetes,
+        &bonddia::Bonddia,
+        &crypto::Crypto,
         &fixed_rate::FixedRate,
         &manual::Manual,
     ];

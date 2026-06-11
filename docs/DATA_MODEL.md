@@ -144,3 +144,17 @@ WHERE w.id = ?1;
 - Una transferencia lógica = **2 filas** (`transfer_out` en origen, `transfer_in` en destino) con el mismo `transfer_group_id` (UUIDv4), insertadas dentro de una sola transacción SQL (`BEGIN`/`COMMIT`).
 - Cross-currency: cada pierna lleva `amount_cents` en la moneda de su propia cartera; el usuario captura ambos montos.
 - Borrar cualquiera de las piernas borra ambas (se busca por `transfer_group_id`).
+
+## Migración 4: cachés de mercado
+
+```sql
+CREATE TABLE rate_history (      -- serie histórica de Banxico (hoy: 'objetivo' para bonddia)
+  series TEXT NOT NULL, date TEXT NOT NULL, rate_bps INTEGER NOT NULL,
+  PRIMARY KEY (series, date)
+);
+CREATE TABLE crypto_prices (     -- último precio por símbolo (CoinGecko)
+  symbol TEXT PRIMARY KEY, price_mxn_cents INTEGER NOT NULL,
+  price_usd_cents INTEGER, as_of TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+Ambas se refrescan automáticamente al arrancar (task async en setup) y bajo demanda con `refresh_market_data_cmd`.
