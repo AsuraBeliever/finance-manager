@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { deleteTransaction } from "../../lib/api";
 import { formatCents } from "../../lib/money";
 import type { Transaction } from "../../lib/types";
@@ -28,6 +30,7 @@ export function TransactionList({
   showWallet = true,
 }: TransactionListProps) {
   const queryClient = useQueryClient();
+  const [toDelete, setToDelete] = useState<number | null>(null);
   const remove = useMutation({
     mutationFn: deleteTransaction,
     onSuccess: () => {
@@ -38,6 +41,7 @@ export function TransactionList({
   });
 
   return (
+    <>
     <ul className="divide-y divide-border-muted rounded-xl border border-border-muted bg-surface-raised">
       {transactions.map((t) => {
         const meta = kindMeta[t.kind];
@@ -73,9 +77,7 @@ export function TransactionList({
               {formatCents(t.amountCents, currency)}
             </span>
             <button
-              onClick={() => {
-                if (window.confirm(es.transactions.deleteConfirm)) remove.mutate(t.id);
-              }}
+              onClick={() => setToDelete(t.id)}
               aria-label={es.common.delete}
               className="rounded-md p-1.5 text-zinc-600 opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
             >
@@ -85,5 +87,15 @@ export function TransactionList({
         );
       })}
     </ul>
+    <ConfirmDialog
+      open={toDelete !== null}
+      title={es.transactions.deleteConfirmTitle}
+      message={es.transactions.deleteConfirm}
+      onConfirm={() => {
+        if (toDelete !== null) remove.mutate(toDelete);
+      }}
+      onClose={() => setToDelete(null)}
+    />
+    </>
   );
 }

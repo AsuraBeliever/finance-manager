@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/Button";
+import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
 import { Modal } from "../../components/Modal";
 import {
@@ -192,13 +193,7 @@ export function TransactionFormModal({
             />
           </Field>
           <Field label={es.transactions.date}>
-            <input
-              type="date"
-              className={inputClass}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
+            <DateInput value={date} onChange={setDate} />
           </Field>
         </div>
 

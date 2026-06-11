@@ -21,6 +21,8 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "../../components/Button";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
 import { Modal } from "../../components/Modal";
 import {
@@ -53,6 +55,8 @@ export function InvestmentDetailPage() {
   const [movementValue, setMovementValue] = useState("");
   const [movementDate, setMovementDate] = useState(today());
   const [movementError, setMovementError] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [movementToDelete, setMovementToDelete] = useState<number | null>(null);
 
   const detail = useQuery({
     queryKey: ["investments", invId],
@@ -147,12 +151,7 @@ export function InvestmentDetailPage() {
               {d.isClosed ? es.investments.reopen : es.investments.close}
             </span>
           </Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              if (window.confirm(es.investments.deleteConfirm)) remove.mutate();
-            }}
-          >
+          <Button variant="danger" onClick={() => setConfirmDeleteOpen(true)}>
             <span className="flex items-center gap-2">
               <Trash2 size={15} /> {es.common.delete}
             </span>
@@ -275,10 +274,7 @@ export function InvestmentDetailPage() {
                     {formatCents(m.amountCents, d.currencyCode)}
                   </span>
                   <button
-                    onClick={() => {
-                      if (window.confirm(es.investments.movementDeleteConfirm))
-                        removeMovement.mutate(m.id);
-                    }}
+                    onClick={() => setMovementToDelete(m.id)}
                     aria-label={es.common.delete}
                     className="rounded-md p-1 text-zinc-600 opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
                   >
@@ -345,14 +341,7 @@ export function InvestmentDetailPage() {
             />
           </Field>
           <Field label={es.investments.movementDate}>
-            <input
-              type="date"
-              className={inputClass}
-              value={movementDate}
-              onChange={(e) => setMovementDate(e.target.value)}
-              min={d.startDate}
-              required
-            />
+            <DateInput value={movementDate} onChange={setMovementDate} min={d.startDate} />
           </Field>
           {movementError && <p className="text-sm text-danger">{movementError}</p>}
           <div className="flex justify-end gap-2">
@@ -391,13 +380,7 @@ export function InvestmentDetailPage() {
             />
           </Field>
           <Field label={es.investments.snapshotDate}>
-            <input
-              type="date"
-              className={inputClass}
-              value={snapshotDate}
-              onChange={(e) => setSnapshotDate(e.target.value)}
-              required
-            />
+            <DateInput value={snapshotDate} onChange={setSnapshotDate} />
           </Field>
           {snapshotError && <p className="text-sm text-danger">{snapshotError}</p>}
           <div className="flex justify-end gap-2">
@@ -410,6 +393,23 @@ export function InvestmentDetailPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title={es.investments.deleteConfirmTitle}
+        message={es.investments.deleteConfirm}
+        onConfirm={() => remove.mutate()}
+        onClose={() => setConfirmDeleteOpen(false)}
+      />
+      <ConfirmDialog
+        open={movementToDelete !== null}
+        title={es.investments.movementDeleteTitle}
+        message={es.investments.movementDeleteConfirm}
+        onConfirm={() => {
+          if (movementToDelete !== null) removeMovement.mutate(movementToDelete);
+        }}
+        onClose={() => setMovementToDelete(null)}
+      />
     </>
   );
 }

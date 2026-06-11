@@ -1,11 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, ArrowLeftRight, Pencil, Plus } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowLeftRight,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
-import { archiveWallet, getWallet, listTransactions } from "../../lib/api";
+import { archiveWallet, deleteWallet, getWallet, listTransactions } from "../../lib/api";
 import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
 import { TransactionFormModal } from "../transactions/TransactionFormModal";
@@ -19,6 +27,7 @@ export function WalletDetailPage() {
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [txFormOpen, setTxFormOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const wallet = useQuery({
     queryKey: ["wallets", walletId],
@@ -48,6 +57,16 @@ export function WalletDetailPage() {
     },
   });
 
+  const remove = useMutation({
+    mutationFn: () => deleteWallet(walletId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wallets"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      navigate("/carteras");
+    },
+  });
+
   if (wallet.isPending) return <p className="text-sm text-zinc-500">{es.common.loading}</p>;
   if (wallet.isError) return <p className="text-sm text-danger">{String(wallet.error)}</p>;
 
@@ -72,6 +91,11 @@ export function WalletDetailPage() {
               <span className="flex items-center gap-2">
                 {w.isArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}
                 {w.isArchived ? es.wallets.unarchive : es.wallets.archive}
+              </span>
+            </Button>
+            <Button variant="danger" onClick={() => setConfirmDeleteOpen(true)}>
+              <span className="flex items-center gap-2">
+                <Trash2 size={15} /> {es.common.delete}
               </span>
             </Button>
           </div>
@@ -128,6 +152,13 @@ export function WalletDetailPage() {
         open={txFormOpen}
         onClose={() => setTxFormOpen(false)}
         defaultWalletId={walletId}
+      />
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title={es.wallets.deleteConfirmTitle}
+        message={es.wallets.deleteConfirmMessage}
+        onConfirm={() => remove.mutate()}
+        onClose={() => setConfirmDeleteOpen(false)}
       />
     </>
   );

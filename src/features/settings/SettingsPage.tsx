@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "../../components/PageHeader";
 import { listCurrencies, listWalletCategories } from "../../lib/api";
 import { es } from "../../i18n/es";
+import { BanxicoSection } from "./BanxicoSection";
 import { ExchangeRatesSection } from "./ExchangeRatesSection";
 
 export function SettingsPage() {
@@ -16,6 +17,7 @@ export function SettingsPage() {
       <PageHeader title={es.settings.title} />
       <div className="grid max-w-3xl gap-6">
         <ExchangeRatesSection />
+        <BanxicoSection />
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-3 font-medium">{es.settings.currencies}</h3>
           {currencies.isPending && (
