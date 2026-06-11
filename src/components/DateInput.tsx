@@ -14,6 +14,8 @@ import { inputClass } from "./Field";
 import { es } from "../i18n/es";
 
 const WEEKDAYS = ["L", "M", "M", "J", "V", "S", "D"];
+const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const YEAR_FROM = 1970;
 
 interface DateInputProps {
   /** ISO date 'YYYY-MM-DD' */
@@ -28,6 +30,7 @@ interface DateInputProps {
  *  are picked with our own popover instead. */
 export function DateInput({ value, onChange, min }: DateInputProps) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"days" | "months">("days");
   const selected = value ? parseISO(value) : new Date();
   const [view, setView] = useState(startOfMonth(selected));
   const rootRef = useRef<HTMLDivElement>(null);
@@ -70,6 +73,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
         className={`${inputClass} flex items-center justify-between gap-2 text-left`}
         onClick={() => {
           setView(startOfMonth(value ? parseISO(value) : new Date()));
+          setMode("days");
           setOpen((o) => !o);
         }}
       >
@@ -83,6 +87,78 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
 
       {open && (
         <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-muted bg-surface-overlay p-3 shadow-2xl">
+          {mode === "months" ? (
+            <>
+              <div className="mb-3 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setView((v) => addMonths(v, -12))}
+                  className="rounded-md p-1.5 text-zinc-400 hover:bg-surface-raised hover:text-zinc-200"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <select
+                  className="rounded-lg border border-border-muted bg-surface py-1 pl-2 text-sm font-medium text-zinc-100 outline-none"
+                  value={view.getFullYear()}
+                  onChange={(e) =>
+                    setView(new Date(Number(e.target.value), view.getMonth(), 1))
+                  }
+                >
+                  {Array.from(
+                    { length: new Date().getFullYear() + 2 - YEAR_FROM },
+                    (_, i) => YEAR_FROM + i,
+                  )
+                    .reverse()
+                    .map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setView((v) => addMonths(v, 12))}
+                  className="rounded-md p-1.5 text-zinc-400 hover:bg-surface-raised hover:text-zinc-200"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {MONTHS.map((m, i) => {
+                  const isCurrent =
+                    i === view.getMonth() &&
+                    view.getFullYear() === (value ? parseISO(value) : new Date()).getFullYear();
+                  // a month is selectable if its last day is not before min
+                  const lastDay = format(
+                    endOfMonth(new Date(view.getFullYear(), i, 1)),
+                    "yyyy-MM-dd",
+                  );
+                  const disabled = min !== undefined && lastDay < min;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => {
+                        setView(new Date(view.getFullYear(), i, 1));
+                        setMode("days");
+                      }}
+                      className={`rounded-lg py-2 text-sm capitalize transition-colors ${
+                        disabled
+                          ? "cursor-not-allowed text-zinc-700"
+                          : isCurrent
+                            ? "bg-accent-dim/15 font-semibold text-accent hover:bg-surface-raised"
+                            : "text-zinc-300 hover:bg-surface-raised"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+          <>
           <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
@@ -91,9 +167,14 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="text-sm font-medium capitalize">
-              {format(view, "MMMM yyyy", { locale: esLocale })}
-            </span>
+            <button
+              type="button"
+              onClick={() => setMode("months")}
+              className="rounded-lg px-2 py-1 text-sm font-medium capitalize hover:bg-surface-raised"
+              title={es.common.pickMonthYear}
+            >
+              {format(view, "MMMM yyyy", { locale: esLocale })} ▾
+            </button>
             <button
               type="button"
               onClick={() => setView((v) => addMonths(v, 1))}
@@ -154,6 +235,8 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
           >
             {es.common.today} · {getDate(new Date())} {format(new Date(), "MMM", { locale: esLocale })}
           </button>
+          </>
+          )}
         </div>
       )}
     </div>

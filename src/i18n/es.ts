@@ -23,6 +23,7 @@ export const es = {
     empty: "No hay datos todavía",
     today: "Hoy",
     pickDate: "Elige una fecha",
+    pickMonthYear: "Elegir mes y año",
   },
   dashboard: {
     title: "Resumen",
