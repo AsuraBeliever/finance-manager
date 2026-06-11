@@ -230,7 +230,9 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
       onClose={onClose}
     >
       {step === "catalog" && !investment ? (
-        <div className="grid gap-2">
+        // minmax(0,1fr): otherwise WebKitGTK sizes the track to the widest
+        // nowrap description and every row overflows the modal
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
           {catalog.isPending && (
             <p className="py-4 text-center text-sm text-zinc-500">
               {es.investments.catalogLoading}
@@ -244,7 +246,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
                 key={item.id}
                 type="button"
                 onClick={() => pickCatalogItem(item)}
-                className="flex items-center gap-3 rounded-xl border border-border-muted bg-surface px-4 py-3 text-left transition-colors hover:border-accent-dim/60"
+                className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-border-muted bg-surface px-4 py-3 text-left transition-colors hover:border-accent-dim/60"
               >
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium">{label.name}</span>
@@ -253,7 +255,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
                   </span>
                 </span>
                 {item.rateBps !== null ? (
-                  <span className="text-right">
+                  <span className="shrink-0 text-right">
                     <span className="block font-semibold tabular-nums text-accent">
                       {formatBps(item.rateBps)}
                     </span>

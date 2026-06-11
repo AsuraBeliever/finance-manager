@@ -5,9 +5,11 @@
 //! compounds day by day over the CACHED HISTORICAL series ('objetivo' in
 //! rate_history, refreshed from Banxico on startup).
 //!
-//! params: {"spread_bps": 0, "annual_rate_bps": 650}
+//! params: {"spread_bps": 53.06, "annual_rate_bps": 650}
 //! - spread_bps: optional adjustment over the target rate (fees / tracking
-//!   difference); subtracted from every day's rate.
+//!   difference); subtracted from every day's rate. May be FRACTIONAL: one
+//!   whole bps moves a multi-year position by pesos, so cent-level
+//!   calibration against the real account needs sub-bps resolution.
 //! - annual_rate_bps: fallback flat rate when the history cache is empty
 //!   (e.g. first run offline).
 
@@ -43,7 +45,7 @@ fn load_history(conn: &Connection) -> AppResult<Vec<(NaiveDate, i64)>> {
 /// after the last record, the last rate.
 fn factor_over_history(
     history: &[(NaiveDate, i64)],
-    spread_bps: i64,
+    spread_bps: f64,
     from: NaiveDate,
     to: NaiveDate,
 ) -> f64 {
@@ -66,8 +68,8 @@ fn factor_over_history(
             .unwrap_or(to)
             .max(day + Duration::days(1));
         let days = (step_end - day).num_days();
-        let rate_bps = (history[idx].1 - spread_bps).max(0);
-        let r = rate_bps as f64 / 10_000.0;
+        let rate_bps = (history[idx].1 as f64 - spread_bps).max(0.0);
+        let r = rate_bps / 10_000.0;
         factor *= (1.0 + r / 365.0).powi(days as i32);
         day = step_end;
         if idx + 1 < history.len() && history[idx + 1].0 <= day {
@@ -84,7 +86,10 @@ impl InvestmentCalculator for Bonddia {
 
     fn value_at(&self, inv: &Investment, conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
         let params = parse_params(inv)?;
-        let spread_bps = param_i64_or(&params, "spread_bps", 0);
+        let spread_bps = params
+            .get("spread_bps")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
         let history = load_history(conn)?;
 
         if history.is_empty() {

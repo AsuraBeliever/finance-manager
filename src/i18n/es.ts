@@ -178,8 +178,7 @@ export const es = {
       },
       bonddia: {
         name: "BONDDIA",
-        description:
-          "Fondo diario de cetesdirecto; se calcula con la tasa histórica de Banxico día por día",
+        description: "Fondo diario de cetesdirecto; usa la tasa histórica de Banxico",
       },
       nu_cajita: {
         name: "Nu Cajita",
