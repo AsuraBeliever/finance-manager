@@ -11,13 +11,10 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // Must be the first plugin. A second launch used to flash a window
-        // and die (two instances can't share the WebKitGTK profile dir);
-        // now it signals this instance and exits cleanly. The callback must
-        // NOT touch the window: unminimize()/set_focus() crash GTK3 under
-        // Wayland (protocol error 71) — surfacing the window is handled by
-        // scripts/finanzas-open via hyprctl instead.
-        .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {}))
+        // NOTE: tauri-plugin-single-instance was tried and removed — its DBus
+        // signaling crashes the running instance under GTK3/Wayland (protocol
+        // error 71). Single-instance behavior lives in scripts/finanzas-open
+        // (pgrep guard); launching the bare binary twice is unsupported.
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;

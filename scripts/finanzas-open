@@ -5,20 +5,21 @@
 # every NEW window spawn hidden on workspace 3 — that's what the user wants
 # when the assistant launches the app in the background. When the USER opens
 # it, they want it on the workspace they're standing on, so this wrapper
-# launches (or signals the running instance, thanks to single-instance) and
-# then moves the window to the active workspace.
+# launches the app (only if it isn't running: a second process can't share
+# the WebKitGTK profile and dies) and moves the window to the active
+# workspace.
 set -u
 
 BIN="$(dirname "$(realpath "$0")")/../src-tauri/target/release/finanzas"
 
-setsid "$BIN" >/dev/null 2>&1 &
-
-# wait for the window to exist (fresh launch) — single-instance relaunches
-# leave the existing window in place, which grep also finds
-for _ in $(seq 1 50); do
-  hyprctl clients 2>/dev/null | grep -q 'class: finanzas' && break
-  sleep 0.1
-done
+if ! pgrep -x finanzas >/dev/null 2>&1; then
+  setsid "$BIN" >/dev/null 2>&1 &
+  # wait for the window to exist
+  for _ in $(seq 1 50); do
+    hyprctl clients 2>/dev/null | grep -q 'class: finanzas' && break
+    sleep 0.1
+  done
+fi
 
 WS="$(hyprctl activeworkspace 2>/dev/null | head -1 | grep -oE 'ID [0-9]+' | grep -oE '[0-9]+')"
 if [ -n "${WS:-}" ]; then
