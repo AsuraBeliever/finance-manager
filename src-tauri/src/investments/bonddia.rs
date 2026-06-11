@@ -38,7 +38,9 @@ fn load_official_price(conn: &Connection) -> AppResult<Option<i64>> {
     Ok(raw
         .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
         .and_then(|v| v.get("price_micros").and_then(|p| p.as_i64()))
-        .filter(|p| *p > 0))
+        // plausibility guard: the NAV is a few pesos; a value outside this
+        // range means a bad scrape and must not poison valuations
+        .filter(|p| (500_000..100_000_000).contains(p)))
 }
 
 /// (effective_date, rate_bps) steps, chronological.

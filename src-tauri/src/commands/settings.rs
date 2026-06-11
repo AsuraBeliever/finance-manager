@@ -594,54 +594,62 @@ const SPANISH_MONTHS: [(&str, u32); 12] = [
     ("diciembre", 12),
 ];
 
-/// Extract (price_micros, iso_date) from the BONDDIA page HTML.
-pub(crate) fn parse_bonddia_page(html: &str) -> Option<(i64, String)> {
-    let text: String = html
-        .replace(['\n', '\r'], " ")
-        .chars()
-        .collect();
-    // price: first decimal number after "Precio"
-    let after = text.split("Precio").nth(1)?;
-    let price_str: String = after
-        .chars()
-        .skip_while(|c| !c.is_ascii_digit())
-        .take_while(|c| c.is_ascii_digit() || *c == '.')
-        .collect();
-    let price: f64 = price_str.parse().ok()?;
-    if !(0.5..1000.0).contains(&price) {
-        return None;
+/// Drop everything inside <...> so markup attributes (e.g. `<TD WIDTH=6>`)
+/// can never be mistaken for data. Tags become spaces to keep tokens apart.
+fn strip_tags(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for c in html.chars() {
+        match c {
+            '<' => {
+                in_tag = true;
+                out.push(' ');
+            }
+            '>' => in_tag = false,
+            c if !in_tag => out.push(c),
+            _ => {}
+        }
     }
-    // date like "11 Junio 2026" anywhere in the page
-    let mut iso_date = None;
-    for (name, month) in SPANISH_MONTHS {
-        if let Some(pos) = text.to_lowercase().find(name) {
-            let before: String = text[..pos]
-                .chars()
-                .rev()
-                .take(8)
-                .collect::<String>()
-                .chars()
-                .rev()
-                .collect();
-            let day: String = before.chars().filter(|c| c.is_ascii_digit()).collect();
-            let after_month = &text[pos + name.len()..];
-            let year: String = after_month
-                .chars()
-                .skip_while(|c| !c.is_ascii_digit())
-                .take(4)
-                .collect();
-            if let (Ok(d), Ok(y)) = (day.parse::<u32>(), year.parse::<i32>()) {
-                if (1..=31).contains(&d) && (2000..2100).contains(&y) {
-                    iso_date = Some(format!("{y:04}-{month:02}-{d:02}"));
-                    break;
+    out
+}
+
+/// Extract (price_micros, iso_date) from the BONDDIA page HTML.
+/// The price is the first token after "Precio" that looks like a fund NAV:
+/// a decimal with 4+ fraction digits in a plausible range. The raw page is
+/// 90s-style HTML where naive "next number" scans pick up attribute values.
+pub(crate) fn parse_bonddia_page(html: &str) -> Option<(i64, String)> {
+    let text = strip_tags(&html.replace(['\n', '\r', '\t'], " "));
+    let tokens: Vec<&str> = text.split_whitespace().collect();
+
+    let precio_idx = tokens.iter().position(|t| t.starts_with("Precio"))?;
+    let price = tokens[precio_idx..].iter().take(10).find_map(|t| {
+        let (int_part, frac_part) = t.split_once('.')?;
+        if frac_part.len() < 4
+            || !int_part.chars().all(|c| c.is_ascii_digit())
+            || !frac_part.chars().all(|c| c.is_ascii_digit())
+        {
+            return None;
+        }
+        let p: f64 = t.parse().ok()?;
+        (0.5..100.0).contains(&p).then_some(p)
+    })?;
+
+    // date: "11 Junio 2026" — day token, month-name token, year token
+    let mut iso_date = String::new();
+    'outer: for (i, token) in tokens.iter().enumerate() {
+        for (name, month) in SPANISH_MONTHS {
+            if token.eq_ignore_ascii_case(name) && i > 0 && i + 1 < tokens.len() {
+                if let (Ok(d), Ok(y)) = (tokens[i - 1].parse::<u32>(), tokens[i + 1].parse::<i32>())
+                {
+                    if (1..=31).contains(&d) && (2000..2100).contains(&y) {
+                        iso_date = format!("{y:04}-{month:02}-{d:02}");
+                        break 'outer;
+                    }
                 }
             }
         }
     }
-    Some((
-        (price * 1_000_000.0).round() as i64,
-        iso_date.unwrap_or_default(),
-    ))
+    Some(((price * 1_000_000.0).round() as i64, iso_date))
 }
 
 pub(crate) async fn fetch_bonddia_price() -> AppResult<(i64, String)> {
@@ -668,9 +676,12 @@ mod bonddia_price_tests {
     use super::*;
 
     #[test]
-    fn parses_price_and_date_from_page() {
-        let html = "<div>BONDDIA</div><span>11 Junio 2026</span>\
-                    <td>Precio d&iacute;a anterior</td><td>2.334524</td>";
+    fn parses_price_and_date_from_real_markup() {
+        // mirrors the live page: attribute numbers (WIDTH=6) sit between
+        // "Precio" and the actual value — they must never win
+        let html = "<FONT SIZE=2>11 Junio 2026</FONT> \
+            <TD>Precio d&iacute;a anterior</FONT></TD>\t<TD WIDTH=6 BGCOLOR=#235B4E></TD>\
+            <TD WIDTH=4></TD><TD ALIGN=LEFT BGCOLOR=#F2F2F1><FONT COLOR=747474>2.334524</FONT></TD>";
         let (micros, date) = parse_bonddia_page(html).unwrap();
         assert_eq!(micros, 2_334_524);
         assert_eq!(date, "2026-06-11");
@@ -680,5 +691,7 @@ mod bonddia_price_tests {
     fn rejects_pages_without_a_plausible_price() {
         assert!(parse_bonddia_page("<html>mantenimiento</html>").is_none());
         assert!(parse_bonddia_page("Precio 45000.0").is_none());
+        // attribute-like integers and short decimals are not NAVs
+        assert!(parse_bonddia_page("Precio <TD WIDTH=6></TD> 2.33").is_none());
     }
 }
