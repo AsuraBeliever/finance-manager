@@ -73,3 +73,7 @@ Se eliminaron la edición manual de tipos de cambio y el token de Banxico de Aju
 ## 2026-06-10 — Field sin <label> (bug de WebKitGTK)
 
 Clic en "elegir mes y año" del calendario no hacía nada en la app (en Chromium sí funcionaba). WebKitGTK re-despacha clics dentro de un <label> a su primer descendiente etiquetable — el botón que abre/cierra el popover — anulando el cambio de vista. `Field` ahora envuelve en <div>+<span>; regla: no anidar controles compuestos en labels implícitos.
+
+## 2026-06-11 — BONDDIA anclado al precio oficial del título (modo exacto)
+
+La simulación con tasa histórica + spread queda a ±centavos del valor real porque el fondo invierte en títulos enteros y deja remanentes sin rendimiento — imposible de replicar al centavo con cualquier fórmula. Solución definitiva: cetesdirecto publica el precio oficial diario del título (bonddia.html; requiere User-Agent de navegador). Si la inversión guarda `titulos` (y opcionalmente `remanentes_cents`), el valor = títulos × precio + remanentes — idéntico a cetesdirecto por construcción, sin desfase. El precio se cachea en settings ('bonddia_price') y se refresca al arrancar. Sin títulos capturados (o sin precio en caché) se usa la estimación histórica como antes. El usuario actualiza títulos al comprar/vender (los ve en su app).

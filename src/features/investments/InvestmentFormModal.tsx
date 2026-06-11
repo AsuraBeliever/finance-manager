@@ -73,6 +73,8 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
   const [compounding, setCompounding] = useState("daily");
   const [symbol, setSymbol] = useState("BTC");
   const [quantityText, setQuantityText] = useState("");
+  const [titulosText, setTitulosText] = useState("");
+  const [remanentesText, setRemanentesText] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [rateInfo, setRateInfo] = useState<string | null>(null);
@@ -98,6 +100,8 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
     setCompounding(params.compounding ?? "daily");
     setSymbol(params.symbol ?? "BTC");
     setQuantityText("");
+    setTitulosText("");
+    setRemanentesText("");
     setRateInfo(
       item.rateBps !== null && item.rateDate
         ? `${es.investments.banxicoFetched} ${item.rateDate}`
@@ -144,6 +148,12 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
     setQuantityText(
       params.quantity_e8 !== undefined ? (params.quantity_e8 / 1e8).toString() : "",
     );
+    setTitulosText(params.titulos !== undefined ? String(params.titulos) : "");
+    setRemanentesText(
+      params.remanentes_cents !== undefined
+        ? (params.remanentes_cents / 100).toFixed(2)
+        : "",
+    );
     setNotes(investment?.notes ?? "");
     setError(null);
     setRateInfo(null);
@@ -176,10 +186,20 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
         params.compounding = compounding;
       }
       if (calculator === "bonddia") {
-        // keep the catalog's live rate as offline fallback if present
+        // keep the catalog's live rate + calibrated spread as estimation params
         const existing = investment ? JSON.parse(investment.paramsJson) : null;
         const fallback = existing?.annual_rate_bps ?? parseBps(rateText);
         if (fallback) params.annual_rate_bps = fallback;
+        if (existing?.spread_bps !== undefined) params.spread_bps = existing.spread_bps;
+        if (titulosText.trim() !== "") {
+          const titulos = Number(titulosText.replace(/[,\s]/g, ""));
+          if (!Number.isInteger(titulos) || titulos <= 0)
+            throw new Error(es.investments.invalidQuantity);
+          params.titulos = titulos;
+          const rem = remanentesText.trim() === "" ? 0 : parseToCents(remanentesText);
+          if (rem === null || rem < 0) throw new Error(es.investments.invalidAmount);
+          params.remanentes_cents = rem;
+        }
       }
       if (calculator === "crypto") {
         const qty = parseQuantityE8(quantityText);
@@ -409,7 +429,29 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
         )}
 
         {calculator === "bonddia" && (
-          <p className="-mt-2 text-xs text-zinc-500">{es.investments.bonddiaHint}</p>
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={es.investments.bonddiaTitulos}>
+                <input
+                  className={inputClass}
+                  value={titulosText}
+                  onChange={(e) => setTitulosText(e.target.value)}
+                  placeholder="2923"
+                  inputMode="numeric"
+                />
+              </Field>
+              <Field label={es.investments.bonddiaRemanentes}>
+                <input
+                  className={inputClass}
+                  value={remanentesText}
+                  onChange={(e) => setRemanentesText(e.target.value)}
+                  placeholder="0.00"
+                  inputMode="decimal"
+                />
+              </Field>
+            </div>
+            <p className="-mt-2 text-xs text-zinc-500">{es.investments.bonddiaHint}</p>
+          </>
         )}
 
         {calculator === "crypto" && (
