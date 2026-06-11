@@ -49,3 +49,7 @@ El usuario no quiere capturar tasas a mano. La API SIE de Banxico publica la tas
 ## 2026-06-10 — Widgets nativos de WebKitGTK reemplazados (date picker y confirm)
 
 El `<input type="date">` de WebKitGTK congela la ventana hasta que pierde el foco, y `window.confirm` muestra un diálogo del sistema con encabezado "JavaScript - tauri://localhost" ajeno al tema. Se reemplazaron por componentes propios: `DateInput` (popover de calendario con date-fns, lunes primero, soporte de fecha mínima) y `ConfirmDialog` (modal del tema). Regla: no usar widgets nativos del navegador para interacciones — siempre componentes del design system.
+
+## 2026-06-10 — Tasas de Banxico sin token (supersede parcialmente la decisión anterior)
+
+El usuario no quería ni siquiera pegar un token. Se descubrió que el endpoint que alimenta las gráficas del propio sitio de Banxico, `SieInternet/consultaSerieGrafica.do?s=<serie>,<cuadro>,<n>&versionSerie=LA-MAS-RECIENTE`, regresa JSON `{titulo, valores: [[fecha, valor]]}` sin autenticación (centinela -989898.0 = sin dato). Contextos verificados: SF43936,CF107,5 · SF43939,CF107,9 · SF43942,CF107,13 · SF43945,CF107,17 · SF61745,CF101,2. Ahora es la fuente primaria; la API SIE oficial con token quedó como fallback opcional (el endpoint público es interno del sitio y podría cambiar sin aviso — por eso no se eliminó el camino con token). La generación automática del token se descartó: requiere formulario web.
