@@ -285,21 +285,27 @@ mod tests {
     }
 }
 
-// ---- Banxico SIE (tasas de CETES y tasa objetivo) ----
+// ---- Banxico (tasas de CETES y tasa objetivo) ----
 //
 // Series: SF43936/SF43939/SF43942/SF43945 = tasa de rendimiento de la subasta
 // semanal de CETES a 28/91/182/364 días; SF61745 = tasa objetivo de Banxico
 // (referencia para BONDDIA, que sigue la tasa de fondeo gubernamental).
-// Requires a free token from
-// https://www.banxico.org.mx/SieAPIRest/service/v1/token
+//
+// Primary source needs NO token: SieInternet's own chart endpoint
+// (consultaSerieGrafica.do) returns {titulo, valores: [[date, value]]} with
+// -989898.0 as the missing-value sentinel. The series id must be paired with
+// the cuadro context it appears in (e.g. "SF43936,CF107,5").
+// Fallback: official SIE API with the user's free token (settings key
+// 'banxico_token'), in case the public endpoint changes.
 
-fn banxico_series(kind: &str) -> AppResult<&'static str> {
+/// (SIE API series id, SieInternet chart context)
+fn banxico_series(kind: &str) -> AppResult<(&'static str, &'static str)> {
     Ok(match kind {
-        "cetes_28" => "SF43936",
-        "cetes_91" => "SF43939",
-        "cetes_182" => "SF43942",
-        "cetes_364" => "SF43945",
-        "objetivo" => "SF61745",
+        "cetes_28" => ("SF43936", "SF43936,CF107,5"),
+        "cetes_91" => ("SF43939", "SF43939,CF107,9"),
+        "cetes_182" => ("SF43942", "SF43942,CF107,13"),
+        "cetes_364" => ("SF43945", "SF43945,CF107,17"),
+        "objetivo" => ("SF61745", "SF61745,CF101,2"),
         other => {
             return Err(AppError::InvalidInput(format!(
                 "serie desconocida: {other} (válidas: cetes_28/91/182/364, objetivo)"
@@ -307,6 +313,8 @@ fn banxico_series(kind: &str) -> AppResult<&'static str> {
         }
     })
 }
+
+const SIE_SENTINEL: f64 = -989898.0;
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -341,9 +349,57 @@ fn parse_banxico_body(body: &serde_json::Value) -> AppResult<BanxicoRate> {
     })
 }
 
+/// Parse SieInternet chart payload: {valores: [[iso_date, value]]} where
+/// SIE_SENTINEL marks missing values. The latest real value wins.
+fn parse_sie_internet_body(body: &serde_json::Value) -> AppResult<BanxicoRate> {
+    let last = body
+        .get("valores")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|pair| {
+            let date = pair.get(0)?.as_str()?;
+            let value = pair.get(1)?.as_f64()?;
+            (value != SIE_SENTINEL && value > 0.0).then(|| (date.to_string(), value))
+        })
+        .next_back()
+        .ok_or_else(|| AppError::Internal("Banxico no regresó datos para la serie".into()))?;
+    Ok(BanxicoRate {
+        rate_bps: (last.1 * 100.0).round() as i64,
+        date: last.0,
+    })
+}
+
+async fn get_json(url: &str) -> AppResult<serde_json::Value> {
+    reqwest::Client::new()
+        .get(url)
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("no se pudo consultar Banxico: {e}")))?
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(format!("respuesta inválida de Banxico: {e}")))
+}
+
 #[tauri::command]
 pub async fn fetch_banxico_rate(db: State<'_, Db>, kind: String) -> AppResult<BanxicoRate> {
-    let series = banxico_series(&kind)?;
+    let (series, chart_context) = banxico_series(&kind)?;
+
+    // Tokenless public endpoint first.
+    let url = format!(
+        "https://www.banxico.org.mx/SieInternet/consultaSerieGrafica.do?s={chart_context}&versionSerie=LA-MAS-RECIENTE&l=es"
+    );
+    let primary = match get_json(&url).await {
+        Ok(body) => parse_sie_internet_body(&body),
+        Err(e) => Err(e),
+    };
+    let primary_err = match primary {
+        Ok(rate) => return Ok(rate),
+        Err(e) => e,
+    };
+
+    // Fallback: official SIE API if the user configured a token.
     let token = {
         let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         conn.query_row(
@@ -353,24 +409,15 @@ pub async fn fetch_banxico_rate(db: State<'_, Db>, kind: String) -> AppResult<Ba
         )
         .ok()
         .filter(|t| !t.trim().is_empty())
-        .ok_or_else(|| {
-            AppError::InvalidInput("configura tu token de Banxico en Ajustes (es gratuito)".into())
-        })?
+    };
+    let Some(token) = token else {
+        return Err(primary_err);
     };
     let url = format!(
         "https://www.banxico.org.mx/SieAPIRest/service/v1/series/{series}/datos/oportuno?token={}",
         token.trim()
     );
-    let body: serde_json::Value = reqwest::Client::new()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(format!("no se pudo consultar Banxico: {e}")))?
-        .json()
-        .await
-        .map_err(|e| AppError::Internal(format!("respuesta inválida de Banxico: {e}")))?;
-    parse_banxico_body(&body)
+    parse_banxico_body(&get_json(&url).await?)
 }
 
 #[tauri::command]
@@ -424,5 +471,28 @@ mod banxico_tests {
             serde_json::from_str(r#"{"error":"token inválido"}"#).unwrap();
         assert!(parse_banxico_body(&body).is_err());
         assert!(banxico_series("cetes_90").is_err());
+    }
+
+    #[test]
+    fn parses_sie_internet_chart_payload_skipping_sentinels() {
+        // Latest real value wins; -989898.0 sentinel rows are ignored.
+        let body: serde_json::Value = serde_json::from_str(
+            r#"{"titulo":"Tasa de rendimiento","serie":"SF43936","valores":
+                [["2026-05-28",6.30],["2026-06-04",6.27],
+                 ["2026-06-11",6.25],["2026-06-18",-989898.0]]}"#,
+        )
+        .unwrap();
+        let rate = parse_sie_internet_body(&body).unwrap();
+        assert_eq!(rate.rate_bps, 625);
+        assert_eq!(rate.date, "2026-06-11");
+    }
+
+    #[test]
+    fn sie_internet_rejects_empty_or_all_sentinel() {
+        let body: serde_json::Value =
+            serde_json::from_str(r#"{"valores":[["2026-06-11",-989898.0]]}"#).unwrap();
+        assert!(parse_sie_internet_body(&body).is_err());
+        let body: serde_json::Value = serde_json::from_str(r#"{}"#).unwrap();
+        assert!(parse_sie_internet_body(&body).is_err());
     }
 }
