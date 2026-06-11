@@ -11,6 +11,11 @@
   --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
 }
 
+html {
+  /* Native widgets (select popups, date pickers, scrollbars) render dark. */
+  color-scheme: dark;
+}
+
 html,
 body,
 #root {
@@ -25,4 +30,29 @@ body {
 input,
 textarea {
   user-select: text;
+}
+
+/* WebKitGTK ignores dark backgrounds on native selects: drop the native
+   appearance and draw our own chevron so they match the theme. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  padding-right: 2.25rem;
+  cursor: pointer;
+}
+
+select option {
+  @apply bg-surface-overlay text-zinc-100;
+}
+
+::selection {
+  background: rgba(16, 185, 129, 0.35);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-muted) transparent;
 }

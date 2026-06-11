@@ -46,31 +46,35 @@ export function TransactionsPage() {
       />
 
       <div className="mb-4 flex gap-3">
-        <select
-          className={`${inputClass} w-56`}
-          value={walletId}
-          onChange={(e) =>
-            setWalletId(e.target.value === "" ? "" : Number(e.target.value))
-          }
-        >
-          <option value="">{es.transactions.allWallets}</option>
-          {wallets.data?.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className={`${inputClass} w-48`}
-          value={kind}
-          onChange={(e) => setKind(e.target.value as TransactionKind | "")}
-        >
-          <option value="">{es.transactions.allKinds}</option>
-          <option value="income">{es.transactions.income}</option>
-          <option value="expense">{es.transactions.expense}</option>
-          <option value="transfer_in">{es.transactions.transfer} (+)</option>
-          <option value="transfer_out">{es.transactions.transfer} (−)</option>
-        </select>
+        <div className="w-56">
+          <select
+            className={inputClass}
+            value={walletId}
+            onChange={(e) =>
+              setWalletId(e.target.value === "" ? "" : Number(e.target.value))
+            }
+          >
+            <option value="">{es.transactions.allWallets}</option>
+            {wallets.data?.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="w-48">
+          <select
+            className={inputClass}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as TransactionKind | "")}
+          >
+            <option value="">{es.transactions.allKinds}</option>
+            <option value="income">{es.transactions.income}</option>
+            <option value="expense">{es.transactions.expense}</option>
+            <option value="transfer_in">{es.transactions.transfer} (+)</option>
+            <option value="transfer_out">{es.transactions.transfer} (−)</option>
+          </select>
+        </div>
       </div>
 
       {transactions.isError && (
