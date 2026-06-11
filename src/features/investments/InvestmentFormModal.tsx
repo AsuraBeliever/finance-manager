@@ -1,12 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/Button";
+import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
 import { Modal } from "../../components/Modal";
 import {
   createInvestment,
+  fetchBanxicoRate,
   listCurrencies,
   updateInvestment,
+  type BanxicoSeriesKind,
   type InvestmentInput,
 } from "../../lib/api";
 import { parseToCents } from "../../lib/money";
@@ -49,6 +53,26 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
   const [compounding, setCompounding] = useState("daily");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [rateInfo, setRateInfo] = useState<string | null>(null);
+
+  // Nu sets its own rate; Banxico only helps for CETES (auction by plazo)
+  // and BONDDIA-style funds (target rate as reference).
+  const banxicoKind: BanxicoSeriesKind | null =
+    calculator === "cetes"
+      ? (`cetes_${plazo}` as BanxicoSeriesKind)
+      : calculator === "fixed_rate"
+        ? "objetivo"
+        : null;
+
+  const banxico = useMutation({
+    mutationFn: () => fetchBanxicoRate(banxicoKind!),
+    onSuccess: (r) => {
+      setRateText((r.rateBps / 100).toString());
+      setRateInfo(`${es.investments.banxicoFetched} ${r.date}`);
+      setError(null);
+    },
+    onError: (e) => setError(e instanceof Error ? e.message : String(e)),
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -67,6 +91,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
     setCompounding(params.compounding ?? "daily");
     setNotes(investment?.notes ?? "");
     setError(null);
+    setRateInfo(null);
   }, [open, investment]);
 
   const needsRate = calculator !== "manual";
@@ -166,13 +191,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
             />
           </Field>
           <Field label={es.investments.startDate}>
-            <input
-              type="date"
-              className={inputClass}
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              required
-            />
+            <DateInput value={startDate} onChange={setStartDate} />
           </Field>
         </div>
 
@@ -203,6 +222,23 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
             </Field>
           )}
         </div>
+
+        {banxicoKind && (
+          <div className="-mt-2">
+            <button
+              type="button"
+              onClick={() => banxico.mutate()}
+              disabled={banxico.isPending}
+              className="flex items-center gap-2 text-sm text-accent hover:underline disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={banxico.isPending ? "animate-spin" : ""} />
+              {calculator === "cetes"
+                ? `${es.investments.banxicoCetes} (${plazo} días)`
+                : es.investments.banxicoObjetivo}
+            </button>
+            {rateInfo && <p className="mt-1 text-xs text-zinc-500">{rateInfo}</p>}
+          </div>
+        )}
 
         {calculator === "cetes" && (
           <div className="grid grid-cols-2 gap-3">

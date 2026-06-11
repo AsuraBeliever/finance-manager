@@ -41,3 +41,11 @@ El usuario pidió que el tipo de cambio se calcule solo. Banxico SIE es la fuent
 ## 2026-06-10 — Movimientos de inversión con valuación por posición
 
 El usuario aporta a CETES/cajitas varias veces y también retira; un solo `principal` no lo modela. Se agregó `investment_movements` (deposit/withdrawal con fecha) y la valuación cambió a "por posición": cada monto crece con el factor de la calculadora desde su propia fecha, y un retiro resta su monto multiplicado por el mismo factor desde la fecha del retiro (deja de generar rendimiento exactamente ahí). El rendimiento se reporta contra el aportado neto (principal + aportaciones − retiros), capturando rendimiento realizado y no realizado. Para CETES se añadió el modo `reinvest` (posición rodante que capitaliza cada plazo, sin vencimiento) porque cetesdirecto con depósitos recurrentes reinvierte al vencer; el ISR en ese modo se aproxima prorrateado sobre el capital aportado. Las inversiones `manual` quedan fuera (su valor viene de snapshots). Limitación conocida y aceptada: una sola tasa para toda la posición — las tasas históricas por periodo siguen en el roadmap.
+
+## 2026-06-10 — Tasas de CETES/BONDDIA desde Banxico SIE (con token del usuario)
+
+El usuario no quiere capturar tasas a mano. La API SIE de Banxico publica la tasa de la última subasta de CETES por plazo (SF43936/SF43939/SF43942/SF43945 para 28/91/182/364 días) y la tasa objetivo (SF61745), que sirve de referencia para BONDDIA porque el fondo sigue la tasa de fondeo gubernamental (≈ tasa objetivo). SIE requiere token gratuito: se guarda en la tabla `settings` (key `banxico_token`) y se captura en Ajustes. El formulario de inversiones ofrece "usar tasa de Banxico" para cetes (según plazo) y fixed_rate (objetivo). No se eligió scrapear cetesdirecto: no tiene API pública estable.
+
+## 2026-06-10 — Widgets nativos de WebKitGTK reemplazados (date picker y confirm)
+
+El `<input type="date">` de WebKitGTK congela la ventana hasta que pierde el foco, y `window.confirm` muestra un diálogo del sistema con encabezado "JavaScript - tauri://localhost" ajeno al tema. Se reemplazaron por componentes propios: `DateInput` (popover de calendario con date-fns, lunes primero, soporte de fecha mínima) y `ConfirmDialog` (modal del tema). Regla: no usar widgets nativos del navegador para interacciones — siempre componentes del design system.

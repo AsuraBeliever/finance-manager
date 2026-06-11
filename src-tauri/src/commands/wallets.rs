@@ -128,6 +128,36 @@ pub fn update_wallet(
     fetch_wallet(&conn, id)
 }
 
+/// Deletes the wallet and everything that references it: its transactions,
+/// the sibling legs of its transfers (an orphan half-transfer would corrupt
+/// the other wallet's history), and any investment links.
+pub fn delete_wallet_tx(conn: &mut Connection, id: i64) -> AppResult<()> {
+    let tx = conn.transaction()?;
+    tx.execute(
+        "DELETE FROM transactions WHERE transfer_group_id IN (
+           SELECT transfer_group_id FROM transactions
+           WHERE wallet_id = ?1 AND transfer_group_id IS NOT NULL)",
+        [id],
+    )?;
+    tx.execute("DELETE FROM transactions WHERE wallet_id = ?1", [id])?;
+    tx.execute(
+        "UPDATE investments SET linked_wallet_id = NULL WHERE linked_wallet_id = ?1",
+        [id],
+    )?;
+    let deleted = tx.execute("DELETE FROM wallets WHERE id = ?1", [id])?;
+    if deleted == 0 {
+        return Err(AppError::NotFound("cartera"));
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_wallet(db: State<Db>, id: i64) -> AppResult<()> {
+    let mut conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    delete_wallet_tx(&mut conn, id)
+}
+
 #[tauri::command]
 pub fn archive_wallet(db: State<Db>, id: i64, archived: bool) -> AppResult<()> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
@@ -139,4 +169,54 @@ pub fn archive_wallet(db: State<Db>, id: i64, archived: bool) -> AppResult<()> {
         return Err(AppError::NotFound("cartera"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::transactions::{insert_simple, insert_transfer};
+    use crate::db::open_in_memory;
+
+    fn make_wallet(conn: &Connection, name: &str, initial_cents: i64) -> i64 {
+        conn.execute(
+            "INSERT INTO wallets (name, category_id, currency_code, initial_balance_cents)
+             VALUES (?1, 1, 'MXN', ?2)",
+            params![name, initial_cents],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    #[test]
+    fn delete_wallet_removes_transactions_and_transfer_pairs() {
+        let mut conn = open_in_memory();
+        let a = make_wallet(&conn, "A", 100_000);
+        let b = make_wallet(&conn, "B", 0);
+        insert_simple(&conn, a, "income", 5_000, None, None, "2026-06-01").unwrap();
+        insert_simple(&conn, b, "expense", 1_000, None, None, "2026-06-01").unwrap();
+        insert_transfer(&mut conn, a, b, 20_000, 20_000, None, "2026-06-02").unwrap();
+        conn.execute(
+            "INSERT INTO investments (name, calculator, principal_cents, start_date, linked_wallet_id)
+             VALUES ('inv', 'manual', 1000, '2026-01-01', ?1)",
+            [a],
+        )
+        .unwrap();
+
+        delete_wallet_tx(&mut conn, a).unwrap();
+
+        let wallets: i64 = conn
+            .query_row("SELECT COUNT(*) FROM wallets", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(wallets, 1);
+        // only B's own expense survives; A's income and BOTH transfer legs are gone
+        let txs: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(txs, 1);
+        let linked: Option<i64> = conn
+            .query_row("SELECT linked_wallet_id FROM investments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(linked, None);
+        assert!(delete_wallet_tx(&mut conn, a).is_err()); // already gone
+    }
 }

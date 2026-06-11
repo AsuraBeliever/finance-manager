@@ -54,6 +54,8 @@ export const updateWallet = (id: number, input: WalletInput) =>
 export const archiveWallet = (id: number, archived: boolean) =>
   invoke<void>("archive_wallet", { id, archived });
 
+export const deleteWallet = (id: number) => invoke<void>("delete_wallet", { id });
+
 export interface SimpleTxInput {
   walletId: number;
   amountCents: number;
@@ -153,3 +155,24 @@ export const addInvestmentMovement = (
 
 export const deleteInvestmentMovement = (id: number) =>
   invoke<void>("delete_investment_movement", { id });
+
+export type BanxicoSeriesKind =
+  | "cetes_28"
+  | "cetes_91"
+  | "cetes_182"
+  | "cetes_364"
+  | "objetivo";
+
+export interface BanxicoRate {
+  rateBps: number;
+  date: string;
+}
+
+export const fetchBanxicoRate = (kind: BanxicoSeriesKind) =>
+  invoke<BanxicoRate>("fetch_banxico_rate", { kind });
+
+export const getSetting = (key: string) =>
+  invoke<string | null>("get_setting", { key });
+
+export const setSetting = (key: string, value: string) =>
+  invoke<void>("set_setting", { key, value });

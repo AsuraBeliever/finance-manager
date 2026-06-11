@@ -284,3 +284,145 @@ mod tests {
         assert!(!rates_are_fresh(&conn).unwrap());
     }
 }
+
+// ---- Banxico SIE (tasas de CETES y tasa objetivo) ----
+//
+// Series: SF43936/SF43939/SF43942/SF43945 = tasa de rendimiento de la subasta
+// semanal de CETES a 28/91/182/364 días; SF61745 = tasa objetivo de Banxico
+// (referencia para BONDDIA, que sigue la tasa de fondeo gubernamental).
+// Requires a free token from
+// https://www.banxico.org.mx/SieAPIRest/service/v1/token
+
+fn banxico_series(kind: &str) -> AppResult<&'static str> {
+    Ok(match kind {
+        "cetes_28" => "SF43936",
+        "cetes_91" => "SF43939",
+        "cetes_182" => "SF43942",
+        "cetes_364" => "SF43945",
+        "objetivo" => "SF61745",
+        other => {
+            return Err(AppError::InvalidInput(format!(
+                "serie desconocida: {other} (válidas: cetes_28/91/182/364, objetivo)"
+            )))
+        }
+    })
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BanxicoRate {
+    pub rate_bps: i64,
+    pub date: String,
+}
+
+/// Parse SIE "oportuno" payload: bmx.series[0].datos[last] = {fecha, dato}.
+/// Pure function for offline tests.
+fn parse_banxico_body(body: &serde_json::Value) -> AppResult<BanxicoRate> {
+    let dato = body
+        .pointer("/bmx/series/0/datos")
+        .and_then(|d| d.as_array())
+        .and_then(|d| d.last())
+        .ok_or_else(|| AppError::Internal("Banxico no regresó datos para la serie".into()))?;
+    let rate: f64 = dato
+        .get("dato")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.replace(',', "").parse().ok())
+        .ok_or_else(|| {
+            AppError::Internal("dato de tasa inválido en la respuesta de Banxico".into())
+        })?;
+    let date = dato
+        .get("fecha")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+    Ok(BanxicoRate {
+        rate_bps: (rate * 100.0).round() as i64,
+        date,
+    })
+}
+
+#[tauri::command]
+pub async fn fetch_banxico_rate(db: State<'_, Db>, kind: String) -> AppResult<BanxicoRate> {
+    let series = banxico_series(&kind)?;
+    let token = {
+        let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        conn.query_row(
+            "SELECT value FROM settings WHERE key = 'banxico_token'",
+            [],
+            |r| r.get::<_, String>(0),
+        )
+        .ok()
+        .filter(|t| !t.trim().is_empty())
+        .ok_or_else(|| {
+            AppError::InvalidInput("configura tu token de Banxico en Ajustes (es gratuito)".into())
+        })?
+    };
+    let url = format!(
+        "https://www.banxico.org.mx/SieAPIRest/service/v1/series/{series}/datos/oportuno?token={}",
+        token.trim()
+    );
+    let body: serde_json::Value = reqwest::Client::new()
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("no se pudo consultar Banxico: {e}")))?
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(format!("respuesta inválida de Banxico: {e}")))?;
+    parse_banxico_body(&body)
+}
+
+#[tauri::command]
+pub fn get_setting(db: State<Db>, key: String) -> AppResult<Option<String>> {
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let value = conn
+        .query_row("SELECT value FROM settings WHERE key = ?1", [&key], |r| {
+            r.get::<_, String>(0)
+        })
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            other => Err(other),
+        })?;
+    Ok(value)
+}
+
+#[tauri::command]
+pub fn set_setting(db: State<Db>, key: String, value: String) -> AppResult<()> {
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        rusqlite::params![key, value],
+    )?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod banxico_tests {
+    use super::*;
+
+    #[test]
+    fn parses_sie_oportuno_payload() {
+        let body: serde_json::Value = serde_json::from_str(
+            r#"{"bmx":{"series":[{"idSerie":"SF43939","titulo":"Cetes 91 días",
+                "datos":[{"fecha":"05/06/2026","dato":"7.89"}]}]}}"#,
+        )
+        .unwrap();
+        let rate = parse_banxico_body(&body).unwrap();
+        assert_eq!(rate.rate_bps, 789);
+        assert_eq!(rate.date, "05/06/2026");
+    }
+
+    #[test]
+    fn rejects_empty_or_malformed_payload() {
+        let body: serde_json::Value =
+            serde_json::from_str(r#"{"bmx":{"series":[{"datos":[]}]}}"#).unwrap();
+        assert!(parse_banxico_body(&body).is_err());
+        let body: serde_json::Value =
+            serde_json::from_str(r#"{"error":"token inválido"}"#).unwrap();
+        assert!(parse_banxico_body(&body).is_err());
+        assert!(banxico_series("cetes_90").is_err());
+    }
+}

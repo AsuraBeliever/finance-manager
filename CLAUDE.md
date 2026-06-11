@@ -35,7 +35,7 @@ cargo fmt    --manifest-path src-tauri/Cargo.toml
 
 ## Estado actual
 
-- **v1.2.0**: movimientos de inversión (aportaciones/retiros, valuación por posición, CETES con reinversión) + tipos de cambio automáticos (v1.1.0) sobre la v1.0.0 completa (milestones M0–M6 en `docs/PLAN.md`).
+- **v1.3.0**: borrar carteras, DateInput/ConfirmDialog propios (widgets nativos de WebKitGTK rotos/feos), tasas CETES/objetivo desde Banxico SIE (token en Ajustes). Antes: v1.2.0 movimientos de inversión, v1.1.0 tipos de cambio automáticos, v1.0.0 base (M0–M6 en `docs/PLAN.md`).
 - Targets de bundle: solo `deb` y `rpm` — AppImage se quitó porque `linuxdeploy` falla en Arch. El binario de release queda en `src-tauri/target/release/finanzas`.
 - Trabajo futuro: ver `docs/ROADMAP.md` (presupuestos, recurrentes, export/backup, tasas históricas de cajitas).
 
