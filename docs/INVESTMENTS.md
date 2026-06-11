@@ -38,8 +38,16 @@ Sin vencimiento (`maturity_date = None`).
 
 ### `cetes` — CETES (cetesdirecto)
 
-Params: `{"annual_rate_bps": 1080, "plazo_days": 91, "isr_rate_bps": 50}`.
+Params: `{"annual_rate_bps": 1080, "plazo_days": 91, "isr_rate_bps": 50, "reinvest": false}`.
 Plazos válidos: 28, 91, 182, 364. `isr_rate_bps = 0` desactiva la retención.
+
+Con `"reinvest": true` (reinversión automática, como cetesdirecto con depósitos recurrentes) la posición es rodante: cada plazo completo capitaliza y el residuo acumula simple, sin vencimiento fijo —
+
+```
+f(a→t) = (1 + r·plazo/360)^(días div plazo) · (1 + r·(días mod plazo)/360) − isr·días/365
+```
+
+Con `"reinvest": false` (emisión única, comportamiento original) cada monto acumula interés simple hasta `plazo` días después de su propia fecha y luego queda plano.
 
 Los CETES son instrumentos cupón cero: se compran a descuento y pagan valor nominal ($10.00 por título) al vencimiento. Convención de mercado de dinero **ACT/360**; la retención de ISR se prorratea **ACT/365** sobre el capital:
 
@@ -76,6 +84,10 @@ Params: `{}`. `value_at` regresa el último `investment_snapshots.value_cents` c
 3. Agregar tests unitarios `#[cfg(test)]` con valores de referencia calculados a mano.
 4. Agregar la variante del formulario en el frontend (`src/features/investments/`) y sus strings en `src/i18n/es.ts`.
 5. Documentar la fórmula aquí.
+
+## Aportaciones y retiros (movements)
+
+Todas las calculadoras excepto `manual` soportan movimientos posteriores al inicio (tabla `investment_movements`). La valuación es **por posición**: el helper `position_value` en `src-tauri/src/investments/mod.rs` suma cada monto multiplicado por el factor de crecimiento de la calculadora desde la fecha del movimiento — las aportaciones suman, los retiros restan (incluido el rendimiento que ese dinero habría generado). El rendimiento mostrado es `valor actual − aportado neto`, que captura lo realizado y lo no realizado. Caso de uso típico: cajita o CETES con depósitos mensuales y retiros esporádicos.
 
 ## Proyecciones
 

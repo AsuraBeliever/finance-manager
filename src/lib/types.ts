@@ -115,9 +115,20 @@ export interface InvestmentSnapshot {
   source: string;
 }
 
+export interface InvestmentMovement {
+  id: number;
+  investmentId: number;
+  kind: "deposit" | "withdrawal";
+  amountCents: number;
+  occurredAt: string;
+}
+
 /** Investment fields are flattened together with the computed values (serde flatten). */
 export type InvestmentWithValue = Investment & {
   currentValueCents: number;
+  /** principal + aportaciones − retiros */
+  netInvestedCents: number;
+  /** valor actual − aportado neto (rendimiento realizado + no realizado) */
   gainCents: number;
   maturityDate: string | null;
 };
@@ -130,4 +141,5 @@ export interface ProjectionPoint {
 export type InvestmentDetail = InvestmentWithValue & {
   projection: ProjectionPoint[];
   snapshots: InvestmentSnapshot[];
+  movements: InvestmentMovement[];
 };

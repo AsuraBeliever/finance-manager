@@ -5,8 +5,8 @@ use tauri::State;
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
-use crate::investments::{find, registry};
-use crate::models::{Investment, InvestmentSnapshot};
+use crate::investments::{find, net_invested, registry};
+use crate::models::{Investment, InvestmentMovement, InvestmentSnapshot};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +14,9 @@ pub struct InvestmentWithValue {
     #[serde(flatten)]
     pub investment: Investment,
     pub current_value_cents: i64,
+    /// principal + deposits − withdrawals up to today
+    pub net_invested_cents: i64,
+    /// current value − net invested: realized + unrealized yield
     pub gain_cents: i64,
     pub maturity_date: Option<String>,
 }
@@ -32,6 +35,7 @@ pub struct InvestmentDetail {
     pub with_value: InvestmentWithValue,
     pub projection: Vec<ProjectionPoint>,
     pub snapshots: Vec<InvestmentSnapshot>,
+    pub movements: Vec<InvestmentMovement>,
 }
 
 fn investment_from_row(r: &Row) -> rusqlite::Result<Investment> {
@@ -75,12 +79,14 @@ pub fn with_value(
 ) -> AppResult<InvestmentWithValue> {
     let calc = find(&inv.calculator)?;
     let current_value_cents = calc.value_at(&inv, conn, as_of)?;
+    let net_invested_cents = net_invested(conn, &inv, as_of)?;
     let maturity_date = calc
         .maturity_date(&inv)
         .map(|d| d.format("%Y-%m-%d").to_string());
     Ok(InvestmentWithValue {
-        gain_cents: current_value_cents - inv.principal_cents,
+        gain_cents: current_value_cents - net_invested_cents,
         current_value_cents,
+        net_invested_cents,
         maturity_date,
         investment: inv,
     })
@@ -318,9 +324,76 @@ pub fn get_investment_detail(db: State<Db>, id: i64) -> AppResult<InvestmentDeta
         })?
         .collect::<Result<Vec<_>, _>>()?;
 
+    let mut stmt = conn.prepare(
+        "SELECT id, investment_id, kind, amount_cents, occurred_at
+         FROM investment_movements WHERE investment_id = ?1
+         ORDER BY occurred_at DESC, id DESC",
+    )?;
+    let movements = stmt
+        .query_map([id], |r| {
+            Ok(InvestmentMovement {
+                id: r.get(0)?,
+                investment_id: r.get(1)?,
+                kind: r.get(2)?,
+                amount_cents: r.get(3)?,
+                occurred_at: r.get(4)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
     Ok(InvestmentDetail {
         with_value: with_value(&conn, inv, as_of)?,
         projection,
         snapshots,
+        movements,
     })
+}
+
+#[tauri::command]
+pub fn add_investment_movement(
+    db: State<Db>,
+    investment_id: i64,
+    kind: String,
+    amount_cents: i64,
+    occurred_at: String,
+) -> AppResult<()> {
+    if kind != "deposit" && kind != "withdrawal" {
+        return Err(AppError::InvalidInput("tipo de movimiento inválido".into()));
+    }
+    if amount_cents <= 0 {
+        return Err(AppError::InvalidInput("el monto debe ser positivo".into()));
+    }
+    let date = NaiveDate::parse_from_str(&occurred_at, "%Y-%m-%d")
+        .map_err(|_| AppError::InvalidInput("fecha inválida (se espera YYYY-MM-DD)".into()))?;
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let inv = fetch_investment(&conn, investment_id)?;
+    if inv.calculator == "manual" {
+        return Err(AppError::InvalidInput(
+            "las inversiones de valor manual se actualizan con snapshots, no con movimientos"
+                .into(),
+        ));
+    }
+    let start = NaiveDate::parse_from_str(&inv.start_date, "%Y-%m-%d")
+        .map_err(|_| AppError::InvalidInput("fecha de inicio inválida".into()))?;
+    if date < start {
+        return Err(AppError::InvalidInput(
+            "el movimiento no puede ser anterior a la fecha de inicio".into(),
+        ));
+    }
+    conn.execute(
+        "INSERT INTO investment_movements (investment_id, kind, amount_cents, occurred_at)
+         VALUES (?1, ?2, ?3, ?4)",
+        params![investment_id, kind, amount_cents, occurred_at],
+    )?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_investment_movement(db: State<Db>, id: i64) -> AppResult<()> {
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let deleted = conn.execute("DELETE FROM investment_movements WHERE id = ?1", [id])?;
+    if deleted == 0 {
+        return Err(AppError::NotFound("movimiento"));
+    }
+    Ok(())
 }

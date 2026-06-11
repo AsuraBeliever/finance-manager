@@ -5,7 +5,7 @@
 use chrono::NaiveDate;
 use rusqlite::Connection;
 
-use super::{param_i64, parse_params, parse_start_date, InvestmentCalculator};
+use super::{param_i64, parse_params, position_value, InvestmentCalculator};
 use crate::error::AppResult;
 use crate::models::Investment;
 
@@ -16,15 +16,16 @@ impl InvestmentCalculator for NuCajita {
         "nu_cajita"
     }
 
-    fn value_at(&self, inv: &Investment, _conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
+    fn value_at(&self, inv: &Investment, conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
         let params = parse_params(inv)?;
         let rate_bps = param_i64(&params, "annual_rate_bps")?;
-        let start = parse_start_date(inv)?;
-
-        let days = (as_of - start).num_days().max(0);
         let r = rate_bps as f64 / 10_000.0;
-        let value = inv.principal_cents as f64 * (1.0 + r / 365.0).powi(days as i32);
-        Ok(value.round() as i64)
+
+        // Each contributed amount compounds daily from its own date.
+        position_value(inv, conn, as_of, |from| {
+            let days = (as_of - from).num_days().max(0);
+            (1.0 + r / 365.0).powi(days as i32)
+        })
     }
 
     fn maturity_date(&self, _inv: &Investment) -> Option<NaiveDate> {

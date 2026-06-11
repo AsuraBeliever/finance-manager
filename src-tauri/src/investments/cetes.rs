@@ -2,13 +2,23 @@
 //! discount, paying face value ($10.00 per título) at maturity.
 //! Money-market convention ACT/360 for yield; ISR retention prorates ACT/365
 //! over invested capital.
-//! params: {"annual_rate_bps": 1080, "plazo_days": 91, "isr_rate_bps": 50}
+//! params: {"annual_rate_bps": 1080, "plazo_days": 91, "isr_rate_bps": 50,
+//!          "reinvest": false}
 //! plazo_days ∈ {28, 91, 182, 364}; isr_rate_bps = 0 disables retention.
+//!
+//! reinvest = false: single emission — each amount accrues simple interest up
+//!   to plazo days after its own date and then stops (flat at maturity).
+//! reinvest = true: rolling position (reinversión automática de cetesdirecto)
+//!   — at every maturity the proceeds buy the next emission at the same rate,
+//!   so full plazo periods compound and the remainder accrues simple. ISR is
+//!   approximated as prorated retention on the contributed capital.
 
 use chrono::{Duration, NaiveDate};
 use rusqlite::Connection;
 
-use super::{param_i64, param_i64_or, parse_params, parse_start_date, InvestmentCalculator};
+use super::{
+    param_i64, param_i64_or, parse_params, parse_start_date, position_value, InvestmentCalculator,
+};
 use crate::error::{AppError, AppResult};
 use crate::models::Investment;
 
@@ -21,28 +31,47 @@ impl InvestmentCalculator for Cetes {
         "cetes"
     }
 
-    fn value_at(&self, inv: &Investment, _conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
+    fn value_at(&self, inv: &Investment, conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
         let params = parse_params(inv)?;
         let rate_bps = param_i64(&params, "annual_rate_bps")?;
         let plazo_days = param_i64(&params, "plazo_days")?;
         let isr_bps = param_i64_or(&params, "isr_rate_bps", 0);
+        let reinvest = params
+            .get("reinvest")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         if !VALID_PLAZOS.contains(&plazo_days) {
             return Err(AppError::InvalidInput(format!(
                 "plazo inválido: {plazo_days} (válidos: 28, 91, 182, 364)"
             )));
         }
-        let start = parse_start_date(inv)?;
-
-        // Accrual stops at maturity: value is flat afterwards.
-        let d = (as_of - start).num_days().clamp(0, plazo_days) as f64;
         let r = rate_bps as f64 / 10_000.0;
-        let gross = inv.principal_cents as f64 * (1.0 + r * d / 360.0);
-        let isr = inv.principal_cents as f64 * (isr_bps as f64 / 10_000.0) * d / 365.0;
-        Ok((gross - isr).round() as i64)
+        let isr = isr_bps as f64 / 10_000.0;
+
+        position_value(inv, conn, as_of, |from| {
+            let days = (as_of - from).num_days().max(0);
+            if reinvest {
+                let full_periods = (days / plazo_days) as i32;
+                let remainder = (days % plazo_days) as f64;
+                (1.0 + r * plazo_days as f64 / 360.0).powi(full_periods)
+                    * (1.0 + r * remainder / 360.0)
+                    - isr * days as f64 / 365.0
+            } else {
+                let d = days.min(plazo_days) as f64;
+                1.0 + r * d / 360.0 - isr * d / 365.0
+            }
+        })
     }
 
     fn maturity_date(&self, inv: &Investment) -> Option<NaiveDate> {
         let params = parse_params(inv).ok()?;
+        let reinvest = params
+            .get("reinvest")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if reinvest {
+            return None; // rolling position, no fixed maturity
+        }
         let plazo_days = param_i64(&params, "plazo_days").ok()?;
         Some(parse_start_date(inv).ok()? + Duration::days(plazo_days))
     }

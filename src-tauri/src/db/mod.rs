@@ -121,6 +121,18 @@ const MIGRATIONS: &[&str] = &[
       ('Suscripciones', 'expense', 'repeat', 1),
       ('Otro gasto', 'expense', 'minus', 1);
     "#,
+    // 3: investment movements (aportaciones y retiros)
+    r#"
+    CREATE TABLE investment_movements (
+      id INTEGER PRIMARY KEY,
+      investment_id INTEGER NOT NULL REFERENCES investments(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN ('deposit','withdrawal')),
+      amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+      occurred_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_inv_mov ON investment_movements(investment_id, occurred_at);
+    "#,
 ];
 
 pub fn open(path: &Path) -> AppResult<Connection> {

@@ -89,6 +89,16 @@ pub struct Investment {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct InvestmentMovement {
+    pub id: i64,
+    pub investment_id: i64,
+    pub kind: String, // 'deposit' | 'withdrawal'
+    pub amount_cents: i64,
+    pub occurred_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InvestmentSnapshot {
     pub id: i64,
     pub investment_id: i64,
