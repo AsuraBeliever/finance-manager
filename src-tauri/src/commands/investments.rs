@@ -132,6 +132,91 @@ pub fn open_total_mxn(
     Ok(total)
 }
 
+// ---- investment catalog ----
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogItem {
+    /// Stable id the frontend maps to a label/description (i18n).
+    pub id: &'static str,
+    pub calculator: &'static str,
+    /// Prefilled params for the form; the rate is merged in when available.
+    pub params_json: String,
+    pub rate_bps: Option<i64>,
+    pub rate_date: Option<String>,
+}
+
+/// Static catalog: (id, calculator, banxico kind for the live rate, base params).
+const CATALOG: &[(&str, &str, Option<&str>, &str)] = &[
+    (
+        "cetes_28",
+        "cetes",
+        Some("cetes_28"),
+        r#"{"plazo_days":28,"isr_rate_bps":0,"reinvest":false}"#,
+    ),
+    (
+        "cetes_91",
+        "cetes",
+        Some("cetes_91"),
+        r#"{"plazo_days":91,"isr_rate_bps":0,"reinvest":false}"#,
+    ),
+    (
+        "cetes_182",
+        "cetes",
+        Some("cetes_182"),
+        r#"{"plazo_days":182,"isr_rate_bps":0,"reinvest":false}"#,
+    ),
+    (
+        "cetes_364",
+        "cetes",
+        Some("cetes_364"),
+        r#"{"plazo_days":364,"isr_rate_bps":0,"reinvest":false}"#,
+    ),
+    (
+        "bonddia",
+        "fixed_rate",
+        Some("objetivo"),
+        r#"{"compounding":"daily"}"#,
+    ),
+    ("nu_cajita", "nu_cajita", None, "{}"),
+    (
+        "fixed_rate",
+        "fixed_rate",
+        None,
+        r#"{"compounding":"daily"}"#,
+    ),
+    ("manual", "manual", None, "{}"),
+];
+
+/// Catalog of known investment products with live Banxico rates where a
+/// public source exists. Rate fetch failures degrade to None (the user can
+/// still type the rate), so the picker keeps working offline.
+#[tauri::command]
+pub async fn get_investment_catalog() -> Vec<CatalogItem> {
+    let mut items = Vec::with_capacity(CATALOG.len());
+    for (id, calculator, banxico_kind, base_params) in CATALOG {
+        let rate = match banxico_kind {
+            Some(kind) => crate::commands::settings::fetch_rate_tokenless(kind)
+                .await
+                .ok(),
+            None => None,
+        };
+        let mut params: serde_json::Value =
+            serde_json::from_str(base_params).expect("static catalog params are valid JSON");
+        if let Some(r) = &rate {
+            params["annual_rate_bps"] = serde_json::json!(r.rate_bps);
+        }
+        items.push(CatalogItem {
+            id,
+            calculator,
+            params_json: params.to_string(),
+            rate_bps: rate.as_ref().map(|r| r.rate_bps),
+            rate_date: rate.map(|r| r.date),
+        });
+    }
+    items
+}
+
 // ---- commands ----
 
 #[tauri::command]
@@ -396,4 +481,28 @@ pub fn delete_investment_movement(db: State<Db>, id: i64) -> AppResult<()> {
         return Err(AppError::NotFound("movimiento"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod catalog_tests {
+    use super::*;
+
+    #[test]
+    fn catalog_entries_are_wellformed() {
+        for (id, calculator, _, base_params) in CATALOG {
+            // every calculator referenced must exist in the registry
+            assert!(
+                find(calculator).is_ok(),
+                "{id}: calculadora {calculator} no registrada"
+            );
+            let params: serde_json::Value = serde_json::from_str(base_params)
+                .unwrap_or_else(|_| panic!("{id}: params inválidos"));
+            assert!(params.is_object(), "{id}: params no es objeto");
+        }
+        // ids únicos
+        let mut ids: Vec<_> = CATALOG.iter().map(|c| c.0).collect();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), CATALOG.len());
+    }
 }

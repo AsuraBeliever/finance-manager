@@ -8,11 +8,14 @@ import { Modal } from "../../components/Modal";
 import {
   createInvestment,
   fetchBanxicoRate,
+  getInvestmentCatalog,
   listCurrencies,
   updateInvestment,
   type BanxicoSeriesKind,
+  type CatalogItem,
   type InvestmentInput,
 } from "../../lib/api";
+import { formatBps } from "../../lib/money";
 import { parseToCents } from "../../lib/money";
 import type { CalculatorId, InvestmentWithValue } from "../../lib/types";
 import { es } from "../../i18n/es";
@@ -54,6 +57,33 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [rateInfo, setRateInfo] = useState<string | null>(null);
+  const [step, setStep] = useState<"catalog" | "form">("catalog");
+
+  const catalog = useQuery({
+    queryKey: ["investmentCatalog"],
+    queryFn: getInvestmentCatalog,
+    enabled: open && !investment,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  function pickCatalogItem(item: CatalogItem) {
+    const params = JSON.parse(item.paramsJson);
+    setCalculator(item.calculator);
+    setName(es.investments.catalog[item.id]?.name ?? "");
+    setRateText(
+      params.annual_rate_bps !== undefined ? (params.annual_rate_bps / 100).toString() : "",
+    );
+    setPlazo(params.plazo_days ?? 91);
+    setIsrText(params.isr_rate_bps !== undefined ? (params.isr_rate_bps / 100).toString() : "0");
+    setReinvest(params.reinvest ?? false);
+    setCompounding(params.compounding ?? "daily");
+    setRateInfo(
+      item.rateBps !== null && item.rateDate
+        ? `${es.investments.banxicoFetched} ${item.rateDate}`
+        : null,
+    );
+    setStep("form");
+  }
 
   // Nu sets its own rate; Banxico only helps for CETES (auction by plazo)
   // and BONDDIA-style funds (target rate as reference).
@@ -92,6 +122,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
     setNotes(investment?.notes ?? "");
     setError(null);
     setRateInfo(null);
+    setStep(investment ? "form" : "catalog");
   }, [open, investment]);
 
   const needsRate = calculator !== "manual";
@@ -142,10 +173,60 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
 
   return (
     <Modal
-      title={investment ? es.investments.editInvestment : es.investments.newInvestment}
+      title={
+        investment
+          ? es.investments.editInvestment
+          : step === "catalog"
+            ? es.investments.catalogTitle
+            : es.investments.newInvestment
+      }
       open={open}
       onClose={onClose}
     >
+      {step === "catalog" && !investment ? (
+        <div className="grid gap-2">
+          {catalog.isPending && (
+            <p className="py-4 text-center text-sm text-zinc-500">
+              {es.investments.catalogLoading}
+            </p>
+          )}
+          {catalog.data?.map((item) => {
+            const label = es.investments.catalog[item.id];
+            if (!label) return null;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => pickCatalogItem(item)}
+                className="flex items-center gap-3 rounded-xl border border-border-muted bg-surface px-4 py-3 text-left transition-colors hover:border-accent-dim/60"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{label.name}</span>
+                  <span className="block truncate text-xs text-zinc-500">
+                    {label.description}
+                  </span>
+                </span>
+                {item.rateBps !== null ? (
+                  <span className="text-right">
+                    <span className="block font-semibold tabular-nums text-accent">
+                      {formatBps(item.rateBps)}
+                    </span>
+                    {item.rateDate && (
+                      <span className="block text-xs text-zinc-600">
+                        {es.investments.catalogRateAsOf} {item.rateDate}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-xs text-zinc-500">
+                    {es.investments.catalogNoRate}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -153,20 +234,25 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
         }}
         className="grid gap-4"
       >
-        <Field label={es.investments.calculator}>
-          <select
-            className={inputClass}
-            value={calculator}
-            onChange={(e) => setCalculator(e.target.value as CalculatorId)}
-            disabled={!!investment}
+        {investment ? (
+          <Field label={es.investments.calculator}>
+            <select className={inputClass} value={calculator} disabled>
+              {CALCULATORS.map((c) => (
+                <option key={c} value={c}>
+                  {es.investments.calculators[c]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setStep("catalog")}
+            className="justify-self-start text-sm text-accent hover:underline"
           >
-            {CALCULATORS.map((c) => (
-              <option key={c} value={c}>
-                {es.investments.calculators[c]}
-              </option>
-            ))}
-          </select>
-        </Field>
+            {es.investments.catalogBack}
+          </button>
+        )}
 
         <Field label={es.investments.name}>
           <input
@@ -315,6 +401,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
           </Button>
         </div>
       </form>
+      )}
     </Modal>
   );
 }

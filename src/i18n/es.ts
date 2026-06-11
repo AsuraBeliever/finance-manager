@@ -142,6 +142,46 @@ export const es = {
     banxicoCetes: "Usar la tasa de la última subasta de Banxico",
     banxicoObjetivo: "Usar la tasa objetivo de Banxico (referencia BONDDIA)",
     banxicoFetched: "Tasa de Banxico al",
+    catalogTitle: "¿Qué tipo de inversión es?",
+    catalogLoading: "Obteniendo tasas de Banxico…",
+    catalogNoRate: "captura tu tasa",
+    catalogRateAsOf: "al",
+    catalogBack: "‹ Elegir otro tipo",
+    catalog: {
+      cetes_28: {
+        name: "CETES 28 días",
+        description: "Subasta semanal de Banxico, plazo de 4 semanas",
+      },
+      cetes_91: {
+        name: "CETES 91 días",
+        description: "Subasta semanal de Banxico, plazo de 3 meses",
+      },
+      cetes_182: {
+        name: "CETES 182 días",
+        description: "Subasta semanal de Banxico, plazo de 6 meses",
+      },
+      cetes_364: {
+        name: "CETES 364 días",
+        description: "Subasta semanal de Banxico, plazo de 1 año",
+      },
+      bonddia: {
+        name: "BONDDIA",
+        description:
+          "Fondo diario de cetesdirecto; referencia: tasa objetivo de Banxico",
+      },
+      nu_cajita: {
+        name: "Nu Cajita",
+        description: "Rendimiento diario de Nu; la tasa te la muestra su app",
+      },
+      fixed_rate: {
+        name: "Tasa fija personalizada",
+        description: "Cualquier otra inversión con tasa propia",
+      },
+      manual: {
+        name: "Valor manual",
+        description: "Tú registras el valor actual cuando quieras",
+      },
+    } as Record<string, { name: string; description: string }>,
     movementsEmpty: "Sin movimientos. Registra tus aportaciones y retiros aquí.",
     close: "Cerrar inversión",
     reopen: "Reabrir",
