@@ -125,7 +125,7 @@ CREATE INDEX idx_inv_mov ON investment_movements(investment_id, occurred_at);
 ## Seeds (migración 2)
 
 - **Monedas**: MXN (Peso mexicano), USD (Dólar estadounidense).
-- **Categorías de cartera**: Efectivo, Tarjeta de débito, Tarjeta de crédito, Cuenta de ahorro, Inversión, Otro (`is_system = 1`).
+- **Categorías de cartera**: Efectivo, Tarjeta de débito, Tarjeta de crédito, Cuenta de ahorro, Otro (`is_system = 1`). La categoría 'Inversión' del seed original se elimina en la migración 5: las inversiones tienen su propio módulo.
 - **Categorías de transacción** — income: Salario, Regalo, Intereses, Otro ingreso; expense: Comida, Transporte, Hogar, Entretenimiento, Salud, Suscripciones, Otro gasto (`is_system = 1`).
 
 ## Regla de saldo (computado, nunca almacenado)

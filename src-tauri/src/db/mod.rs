@@ -149,6 +149,15 @@ const MIGRATIONS: &[&str] = &[
       as_of TEXT NOT NULL DEFAULT (datetime('now'))
     );
     "#,
+    // 5: drop the redundant 'Inversión' wallet category — investments have
+    // their own module; any wallet still using it moves to 'Otro'
+    r#"
+    UPDATE wallets SET category_id =
+      (SELECT id FROM wallet_categories WHERE name = 'Otro' AND is_system = 1)
+    WHERE category_id IN
+      (SELECT id FROM wallet_categories WHERE name = 'Inversión' AND is_system = 1);
+    DELETE FROM wallet_categories WHERE name = 'Inversión' AND is_system = 1;
+    "#,
 ];
 
 pub fn open(path: &Path) -> AppResult<Connection> {
@@ -207,7 +216,7 @@ mod tests {
         let wallet_cats: i64 = conn
             .query_row("SELECT COUNT(*) FROM wallet_categories", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(wallet_cats, 6);
+        assert_eq!(wallet_cats, 5); // migration 5 removes Inversión
         let tx_cats: i64 = conn
             .query_row("SELECT COUNT(*) FROM transaction_categories", [], |r| {
                 r.get(0)
