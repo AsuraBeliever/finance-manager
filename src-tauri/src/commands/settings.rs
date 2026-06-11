@@ -503,7 +503,18 @@ pub async fn refresh_market_data(db: &Db) -> AppResult<()> {
         tx.commit()?;
     }
 
-    // 2) Crypto prices for held symbols.
+    // 2) Official BONDDIA price (exact valuation for positions tracking
+    // títulos). Best effort: a scrape failure must not block the rest.
+    if let Ok((price_micros, date)) = fetch_bonddia_price().await {
+        let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES ('bonddia_price', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [serde_json::json!({ "price_micros": price_micros, "date": date }).to_string()],
+        )?;
+    }
+
+    // 3) Crypto prices for held symbols.
     let symbols: Vec<String> = {
         let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         let mut stmt = conn.prepare(
@@ -558,4 +569,116 @@ pub async fn refresh_market_data(db: &Db) -> AppResult<()> {
 #[tauri::command]
 pub async fn refresh_market_data_cmd(db: State<'_, Db>) -> AppResult<()> {
     refresh_market_data(&db).await
+}
+
+// ---- BONDDIA official daily price (cetesdirecto) ----
+//
+// https://www.cetesdirecto.com/tablas/valores_gubernamentales/bonddia.html
+// publishes the fund's official price per título ("Precio día anterior").
+// Anchoring a position to títulos × precio reproduces cetesdirecto exactly,
+// with no drift — the NAV already embeds fees and whole-título quantization.
+// The page blocks non-browser user agents, hence the UA header.
+
+const SPANISH_MONTHS: [(&str, u32); 12] = [
+    ("enero", 1),
+    ("febrero", 2),
+    ("marzo", 3),
+    ("abril", 4),
+    ("mayo", 5),
+    ("junio", 6),
+    ("julio", 7),
+    ("agosto", 8),
+    ("septiembre", 9),
+    ("octubre", 10),
+    ("noviembre", 11),
+    ("diciembre", 12),
+];
+
+/// Extract (price_micros, iso_date) from the BONDDIA page HTML.
+pub(crate) fn parse_bonddia_page(html: &str) -> Option<(i64, String)> {
+    let text: String = html
+        .replace(['\n', '\r'], " ")
+        .chars()
+        .collect();
+    // price: first decimal number after "Precio"
+    let after = text.split("Precio").nth(1)?;
+    let price_str: String = after
+        .chars()
+        .skip_while(|c| !c.is_ascii_digit())
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    let price: f64 = price_str.parse().ok()?;
+    if !(0.5..1000.0).contains(&price) {
+        return None;
+    }
+    // date like "11 Junio 2026" anywhere in the page
+    let mut iso_date = None;
+    for (name, month) in SPANISH_MONTHS {
+        if let Some(pos) = text.to_lowercase().find(name) {
+            let before: String = text[..pos]
+                .chars()
+                .rev()
+                .take(8)
+                .collect::<String>()
+                .chars()
+                .rev()
+                .collect();
+            let day: String = before.chars().filter(|c| c.is_ascii_digit()).collect();
+            let after_month = &text[pos + name.len()..];
+            let year: String = after_month
+                .chars()
+                .skip_while(|c| !c.is_ascii_digit())
+                .take(4)
+                .collect();
+            if let (Ok(d), Ok(y)) = (day.parse::<u32>(), year.parse::<i32>()) {
+                if (1..=31).contains(&d) && (2000..2100).contains(&y) {
+                    iso_date = Some(format!("{y:04}-{month:02}-{d:02}"));
+                    break;
+                }
+            }
+        }
+    }
+    Some((
+        (price * 1_000_000.0).round() as i64,
+        iso_date.unwrap_or_default(),
+    ))
+}
+
+pub(crate) async fn fetch_bonddia_price() -> AppResult<(i64, String)> {
+    let html = reqwest::Client::new()
+        .get("https://www.cetesdirecto.com/tablas/valores_gubernamentales/bonddia.html")
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        )
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("no se pudo consultar cetesdirecto: {e}")))?
+        .text()
+        .await
+        .map_err(|e| AppError::Internal(format!("respuesta inválida de cetesdirecto: {e}")))?;
+    parse_bonddia_page(&html).ok_or_else(|| {
+        AppError::Internal("no se encontró el precio de BONDDIA en la página".into())
+    })
+}
+
+#[cfg(test)]
+mod bonddia_price_tests {
+    use super::*;
+
+    #[test]
+    fn parses_price_and_date_from_page() {
+        let html = "<div>BONDDIA</div><span>11 Junio 2026</span>\
+                    <td>Precio d&iacute;a anterior</td><td>2.334524</td>";
+        let (micros, date) = parse_bonddia_page(html).unwrap();
+        assert_eq!(micros, 2_334_524);
+        assert_eq!(date, "2026-06-11");
+    }
+
+    #[test]
+    fn rejects_pages_without_a_plausible_price() {
+        assert!(parse_bonddia_page("<html>mantenimiento</html>").is_none());
+        assert!(parse_bonddia_page("Precio 45000.0").is_none());
+    }
 }

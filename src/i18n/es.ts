@@ -146,7 +146,9 @@ export const es = {
     cryptoQuantity: "Cantidad",
     cryptoPrincipalHint: "Lo que has gastado en comprarla (MXN), para calcular tu rendimiento.",
     bonddiaHint:
-      "El valor se calcula componiendo día a día la tasa objetivo histórica de Banxico (se actualiza sola).",
+      "Si capturas tus títulos (los ves en tu app de cetesdirecto), el valor usa el precio oficial diario del fondo: exacto y sin desfase. Si los dejas vacíos, se estima con la tasa histórica de Banxico.",
+    bonddiaTitulos: "Títulos (opcional)",
+    bonddiaRemanentes: "Remanentes (opcional)",
     quantity: "Cantidad",
     price: "Precio actual",
     invalidQuantity: "Cantidad inválida",

@@ -22,6 +22,25 @@ use crate::models::Investment;
 
 pub struct Bonddia;
 
+/// Latest official price per título in micros (settings key 'bonddia_price').
+fn load_official_price(conn: &Connection) -> AppResult<Option<i64>> {
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'bonddia_price'",
+            [],
+            |r| r.get(0),
+        )
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            other => Err(other),
+        })?;
+    Ok(raw
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v.get("price_micros").and_then(|p| p.as_i64()))
+        .filter(|p| *p > 0))
+}
+
 /// (effective_date, rate_bps) steps, chronological.
 fn load_history(conn: &Connection) -> AppResult<Vec<(NaiveDate, i64)>> {
     let mut stmt = conn.prepare(
@@ -86,6 +105,20 @@ impl InvestmentCalculator for Bonddia {
 
     fn value_at(&self, inv: &Investment, conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
         let params = parse_params(inv)?;
+
+        // Exact mode: anchored to the official daily NAV when the user tracks
+        // títulos (copied from their cetesdirecto app). No drift by
+        // construction — the price already embeds fees and quantization.
+        if let Some(titulos) = params.get("titulos").and_then(|v| v.as_i64()) {
+            if titulos > 0 {
+                if let Some(price_micros) = load_official_price(conn)? {
+                    let remanentes = param_i64_or(&params, "remanentes_cents", 0);
+                    let value = (titulos as i128 * price_micros as i128 / 10_000) as i64;
+                    return Ok(value + remanentes);
+                }
+            }
+        }
+
         let spread_bps = params
             .get("spread_bps")
             .and_then(|v| v.as_f64())
@@ -175,6 +208,40 @@ mod tests {
         let a_year = NaiveDate::from_ymd_opt(2027, 1, 1).unwrap();
         // identical to nu_cajita at 15%: 1,161,798
         assert_eq!(Bonddia.value_at(&inv, &conn, a_year).unwrap(), 1_161_798);
+    }
+
+    #[test]
+    fn titulos_mode_anchors_to_the_official_price() {
+        let conn = open_in_memory();
+        // even with history present, títulos × precio wins
+        seed_history(&conn, &[("2025-01-01", 1000)]);
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES ('bonddia_price',
+             '{\"price_micros\": 2334524, \"date\": \"2026-06-11\"}')",
+            [],
+        )
+        .unwrap();
+        let inv = test_investment(
+            "bonddia",
+            600,
+            r#"{"titulos": 2923, "remanentes_cents": 206, "spread_bps": 53.06}"#,
+        );
+        seed_investment(&conn, &inv);
+        let as_of = NaiveDate::from_ymd_opt(2026, 6, 11).unwrap();
+        // 2923 × 2.334524 = 6,823.81 (truncated to cents) + 2.06 remanentes
+        let expected = (2923i128 * 2_334_524 / 10_000) as i64 + 206;
+        assert_eq!(Bonddia.value_at(&inv, &conn, as_of).unwrap(), expected);
+    }
+
+    #[test]
+    fn titulos_mode_falls_back_to_history_without_price() {
+        let conn = open_in_memory();
+        seed_history(&conn, &[("2025-01-01", 1000)]);
+        let inv = test_investment("bonddia", 1_000_000, r#"{"titulos": 2923}"#);
+        seed_investment(&conn, &inv);
+        let as_of = NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(); // +30d at 10%
+        let expected = (1_000_000.0_f64 * (1.0_f64 + 0.10 / 365.0).powi(30)).round() as i64;
+        assert_eq!(Bonddia.value_at(&inv, &conn, as_of).unwrap(), expected);
     }
 
     #[test]

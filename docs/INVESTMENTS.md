@@ -93,9 +93,9 @@ Todas las calculadoras excepto `manual` soportan movimientos posteriores al inic
 
 `get_investment_detail(id)` regresa valor actual, ganancia (valor − principal) y una serie `[{date, value_cents}]` con puntos semanales hasta el vencimiento (o +1 año si no hay vencimiento) para la gráfica de línea en Recharts.
 
-### `bonddia` — BONDDIA (cetesdirecto) con tasa histórica
+### `bonddia` — BONDDIA (cetesdirecto)
 
-Params: `{"spread_bps": 0, "annual_rate_bps": 650}` (spread opcional sobre la tasa; annual_rate_bps solo como respaldo sin conexión).
+Params: `{"titulos": 2923, "remanentes_cents": 206, "spread_bps": 53.06, "annual_rate_bps": 650}` — todos opcionales. **Modo exacto**: con `titulos`, valor = títulos × precio oficial diario del fondo (cacheado de cetesdirecto) + remanentes — sin desfase. Sin títulos: estimación con tasa histórica (spread fraccionario sobre la tasa objetivo; annual_rate_bps como respaldo sin conexión).
 
 BONDDIA reinvierte diario a la tasa de fondeo vigente (≈ tasa objetivo de Banxico). Usar una sola tasa "actual" subvalúa depósitos antiguos (la tasa era ~11% en 2023-2024 vs ~6.5% en 2026), así que esta calculadora compone **día por día sobre la serie histórica** de la tasa objetivo, cacheada en la tabla `rate_history` (se refresca sola al arrancar). Cada aportación/retiro usa la tasa vigente de cada día desde su propia fecha (ACT/365).
 
