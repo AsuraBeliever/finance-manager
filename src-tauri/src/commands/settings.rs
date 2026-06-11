@@ -477,17 +477,30 @@ mod banxico_tests {
 /// refresh prices for every crypto symbol held in investments. Silent-fail
 /// friendly: callers decide whether errors matter.
 pub async fn refresh_market_data(db: &Db) -> AppResult<()> {
-    // 1) Banxico target-rate history.
-    let history = fetch_series_history("objetivo").await?;
-    {
+    // 1) Banxico target-rate history. The series has ~6,700 daily rows, so
+    // skip the fetch when the cache is already current and write everything
+    // in ONE transaction (row-by-row autocommit locked the DB for seconds).
+    let history_fresh = {
         let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM rate_history
+             WHERE series = 'objetivo' AND date >= date('now', '-3 days'))",
+            [],
+            |r| r.get::<_, bool>(0),
+        )?
+    };
+    if !history_fresh {
+        let history = fetch_series_history("objetivo").await?;
+        let mut conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let tx = conn.transaction()?;
         for (date, rate_bps) in &history {
-            conn.execute(
+            tx.execute(
                 "INSERT INTO rate_history (series, date, rate_bps) VALUES ('objetivo', ?1, ?2)
                  ON CONFLICT(series, date) DO UPDATE SET rate_bps = excluded.rate_bps",
                 rusqlite::params![date, rate_bps],
             )?;
         }
+        tx.commit()?;
     }
 
     // 2) Crypto prices for held symbols.

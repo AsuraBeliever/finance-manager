@@ -977,7 +977,7 @@ dependencies = [
 
 [[package]]
 name = "finanzas"
-version = "1.4.1"
+version = "1.5.0"
 dependencies = [
  "chrono",
  "reqwest 0.12.28",
