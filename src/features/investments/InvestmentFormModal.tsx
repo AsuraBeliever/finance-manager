@@ -45,6 +45,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
   const [rateText, setRateText] = useState("");
   const [plazo, setPlazo] = useState(91);
   const [isrText, setIsrText] = useState("0");
+  const [reinvest, setReinvest] = useState(false);
   const [compounding, setCompounding] = useState("daily");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +63,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
     );
     setPlazo(params.plazo_days ?? 91);
     setIsrText(params.isr_rate_bps !== undefined ? (params.isr_rate_bps / 100).toString() : "0");
+    setReinvest(params.reinvest ?? false);
     setCompounding(params.compounding ?? "daily");
     setNotes(investment?.notes ?? "");
     setError(null);
@@ -86,6 +88,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
         if (isr === null) throw new Error(es.investments.invalidRate);
         params.plazo_days = plazo;
         params.isr_rate_bps = isr;
+        params.reinvest = reinvest;
       }
       if (calculator === "fixed_rate") {
         params.compounding = compounding;
@@ -228,6 +231,21 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
               </span>
             </Field>
           </div>
+        )}
+
+        {calculator === "cetes" && (
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={reinvest}
+              onChange={(e) => setReinvest(e.target.checked)}
+              className="mt-1 accent-emerald-500"
+            />
+            <span>
+              <span className="block text-sm font-medium">{es.investments.reinvest}</span>
+              <span className="block text-xs text-zinc-500">{es.investments.reinvestHint}</span>
+            </span>
+          </label>
         )}
 
         {calculator === "fixed_rate" && (

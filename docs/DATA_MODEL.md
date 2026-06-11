@@ -102,7 +102,25 @@ CREATE TABLE investment_snapshots (       -- marcas manuales + registro históri
 );
 
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+-- migración 3
+CREATE TABLE investment_movements (   -- aportaciones y retiros posteriores al inicio
+  id INTEGER PRIMARY KEY,
+  investment_id INTEGER NOT NULL REFERENCES investments(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('deposit','withdrawal')),
+  amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+  occurred_at TEXT NOT NULL,          -- 'YYYY-MM-DD', >= start_date de la inversión
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_inv_mov ON investment_movements(investment_id, occurred_at);
 ```
+
+## Semántica de movimientos de inversión
+
+- El `principal_cents` de la inversión es la aportación inicial (en `start_date`); los movimientos posteriores viven en `investment_movements`.
+- **Valuación por posición**: cada monto genera rendimiento desde su propia fecha — `valor(t) = principal·f(start→t) + Σ aportaciones·f(fecha→t) − Σ retiros·f(fecha→t)`, donde `f` es el factor de crecimiento de la calculadora. Un retiro resta también el rendimiento que ese dinero habría generado desde la fecha del retiro.
+- **Aportado neto** = principal + aportaciones − retiros. **Rendimiento** = valor actual − aportado neto (captura rendimiento realizado y no realizado; puede ser positivo aunque el valor actual sea menor a lo retirado).
+- Las inversiones `manual` no usan movimientos (su valor viene de snapshots).
 
 ## Seeds (migración 2)
 

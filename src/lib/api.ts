@@ -137,3 +137,19 @@ export const addSnapshot = (investmentId: number, valueCents: number, asOf: stri
 
 export const getInvestmentDetail = (id: number) =>
   invoke<InvestmentDetail>("get_investment_detail", { id });
+
+export const addInvestmentMovement = (
+  investmentId: number,
+  kind: "deposit" | "withdrawal",
+  amountCents: number,
+  occurredAt: string,
+) =>
+  invoke<void>("add_investment_movement", {
+    investmentId,
+    kind,
+    amountCents,
+    occurredAt,
+  });
+
+export const deleteInvestmentMovement = (id: number) =>
+  invoke<void>("delete_investment_movement", { id });

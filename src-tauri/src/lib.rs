@@ -58,6 +58,8 @@ pub fn run() {
             commands::investments::delete_investment,
             commands::investments::add_snapshot,
             commands::investments::get_investment_detail,
+            commands::investments::add_investment_movement,
+            commands::investments::delete_investment_movement,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

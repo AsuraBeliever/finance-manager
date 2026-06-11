@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, LockOpen, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Lock,
+  LockOpen,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -16,9 +24,11 @@ import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
 import { Modal } from "../../components/Modal";
 import {
+  addInvestmentMovement,
   addSnapshot,
   closeInvestment,
   deleteInvestment,
+  deleteInvestmentMovement,
   getInvestmentDetail,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
@@ -39,6 +49,10 @@ export function InvestmentDetailPage() {
   const [snapshotValue, setSnapshotValue] = useState("");
   const [snapshotDate, setSnapshotDate] = useState(today());
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
+  const [movementKind, setMovementKind] = useState<"deposit" | "withdrawal" | null>(null);
+  const [movementValue, setMovementValue] = useState("");
+  const [movementDate, setMovementDate] = useState(today());
+  const [movementError, setMovementError] = useState<string | null>(null);
 
   const detail = useQuery({
     queryKey: ["investments", invId],
@@ -78,6 +92,28 @@ export function InvestmentDetailPage() {
       setSnapshotDate(today());
     },
     onError: (e) => setSnapshotError(e instanceof Error ? e.message : String(e)),
+  });
+
+  const movement = useMutation({
+    mutationFn: () => {
+      const cents = parseToCents(movementValue);
+      if (cents === null || cents <= 0)
+        return Promise.reject(new Error(es.investments.invalidAmount));
+      if (!movementKind) return Promise.reject(new Error(es.investments.invalidAmount));
+      return addInvestmentMovement(invId, movementKind, cents, movementDate);
+    },
+    onSuccess: () => {
+      invalidate();
+      setMovementKind(null);
+      setMovementValue("");
+      setMovementDate(today());
+    },
+    onError: (e) => setMovementError(e instanceof Error ? e.message : String(e)),
+  });
+
+  const removeMovement = useMutation({
+    mutationFn: deleteInvestmentMovement,
+    onSuccess: invalidate,
   });
 
   if (detail.isPending) return <p className="text-sm text-zinc-500">{es.common.loading}</p>;
@@ -143,9 +179,9 @@ export function InvestmentDetailPage() {
           </p>
         </div>
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
-          <p className="text-xs text-zinc-500">{es.investments.principal}</p>
+          <p className="text-xs text-zinc-500">{es.investments.netInvested}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums">
-            {formatCents(d.principalCents, d.currencyCode)}
+            {formatCents(d.netInvestedCents, d.currencyCode)}
           </p>
         </div>
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
@@ -190,6 +226,71 @@ export function InvestmentDetailPage() {
         </ResponsiveContainer>
       </section>
 
+      {d.calculator !== "manual" && (
+        <section className="mb-4 rounded-xl border border-border-muted bg-surface-raised p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-medium">{es.investments.movements}</h3>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setMovementKind("deposit")}>
+                <span className="flex items-center gap-2 text-accent">
+                  <ArrowDownLeft size={15} /> {es.investments.deposit}
+                </span>
+              </Button>
+              <Button variant="ghost" onClick={() => setMovementKind("withdrawal")}>
+                <span className="flex items-center gap-2 text-danger">
+                  <ArrowUpRight size={15} /> {es.investments.withdrawal}
+                </span>
+              </Button>
+            </div>
+          </div>
+          {d.movements.length === 0 ? (
+            <p className="py-2 text-sm text-zinc-500">{es.investments.movementsEmpty}</p>
+          ) : (
+            <ul className="divide-y divide-border-muted">
+              {d.movements.map((m) => (
+                <li key={m.id} className="group flex items-center gap-3 py-2 text-sm">
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-overlay ${
+                      m.kind === "deposit" ? "text-accent" : "text-danger"
+                    }`}
+                  >
+                    {m.kind === "deposit" ? (
+                      <ArrowDownLeft size={13} />
+                    ) : (
+                      <ArrowUpRight size={13} />
+                    )}
+                  </span>
+                  <span className="text-zinc-300">
+                    {m.kind === "deposit"
+                      ? es.investments.depositNoun
+                      : es.investments.withdrawalNoun}
+                  </span>
+                  <span className="text-zinc-500">{m.occurredAt}</span>
+                  <span
+                    className={`ml-auto tabular-nums ${
+                      m.kind === "deposit" ? "text-accent" : "text-danger"
+                    }`}
+                  >
+                    {m.kind === "deposit" ? "+" : "−"}
+                    {formatCents(m.amountCents, d.currencyCode)}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(es.investments.movementDeleteConfirm))
+                        removeMovement.mutate(m.id);
+                    }}
+                    aria-label={es.common.delete}
+                    className="rounded-md p-1 text-zinc-600 opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {d.calculator === "manual" && (
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <div className="mb-3 flex items-center justify-between">
@@ -214,6 +315,56 @@ export function InvestmentDetailPage() {
       )}
 
       <InvestmentFormModal open={editOpen} onClose={() => setEditOpen(false)} investment={d} />
+
+      <Modal
+        title={
+          movementKind === "withdrawal"
+            ? es.investments.withdrawalNoun
+            : es.investments.depositNoun
+        }
+        open={movementKind !== null}
+        onClose={() => setMovementKind(null)}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setMovementError(null);
+            movement.mutate();
+          }}
+          className="grid gap-4"
+        >
+          <Field label={es.investments.movementAmount}>
+            <input
+              className={inputClass}
+              value={movementValue}
+              onChange={(e) => setMovementValue(e.target.value)}
+              placeholder="0.00"
+              inputMode="decimal"
+              required
+              autoFocus
+            />
+          </Field>
+          <Field label={es.investments.movementDate}>
+            <input
+              type="date"
+              className={inputClass}
+              value={movementDate}
+              onChange={(e) => setMovementDate(e.target.value)}
+              min={d.startDate}
+              required
+            />
+          </Field>
+          {movementError && <p className="text-sm text-danger">{movementError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setMovementKind(null)}>
+              {es.common.cancel}
+            </Button>
+            <Button type="submit" disabled={movement.isPending}>
+              {es.common.save}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         title={es.investments.addSnapshot}

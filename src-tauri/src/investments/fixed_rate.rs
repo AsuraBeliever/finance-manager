@@ -7,7 +7,7 @@
 use chrono::{Datelike, NaiveDate};
 use rusqlite::Connection;
 
-use super::{param_i64, parse_params, parse_start_date, InvestmentCalculator};
+use super::{param_i64, parse_params, InvestmentCalculator};
 use crate::error::{AppError, AppResult};
 use crate::models::Investment;
 
@@ -31,7 +31,7 @@ impl InvestmentCalculator for FixedRate {
         "fixed_rate"
     }
 
-    fn value_at(&self, inv: &Investment, _conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
+    fn value_at(&self, inv: &Investment, conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
         let params = parse_params(inv)?;
         let rate_bps = param_i64(&params, "annual_rate_bps")?;
         let compounding = params
@@ -39,22 +39,21 @@ impl InvestmentCalculator for FixedRate {
             .and_then(|v| v.as_str())
             .unwrap_or("daily")
             .to_string();
-        let start = parse_start_date(inv)?;
-
-        let days = (as_of - start).num_days().max(0);
+        if !matches!(compounding.as_str(), "daily" | "monthly" | "simple") {
+            return Err(AppError::InvalidInput(format!(
+                "compounding inválido: {compounding} (válidos: daily, monthly, simple)"
+            )));
+        }
         let r = rate_bps as f64 / 10_000.0;
-        let principal = inv.principal_cents as f64;
-        let value = match compounding.as_str() {
-            "daily" => principal * (1.0 + r / 365.0).powi(days as i32),
-            "monthly" => principal * (1.0 + r / 12.0).powi(full_months_between(start, as_of)),
-            "simple" => principal * (1.0 + r * days as f64 / 365.0),
-            other => {
-                return Err(AppError::InvalidInput(format!(
-                    "compounding inválido: {other} (válidos: daily, monthly, simple)"
-                )))
+
+        super::position_value(inv, conn, as_of, |from| {
+            let days = (as_of - from).num_days().max(0);
+            match compounding.as_str() {
+                "daily" => (1.0 + r / 365.0).powi(days as i32),
+                "monthly" => (1.0 + r / 12.0).powi(full_months_between(from, as_of)),
+                _ => 1.0 + r * days as f64 / 365.0,
             }
-        };
-        Ok(value.round() as i64)
+        })
     }
 
     fn maturity_date(&self, _inv: &Investment) -> Option<NaiveDate> {
