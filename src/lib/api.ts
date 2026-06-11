@@ -119,6 +119,17 @@ export interface InvestmentInput {
 
 export const listCalculators = () => invoke<CalculatorId[]>("list_calculators");
 
+export interface CatalogItem {
+  id: string;
+  calculator: CalculatorId;
+  paramsJson: string;
+  rateBps: number | null;
+  rateDate: string | null;
+}
+
+export const getInvestmentCatalog = () =>
+  invoke<CatalogItem[]>("get_investment_catalog");
+
 export const listInvestments = (includeClosed = false) =>
   invoke<InvestmentWithValue[]>("list_investments", { includeClosed });
 

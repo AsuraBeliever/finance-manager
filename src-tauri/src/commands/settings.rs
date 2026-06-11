@@ -382,19 +382,21 @@ async fn get_json(url: &str) -> AppResult<serde_json::Value> {
         .map_err(|e| AppError::Internal(format!("respuesta inválida de Banxico: {e}")))
 }
 
-#[tauri::command]
-pub async fn fetch_banxico_rate(db: State<'_, Db>, kind: String) -> AppResult<BanxicoRate> {
-    let (series, chart_context) = banxico_series(&kind)?;
-
-    // Tokenless public endpoint first.
+/// Tokenless fetch from the public SieInternet chart endpoint.
+pub(crate) async fn fetch_rate_tokenless(kind: &str) -> AppResult<BanxicoRate> {
+    let (_series, chart_context) = banxico_series(kind)?;
     let url = format!(
         "https://www.banxico.org.mx/SieInternet/consultaSerieGrafica.do?s={chart_context}&versionSerie=LA-MAS-RECIENTE&l=es"
     );
-    let primary = match get_json(&url).await {
-        Ok(body) => parse_sie_internet_body(&body),
-        Err(e) => Err(e),
-    };
-    let primary_err = match primary {
+    parse_sie_internet_body(&get_json(&url).await?)
+}
+
+#[tauri::command]
+pub async fn fetch_banxico_rate(db: State<'_, Db>, kind: String) -> AppResult<BanxicoRate> {
+    let (series, _) = banxico_series(&kind)?;
+
+    // Tokenless public endpoint first.
+    let primary_err = match fetch_rate_tokenless(&kind).await {
         Ok(rate) => return Ok(rate),
         Err(e) => e,
     };

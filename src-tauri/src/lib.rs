@@ -1,4 +1,4 @@
-mod commands;
+pub(crate) mod commands;
 mod db;
 mod error;
 mod investments;
@@ -55,6 +55,7 @@ pub fn run() {
             commands::transactions::create_transaction_category,
             commands::dashboard::get_dashboard_summary,
             commands::investments::list_calculators,
+            commands::investments::get_investment_catalog,
             commands::investments::list_investments,
             commands::investments::create_investment,
             commands::investments::update_investment,
