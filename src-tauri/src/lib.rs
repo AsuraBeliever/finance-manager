@@ -7,10 +7,6 @@ pub(crate) use finanzas_core::error;
 pub(crate) use finanzas_core::investments;
 pub(crate) use finanzas_core::models;
 
-use std::fs;
-use std::sync::Mutex;
-use tauri::Manager;
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // WebKitGTK's DMABUF renderer is unstable on NVIDIA + Wayland: GBM
@@ -20,34 +16,17 @@ pub fn run() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
 
+    // v2.0.0: the window loads the deployed cloud app (tauri.conf.json) and
+    // talks to the Worker over HTTP — nothing invokes these commands anymore.
+    // The local backend stays compiled but DORMANT: the local finanzas.db is
+    // the pre-migration read-only backup and must never be opened for writing
+    // (no db open, no managed state, no startup market refresh).
     tauri::Builder::default()
         // NOTE: tauri-plugin-single-instance was tried and removed — its DBus
         // signaling crashes the running instance under GTK3/Wayland (protocol
         // error 71). Single-instance behavior lives in scripts/finanzas-open
         // (pgrep guard); launching the bare binary twice is unsupported.
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
-            let data_dir = app.path().app_data_dir()?;
-            fs::create_dir_all(&data_dir)?;
-            let conn = db::open(&data_dir.join("finanzas.db"))
-                .map_err(|e| format!("failed to open database: {e}"))?;
-            app.manage(db::Db(Mutex::new(conn)));
-
-            // Refresh market data in the background on startup, silent on
-            // failure (offline keeps the last cached values): fx rates,
-            // Banxico target-rate history (bonddia) and crypto prices.
-            let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let db = handle.state::<db::Db>();
-                if let Err(e) = commands::settings::fetch_and_store_rates(&db, false).await {
-                    eprintln!("exchange rate auto-update failed: {e}");
-                }
-                if let Err(e) = commands::settings::refresh_market_data(&db).await {
-                    eprintln!("market data auto-update failed: {e}");
-                }
-            });
-            Ok(())
-        })
         .invoke_handler(tauri::generate_handler![
             commands::settings::list_currencies,
             commands::settings::list_wallet_categories,

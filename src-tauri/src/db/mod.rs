@@ -8,8 +8,9 @@ use crate::error::AppResult;
 pub struct Db(pub Mutex<Connection>);
 
 /// Ordered migrations; each runs once, tracked in schema_migrations.
-/// NEVER edit an applied migration — append a new one instead, and keep
-/// docs/DATA_MODEL.md in sync.
+/// FROZEN since v2.0.0: the canonical schema lives in worker/migrations/
+/// (D1); this module only backs the dormant local stack and its tests.
+#[allow(dead_code)] // dormant since v2.0.0 — desktop shell uses the cloud API
 const MIGRATIONS: &[&str] = &[
     // 1: schema
     r#"
@@ -160,6 +161,7 @@ const MIGRATIONS: &[&str] = &[
     "#,
 ];
 
+#[allow(dead_code)] // dormant since v2.0.0 — desktop shell uses the cloud API
 pub fn open(path: &Path) -> AppResult<Connection> {
     let conn = Connection::open(path)?;
     conn.pragma_update(None, "foreign_keys", true)?;
@@ -167,6 +169,7 @@ pub fn open(path: &Path) -> AppResult<Connection> {
     Ok(conn)
 }
 
+#[allow(dead_code)] // dormant since v2.0.0 — used by tests via open_in_memory
 fn migrate(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
