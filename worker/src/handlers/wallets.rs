@@ -116,11 +116,7 @@ pub struct CreateWalletArgs {
     pub notes: Option<String>,
 }
 
-pub async fn create_wallet(
-    db: &D1Database,
-    uid: i64,
-    a: CreateWalletArgs,
-) -> AppResult<Wallet> {
+pub async fn create_wallet(db: &D1Database, uid: i64, a: CreateWalletArgs) -> AppResult<Wallet> {
     validate(&a.name)?;
     let res = exec(
         db,
@@ -144,11 +140,7 @@ pub struct UpdateWalletArgs {
     pub notes: Option<String>,
 }
 
-pub async fn update_wallet(
-    db: &D1Database,
-    uid: i64,
-    a: UpdateWalletArgs,
-) -> AppResult<Wallet> {
+pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> AppResult<Wallet> {
     validate(&a.name)?;
     let res = exec(
         db,
@@ -156,7 +148,16 @@ pub async fn update_wallet(
          SET name = ?3, category_id = ?4, currency_code = ?5,
              initial_balance_cents = ?6, color = ?7, notes = ?8
          WHERE id = ?1 AND user_id = ?2",
-        jsv![a.id, uid, a.name.trim(), a.category_id, a.currency_code, a.initial_balance_cents, a.color, a.notes],
+        jsv![
+            a.id,
+            uid,
+            a.name.trim(),
+            a.category_id,
+            a.currency_code,
+            a.initial_balance_cents,
+            a.color,
+            a.notes
+        ],
     )
     .await?;
     if changes(&res) == 0 {
@@ -199,7 +200,11 @@ pub async fn delete_wallet(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<()
                WHERE wallet_id = ?1 AND transfer_group_id IS NOT NULL)",
             jsv![a.id],
         )?,
-        stmt(db, "DELETE FROM transactions WHERE wallet_id = ?1", jsv![a.id])?,
+        stmt(
+            db,
+            "DELETE FROM transactions WHERE wallet_id = ?1",
+            jsv![a.id],
+        )?,
         stmt(
             db,
             "UPDATE investments SET linked_wallet_id = NULL

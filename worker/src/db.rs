@@ -40,11 +40,6 @@ impl ToJs for str {
         JsValue::from_str(self)
     }
 }
-impl ToJs for &str {
-    fn to_js(&self) -> JsValue {
-        JsValue::from_str(self)
-    }
-}
 impl ToJs for String {
     fn to_js(&self) -> JsValue {
         JsValue::from_str(self)
@@ -96,7 +91,10 @@ pub async fn first<T: DeserializeOwned>(
     sql: &str,
     params: Vec<JsValue>,
 ) -> AppResult<Option<T>> {
-    stmt(db, sql, params)?.first::<T>(None).await.map_err(db_err)
+    stmt(db, sql, params)?
+        .first::<T>(None)
+        .await
+        .map_err(db_err)
 }
 
 pub async fn exec(db: &D1Database, sql: &str, params: Vec<JsValue>) -> AppResult<D1Result> {
@@ -105,10 +103,7 @@ pub async fn exec(db: &D1Database, sql: &str, params: Vec<JsValue>) -> AppResult
 
 /// Atomic multi-statement write. D1 has no interactive BEGIN/COMMIT — a batch
 /// IS the transaction (all statements roll back if any fails).
-pub async fn batch(
-    db: &D1Database,
-    stmts: Vec<D1PreparedStatement>,
-) -> AppResult<Vec<D1Result>> {
+pub async fn batch(db: &D1Database, stmts: Vec<D1PreparedStatement>) -> AppResult<Vec<D1Result>> {
     db.batch(stmts).await.map_err(db_err)
 }
 
@@ -129,11 +124,7 @@ pub async fn batch_chunks(
 }
 
 pub fn changes(r: &D1Result) -> i64 {
-    r.meta()
-        .ok()
-        .flatten()
-        .and_then(|m| m.changes)
-        .unwrap_or(0) as i64
+    r.meta().ok().flatten().and_then(|m| m.changes).unwrap_or(0) as i64
 }
 
 pub fn last_row_id(r: &D1Result) -> AppResult<i64> {
@@ -141,7 +132,6 @@ pub fn last_row_id(r: &D1Result) -> AppResult<i64> {
         .ok()
         .flatten()
         .and_then(|m| m.last_row_id)
-        .map(|v| v as i64)
         .ok_or_else(|| AppError::Internal("no se obtuvo el id insertado".into()))
 }
 

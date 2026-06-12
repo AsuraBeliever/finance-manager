@@ -325,7 +325,12 @@ const CATALOG: &[(&str, &str, Option<&str>, &str)] = &[
     ("bonddia", "bonddia", Some("objetivo"), "{}"),
     ("nu_cajita", "nu_cajita", None, "{}"),
     ("crypto", "crypto", None, "{}"),
-    ("fixed_rate", "fixed_rate", None, r#"{"compounding":"daily"}"#),
+    (
+        "fixed_rate",
+        "fixed_rate",
+        None,
+        r#"{"compounding":"daily"}"#,
+    ),
     ("manual", "manual", None, "{}"),
 ];
 
@@ -408,7 +413,12 @@ pub async fn create_investment(
     if a.name.trim().is_empty() {
         return Err(AppError::InvalidInput("el nombre es obligatorio".into()));
     }
-    validate_input(&a.calculator, a.principal_cents, &a.start_date, &a.params_json)?;
+    validate_input(
+        &a.calculator,
+        a.principal_cents,
+        &a.start_date,
+        &a.params_json,
+    )?;
     let res = exec(
         db,
         "INSERT INTO investments (user_id, name, calculator, currency_code, principal_cents, start_date, params_json, linked_wallet_id, notes)
@@ -454,7 +464,17 @@ pub async fn update_investment(
          SET name = ?3, currency_code = ?4, principal_cents = ?5, start_date = ?6,
              params_json = ?7, linked_wallet_id = ?8, notes = ?9
          WHERE id = ?1 AND user_id = ?2",
-        jsv![a.id, uid, a.name.trim(), a.currency_code, a.principal_cents, a.start_date, a.params_json, a.linked_wallet_id, a.notes],
+        jsv![
+            a.id,
+            uid,
+            a.name.trim(),
+            a.currency_code,
+            a.principal_cents,
+            a.start_date,
+            a.params_json,
+            a.linked_wallet_id,
+            a.notes
+        ],
     )
     .await?;
     let inv = fetch_investment(db, uid, a.id).await?;

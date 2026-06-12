@@ -106,12 +106,26 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
         stmt(
             db,
             insert,
-            jsv![a.from_wallet_id, "transfer_out", a.amount_from_cents, group_id, a.description, a.occurred_at],
+            jsv![
+                a.from_wallet_id,
+                "transfer_out",
+                a.amount_from_cents,
+                group_id,
+                a.description,
+                a.occurred_at
+            ],
         )?,
         stmt(
             db,
             insert,
-            jsv![a.to_wallet_id, "transfer_in", a.amount_to_cents, group_id, a.description, a.occurred_at],
+            jsv![
+                a.to_wallet_id,
+                "transfer_in",
+                a.amount_to_cents,
+                group_id,
+                a.description,
+                a.occurred_at
+            ],
         )?,
     ];
     batch(db, stmts).await?;

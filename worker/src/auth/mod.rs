@@ -107,9 +107,7 @@ async fn create_session(db: &D1Database, user_id: i64) -> AppResult<String> {
 }
 
 fn session_cookie(token: &str, max_age: i64) -> String {
-    format!(
-        "{SESSION_COOKIE}={token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={max_age}"
-    )
+    format!("{SESSION_COOKIE}={token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={max_age}")
 }
 
 fn with_cookie(resp: Response, cookie: &str) -> worker::Result<Response> {
@@ -177,7 +175,9 @@ pub async fn register(mut req: Request, ctx: RouteContext<()>) -> worker::Result
 async fn do_register(ctx: &RouteContext<()>, args: RegisterArgs) -> AppResult<(UserInfo, String)> {
     let expected = invite_code(ctx)?;
     if args.invite_code.trim() != expected {
-        return Err(AppError::Unauthorized("código de invitación incorrecto".into()));
+        return Err(AppError::Unauthorized(
+            "código de invitación incorrecto".into(),
+        ));
     }
     let email = args.email.trim().to_lowercase();
     if !email.contains('@') || email.len() < 5 {
@@ -276,7 +276,13 @@ pub async fn logout(req: Request, ctx: RouteContext<()>) -> worker::Result<Respo
     };
     if let Some(token) = cookie_token(&req) {
         let hash = sha256_hex(token.as_bytes());
-        if let Err(e) = exec(&db, "DELETE FROM sessions WHERE token_hash = ?1", jsv![hash]).await {
+        if let Err(e) = exec(
+            &db,
+            "DELETE FROM sessions WHERE token_hash = ?1",
+            jsv![hash],
+        )
+        .await
+        {
             return error_response(&e);
         }
     }

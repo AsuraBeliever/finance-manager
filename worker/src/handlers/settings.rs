@@ -167,7 +167,11 @@ pub struct GetSettingArgs {
 
 /// User row wins; falls back to the system user (id 0), which holds global
 /// market cache entries like 'bonddia_price'.
-pub async fn get_setting(db: &D1Database, uid: i64, a: GetSettingArgs) -> AppResult<Option<String>> {
+pub async fn get_setting(
+    db: &D1Database,
+    uid: i64,
+    a: GetSettingArgs,
+) -> AppResult<Option<String>> {
     let row: Option<ValueRow> = first(
         db,
         "SELECT value FROM settings WHERE key = ?1 AND user_id IN (?2, 0)

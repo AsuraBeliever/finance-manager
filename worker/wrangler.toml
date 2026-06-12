@@ -8,7 +8,9 @@ main = "build/worker/shim.mjs"
 compatibility_date = "2026-06-01"
 
 [build]
-command = "worker-build --release"
+# worker-build lives in ~/.cargo/bin (cargo install worker-build), which the
+# user's fish PATH has but wrangler's /bin/sh may not.
+command = "PATH=\"$HOME/.cargo/bin:$PATH\" worker-build --release"
 
 [assets]
 directory = "../dist"

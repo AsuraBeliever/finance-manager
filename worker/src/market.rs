@@ -72,7 +72,12 @@ async fn non_mxn_currencies(db: &D1Database) -> AppResult<Vec<String>> {
     struct Row {
         code: String,
     }
-    let rows: Vec<Row> = all(db, "SELECT code FROM currencies WHERE code != 'MXN'", vec![]).await?;
+    let rows: Vec<Row> = all(
+        db,
+        "SELECT code FROM currencies WHERE code != 'MXN'",
+        vec![],
+    )
+    .await?;
     Ok(rows.into_iter().map(|r| r.code).collect())
 }
 

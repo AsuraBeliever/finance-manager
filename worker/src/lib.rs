@@ -10,8 +10,10 @@ mod handlers;
 mod market;
 mod rpc;
 
-use worker::{console_error, event, Context, Env, Request, Response, Result, Router,
-             ScheduleContext, ScheduledEvent};
+use worker::{
+    console_error, event, Context, Env, Request, Response, Result, Router, ScheduleContext,
+    ScheduledEvent,
+};
 
 #[event(fetch)]
 pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
