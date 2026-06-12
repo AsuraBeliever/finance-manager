@@ -5,4 +5,5 @@
 
 pub mod error;
 pub mod investments;
+pub mod market;
 pub mod models;

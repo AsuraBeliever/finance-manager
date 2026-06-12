@@ -13,6 +13,10 @@ pub enum AppError {
     #[error("{0} not found")]
     NotFound(&'static str),
 
+    // No authenticated session / bad credentials; maps to HTTP 401.
+    #[error("{0}")]
+    Unauthorized(String),
+
     #[error("{0}")]
     Internal(String),
 }

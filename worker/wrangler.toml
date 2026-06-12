@@ -1,0 +1,31 @@
+# Cloudflare Worker: serves the built frontend (../dist) and the /api/* RPC.
+# Local dev:  npm run build && npx wrangler dev          (from worker/)
+# Deploy:     npx wrangler deploy
+# D1 local:   npx wrangler d1 migrations apply finanzas --local
+
+name = "finanzas"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-06-01"
+
+[build]
+command = "worker-build --release"
+
+[assets]
+directory = "../dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "finanzas"
+database_id = "REPLACE-ON-DEPLOY"   # filled by `wrangler d1 create finanzas` (M5)
+migrations_dir = "migrations"
+
+[triggers]
+# Daily market-data refresh. Cron is UTC: 07:00 UTC ≈ 01:00 Mexico City.
+crons = ["0 7 * * *"]
+
+[vars]
+# Overridden per-environment; secrets (INVITE_CODE) via `wrangler secret put`.
+PBKDF2_ITERATIONS = "100000"
