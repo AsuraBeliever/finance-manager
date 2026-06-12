@@ -13,7 +13,7 @@ export default defineConfig(async () => ({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["apple-touch-icon.png"],
+      includeAssets: ["apple-touch-icon.png", "favicon.ico", "favicon-32.png"],
       manifest: {
         name: "Finanzas",
         short_name: "Finanzas",
