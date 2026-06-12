@@ -22,10 +22,10 @@ export function Modal({ title, open, onClose, children }: ModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-6"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-md rounded-xl border border-border-muted bg-surface-raised shadow-2xl">
+      <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl border border-border-muted bg-surface-raised shadow-2xl">
         <header className="flex items-center justify-between border-b border-border-muted px-5 py-4">
           <h3 className="font-semibold">{title}</h3>
           <button

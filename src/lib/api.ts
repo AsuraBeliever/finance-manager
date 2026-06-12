@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import type {
   CalculatorId,
   Currency,
@@ -13,20 +12,48 @@ import type {
   WalletCategory,
 } from "./types";
 
-// One typed wrapper per Tauri command. Components never call invoke() directly.
+// One typed wrapper per backend command. Components never fetch directly.
+//
+// Transport: POST /api/rpc/<command> against the Cloudflare Worker, with the
+// same camelCase argument shapes the Tauri invoke bridge used. Errors arrive
+// as {"error": "..."} and are rethrown as Error(message), matching the old
+// string-rejection contract.
 
-export const listCurrencies = () => invoke<Currency[]>("list_currencies");
+/** Fired when any call returns 401 so the app can show the login screen. */
+export const UNAUTHORIZED_EVENT = "auth:unauthorized";
+
+export async function rpc<T>(
+  name: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(`/api/rpc/${name}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify(args ?? {}),
+  });
+  if (res.status === 401) {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Error ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
+export const listCurrencies = () => rpc<Currency[]>("list_currencies");
 
 export const listWalletCategories = () =>
-  invoke<WalletCategory[]>("list_wallet_categories");
+  rpc<WalletCategory[]>("list_wallet_categories");
 
-export const getExchangeRates = () => invoke<ExchangeRate[]>("get_exchange_rates");
+export const getExchangeRates = () => rpc<ExchangeRate[]>("get_exchange_rates");
 
 /** Refresh market caches (Banxico rate history + crypto prices). */
-export const refreshMarketData = () => invoke<void>("refresh_market_data_cmd");
+export const refreshMarketData = () => rpc<void>("refresh_market_data_cmd");
 
 export const addCurrency = (code: string, name: string, symbol: string) =>
-  invoke<Currency>("add_currency", { code, name, symbol });
+  rpc<Currency>("add_currency", { code, name, symbol });
 
 export interface WalletInput {
   name: string;
@@ -38,20 +65,20 @@ export interface WalletInput {
 }
 
 export const listWallets = (includeArchived = false) =>
-  invoke<Wallet[]>("list_wallets", { includeArchived });
+  rpc<Wallet[]>("list_wallets", { includeArchived });
 
-export const getWallet = (id: number) => invoke<Wallet>("get_wallet", { id });
+export const getWallet = (id: number) => rpc<Wallet>("get_wallet", { id });
 
 export const createWallet = (input: WalletInput) =>
-  invoke<Wallet>("create_wallet", { ...input });
+  rpc<Wallet>("create_wallet", { ...input });
 
 export const updateWallet = (id: number, input: WalletInput) =>
-  invoke<Wallet>("update_wallet", { id, ...input });
+  rpc<Wallet>("update_wallet", { id, ...input });
 
 export const archiveWallet = (id: number, archived: boolean) =>
-  invoke<void>("archive_wallet", { id, archived });
+  rpc<void>("archive_wallet", { id, archived });
 
-export const deleteWallet = (id: number) => invoke<void>("delete_wallet", { id });
+export const deleteWallet = (id: number) => rpc<void>("delete_wallet", { id });
 
 export interface SimpleTxInput {
   walletId: number;
@@ -81,28 +108,28 @@ export interface TxFilter {
 }
 
 export const addIncome = (input: SimpleTxInput) =>
-  invoke<number>("add_income", { ...input });
+  rpc<number>("add_income", { ...input });
 
 export const addExpense = (input: SimpleTxInput) =>
-  invoke<number>("add_expense", { ...input });
+  rpc<number>("add_expense", { ...input });
 
 export const addTransfer = (input: TransferInput) =>
-  invoke<string>("add_transfer", { ...input });
+  rpc<string>("add_transfer", { ...input });
 
 export const listTransactions = (filter: TxFilter = {}) =>
-  invoke<Transaction[]>("list_transactions", { filter });
+  rpc<Transaction[]>("list_transactions", { filter });
 
 export const deleteTransaction = (id: number) =>
-  invoke<void>("delete_transaction", { id });
+  rpc<void>("delete_transaction", { id });
 
 export const listTransactionCategories = () =>
-  invoke<TransactionCategory[]>("list_transaction_categories");
+  rpc<TransactionCategory[]>("list_transaction_categories");
 
 export const createTransactionCategory = (name: string, kind: "income" | "expense") =>
-  invoke<number>("create_transaction_category", { name, kind });
+  rpc<number>("create_transaction_category", { name, kind });
 
 export const getDashboardSummary = () =>
-  invoke<DashboardSummary>("get_dashboard_summary");
+  rpc<DashboardSummary>("get_dashboard_summary");
 
 export interface InvestmentInput {
   name: string;
@@ -114,7 +141,7 @@ export interface InvestmentInput {
   notes: string | null;
 }
 
-export const listCalculators = () => invoke<CalculatorId[]>("list_calculators");
+export const listCalculators = () => rpc<CalculatorId[]>("list_calculators");
 
 export interface CatalogItem {
   id: string;
@@ -125,28 +152,28 @@ export interface CatalogItem {
 }
 
 export const getInvestmentCatalog = () =>
-  invoke<CatalogItem[]>("get_investment_catalog");
+  rpc<CatalogItem[]>("get_investment_catalog");
 
 export const listInvestments = (includeClosed = false) =>
-  invoke<InvestmentWithValue[]>("list_investments", { includeClosed });
+  rpc<InvestmentWithValue[]>("list_investments", { includeClosed });
 
 export const createInvestment = (calculator: CalculatorId, input: InvestmentInput) =>
-  invoke<InvestmentWithValue>("create_investment", { calculator, ...input });
+  rpc<InvestmentWithValue>("create_investment", { calculator, ...input });
 
 export const updateInvestment = (id: number, input: InvestmentInput) =>
-  invoke<InvestmentWithValue>("update_investment", { id, ...input });
+  rpc<InvestmentWithValue>("update_investment", { id, ...input });
 
 export const closeInvestment = (id: number, closed: boolean) =>
-  invoke<void>("close_investment", { id, closed });
+  rpc<void>("close_investment", { id, closed });
 
 export const deleteInvestment = (id: number) =>
-  invoke<void>("delete_investment", { id });
+  rpc<void>("delete_investment", { id });
 
 export const addSnapshot = (investmentId: number, valueCents: number, asOf: string) =>
-  invoke<void>("add_snapshot", { investmentId, valueCents, asOf });
+  rpc<void>("add_snapshot", { investmentId, valueCents, asOf });
 
 export const getInvestmentDetail = (id: number) =>
-  invoke<InvestmentDetail>("get_investment_detail", { id });
+  rpc<InvestmentDetail>("get_investment_detail", { id });
 
 export const addInvestmentMovement = (
   investmentId: number,
@@ -154,7 +181,7 @@ export const addInvestmentMovement = (
   amountCents: number,
   occurredAt: string,
 ) =>
-  invoke<void>("add_investment_movement", {
+  rpc<void>("add_investment_movement", {
     investmentId,
     kind,
     amountCents,
@@ -162,7 +189,7 @@ export const addInvestmentMovement = (
   });
 
 export const deleteInvestmentMovement = (id: number) =>
-  invoke<void>("delete_investment_movement", { id });
+  rpc<void>("delete_investment_movement", { id });
 
 export type BanxicoSeriesKind =
   | "cetes_28"
@@ -177,5 +204,4 @@ export interface BanxicoRate {
 }
 
 export const fetchBanxicoRate = (kind: BanxicoSeriesKind) =>
-  invoke<BanxicoRate>("fetch_banxico_rate", { kind });
-
+  rpc<BanxicoRate>("fetch_banxico_rate", { kind });
