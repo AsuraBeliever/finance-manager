@@ -1,44 +1,75 @@
-# Finanzas — app de finanzas personales (Tauri 2 + React)
+# Finanzas — finanzas personales en la nube (Cloudflare Workers + D1 + PWA)
 
-App de escritorio para gestionar carteras, transacciones e inversiones. MXN principal, multi-moneda. UI en español (es-MX), código y comentarios en inglés.
+App de carteras, transacciones e inversiones. MXN principal, multi-moneda,
+multiusuario (registro con código de invitación). El frontend es una PWA
+(iPhone vía Safari → «Agregar a pantalla de inicio»); el escritorio es un
+shell Tauri que carga la URL desplegada. UI en español (es-MX), código y
+comentarios en inglés.
 
 ## Comandos
 
 ```sh
-npm run tauri dev                                  # correr la app
-npm run tauri build                                # bundle (.deb / AppImage)
-npm run build                                      # tsc + vite build (chequeo rápido de frontend)
-cargo check  --manifest-path src-tauri/Cargo.toml  # chequeo rápido de Rust
-cargo test   --manifest-path src-tauri/Cargo.toml  # tests (fórmulas de inversión)
-cargo clippy --manifest-path src-tauri/Cargo.toml
-cargo fmt    --manifest-path src-tauri/Cargo.toml
+npm run build                                # tsc + vite build → dist/ (el worker lo sirve)
+cargo test --workspace                       # tests (fórmulas + parsers, nativos en finanzas-core)
+cargo check -p finanzas-worker --target wasm32-unknown-unknown   # chequeo rápido del worker
+cargo clippy --workspace && cargo fmt --all
+
+# desarrollo local (app completa en http://localhost:8787)
+cd worker && npx wrangler d1 migrations apply finanzas --local
+cd worker && npx wrangler dev                # requiere npm run build previo; INVITE_CODE en worker/.dev.vars
+npm run dev                                  # (opcional) Vite con HMR; /api se proxea a :8787
+
+# producción
+cd worker && npx wrangler deploy             # publica worker + dist/
+cd worker && npx wrangler tail               # logs (cron, errores)
+npm run tauri dev                            # shell de escritorio
 ```
 
 ## Arquitectura (resumen — detalle en docs/ARCHITECTURE.md)
 
-- **Toda la lógica de dinero vive en Rust** (`src-tauri/src/commands/`, `src-tauri/src/investments/`). El frontend NUNCA calcula dinero: solo renderiza centavos/series que regresa el backend vía wrappers tipados en `src/lib/api.ts` + TanStack Query.
-- SQLite vía rusqlite (`bundled`), `Mutex<Connection>` en managed state, DB en `~/.local/share/com.asura.finanzas/finanzas.db`.
+- **Toda la lógica de dinero vive en Rust**: pura en `crates/finanzas-core`
+  (calculadoras con `CalcContext`, parsers de mercado; tests nativos) y
+  orquestación/SQL en `worker/src/handlers/`. El frontend NUNCA calcula
+  dinero: solo renderiza lo que regresa `src/lib/api.ts` (RPC fetch) +
+  TanStack Query.
+- API RPC-style: `POST /api/rpc/<comando>` con cuerpos camelCase; auth en
+  `/api/auth/*` (sesiones por cookie HttpOnly; PBKDF2 vía SubtleCrypto nativo,
+  NUNCA un crate de hashing puro — límite de 10ms CPU del free tier).
+- **D1 no tiene BEGIN/COMMIT**: toda escritura multi-statement va en
+  `db.batch()` (transferencias = 2 filas con mismo `transfer_group_id`).
 - Saldo de cartera = calculado (initial + Σ transacciones), nunca almacenado.
-- Transferencia = 2 filas (`transfer_out`/`transfer_in`) con mismo `transfer_group_id`, insertadas/borradas atómicamente.
-- Router: `createHashRouter` (protocolo custom de Tauri no soporta history routing).
-- Tipos de cambio: auto-actualización al arrancar vía open.er-api.com (reqwest, silencioso si falla) + botón en Ajustes + override manual. NUNCA sostener el lock de la DB a través de un `await`.
+- Scoping multiusuario: `user_id` en wallets/investments/transaction_categories
+  (NULL = seed); transactions/snapshots/movements por JOIN al padre; settings
+  PK `(user_id, key)` con usuario 0 = cachés globales.
+- Datos de mercado por cron trigger diario (Banxico, open.er-api, BONDDIA,
+  CoinGecko) — ver `worker/src/market.rs`.
+- Router: `createHashRouter` (funciona igual en web y Tauri).
+- El service worker de la PWA JAMÁS cachea `/api/*`.
+- No multiplicar centavos×micros en SQL (números D1 → JS f64): esa aritmética
+  va en Rust con i128 intermedio.
 
 ## Convenciones
 
 - **Dinero**: centavos enteros `i64`. **Tipos de cambio**: micros. **Tasas**: basis points. **Fechas de negocio**: TEXT `YYYY-MM-DD`.
-- serde `rename_all = "camelCase"` en todo lo que cruza el puente Tauri.
+- serde `rename_all = "camelCase"` en todo lo que cruza HTTP.
 - Strings de UI SOLO en `src/i18n/es.ts` (español); nada hardcodeado en componentes.
-- **Cambios de esquema**: solo vía migración nueva en `src-tauri/src/db/mod.rs` + actualizar `docs/DATA_MODEL.md`.
-- **Calculadoras de inversión nuevas**: implementar el trait `InvestmentCalculator` + registry + tests + form; guía en `docs/INVESTMENTS.md`.
-- Git: conventional commits (`feat:`, `fix:`, `docs:`, `chore:`...); milestone por branch `feat/<nombre>`, merge `--no-ff` a `main`, tag semver al completar. Fixes triviales directo a `main`.
-- Tests de fórmulas financieras son obligatorios, con valores de referencia calculados a mano.
+- **Cambios de esquema**: solo vía migración nueva en `worker/migrations/*.sql` + actualizar `docs/DATA_MODEL.md`.
+- **Calculadoras de inversión nuevas**: implementar `InvestmentCalculator` en finanzas-core + registry + tests + cargar su `CalcContext` en ambos loaders (worker y src-tauri) + form; guía en `docs/INVESTMENTS.md`.
+- Git: conventional commits; milestone por branch `feat/<nombre>`, merge `--no-ff` a `main`, tag semver al completar. Fixes triviales directo a `main`.
+- Tests de fórmulas financieras obligatorios, con valores de referencia calculados a mano.
 
 ## Estado actual
 
-- **v1.5.0**: BONDDIA con serie histórica de tasas (rate_history), criptomonedas (CoinGecko), donut de inversiones en Resumen, Ajustes sin config manual, Field sin label (bug WebKitGTK). Antes — v1.4.x: catálogo de inversiones con tasas precargadas. v1.3.x: borrar carteras, DateInput/ConfirmDialog propios (widgets nativos de WebKitGTK rotos/feos), tasas CETES/objetivo desde Banxico sin token (endpoint público de SieInternet; token SIE opcional como respaldo). Antes: v1.2.0 movimientos de inversión, v1.1.0 tipos de cambio automáticos, v1.0.0 base (M0–M6 en `docs/PLAN.md`).
-- Targets de bundle: solo `deb` y `rpm` — AppImage se quitó porque `linuxdeploy` falla en Arch. El binario de release queda en `src-tauri/target/release/finanzas`.
-- Trabajo futuro: ver `docs/ROADMAP.md` (presupuestos, recurrentes, export/backup, tasas históricas de cajitas).
+- **v2.0.0 (feat/mobile)**: migración a la nube — PWA + Workers (workers-rs) +
+  D1 multiusuario. La DB local `~/.local/share/com.asura.finanzas/finanzas.db`
+  es respaldo de solo lectura post-migración: NUNCA borrarla ni escribirla.
+  Migración de datos: `scripts/migrate_to_d1.py` (checksums antes/después).
+- Antes — v1.6.x escritorio: BONDDIA con precio oficial + serie histórica,
+  criptomonedas (CoinGecko), catálogo de inversiones con tasas Banxico sin
+  token, DateInput/ConfirmDialog propios (WebKitGTK), tipos de cambio
+  automáticos. Historia completa en `docs/DECISIONS.md` y `docs/PLAN.md`.
+- Trabajo futuro: ver `docs/ROADMAP.md`.
 
 ## Docs
 
-`docs/PLAN.md` (plan + checklist) · `docs/ARCHITECTURE.md` (capas, catálogo de comandos) · `docs/DATA_MODEL.md` (SQL canónico) · `docs/INVESTMENTS.md` (fórmulas: Nu cajita ACT/365 compuesto diario, CETES ACT/360 + ISR) · `docs/ROADMAP.md` · `docs/DECISIONS.md` (ADRs).
+`docs/PLAN.md` (plan + checklist) · `docs/ARCHITECTURE.md` (capas, catálogo de comandos RPC, dev local) · `docs/DATA_MODEL.md` (SQL canónico de D1) · `docs/INVESTMENTS.md` (fórmulas: Nu cajita ACT/365 compuesto diario, CETES ACT/360 + ISR) · `docs/ROADMAP.md` · `docs/DECISIONS.md` (ADRs).

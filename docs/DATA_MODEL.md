@@ -1,6 +1,38 @@
 # Modelo de datos
 
-Esquema canónico de SQLite. Cualquier cambio se hace **solo** vía una migración nueva en `src-tauri/src/db/mod.rs` y se refleja aquí.
+Esquema canónico de SQLite **en Cloudflare D1**. Cualquier cambio se hace
+**solo** vía una migración nueva en `worker/migrations/*.sql` (`wrangler d1
+migrations apply finanzas`) y se refleja aquí.
+
+> El esquema histórico del escritorio (`src-tauri/src/db/mod.rs`) quedó
+> congelado: `~/.local/share/com.asura.finanzas/finanzas.db` es el respaldo de
+> solo lectura previo a la migración a la nube (2026-06). No recibe cambios.
+
+## Multiusuario (v2.0.0)
+
+```sql
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY,                 -- id 0 = usuario sistema (cachés globales)
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  password_hash TEXT NOT NULL,            -- pbkdf2-sha256$<iters>$<salt_hex>$<hash_hex>
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE sessions (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,        -- SHA-256 del token de la cookie
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL                -- deslizante, +30 días al usarse
+);
+```
+
+Scoping: `wallets.user_id` y `investments.user_id` (NOT NULL);
+`transaction_categories.user_id` (NULL = seed del sistema, visible a todos);
+`transactions`, `investment_snapshots` e `investment_movements` se escopan por
+JOIN a su padre; `settings` tiene PK `(user_id, key)` y el usuario 0 guarda
+cachés globales (`bonddia_price`). Tablas globales sin user_id: `currencies`,
+`exchange_rates`, `wallet_categories`, `rate_history`, `crypto_prices`.
 
 ## Convenciones
 
@@ -17,10 +49,7 @@ Nunca se usan flotantes para dinero almacenado. `PRAGMA foreign_keys = ON` siemp
 ## Esquema
 
 ```sql
-CREATE TABLE schema_migrations (
-  version INTEGER PRIMARY KEY,
-  applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- (las migraciones las versiona wrangler en la tabla d1_migrations)
 
 CREATE TABLE currencies (
   code TEXT PRIMARY KEY,                  -- ISO 4217: 'MXN','USD'
@@ -46,6 +75,7 @@ CREATE TABLE wallet_categories (
 
 CREATE TABLE wallets (
   id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
   name TEXT NOT NULL,
   category_id INTEGER NOT NULL REFERENCES wallet_categories(id),
   currency_code TEXT NOT NULL REFERENCES currencies(code),
@@ -58,6 +88,7 @@ CREATE TABLE wallets (
 
 CREATE TABLE transaction_categories (
   id INTEGER PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),   -- NULL = seed del sistema (todos la ven)
   name TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('income','expense')),
   icon TEXT,
@@ -81,6 +112,7 @@ CREATE INDEX idx_tx_transfer ON transactions(transfer_group_id);
 
 CREATE TABLE investments (
   id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
   name TEXT NOT NULL,
   calculator TEXT NOT NULL,               -- 'nu_cajita' | 'cetes' | 'fixed_rate' | 'manual'
   currency_code TEXT NOT NULL DEFAULT 'MXN' REFERENCES currencies(code),
@@ -101,9 +133,11 @@ CREATE TABLE investment_snapshots (       -- marcas manuales + registro históri
   source TEXT NOT NULL DEFAULT 'manual'
 );
 
-CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE settings (                  -- user_id 0 = cachés globales (bonddia_price)
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (user_id, key)
+);
 
--- migración 3
 CREATE TABLE investment_movements (   -- aportaciones y retiros posteriores al inicio
   id INTEGER PRIMARY KEY,
   investment_id INTEGER NOT NULL REFERENCES investments(id) ON DELETE CASCADE,
@@ -122,10 +156,10 @@ CREATE INDEX idx_inv_mov ON investment_movements(investment_id, occurred_at);
 - **Aportado neto** = principal + aportaciones − retiros. **Rendimiento** = valor actual − aportado neto (captura rendimiento realizado y no realizado; puede ser positivo aunque el valor actual sea menor a lo retirado).
 - Las inversiones `manual` no usan movimientos (su valor viene de snapshots).
 
-## Seeds (migración 2)
+## Seeds (worker/migrations/0002_seed.sql)
 
 - **Monedas**: MXN (Peso mexicano), USD (Dólar estadounidense).
-- **Categorías de cartera**: Efectivo, Tarjeta de débito, Tarjeta de crédito, Cuenta de ahorro, Otro (`is_system = 1`). La categoría 'Inversión' del seed original se elimina en la migración 5: las inversiones tienen su propio módulo.
+- **Categorías de cartera**: Efectivo, Tarjeta de débito, Tarjeta de crédito, Cuenta de ahorro, Otro (`is_system = 1`; la categoría 'Inversión' del seed original del escritorio ya no existe).
 - **Categorías de transacción** — income: Salario, Regalo, Intereses, Otro ingreso; expense: Comida, Transporte, Hogar, Entretenimiento, Salud, Suscripciones, Otro gasto (`is_system = 1`).
 
 ## Regla de saldo (computado, nunca almacenado)
@@ -141,11 +175,11 @@ WHERE w.id = ?1;
 
 ## Semántica de transferencias
 
-- Una transferencia lógica = **2 filas** (`transfer_out` en origen, `transfer_in` en destino) con el mismo `transfer_group_id` (UUIDv4), insertadas dentro de una sola transacción SQL (`BEGIN`/`COMMIT`).
+- Una transferencia lógica = **2 filas** (`transfer_out` en origen, `transfer_in` en destino) con el mismo `transfer_group_id` (UUIDv4), insertadas en un `batch()` de D1 (su única primitiva transaccional; atómico).
 - Cross-currency: cada pierna lleva `amount_cents` en la moneda de su propia cartera; el usuario captura ambos montos.
 - Borrar cualquiera de las piernas borra ambas (se busca por `transfer_group_id`).
 
-## Migración 4: cachés de mercado
+## Cachés de mercado
 
 ```sql
 CREATE TABLE rate_history (      -- serie histórica de Banxico (hoy: 'objetivo' para bonddia)
@@ -157,4 +191,4 @@ CREATE TABLE crypto_prices (     -- último precio por símbolo (CoinGecko)
   price_usd_cents INTEGER, as_of TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
-Ambas se refrescan automáticamente al arrancar (task async en setup) y bajo demanda con `refresh_market_data_cmd`.
+Ambas se refrescan con el cron trigger diario del worker y bajo demanda con `refresh_market_data_cmd`.
