@@ -1,8 +1,11 @@
 pub(crate) mod commands;
 mod db;
-mod error;
-mod investments;
-mod models;
+
+// Pure financial logic lives in the shared finanzas-core crate (also used by
+// the Cloudflare Worker); re-exported so internal `crate::` paths keep working.
+pub(crate) use finanzas_core::error;
+pub(crate) use finanzas_core::investments;
+pub(crate) use finanzas_core::models;
 
 use std::fs;
 use std::sync::Mutex;

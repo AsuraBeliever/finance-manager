@@ -1,9 +1,9 @@
 //! Cryptocurrency holdings. The investment stores the QUANTITY held
 //! (params.quantity_e8 = units × 1e8, exact integer) and is valued in MXN
 //! with the latest cached price (crypto_prices table, refreshed from
-//! CoinGecko). Movements track the MXN you spent/received (buys and sells)
-//! so gain = current value − net invested; update the quantity when you buy
-//! or sell.
+//! CoinGecko), provided via `CalcContext`. Movements track the MXN you
+//! spent/received (buys and sells) so gain = current value − net invested;
+//! update the quantity when you buy or sell.
 //!
 //! params: {"symbol": "BTC", "quantity_e8": 5000000}   (0.05 BTC)
 //!
@@ -11,9 +11,8 @@
 //! so projections are flat by design.
 
 use chrono::NaiveDate;
-use rusqlite::Connection;
 
-use super::{parse_params, InvestmentCalculator};
+use super::{parse_params, CalcContext, InvestmentCalculator};
 use crate::error::{AppError, AppResult};
 use crate::models::Investment;
 
@@ -42,9 +41,9 @@ impl InvestmentCalculator for Crypto {
         "crypto"
     }
 
-    fn value_at(&self, inv: &Investment, conn: &Connection, _as_of: NaiveDate) -> AppResult<i64> {
+    fn value_at(&self, inv: &Investment, ctx: &CalcContext, _as_of: NaiveDate) -> AppResult<i64> {
         let params = parse_params(inv)?;
-        let symbol = params
+        params
             .get("symbol")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AppError::InvalidInput("falta el parámetro 'symbol'".into()))?;
@@ -53,18 +52,7 @@ impl InvestmentCalculator for Crypto {
             .and_then(|v| v.as_i64())
             .ok_or_else(|| AppError::InvalidInput("falta el parámetro 'quantity_e8'".into()))?;
 
-        let price_cents: Option<i64> = conn
-            .query_row(
-                "SELECT price_mxn_cents FROM crypto_prices WHERE symbol = ?1",
-                [symbol],
-                |r| r.get(0),
-            )
-            .map(Some)
-            .or_else(|e| match e {
-                rusqlite::Error::QueryReturnedNoRows => Ok(None),
-                other => Err(other),
-            })?;
-        let Some(price_cents) = price_cents else {
+        let Some(price_cents) = ctx.crypto_price_cents else {
             // no price yet (offline first run): show what was paid for it
             return Ok(inv.principal_cents);
         };
@@ -79,37 +67,34 @@ impl InvestmentCalculator for Crypto {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::open_in_memory;
     use crate::investments::test_investment;
 
     #[test]
     fn values_quantity_at_cached_price() {
-        let conn = open_in_memory();
         // 1 BTC = $2,000,000.00 MXN; holding 0.05 BTC → $100,000.00
-        conn.execute(
-            "INSERT INTO crypto_prices (symbol, price_mxn_cents) VALUES ('BTC', 200000000)",
-            [],
-        )
-        .unwrap();
+        let ctx = CalcContext {
+            crypto_price_cents: Some(200_000_000),
+            ..Default::default()
+        };
         let inv = test_investment(
             "crypto",
             9_000_000,
             r#"{"symbol":"BTC","quantity_e8":5000000}"#,
         );
         let date = NaiveDate::from_ymd_opt(2026, 6, 10).unwrap();
-        assert_eq!(Crypto.value_at(&inv, &conn, date).unwrap(), 10_000_000);
+        assert_eq!(Crypto.value_at(&inv, &ctx, date).unwrap(), 10_000_000);
     }
 
     #[test]
     fn falls_back_to_principal_without_price() {
-        let conn = open_in_memory();
+        let ctx = CalcContext::default();
         let inv = test_investment(
             "crypto",
             9_000_000,
             r#"{"symbol":"BTC","quantity_e8":5000000}"#,
         );
         let date = NaiveDate::from_ymd_opt(2026, 6, 10).unwrap();
-        assert_eq!(Crypto.value_at(&inv, &conn, date).unwrap(), 9_000_000);
+        assert_eq!(Crypto.value_at(&inv, &ctx, date).unwrap(), 9_000_000);
     }
 
     #[test]

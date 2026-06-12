@@ -5,9 +5,8 @@
 //! - simple:  principal * (1 + r * days/365)
 
 use chrono::{Datelike, NaiveDate};
-use rusqlite::Connection;
 
-use super::{param_i64, parse_params, InvestmentCalculator};
+use super::{param_i64, parse_params, CalcContext, InvestmentCalculator};
 use crate::error::{AppError, AppResult};
 use crate::models::Investment;
 
@@ -31,7 +30,7 @@ impl InvestmentCalculator for FixedRate {
         "fixed_rate"
     }
 
-    fn value_at(&self, inv: &Investment, conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
+    fn value_at(&self, inv: &Investment, ctx: &CalcContext, as_of: NaiveDate) -> AppResult<i64> {
         let params = parse_params(inv)?;
         let rate_bps = param_i64(&params, "annual_rate_bps")?;
         let compounding = params
@@ -46,7 +45,7 @@ impl InvestmentCalculator for FixedRate {
         }
         let r = rate_bps as f64 / 10_000.0;
 
-        super::position_value(inv, conn, as_of, |from| {
+        super::position_value(inv, ctx, as_of, |from| {
             let days = (as_of - from).num_days().max(0);
             match compounding.as_str() {
                 "daily" => (1.0 + r / 365.0).powi(days as i32),
@@ -64,25 +63,23 @@ impl InvestmentCalculator for FixedRate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::open_in_memory;
-    use crate::investments::test_investment;
+    use crate::investments::{test_ctx, test_investment};
 
     #[test]
     fn simple_interest() {
-        let conn = open_in_memory();
         // $10,000.00 at 10% simple for exactly one year = $11,000.00
         let inv = test_investment(
             "fixed_rate",
             1_000_000,
             r#"{"annual_rate_bps": 1000, "compounding": "simple"}"#,
         );
+        let ctx = test_ctx(&[]);
         let a_year = NaiveDate::from_ymd_opt(2027, 1, 1).unwrap();
-        assert_eq!(FixedRate.value_at(&inv, &conn, a_year).unwrap(), 1_100_000);
+        assert_eq!(FixedRate.value_at(&inv, &ctx, a_year).unwrap(), 1_100_000);
     }
 
     #[test]
     fn monthly_compounding_uses_full_calendar_months() {
-        let conn = open_in_memory();
         // 12% annual monthly-compounded = 1% per month.
         // 3 full months: 1_000_000 * 1.01^3 = 1_030_301
         let inv = test_investment(
@@ -90,37 +87,38 @@ mod tests {
             1_000_000,
             r#"{"annual_rate_bps": 1200, "compounding": "monthly"}"#,
         );
+        let ctx = test_ctx(&[]);
         let three_months = NaiveDate::from_ymd_opt(2026, 4, 1).unwrap();
         assert_eq!(
-            FixedRate.value_at(&inv, &conn, three_months).unwrap(),
+            FixedRate.value_at(&inv, &ctx, three_months).unwrap(),
             1_030_301
         );
         // one day short of the third month -> only 2 full months
         let almost = NaiveDate::from_ymd_opt(2026, 3, 31).unwrap();
-        assert_eq!(FixedRate.value_at(&inv, &conn, almost).unwrap(), 1_020_100);
+        assert_eq!(FixedRate.value_at(&inv, &ctx, almost).unwrap(), 1_020_100);
     }
 
     #[test]
     fn daily_matches_nu_formula() {
-        let conn = open_in_memory();
         let inv = test_investment(
             "fixed_rate",
             1_000_000,
             r#"{"annual_rate_bps": 1500, "compounding": "daily"}"#,
         );
+        let ctx = test_ctx(&[]);
         let a_year = NaiveDate::from_ymd_opt(2027, 1, 1).unwrap();
-        assert_eq!(FixedRate.value_at(&inv, &conn, a_year).unwrap(), 1_161_798);
+        assert_eq!(FixedRate.value_at(&inv, &ctx, a_year).unwrap(), 1_161_798);
     }
 
     #[test]
     fn rejects_unknown_compounding() {
-        let conn = open_in_memory();
         let inv = test_investment(
             "fixed_rate",
             1_000_000,
             r#"{"annual_rate_bps": 1000, "compounding": "hourly"}"#,
         );
+        let ctx = test_ctx(&[]);
         let date = NaiveDate::from_ymd_opt(2026, 2, 1).unwrap();
-        assert!(FixedRate.value_at(&inv, &conn, date).is_err());
+        assert!(FixedRate.value_at(&inv, &ctx, date).is_err());
     }
 }
