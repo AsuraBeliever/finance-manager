@@ -6,6 +6,9 @@
 name = "finanzas"
 main = "build/worker/shim.mjs"
 compatibility_date = "2026-06-01"
+# the app lives only at the canonical URL; no per-version preview URLs
+preview_urls = false
+workers_dev = true
 
 [build]
 # worker-build lives in ~/.cargo/bin (cargo install worker-build), which the
@@ -21,7 +24,7 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "finanzas"
-database_id = "REPLACE-ON-DEPLOY"   # filled by `wrangler d1 create finanzas` (M5)
+database_id = "989837f1-f89f-4518-983e-616b08da9c02"
 migrations_dir = "migrations"
 
 [triggers]
