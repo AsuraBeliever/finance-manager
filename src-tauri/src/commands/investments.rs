@@ -5,7 +5,9 @@ use tauri::State;
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
-use crate::investments::{find, net_invested, registry};
+use crate::investments::{
+    find, net_invested, parse_bonddia_price, registry, CalcContext, Movement, Snapshot,
+};
 use crate::models::{Investment, InvestmentMovement, InvestmentSnapshot};
 
 #[derive(Debug, Serialize)]
@@ -72,14 +74,120 @@ fn today() -> NaiveDate {
     Local::now().date_naive()
 }
 
+fn load_movements(conn: &Connection, investment_id: i64) -> AppResult<Vec<Movement>> {
+    let mut stmt = conn.prepare(
+        "SELECT kind, amount_cents, occurred_at FROM investment_movements
+         WHERE investment_id = ?1 ORDER BY occurred_at, id",
+    )?;
+    let rows = stmt
+        .query_map([investment_id], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, String>(2)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    rows.into_iter()
+        .map(|(kind, amount_cents, date)| {
+            Ok(Movement {
+                kind,
+                amount_cents,
+                occurred_at: NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+                    .map_err(|_| AppError::InvalidInput("fecha de movimiento inválida".into()))?,
+            })
+        })
+        .collect()
+}
+
+/// Preload the stored data this investment's calculator reads (movements plus
+/// calculator-specific series/prices/snapshots) into the storage-agnostic
+/// context consumed by finanzas-core.
+pub fn load_calc_context(conn: &Connection, inv: &Investment) -> AppResult<CalcContext> {
+    let mut ctx = CalcContext {
+        movements: load_movements(conn, inv.id)?,
+        ..Default::default()
+    };
+    match inv.calculator.as_str() {
+        "bonddia" => {
+            let mut stmt = conn.prepare(
+                "SELECT date, rate_bps FROM rate_history WHERE series = 'objetivo' ORDER BY date",
+            )?;
+            let rows = stmt
+                .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?
+                .collect::<Result<Vec<_>, _>>()?;
+            ctx.rate_history = rows
+                .into_iter()
+                .filter_map(|(d, bps)| {
+                    NaiveDate::parse_from_str(&d, "%Y-%m-%d")
+                        .ok()
+                        .map(|d| (d, bps))
+                })
+                .collect();
+            let raw: Option<String> = conn
+                .query_row(
+                    "SELECT value FROM settings WHERE key = 'bonddia_price'",
+                    [],
+                    |r| r.get(0),
+                )
+                .map(Some)
+                .or_else(|e| match e {
+                    rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                    other => Err(other),
+                })?;
+            ctx.bonddia_price_micros = raw.as_deref().and_then(parse_bonddia_price);
+        }
+        "crypto" => {
+            let symbol = serde_json::from_str::<serde_json::Value>(&inv.params_json)
+                .ok()
+                .and_then(|p| p.get("symbol").and_then(|v| v.as_str()).map(str::to_owned));
+            if let Some(symbol) = symbol {
+                ctx.crypto_price_cents = conn
+                    .query_row(
+                        "SELECT price_mxn_cents FROM crypto_prices WHERE symbol = ?1",
+                        [&symbol],
+                        |r| r.get(0),
+                    )
+                    .map(Some)
+                    .or_else(|e| match e {
+                        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                        other => Err(other),
+                    })?;
+            }
+        }
+        "manual" => {
+            let mut stmt = conn.prepare(
+                "SELECT value_cents, as_of FROM investment_snapshots
+                 WHERE investment_id = ?1 ORDER BY as_of, id",
+            )?;
+            let rows = stmt
+                .query_map([inv.id], |r| {
+                    Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            ctx.snapshots = rows
+                .into_iter()
+                .filter_map(|(value_cents, as_of)| {
+                    NaiveDate::parse_from_str(&as_of, "%Y-%m-%d")
+                        .ok()
+                        .map(|as_of| Snapshot { value_cents, as_of })
+                })
+                .collect();
+        }
+        _ => {}
+    }
+    Ok(ctx)
+}
+
 pub fn with_value(
     conn: &Connection,
     inv: Investment,
     as_of: NaiveDate,
 ) -> AppResult<InvestmentWithValue> {
     let calc = find(&inv.calculator)?;
-    let current_value_cents = calc.value_at(&inv, conn, as_of)?;
-    let net_invested_cents = net_invested(conn, &inv, as_of)?;
+    let ctx = load_calc_context(conn, &inv)?;
+    let current_value_cents = calc.value_at(&inv, &ctx, as_of)?;
+    let net_invested_cents = net_invested(&inv, &ctx, as_of);
     let maturity_date = calc
         .maturity_date(&inv)
         .map(|d| d.format("%Y-%m-%d").to_string());
@@ -132,7 +240,8 @@ pub fn open_investments_mxn(
         .collect::<Result<Vec<_>, _>>()?;
     let mut slices = Vec::new();
     for inv in invs {
-        let value = find(&inv.calculator)?.value_at(&inv, conn, as_of)?;
+        let ctx = load_calc_context(conn, &inv)?;
+        let value = find(&inv.calculator)?.value_at(&inv, &ctx, as_of)?;
         if let Some(rate) = rates.get(&inv.currency_code) {
             slices.push(InvestmentSlice {
                 id: inv.id,
@@ -389,18 +498,20 @@ pub fn get_investment_detail(db: State<Db>, id: i64) -> AppResult<InvestmentDeta
         .unwrap_or(as_of.max(start) + Duration::days(365));
 
     // Weekly points from start to maturity (or +1 year), endpoint included.
+    // One context load serves every projection point.
+    let ctx = load_calc_context(&conn, &inv)?;
     let mut projection = Vec::new();
     let mut d = start;
     while d < end {
         projection.push(ProjectionPoint {
             date: d.format("%Y-%m-%d").to_string(),
-            value_cents: calc.value_at(&inv, &conn, d)?,
+            value_cents: calc.value_at(&inv, &ctx, d)?,
         });
         d += Duration::days(7);
     }
     projection.push(ProjectionPoint {
         date: end.format("%Y-%m-%d").to_string(),
-        value_cents: calc.value_at(&inv, &conn, end)?,
+        value_cents: calc.value_at(&inv, &ctx, end)?,
     });
 
     let mut stmt = conn.prepare(

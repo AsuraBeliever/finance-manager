@@ -3,9 +3,8 @@
 //! params: {"annual_rate_bps": 1500}  (15.00%, user-editable since Nu changes it)
 
 use chrono::NaiveDate;
-use rusqlite::Connection;
 
-use super::{param_i64, parse_params, position_value, InvestmentCalculator};
+use super::{param_i64, parse_params, position_value, CalcContext, InvestmentCalculator};
 use crate::error::AppResult;
 use crate::models::Investment;
 
@@ -16,13 +15,13 @@ impl InvestmentCalculator for NuCajita {
         "nu_cajita"
     }
 
-    fn value_at(&self, inv: &Investment, conn: &Connection, as_of: NaiveDate) -> AppResult<i64> {
+    fn value_at(&self, inv: &Investment, ctx: &CalcContext, as_of: NaiveDate) -> AppResult<i64> {
         let params = parse_params(inv)?;
         let rate_bps = param_i64(&params, "annual_rate_bps")?;
         let r = rate_bps as f64 / 10_000.0;
 
         // Each contributed amount compounds daily from its own date.
-        position_value(inv, conn, as_of, |from| {
+        position_value(inv, ctx, as_of, |from| {
             let days = (as_of - from).num_days().max(0);
             (1.0 + r / 365.0).powi(days as i32)
         })
@@ -36,35 +35,34 @@ impl InvestmentCalculator for NuCajita {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::open_in_memory;
-    use crate::investments::test_investment;
+    use crate::investments::{test_ctx, test_investment};
 
     #[test]
     fn compounds_daily_act_365() {
-        let conn = open_in_memory();
         // $10,000.00 at 15.00% annual after exactly one year (365 days):
         // 1_000_000 * (1 + 0.15/365)^365 = 1_161_798.4 -> $11,617.98
         let inv = test_investment("nu_cajita", 1_000_000, r#"{"annual_rate_bps": 1500}"#);
+        let ctx = test_ctx(&[]);
         let a_year_later = NaiveDate::from_ymd_opt(2027, 1, 1).unwrap();
         assert_eq!(
-            NuCajita.value_at(&inv, &conn, a_year_later).unwrap(),
+            NuCajita.value_at(&inv, &ctx, a_year_later).unwrap(),
             1_161_798
         );
     }
 
     #[test]
     fn value_before_start_is_principal() {
-        let conn = open_in_memory();
         let inv = test_investment("nu_cajita", 1_000_000, r#"{"annual_rate_bps": 1500}"#);
+        let ctx = test_ctx(&[]);
         let before = NaiveDate::from_ymd_opt(2025, 12, 1).unwrap();
-        assert_eq!(NuCajita.value_at(&inv, &conn, before).unwrap(), 1_000_000);
+        assert_eq!(NuCajita.value_at(&inv, &ctx, before).unwrap(), 1_000_000);
     }
 
     #[test]
     fn day_zero_is_principal() {
-        let conn = open_in_memory();
         let inv = test_investment("nu_cajita", 1_000_000, r#"{"annual_rate_bps": 1500}"#);
+        let ctx = test_ctx(&[]);
         let start = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
-        assert_eq!(NuCajita.value_at(&inv, &conn, start).unwrap(), 1_000_000);
+        assert_eq!(NuCajita.value_at(&inv, &ctx, start).unwrap(), 1_000_000);
     }
 }

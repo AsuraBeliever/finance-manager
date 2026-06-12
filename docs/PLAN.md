@@ -1,6 +1,6 @@
 # Plan del proyecto — Finanzas
 
-App de finanzas personales de escritorio (Tauri 2 + React) para gestionar carteras ilimitadas, transacciones e inversiones, con MXN como moneda principal y soporte multi-moneda.
+App de finanzas personales para gestionar carteras ilimitadas, transacciones e inversiones, con MXN como moneda principal y soporte multi-moneda. Desde v2.0.0 vive en la nube (Cloudflare Workers + D1) como PWA multiusuario; el escritorio es un shell Tauri.
 
 ## Objetivos
 
@@ -33,6 +33,16 @@ App de finanzas personales de escritorio (Tauri 2 + React) para gestionar carter
 - [x] **M4 — Dashboard (`v0.5.0`)** `feat/dashboard`: resumen con conversión a MXN, edición de tipos de cambio, gráficas (dona por cartera, barras 6 meses).
 - [x] **M5 — Inversiones (`v0.6.0`)** `feat/investments`: trait + 4 calculadoras con tests unitarios, páginas con proyección, integración al dashboard.
 - [x] **M6 — Pulido (`v1.0.0`)** `feat/polish`: validaciones, confirmaciones, formato es-MX, ícono, clippy/fmt, bundle instalable. Nota: AppImage quedó fuera de los targets (linuxdeploy falla en Arch); se generan .deb y .rpm, y el binario directo vive en `src-tauri/target/release/finanzas`.
+
+### v2.0.0 — a la nube (`feat/mobile`)
+
+- [x] **M0 — Workspace**: crate `finanzas-core` (calculadoras con `CalcContext`, parsers de mercado, modelos, errores) compartido por escritorio y worker; tests nativos intactos.
+- [x] **M1 — Worker + D1**: crate `worker/` (workers-rs), migraciones D1 multiusuario, dispatcher RPC `POST /api/rpc/<comando>` con los 35 comandos; escrituras multi-statement vía `batch()`.
+- [x] **M2 — Auth**: registro con código de invitación (secret), PBKDF2-SHA256 vía SubtleCrypto, sesiones cookie HttpOnly (hash en DB, expiración deslizante), aislamiento por `user_id` verificado.
+- [x] **M3 — Mercado**: fetch de Banxico/open.er-api/BONDDIA/CoinGecko vía worker Fetch + cron trigger diario (07:00 UTC).
+- [x] **M4 — PWA**: api.ts → fetch RPC, login/registro, manifest + íconos + metas iOS, bottom-nav móvil, service worker (jamás cachea /api/*).
+- [x] **M5 — Deploy + migración**: https://finanzas.asura.workers.dev, datos locales migrados a D1 con checksums verificados (conteos y saldos al centavo); `finanzas.db` local conservada como respaldo de solo lectura.
+- [x] **M6 — Escritorio shell**: la ventana Tauri carga la URL desplegada; docs actualizadas; merge + tag v2.0.0.
 
 Cada milestone se desarrolla en su branch `feat/*`, se mergea a `main` con `--no-ff` al verificar, y se etiqueta con su tag semver.
 

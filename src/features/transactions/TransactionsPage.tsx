@@ -45,8 +45,8 @@ export function TransactionsPage() {
         }
       />
 
-      <div className="mb-4 flex gap-3">
-        <div className="w-56">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+        <div className="w-full sm:w-56">
           <select
             className={inputClass}
             value={walletId}
@@ -62,7 +62,7 @@ export function TransactionsPage() {
             ))}
           </select>
         </div>
-        <div className="w-48">
+        <div className="w-full sm:w-48">
           <select
             className={inputClass}
             value={kind}

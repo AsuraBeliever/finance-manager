@@ -7,7 +7,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, actions }: PageHeaderProps) {
   return (
-    <header className="mb-6 flex items-center justify-between">
+    <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
       {actions}
     </header>

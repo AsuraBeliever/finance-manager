@@ -1,14 +1,25 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { LogOut } from "lucide-react";
+import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
 import { listCurrencies, listWalletCategories } from "../../lib/api";
+import { logout, me } from "../../lib/auth";
 import { es } from "../../i18n/es";
 
 export function SettingsPage() {
+  const queryClient = useQueryClient();
   const currencies = useQuery({ queryKey: ["currencies"], queryFn: listCurrencies });
   const categories = useQuery({
     queryKey: ["walletCategories"],
     queryFn: listWalletCategories,
   });
+  const session = useQuery({ queryKey: ["me"], queryFn: me, staleTime: Infinity });
+
+  const doLogout = async () => {
+    await logout().catch(() => {});
+    queryClient.setQueryData(["me"], null);
+    queryClient.clear();
+  };
 
   return (
     <>
@@ -46,6 +57,18 @@ export function SettingsPage() {
               </li>
             ))}
           </ul>
+        </section>
+
+        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="mb-3 font-medium">{es.settings.session}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-zinc-300">{session.data?.email}</span>
+            <Button variant="ghost" onClick={doLogout}>
+              <span className="flex items-center gap-2">
+                <LogOut size={16} /> {es.auth.logout}
+              </span>
+            </Button>
+          </div>
         </section>
       </div>
     </>

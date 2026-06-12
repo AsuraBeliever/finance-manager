@@ -1,0 +1,16 @@
+[package]
+name = "finanzas-core"
+version = "0.1.0"
+description = "Pure financial logic shared by the desktop app and the Cloudflare Worker"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+rusqlite = { workspace = true, optional = true }
+
+[features]
+# Enables From<rusqlite::Error> for AppError; only the desktop app wants this.
+rusqlite = ["dep:rusqlite"]

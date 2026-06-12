@@ -10,7 +10,8 @@
 # workspace.
 set -u
 
-BIN="$(dirname "$(realpath "$0")")/../src-tauri/target/release/finanzas"
+# Cargo workspace: the target dir lives at the repo root.
+BIN="$(dirname "$(realpath "$0")")/../target/release/finanzas"
 
 if ! pgrep -x finanzas >/dev/null 2>&1; then
   setsid "$BIN" >/dev/null 2>&1 &

@@ -218,5 +218,22 @@ export const es = {
     currenciesHint:
       "Los tipos de cambio se obtienen y actualizan solos al usar cualquier moneda distinta de MXN.",
     walletCategories: "Categorías de cartera",
+    session: "Sesión",
+  },
+  auth: {
+    loginTitle: "Inicia sesión",
+    registerTitle: "Crea tu cuenta",
+    email: "Correo electrónico",
+    emailPlaceholder: "tu@correo.com",
+    password: "Contraseña",
+    passwordHint: "Mínimo 8 caracteres",
+    inviteCode: "Código de invitación",
+    inviteCodeHint: "Pídeselo a quien administra la app.",
+    login: "Entrar",
+    register: "Crear cuenta",
+    switchToRegister: "¿No tienes cuenta? Regístrate",
+    switchToLogin: "¿Ya tienes cuenta? Inicia sesión",
+    logout: "Cerrar sesión",
+    checkingSession: "Verificando sesión…",
   },
 } as const;

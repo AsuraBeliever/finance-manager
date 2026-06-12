@@ -23,7 +23,18 @@ dist-ssr
 *.sln
 *.sw?
 
+# Rust workspace build dir (root since the workspace split)
+/target
+
 # App data
 *.db
 *.db-journal
 *.sqlite
+
+# One-time data migration dump (personal data, never commit)
+migration-data.sql
+
+# wrangler local state
+worker/.wrangler
+worker/build
+worker/.dev.vars
