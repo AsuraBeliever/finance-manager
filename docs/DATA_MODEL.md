@@ -14,9 +14,11 @@ migrations apply finanzas`) y se refleja aquí.
 CREATE TABLE users (
   id INTEGER PRIMARY KEY,                 -- id 0 = usuario sistema (cachés globales)
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
-  password_hash TEXT NOT NULL,            -- pbkdf2-sha256$<iters>$<salt_hex>$<hash_hex>
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  password_hash TEXT NOT NULL,            -- pbkdf2-sha256$<iters>$<salt_hex>$<hash_hex>; '!' = sin contraseña (solo Google)
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  google_sub TEXT                         -- 0004: OIDC 'sub' de Google (UNIQUE parcial)
 );
+CREATE UNIQUE INDEX idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL;
 
 CREATE TABLE sessions (
   id INTEGER PRIMARY KEY,

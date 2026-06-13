@@ -7,6 +7,7 @@
 //! - Sliding expiry: 30 days, refreshed on use (at most once a day).
 //! - CSRF: SameSite=Lax cookie + Origin check on mutating routes.
 
+pub mod google;
 pub mod password;
 
 use finanzas_core::error::{AppError, AppResult};
@@ -18,16 +19,21 @@ use crate::error::{db_err, error_response, json_response};
 use crate::jsv;
 
 const SESSION_COOKIE: &str = "session";
-const SESSION_MAX_AGE_SECS: i64 = 30 * 24 * 3600;
+pub(crate) const SESSION_MAX_AGE_SECS: i64 = 30 * 24 * 3600;
 
 // ---- session plumbing ----
 
-fn cookie_token(req: &Request) -> Option<String> {
+/// Value of a named cookie on the request, if present.
+pub(crate) fn cookie(req: &Request, name: &str) -> Option<String> {
     let header = req.headers().get("Cookie").ok()??;
     header.split(';').find_map(|part| {
-        let (name, value) = part.trim().split_once('=')?;
-        (name == SESSION_COOKIE).then(|| value.to_string())
+        let (k, v) = part.trim().split_once('=')?;
+        (k == name).then(|| v.to_string())
     })
+}
+
+fn cookie_token(req: &Request) -> Option<String> {
+    cookie(req, SESSION_COOKIE)
 }
 
 /// SHA-256 of the request's session token, as stored in the sessions table.
@@ -35,7 +41,7 @@ fn current_token_hash(req: &Request) -> Option<String> {
     cookie_token(req).map(|t| sha256_hex(t.as_bytes()))
 }
 
-fn user_agent(req: &Request) -> Option<String> {
+pub(crate) fn user_agent(req: &Request) -> Option<String> {
     let mut ua = req.headers().get("User-Agent").ok().flatten()?;
     ua.truncate(256);
     Some(ua)
@@ -110,7 +116,7 @@ pub fn check_origin(req: &Request) -> AppResult<()> {
     }
 }
 
-async fn create_session(
+pub(crate) async fn create_session(
     db: &D1Database,
     user_id: i64,
     user_agent: Option<String>,
@@ -126,7 +132,7 @@ async fn create_session(
     Ok(token)
 }
 
-fn session_cookie(token: &str, max_age: i64) -> String {
+pub(crate) fn session_cookie(token: &str, max_age: i64) -> String {
     format!("{SESSION_COOKIE}={token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={max_age}")
 }
 

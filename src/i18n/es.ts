@@ -236,6 +236,9 @@ export const es = {
     switchToLogin: "¿Ya tienes cuenta? Inicia sesión",
     logout: "Cerrar sesión",
     checkingSession: "Verificando sesión…",
+    continueWithGoogle: "Continuar con Google",
+    or: "o",
+    googleError: "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
   },
   account: {
     changePassword: "Cambiar contraseña",
@@ -253,6 +256,10 @@ export const es = {
     revokeOthers: "Cerrar las demás sesiones",
     unknownDevice: "Dispositivo desconocido",
     desktopApp: "App de escritorio",
+  },
+  update: {
+    available: "Hay una nueva versión",
+    action: "Actualizar",
   },
   offline: {
     banner: "Sin conexión — mostrando los últimos datos sincronizados",

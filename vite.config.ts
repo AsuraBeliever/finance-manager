@@ -12,7 +12,9 @@ export default defineConfig(async () => ({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt": when a new version is deployed the app shows an "Actualizar"
+      // banner instead of silently swapping — see src/features/update/.
+      registerType: "prompt",
       includeAssets: ["apple-touch-icon.png", "favicon.ico", "favicon-32.png"],
       manifest: {
         name: "Finanzas",

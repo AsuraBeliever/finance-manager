@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { TrendingUp } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
+import { GoogleIcon } from "../../components/GoogleIcon";
 import { es } from "../../i18n/es";
 import { login, register } from "../../lib/auth";
 
@@ -16,6 +17,15 @@ export function LoginPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // The Google callback redirects here with ?authError=google on failure.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("authError") === "google") {
+      setError(es.auth.googleError);
+      window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+    }
+  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -51,6 +61,23 @@ export function LoginPage() {
           <h2 className="text-lg font-medium">
             {mode === "login" ? es.auth.loginTitle : es.auth.registerTitle}
           </h2>
+
+          {/* OAuth needs a full-page navigation, not a fetch. */}
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = "/api/auth/google/start";
+            }}
+            className="flex items-center justify-center gap-3 rounded-lg border border-border-muted bg-white px-4 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100"
+          >
+            <GoogleIcon size={18} />
+            {es.auth.continueWithGoogle}
+          </button>
+          <div className="flex items-center gap-3 text-xs text-zinc-600">
+            <span className="h-px flex-1 bg-border-muted" />
+            {es.auth.or}
+            <span className="h-px flex-1 bg-border-muted" />
+          </div>
           <Field label={es.auth.email}>
             <input
               type="email"

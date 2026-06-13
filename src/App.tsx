@@ -16,6 +16,7 @@ import { logout, me } from "./lib/auth";
 import { useOnline } from "./lib/online";
 import { flush } from "./lib/outbox";
 import { LoginPage } from "./features/auth/LoginPage";
+import { UpdateBanner } from "./features/update/UpdateBanner";
 
 const navItems = [
   { to: "/", label: es.nav.dashboard, icon: LayoutDashboard, end: true },
@@ -33,10 +34,15 @@ const navItems = [
 export default function App() {
   const queryClient = useQueryClient();
   const online = useOnline();
+  // Always revalidate the session against the server on load: after a Google
+  // OAuth redirect there is no JS continuity to setQueryData, so the app must
+  // re-check /me. The persisted cache still provides instant offline render
+  // (cached data shows immediately; the refetch only updates it, and on a
+  // network error the cached value is kept).
   const { data: user, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: me,
-    staleTime: Infinity,
+    refetchOnMount: "always",
     retry: false,
   });
 
@@ -67,17 +73,28 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-zinc-500">
-        {es.auth.checkingSession}
+      <div className="flex h-full flex-col">
+        <UpdateBanner />
+        <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
+          {es.auth.checkingSession}
+        </div>
       </div>
     );
   }
   if (!user) {
-    return <LoginPage />;
+    return (
+      <div className="flex h-full flex-col">
+        <UpdateBanner />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <LoginPage />
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="flex h-full flex-col">
+      <UpdateBanner />
       {!online && (
         <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-500/15 px-4 py-1.5 text-xs text-amber-300">
           <CloudOff size={14} />
