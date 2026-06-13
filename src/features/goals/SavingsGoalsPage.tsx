@@ -5,7 +5,7 @@ import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { Field, inputClass } from "../../components/Field";
-import { Gauge } from "../../components/Gauge";
+import { ProgressBar } from "../../components/ProgressBar";
 import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
 import {
@@ -63,49 +63,72 @@ export function SavingsGoalsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {list.map((g) => (
-          <section
-            key={g.id}
-            className="rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card"
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="truncate font-display text-lg font-medium text-fg">{g.name}</h3>
-              <div className="flex shrink-0 gap-1">
-                <button
-                  onClick={() => {
-                    setFormGoal(g);
-                    setFormOpen(true);
-                  }}
-                  className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-overlay hover:text-fg"
+        {list.map((g) => {
+          const done = g.progressBps >= 10000;
+          const remaining = Math.max(0, g.targetCents - g.savedCents);
+          const color = g.color ?? "var(--color-accent)";
+          return (
+            <section
+              key={g.id}
+              className="group rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/40"
+            >
+              <div className="mb-4 flex items-center gap-2.5">
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: `color-mix(in oklab, ${color} 22%, transparent)` }}
                 >
-                  <Pencil size={15} />
-                </button>
-                <button
-                  onClick={() => setDeleteId(g.id)}
-                  className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-danger/10 hover:text-danger"
-                >
-                  <Trash2 size={15} />
-                </button>
+                  <PiggyBank size={17} style={{ color }} />
+                </span>
+                <h3 className="min-w-0 flex-1 truncate font-display text-lg font-medium text-fg">
+                  {g.name}
+                </h3>
+                <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    onClick={() => {
+                      setFormGoal(g);
+                      setFormOpen(true);
+                    }}
+                    className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-overlay hover:text-fg"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    onClick={() => setDeleteId(g.id)}
+                    className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-danger/10 hover:text-danger"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
-            </div>
-            <Gauge
-              value={g.progressBps / 10000}
-              color={g.color ?? "var(--color-accent)"}
-              label={formatCents(g.savedCents, g.currencyCode)}
-              sublabel={`${es.goals.of} ${formatCents(g.targetCents, g.currencyCode)}`}
-            />
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-sm font-medium text-accent">
-                {g.progressBps >= 10000
-                  ? es.goals.completed
-                  : `${Math.round(g.progressBps / 100)}%`}
-              </span>
-              <Button variant="ghost" onClick={() => setContribFor(g)}>
-                {es.goals.contribute}
-              </Button>
-            </div>
-          </section>
-        ))}
+
+              <p className="font-display text-2xl font-semibold tabular-nums text-fg">
+                {formatCents(g.savedCents, g.currencyCode)}
+                <span className="ml-1.5 text-sm font-normal text-fg-subtle">
+                  {es.goals.of} {formatCents(g.targetCents, g.currencyCode)}
+                </span>
+              </p>
+
+              <ProgressBar className="mt-3" value={g.progressBps / 10000} color={color} />
+
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-sm tabular-nums">
+                  <span className="font-semibold text-accent">
+                    {done ? es.goals.completed : `${Math.round(g.progressBps / 100)}%`}
+                  </span>
+                  {!done && (
+                    <span className="text-fg-subtle">
+                      {" · "}
+                      {es.goals.remaining} {formatCents(remaining, g.currencyCode)}
+                    </span>
+                  )}
+                </span>
+                <Button variant="ghost" onClick={() => setContribFor(g)}>
+                  {es.goals.contribute}
+                </Button>
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       <GoalFormModal

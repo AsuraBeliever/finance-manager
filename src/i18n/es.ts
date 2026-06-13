@@ -30,6 +30,7 @@ export const es = {
     saved: "Ahorrado",
     of: "de",
     contribute: "Aportar",
+    remaining: "Faltan",
     contributeTitle: "Aportar a la meta",
     amount: "Monto",
     withdrawHint: "Usa un monto negativo para retirar.",
