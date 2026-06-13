@@ -99,6 +99,24 @@ Dos mecanismos, ambos del lado de la app (el service worker sigue sin cachear
   sincronizar» (TransactionsPage), separados de la lista real — no afectan
   saldos hasta sincronizarse.
 
+La query `["me"]` usa `refetchOnMount: "always"` (no `staleTime: Infinity`):
+tras un redirect de OAuth la app debe revalidar la sesión contra el servidor;
+la caché persistida igual da render instantáneo y se conserva si la red falla.
+
+## Actualizaciones (un deploy actualiza todo)
+
+El escritorio es un shell Tauri que carga la URL desplegada, igual que la web y
+la PWA de iPhone — los tres corren el mismo bundle servido por el Worker, así
+que **`wrangler deploy` actualiza a los tres**. No se recompila el binario
+Tauri salvo cambios en código nativo de `src-tauri/` (dormido).
+
+La PWA usa `registerType: "prompt"` (vite-plugin-pwa). `src/features/update/
+UpdateBanner.tsx` (hook `useRegisterSW`) muestra «Hay una nueva versión —
+Actualizar» cuando hay un service worker nuevo en espera; el botón llama
+`updateServiceWorker(true)` (activa el SW nuevo y recarga). Re-chequea cada
+hora y al volver el foco, para que el shell de escritorio (siempre abierto)
+note las versiones sin recargar a mano.
+
 ## Estructura de carpetas
 
 ```

@@ -44,6 +44,10 @@ npm run tauri dev                            # shell de escritorio
 - Datos de mercado por cron trigger diario (Banxico, open.er-api, BONDDIA,
   CoinGecko) — ver `worker/src/market.rs`.
 - Router: `createHashRouter` (funciona igual en web y Tauri).
+- **Escritorio = web**: el shell Tauri carga la URL desplegada; `wrangler deploy`
+  actualiza web + iPhone + escritorio a la vez (no se recompila el binario salvo
+  cambios nativos en `src-tauri/`). Aviso de versión nueva in-app vía
+  `registerType: "prompt"` + `src/features/update/UpdateBanner.tsx`.
 - El service worker de la PWA JAMÁS cachea `/api/*`.
 - No multiplicar centavos×micros en SQL (números D1 → JS f64): esa aritmética
   va en Rust con i128 intermedio.
