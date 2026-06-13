@@ -34,3 +34,31 @@ export async function me(): Promise<AuthUser | null> {
   if (!res.ok) throw new Error(`Error ${res.status}`);
   return (await res.json()) as AuthUser;
 }
+
+// ---- account management ----
+
+export interface SessionInfo {
+  id: number;
+  createdAt: string;
+  lastSeenAt: string | null;
+  userAgent: string | null;
+  current: boolean;
+}
+
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  authPost<{ ok: boolean }>("change_password", { currentPassword, newPassword });
+
+export async function listSessions(): Promise<SessionInfo[]> {
+  const res = await fetch("/api/auth/sessions", { credentials: "same-origin" });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? `Error ${res.status}`);
+  }
+  return (await res.json()) as SessionInfo[];
+}
+
+export const revokeSession = (id: number) =>
+  authPost<{ ok: boolean }>("revoke_session", { id });
+
+export const revokeOtherSessions = () =>
+  authPost<{ revoked: number }>("revoke_other_sessions", {});

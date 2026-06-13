@@ -30,13 +30,25 @@ fn cookie_token(req: &Request) -> Option<String> {
     })
 }
 
+/// SHA-256 of the request's session token, as stored in the sessions table.
+fn current_token_hash(req: &Request) -> Option<String> {
+    cookie_token(req).map(|t| sha256_hex(t.as_bytes()))
+}
+
+fn user_agent(req: &Request) -> Option<String> {
+    let mut ua = req.headers().get("User-Agent").ok().flatten()?;
+    ua.truncate(256);
+    Some(ua)
+}
+
 #[derive(Deserialize)]
 struct SessionRow {
     user_id: i64,
 }
 
-/// Resolve the request's session cookie to a user id, refreshing the sliding
-/// expiry at most once a day.
+/// Resolve the request's session cookie to a user id. The same throttled
+/// write (at most ~1/hour per session) refreshes the sliding expiry and the
+/// device's last_seen_at.
 pub async fn user_from_request(req: &Request, db: &D1Database) -> AppResult<Option<i64>> {
     let Some(token) = cookie_token(req) else {
         return Ok(None);
@@ -52,8 +64,12 @@ pub async fn user_from_request(req: &Request, db: &D1Database) -> AppResult<Opti
     let Some(row) = row else { return Ok(None) };
     exec(
         db,
-        "UPDATE sessions SET expires_at = datetime('now', '+30 days')
-         WHERE token_hash = ?1 AND expires_at < datetime('now', '+29 days')",
+        "UPDATE sessions
+         SET expires_at = datetime('now', '+30 days'), last_seen_at = datetime('now')
+         WHERE token_hash = ?1
+           AND (expires_at < datetime('now', '+29 days')
+                OR last_seen_at IS NULL
+                OR last_seen_at < datetime('now', '-1 hour'))",
         jsv![hash],
     )
     .await?;
@@ -94,13 +110,17 @@ pub fn check_origin(req: &Request) -> AppResult<()> {
     }
 }
 
-async fn create_session(db: &D1Database, user_id: i64) -> AppResult<String> {
+async fn create_session(
+    db: &D1Database,
+    user_id: i64,
+    user_agent: Option<String>,
+) -> AppResult<String> {
     let token = hex::encode(random_bytes(32));
     exec(
         db,
-        "INSERT INTO sessions (user_id, token_hash, expires_at)
-         VALUES (?1, ?2, datetime('now', '+30 days'))",
-        jsv![user_id, sha256_hex(token.as_bytes())],
+        "INSERT INTO sessions (user_id, token_hash, expires_at, user_agent, last_seen_at)
+         VALUES (?1, ?2, datetime('now', '+30 days'), ?3, datetime('now'))",
+        jsv![user_id, sha256_hex(token.as_bytes()), user_agent],
     )
     .await?;
     Ok(token)
@@ -158,11 +178,12 @@ pub async fn register(mut req: Request, ctx: RouteContext<()>) -> worker::Result
     if let Err(e) = check_origin(&req) {
         return error_response(&e);
     }
+    let ua = user_agent(&req);
     let args: RegisterArgs = match req.json().await {
         Ok(a) => a,
         Err(_) => return error_response(&AppError::InvalidInput("cuerpo inválido".into())),
     };
-    let result = do_register(&ctx, args).await;
+    let result = do_register(&ctx, args, ua).await;
     match result {
         Ok((user, token)) => {
             let resp = Response::from_json(&user)?;
@@ -172,7 +193,11 @@ pub async fn register(mut req: Request, ctx: RouteContext<()>) -> worker::Result
     }
 }
 
-async fn do_register(ctx: &RouteContext<()>, args: RegisterArgs) -> AppResult<(UserInfo, String)> {
+async fn do_register(
+    ctx: &RouteContext<()>,
+    args: RegisterArgs,
+    ua: Option<String>,
+) -> AppResult<(UserInfo, String)> {
     let expected = invite_code(ctx)?;
     if args.invite_code.trim() != expected {
         return Err(AppError::Unauthorized(
@@ -203,7 +228,7 @@ async fn do_register(ctx: &RouteContext<()>, args: RegisterArgs) -> AppResult<(U
         other => other,
     })?;
     let user_id = crate::db::last_row_id(&res)?;
-    let token = create_session(&db, user_id).await?;
+    let token = create_session(&db, user_id, ua).await?;
     Ok((UserInfo { id: user_id, email }, token))
 }
 
@@ -225,6 +250,7 @@ pub async fn login(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Re
     if let Err(e) = check_origin(&req) {
         return error_response(&e);
     }
+    let ua = user_agent(&req);
     let args: LoginArgs = match req.json().await {
         Ok(a) => a,
         Err(_) => return error_response(&AppError::InvalidInput("cuerpo inválido".into())),
@@ -233,7 +259,7 @@ pub async fn login(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Re
         Ok(d) => d,
         Err(e) => return error_response(&db_err(e)),
     };
-    match do_login(&db, args).await {
+    match do_login(&db, args, ua).await {
         Ok((user, token)) => {
             let resp = Response::from_json(&user)?;
             with_cookie(resp, &session_cookie(&token, SESSION_MAX_AGE_SECS))
@@ -242,7 +268,11 @@ pub async fn login(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Re
     }
 }
 
-async fn do_login(db: &D1Database, args: LoginArgs) -> AppResult<(UserInfo, String)> {
+async fn do_login(
+    db: &D1Database,
+    args: LoginArgs,
+    ua: Option<String>,
+) -> AppResult<(UserInfo, String)> {
     // uniform error: never reveal whether the email exists
     let bad = || AppError::Unauthorized("correo o contraseña incorrectos".into());
     let email = args.email.trim().to_lowercase();
@@ -256,7 +286,7 @@ async fn do_login(db: &D1Database, args: LoginArgs) -> AppResult<(UserInfo, Stri
     if !password::verify_password(&args.password, &user.password_hash).await? {
         return Err(bad());
     }
-    let token = create_session(db, user.id).await?;
+    let token = create_session(db, user.id, ua).await?;
     Ok((
         UserInfo {
             id: user.id,
@@ -308,6 +338,185 @@ pub async fn me(req: Request, ctx: RouteContext<()>) -> worker::Result<Response>
             id: user.id,
             email: user.email,
         })
+    }
+    .await;
+    json_response(result)
+}
+
+// ---- account management ----
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionInfo {
+    id: i64,
+    created_at: String,
+    last_seen_at: Option<String>,
+    user_agent: Option<String>,
+    current: bool,
+}
+
+#[derive(Deserialize)]
+struct SessionListRow {
+    id: i64,
+    token_hash: String,
+    created_at: String,
+    last_seen_at: Option<String>,
+    user_agent: Option<String>,
+}
+
+/// Devices with an active session on this account.
+pub async fn sessions(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    let db = match ctx.env.d1("DB") {
+        Ok(d) => d,
+        Err(e) => return error_response(&db_err(e)),
+    };
+    let result: AppResult<Vec<SessionInfo>> = async {
+        let uid = require_user(&req, &db).await?;
+        let current_hash = current_token_hash(&req).unwrap_or_default();
+        let rows: Vec<SessionListRow> = crate::db::all(
+            &db,
+            "SELECT id, token_hash, created_at, last_seen_at, user_agent FROM sessions
+             WHERE user_id = ?1 AND expires_at > datetime('now')
+             ORDER BY COALESCE(last_seen_at, created_at) DESC",
+            jsv![uid],
+        )
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| SessionInfo {
+                id: r.id,
+                created_at: r.created_at,
+                last_seen_at: r.last_seen_at,
+                user_agent: r.user_agent,
+                current: r.token_hash == current_hash,
+            })
+            .collect())
+    }
+    .await;
+    json_response(result)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RevokeArgs {
+    id: i64,
+}
+
+/// Close another device's session. The current one is closed via logout, so
+/// revoking it here is a 404 — the UI never offers it.
+pub async fn revoke_session(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    if let Err(e) = check_origin(&req) {
+        return error_response(&e);
+    }
+    let db = match ctx.env.d1("DB") {
+        Ok(d) => d,
+        Err(e) => return error_response(&db_err(e)),
+    };
+    let result: AppResult<serde_json::Value> = async {
+        let uid = require_user(&req, &db).await?;
+        let args: RevokeArgs = req
+            .json()
+            .await
+            .map_err(|_| AppError::InvalidInput("cuerpo inválido".into()))?;
+        let current_hash = current_token_hash(&req).unwrap_or_default();
+        let res = exec(
+            &db,
+            "DELETE FROM sessions WHERE id = ?1 AND user_id = ?2 AND token_hash != ?3",
+            jsv![args.id, uid, current_hash],
+        )
+        .await?;
+        if crate::db::changes(&res) == 0 {
+            return Err(AppError::NotFound("sesión"));
+        }
+        Ok(serde_json::json!({ "ok": true }))
+    }
+    .await;
+    json_response(result)
+}
+
+/// Close every session except the current one.
+pub async fn revoke_other_sessions(
+    req: Request,
+    ctx: RouteContext<()>,
+) -> worker::Result<Response> {
+    if let Err(e) = check_origin(&req) {
+        return error_response(&e);
+    }
+    let db = match ctx.env.d1("DB") {
+        Ok(d) => d,
+        Err(e) => return error_response(&db_err(e)),
+    };
+    let result: AppResult<serde_json::Value> = async {
+        let uid = require_user(&req, &db).await?;
+        let current_hash = current_token_hash(&req).unwrap_or_default();
+        let res = exec(
+            &db,
+            "DELETE FROM sessions WHERE user_id = ?1 AND token_hash != ?2",
+            jsv![uid, current_hash],
+        )
+        .await?;
+        Ok(serde_json::json!({ "revoked": crate::db::changes(&res) }))
+    }
+    .await;
+    json_response(result)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ChangePasswordArgs {
+    current_password: String,
+    new_password: String,
+}
+
+/// Change the password (requires the current one) and revoke every other
+/// session — standard hygiene after a credential change.
+pub async fn change_password(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    if let Err(e) = check_origin(&req) {
+        return error_response(&e);
+    }
+    let db = match ctx.env.d1("DB") {
+        Ok(d) => d,
+        Err(e) => return error_response(&db_err(e)),
+    };
+    let result: AppResult<serde_json::Value> = async {
+        let uid = require_user(&req, &db).await?;
+        let args: ChangePasswordArgs = req
+            .json()
+            .await
+            .map_err(|_| AppError::InvalidInput("cuerpo inválido".into()))?;
+        if args.new_password.len() < 8 {
+            return Err(AppError::InvalidInput(
+                "la contraseña debe tener al menos 8 caracteres".into(),
+            ));
+        }
+        let user: UserRow = first(
+            &db,
+            "SELECT id, email, password_hash FROM users WHERE id = ?1",
+            jsv![uid],
+        )
+        .await?
+        .ok_or(AppError::NotFound("usuario"))?;
+        if !password::verify_password(&args.current_password, &user.password_hash).await? {
+            return Err(AppError::Unauthorized(
+                "contraseña actual incorrecta".into(),
+            ));
+        }
+        let iterations = pbkdf2_iterations(&ctx);
+        let hash = password::hash_password(&args.new_password, iterations).await?;
+        exec(
+            &db,
+            "UPDATE users SET password_hash = ?2 WHERE id = ?1",
+            jsv![uid, hash],
+        )
+        .await?;
+        let current_hash = current_token_hash(&req).unwrap_or_default();
+        exec(
+            &db,
+            "DELETE FROM sessions WHERE user_id = ?1 AND token_hash != ?2",
+            jsv![uid, current_hash],
+        )
+        .await?;
+        Ok(serde_json::json!({ "ok": true }))
     }
     .await;
     json_response(result)

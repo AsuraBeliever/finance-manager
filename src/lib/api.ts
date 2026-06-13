@@ -1,3 +1,4 @@
+import { es } from "../i18n/es";
 import type {
   CalculatorId,
   Currency,
@@ -22,16 +23,25 @@ import type {
 /** Fired when any call returns 401 so the app can show the login screen. */
 export const UNAUTHORIZED_EVENT = "auth:unauthorized";
 
+/** The request never reached the server (offline / DNS / aborted). The
+ *  offline outbox retries these; real API errors are never retried. */
+export class NetworkError extends Error {}
+
 export async function rpc<T>(
   name: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  const res = await fetch(`/api/rpc/${name}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify(args ?? {}),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api/rpc/${name}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(args ?? {}),
+    });
+  } catch {
+    throw new NetworkError(es.common.offline);
+  }
   if (res.status === 401) {
     window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   }

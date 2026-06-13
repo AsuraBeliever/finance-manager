@@ -23,6 +23,13 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .post_async("/api/auth/login", auth::login)
         .post_async("/api/auth/logout", auth::logout)
         .get_async("/api/auth/me", auth::me)
+        .get_async("/api/auth/sessions", auth::sessions)
+        .post_async("/api/auth/revoke_session", auth::revoke_session)
+        .post_async(
+            "/api/auth/revoke_other_sessions",
+            auth::revoke_other_sessions,
+        )
+        .post_async("/api/auth/change_password", auth::change_password)
         .post_async("/api/rpc/:name", rpc::handle)
         .or_else_any_method_async("/*catchall", |_, _| async {
             Response::error("Not found", 404)

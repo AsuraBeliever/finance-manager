@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  CloudOff,
   LayoutDashboard,
   LogOut,
   Wallet,
@@ -12,6 +13,8 @@ import {
 import { es } from "./i18n/es";
 import { UNAUTHORIZED_EVENT } from "./lib/api";
 import { logout, me } from "./lib/auth";
+import { useOnline } from "./lib/online";
+import { flush } from "./lib/outbox";
 import { LoginPage } from "./features/auth/LoginPage";
 
 const navItems = [
@@ -29,6 +32,7 @@ const navItems = [
 
 export default function App() {
   const queryClient = useQueryClient();
+  const online = useOnline();
   const { data: user, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: me,
@@ -41,6 +45,18 @@ export default function App() {
     const onUnauthorized = () => queryClient.setQueryData(["me"], null);
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, [queryClient]);
+
+  // Drain the offline outbox on startup and whenever the connection returns.
+  useEffect(() => {
+    const drain = () => {
+      flush().then((synced) => {
+        if (synced > 0) queryClient.invalidateQueries();
+      });
+    };
+    drain();
+    window.addEventListener("online", drain);
+    return () => window.removeEventListener("online", drain);
   }, [queryClient]);
 
   const doLogout = async () => {
@@ -61,8 +77,15 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full">
-      {/* Desktop sidebar */}
+    <div className="flex h-full flex-col">
+      {!online && (
+        <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-500/15 px-4 py-1.5 text-xs text-amber-300">
+          <CloudOff size={14} />
+          {es.offline.banner}
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1">
+        {/* Desktop sidebar */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-border-muted bg-surface-raised md:flex">
         <div className="flex items-center gap-2 px-5 py-5">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-dim/20 text-accent">
@@ -126,6 +149,7 @@ export default function App() {
           </NavLink>
         ))}
       </nav>
+      </div>
     </div>
   );
 }

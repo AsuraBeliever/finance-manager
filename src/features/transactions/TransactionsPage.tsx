@@ -10,6 +10,7 @@ import type { TransactionKind } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { TransactionFormModal } from "./TransactionFormModal";
 import { TransactionList } from "./TransactionList";
+import { OutboxPanel } from "./OutboxPanel";
 
 export function TransactionsPage() {
   const [formOpen, setFormOpen] = useState(false);
@@ -44,6 +45,8 @@ export function TransactionsPage() {
           </Button>
         }
       />
+
+      <OutboxPanel />
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <div className="w-full sm:w-56">

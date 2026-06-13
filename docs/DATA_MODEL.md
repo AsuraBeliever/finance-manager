@@ -23,7 +23,9 @@ CREATE TABLE sessions (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,        -- SHA-256 del token de la cookie
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  expires_at TEXT NOT NULL                -- deslizante, +30 días al usarse
+  expires_at TEXT NOT NULL,               -- deslizante, +30 días al usarse
+  user_agent TEXT,                        -- 0003: lista de dispositivos
+  last_seen_at TEXT                       -- 0003: actividad (granularidad ~1h)
 );
 ```
 
@@ -105,10 +107,12 @@ CREATE TABLE transactions (
   transfer_group_id TEXT,                 -- UUIDv4 compartido por las 2 piernas de una transferencia
   description TEXT,
   occurred_at TEXT NOT NULL,              -- 'YYYY-MM-DD'
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  client_id TEXT                          -- 0003: idempotencia del outbox offline
 );
 CREATE INDEX idx_tx_wallet ON transactions(wallet_id, occurred_at);
 CREATE INDEX idx_tx_transfer ON transactions(transfer_group_id);
+CREATE UNIQUE INDEX idx_tx_client ON transactions(client_id) WHERE client_id IS NOT NULL;
 
 CREATE TABLE investments (
   id INTEGER PRIMARY KEY,

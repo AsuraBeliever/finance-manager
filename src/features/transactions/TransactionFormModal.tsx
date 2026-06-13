@@ -4,13 +4,8 @@ import { Button } from "../../components/Button";
 import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
 import { Modal } from "../../components/Modal";
-import {
-  addExpense,
-  addIncome,
-  addTransfer,
-  listTransactionCategories,
-  listWallets,
-} from "../../lib/api";
+import { listTransactionCategories, listWallets } from "../../lib/api";
+import { submitOrQueue } from "../../lib/outbox";
 import { parseToCents } from "../../lib/money";
 import { es } from "../../i18n/es";
 
@@ -92,15 +87,17 @@ export function TransactionFormModal({
         description: description.trim() === "" ? null : description.trim(),
         occurredAt: date,
       };
-      if (tab === "income") return addIncome(common);
-      if (tab === "expense") return addExpense(common);
+      // Captures go through the offline outbox: sent right away when online,
+      // queued (and replayed idempotently) when there is no connection.
+      if (tab === "income") return submitOrQueue("add_income", common);
+      if (tab === "expense") return submitOrQueue("add_expense", common);
 
       const toId = toWalletId ?? walletList.find((w) => w.id !== wid)?.id;
       if (toId === undefined) throw new Error(es.transactions.toWallet);
       const toCents = crossCurrency ? parseToCents(amountToText) : cents;
       if (toCents === null || toCents <= 0)
         throw new Error(es.transactions.invalidAmount);
-      return addTransfer({
+      return submitOrQueue("add_transfer", {
         fromWalletId: wid,
         toWalletId: toId,
         amountFromCents: cents,

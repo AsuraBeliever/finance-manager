@@ -44,8 +44,12 @@ React (render + forms)  ──  PWA instalable (Safari/Chrome)
 
 ## Multiusuario
 
-- `users` + `sessions` (token de cookie hasheado SHA-256, expiración deslizante 30 días).
+- `users` + `sessions` (token de cookie hasheado SHA-256, expiración deslizante
+  30 días; guardan `user_agent` y `last_seen_at` para la lista de dispositivos).
 - Registro con código de invitación (secret `INVITE_CODE`).
+- Cuenta (`/api/auth/*`): `register`, `login`, `logout`, `me`, `sessions`
+  (dispositivos activos), `revoke_session`, `revoke_other_sessions`,
+  `change_password` (exige la actual y revoca las demás sesiones).
 - `user_id` en `wallets`, `investments`, `transaction_categories` (NULL = seed
   del sistema visible a todos); `transactions`/`snapshots`/`movements` se
   escopan por JOIN al padre. `settings` tiene PK `(user_id, key)`; el usuario
@@ -61,7 +65,7 @@ puente Tauri original), respuesta JSON o `{"error": "..."}` (400/401/404/500).
 | Área | Comandos |
 |---|---|
 | Carteras | `list_wallets`, `get_wallet`, `create_wallet`, `update_wallet`, `archive_wallet`, `delete_wallet`, `list_wallet_categories` |
-| Transacciones | `add_income`, `add_expense`, `add_transfer`, `list_transactions`, `delete_transaction`, `list_transaction_categories`, `create_transaction_category` |
+| Transacciones | `add_income`, `add_expense`, `add_transfer` (los tres aceptan `clientId` opcional para idempotencia del outbox offline), `list_transactions`, `delete_transaction`, `list_transaction_categories`, `create_transaction_category` |
 | Dashboard | `get_dashboard_summary` |
 | Inversiones | `list_investments`, `create_investment`, `update_investment`, `close_investment`, `delete_investment`, `get_investment_detail`, `add_snapshot`, `add_investment_movement`, `delete_investment_movement`, `list_calculators`, `get_investment_catalog` |
 | Ajustes / mercado | `list_currencies`, `add_currency`, `get_exchange_rates`, `set_exchange_rate`, `fetch_exchange_rates`, `fetch_banxico_rate`, `refresh_market_data_cmd`, `get_setting`, `set_setting` |
@@ -69,6 +73,24 @@ puente Tauri original), respuesta JSON o `{"error": "..."}` (400/401/404/500).
 Datos de mercado: cron trigger diario (07:00 UTC ≈ 01:00 CDMX) refresca fx,
 historial de tasa objetivo, precio BONDDIA y precios cripto; también borra
 sesiones expiradas. Fallos silenciosos, visibles con `wrangler tail`.
+
+## Offline (PWA)
+
+Dos mecanismos, ambos del lado de la app (el service worker sigue sin cachear
+`/api/*`):
+
+- **Consulta**: la caché de TanStack Query se persiste en localStorage
+  (`PersistQueryClientProvider`, `maxAge` 7 días, llave `finanzas.cache.v1`).
+  Sin red, la app abre con los últimos datos sincronizados y un banner visible
+  de «sin conexión»; el servidor sigue siendo la única fuente de verdad.
+- **Captura (outbox)**: `src/lib/outbox.ts` encola SOLO
+  `add_income`/`add_expense`/`add_transfer` (append-only ⇒ sin conflictos) en
+  localStorage con un `clientId` que el servidor usa para idempotencia (índice
+  único en `transactions.client_id`): un reenvío tras una respuesta perdida
+  jamás duplica. La cola se drena al evento `online` y al arrancar; los items
+  con error de API quedan marcados para revisión en el panel «Pendientes de
+  sincronizar» (TransactionsPage), separados de la lista real — no afectan
+  saldos hasta sincronizarse.
 
 ## Estructura de carpetas
 

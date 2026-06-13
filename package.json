@@ -1,7 +1,7 @@
 {
   "name": "finanzas",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
+    "@tanstack/query-sync-storage-persister": "^5.101.0",
     "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-query-persist-client": "^5.101.0",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.17.0",
     "react": "^19.1.0",

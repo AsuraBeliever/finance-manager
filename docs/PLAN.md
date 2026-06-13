@@ -44,6 +44,12 @@ App de finanzas personales para gestionar carteras ilimitadas, transacciones e i
 - [x] **M5 — Deploy + migración**: https://finanzas.asura.workers.dev, datos locales migrados a D1 con checksums verificados (conteos y saldos al centavo); `finanzas.db` local conservada como respaldo de solo lectura.
 - [x] **M6 — Escritorio shell**: la ventana Tauri carga la URL desplegada; docs actualizadas; merge + tag v2.0.0.
 
+### v2.1.0 — cuenta y offline (`feat/account-offline`)
+
+- [x] **Cuenta**: cambiar contraseña (revoca las demás sesiones) y lista de dispositivos con sesión (User-Agent + última actividad, revocar individual o todas) en Ajustes.
+- [x] **Offline consulta**: caché de queries persistida en localStorage; sin red la app abre con los últimos datos y banner de «sin conexión».
+- [x] **Offline captura**: outbox append-only para ingresos/gastos/transferencias con idempotencia server-side (`transactions.client_id`); panel «Pendientes de sincronizar» y drenado automático al reconectar.
+
 Cada milestone se desarrolla en su branch `feat/*`, se mergea a `main` con `--no-ff` al verificar, y se etiqueta con su tag semver.
 
 ## Verificación final (v1.0.0)
