@@ -236,6 +236,9 @@ export const es = {
     switchToLogin: "¿Ya tienes cuenta? Inicia sesión",
     logout: "Cerrar sesión",
     checkingSession: "Verificando sesión…",
+    continueWithGoogle: "Continuar con Google",
+    or: "o",
+    googleError: "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
   },
   account: {
     changePassword: "Cambiar contraseña",

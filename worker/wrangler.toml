@@ -32,5 +32,8 @@ migrations_dir = "migrations"
 crons = ["0 7 * * *"]
 
 [vars]
-# Overridden per-environment; secrets (INVITE_CODE) via `wrangler secret put`.
+# Secrets (INVITE_CODE, GOOGLE_CLIENT_SECRET) via `wrangler secret put`.
 PBKDF2_ITERATIONS = "100000"
+# Google OAuth client id (not secret; appears in the consent URL). Set to the
+# real id before deploy: the Client ID from Google Cloud → Credentials.
+GOOGLE_CLIENT_ID = "REPLACE-WITH-GOOGLE-CLIENT-ID"

@@ -23,6 +23,8 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .post_async("/api/auth/login", auth::login)
         .post_async("/api/auth/logout", auth::logout)
         .get_async("/api/auth/me", auth::me)
+        .get_async("/api/auth/google/start", auth::google::start)
+        .get_async("/api/auth/google/callback", auth::google::callback)
         .get_async("/api/auth/sessions", auth::sessions)
         .post_async("/api/auth/revoke_session", auth::revoke_session)
         .post_async(

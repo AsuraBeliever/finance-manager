@@ -50,6 +50,10 @@ App de finanzas personales para gestionar carteras ilimitadas, transacciones e i
 - [x] **Offline consulta**: caché de queries persistida en localStorage; sin red la app abre con los últimos datos y banner de «sin conexión».
 - [x] **Offline captura**: outbox append-only para ingresos/gastos/transferencias con idempotencia server-side (`transactions.client_id`); panel «Pendientes de sincronizar» y drenado automático al reconectar.
 
+### v2.2.0 — login con Google (`feat/google-auth`)
+
+- [x] OAuth 2.0 server-side en el Worker (`/api/auth/google/{start,callback}`), `users.google_sub`, botón «Continuar con Google» en login/registro. Abierto (sin invitación); vincula por email verificado.
+
 Cada milestone se desarrolla en su branch `feat/*`, se mergea a `main` con `--no-ff` al verificar, y se etiqueta con su tag semver.
 
 ## Verificación final (v1.0.0)

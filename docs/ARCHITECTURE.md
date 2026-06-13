@@ -50,6 +50,13 @@ React (render + forms)  ──  PWA instalable (Safari/Chrome)
 - Cuenta (`/api/auth/*`): `register`, `login`, `logout`, `me`, `sessions`
   (dispositivos activos), `revoke_session`, `revoke_other_sessions`,
   `change_password` (exige la actual y revoca las demás sesiones).
+- **Google** (`/api/auth/google/{start,callback}`): OAuth 2.0 Authorization
+  Code server-side. `start` setea cookie CSRF `oauth_state` y redirige a la
+  pantalla de Google; `callback` valida el state, intercambia el code por el
+  `id_token` (TLS directo con el client_secret ⇒ no se verifica la firma),
+  y crea/vincula el usuario por `google_sub`/email verificado. Abierto (sin
+  invitación); usuarios solo-Google tienen `password_hash = '!'`. Requiere
+  `GOOGLE_CLIENT_ID` (var) y `GOOGLE_CLIENT_SECRET` (secret).
 - `user_id` en `wallets`, `investments`, `transaction_categories` (NULL = seed
   del sistema visible a todos); `transactions`/`snapshots`/`movements` se
   escopan por JOIN al padre. `settings` tiene PK `(user_id, key)`; el usuario
