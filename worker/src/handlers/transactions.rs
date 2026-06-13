@@ -46,6 +46,13 @@ pub struct SimpleTxArgs {
     pub category_id: Option<i64>,
     pub description: Option<String>,
     pub occurred_at: String,
+    /// Offline-outbox idempotency: a replay with the same id never inserts twice.
+    pub client_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct IdRow {
+    id: i64,
 }
 
 async fn insert_simple(
@@ -57,11 +64,23 @@ async fn insert_simple(
     validate_amount(a.amount_cents)?;
     validate_date(&a.occurred_at)?;
     wallet_exists(db, uid, a.wallet_id).await?;
+    if let Some(client_id) = &a.client_id {
+        // already applied (response was lost mid-flight): return the same id
+        let existing: Option<IdRow> = first(
+            db,
+            "SELECT id FROM transactions WHERE client_id = ?1",
+            jsv![client_id],
+        )
+        .await?;
+        if let Some(row) = existing {
+            return Ok(row.id);
+        }
+    }
     let res = exec(
         db,
-        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        jsv![a.wallet_id, kind, a.amount_cents, a.category_id, a.description, a.occurred_at],
+        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at, client_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        jsv![a.wallet_id, kind, a.amount_cents, a.category_id, a.description, a.occurred_at, a.client_id],
     )
     .await?;
     last_row_id(&res)
@@ -84,6 +103,8 @@ pub struct TransferArgs {
     pub amount_to_cents: i64,
     pub description: Option<String>,
     pub occurred_at: String,
+    /// Offline-outbox idempotency; stored on the transfer_out leg only.
+    pub client_id: Option<String>,
 }
 
 pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResult<String> {
@@ -98,10 +119,27 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
     wallet_exists(db, uid, a.from_wallet_id).await?;
     wallet_exists(db, uid, a.to_wallet_id).await?;
 
+    if let Some(client_id) = &a.client_id {
+        #[derive(Deserialize)]
+        struct GroupIdRow {
+            transfer_group_id: String,
+        }
+        let existing: Option<GroupIdRow> = first(
+            db,
+            "SELECT transfer_group_id FROM transactions
+             WHERE client_id = ?1 AND transfer_group_id IS NOT NULL",
+            jsv![client_id],
+        )
+        .await?;
+        if let Some(row) = existing {
+            return Ok(row.transfer_group_id);
+        }
+    }
+
     let group_id = new_group_id();
     // Both legs in one batch: a transfer never half-applies.
-    let insert = "INSERT INTO transactions (wallet_id, kind, amount_cents, transfer_group_id, description, occurred_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
+    let insert = "INSERT INTO transactions (wallet_id, kind, amount_cents, transfer_group_id, description, occurred_at, client_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
     let stmts = vec![
         stmt(
             db,
@@ -112,7 +150,8 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
                 a.amount_from_cents,
                 group_id,
                 a.description,
-                a.occurred_at
+                a.occurred_at,
+                a.client_id
             ],
         )?,
         stmt(
@@ -124,7 +163,8 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
                 a.amount_to_cents,
                 group_id,
                 a.description,
-                a.occurred_at
+                a.occurred_at,
+                Option::<String>::None
             ],
         )?,
     ];
