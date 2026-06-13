@@ -56,12 +56,12 @@ export function OutboxPanel() {
         <CloudOff size={15} />
         {es.offline.pendingTitle} ({items.length})
       </h3>
-      <p className="mt-1 text-xs text-zinc-500">{es.offline.pendingHint}</p>
+      <p className="mt-1 text-xs text-fg-subtle">{es.offline.pendingHint}</p>
       <ul className="mt-3 divide-y divide-border-muted">
         {items.map((item) => (
           <li key={item.id} className="flex items-center gap-3 py-2 text-sm">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-zinc-200">
+              <p className="truncate text-fg">
                 {itemSummary(item, currencyByWallet)}
               </p>
               {item.status === "error" && (
@@ -74,7 +74,7 @@ export function OutboxPanel() {
               <button
                 onClick={() => retryNow(item.id)}
                 title={es.offline.retry}
-                className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-surface-overlay hover:text-zinc-200"
+                className="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-overlay hover:text-fg"
               >
                 <RotateCw size={15} />
               </button>
@@ -82,7 +82,7 @@ export function OutboxPanel() {
             <button
               onClick={() => discard(item.id)}
               title={es.offline.discard}
-              className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-danger/10 hover:text-danger"
+              className="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-danger/10 hover:text-danger"
             >
               <Trash2 size={15} />
             </button>

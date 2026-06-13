@@ -35,6 +35,7 @@ import {
   getInvestmentDetail,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
+import { POSITIVE, useChartTokens } from "../../lib/palette";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
 
@@ -44,6 +45,7 @@ function today(): string {
 
 export function InvestmentDetailPage() {
   const { id } = useParams();
+  const chart = useChartTokens();
   const invId = Number(id);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -123,7 +125,7 @@ export function InvestmentDetailPage() {
     onSuccess: invalidate,
   });
 
-  if (detail.isPending) return <p className="text-sm text-zinc-500">{es.common.loading}</p>;
+  if (detail.isPending) return <p className="text-sm text-fg-subtle">{es.common.loading}</p>;
   if (detail.isError) return <p className="text-sm text-danger">{String(detail.error)}</p>;
 
   const d = detail.data;
@@ -180,18 +182,18 @@ export function InvestmentDetailPage() {
 
       <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
-          <p className="text-xs text-zinc-500">{es.investments.currentValue}</p>
+          <p className="text-xs text-fg-subtle">{es.investments.currentValue}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums">
             {formatCents(d.currentValueCents, d.currencyCode)}
           </p>
           {usdEquivalent !== null && (
-            <p className="mt-0.5 text-xs tabular-nums text-zinc-500">
+            <p className="mt-0.5 text-xs tabular-nums text-fg-subtle">
               ≈ {formatCents(usdEquivalent, "USD")}
             </p>
           )}
         </div>
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
-          <p className="text-xs text-zinc-500">{es.investments.gain}</p>
+          <p className="text-xs text-fg-subtle">{es.investments.gain}</p>
           <p
             className={`mt-1 text-xl font-semibold tabular-nums ${
               gainPositive ? "text-accent" : "text-danger"
@@ -202,7 +204,7 @@ export function InvestmentDetailPage() {
           </p>
         </div>
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
-          <p className="text-xs text-zinc-500">{es.investments.netInvested}</p>
+          <p className="text-xs text-fg-subtle">{es.investments.netInvested}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums">
             {formatCents(d.netInvestedCents, d.currencyCode)}
           </p>
@@ -210,14 +212,14 @@ export function InvestmentDetailPage() {
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
           {cryptoParams ? (
             <>
-              <p className="text-xs text-zinc-500">{es.investments.quantity}</p>
+              <p className="text-xs text-fg-subtle">{es.investments.quantity}</p>
               <p className="mt-1 text-xl font-semibold tabular-nums">
                 {(cryptoParams.quantity_e8 / 1e8).toString()} {cryptoParams.symbol}
               </p>
             </>
           ) : (
             <>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-fg-subtle">
                 {d.maturityDate ? es.investments.maturity : es.investments.startDate}
               </p>
               <p className="mt-1 text-xl font-semibold">{d.maturityDate ?? d.startDate}</p>
@@ -227,33 +229,29 @@ export function InvestmentDetailPage() {
       </div>
 
       {d.calculator !== "crypto" && (
-      <section className="mb-4 rounded-xl border border-border-muted bg-surface-raised p-5">
-        <h3 className="mb-2 font-medium">{es.investments.projection}</h3>
+      <section className="mb-4 rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card">
+        <h3 className="mb-4 font-display text-lg font-medium tracking-tight text-fg">{es.investments.projection}</h3>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={chartData}>
-            <CartesianGrid stroke="#2a2f3d" strokeDasharray="3 3" />
-            <XAxis dataKey="date" stroke="#71717a" fontSize={11} minTickGap={40} />
+            <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" />
+            <XAxis dataKey="date" stroke={chart.axis} fontSize={11} minTickGap={40} />
             <YAxis
-              stroke="#71717a"
+              stroke={chart.axis}
               fontSize={11}
               domain={["auto", "auto"]}
               tickFormatter={(v) => (Number(v) / 1000).toFixed(1) + "k"}
             />
             <Tooltip
               formatter={(v) => formatCents(Math.round(Number(v) * 100), d.currencyCode)}
-              contentStyle={{
-                backgroundColor: "#1f2330",
-                border: "1px solid #2a2f3d",
-                borderRadius: 8,
-              }}
+              contentStyle={chart.tooltip}
             />
             {chartData.some((p) => p.date >= todayStr) && (
-              <ReferenceLine x={todayStr} stroke="#71717a" strokeDasharray="4 4" />
+              <ReferenceLine x={todayStr} stroke={chart.axis} strokeDasharray="4 4" />
             )}
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#34d399"
+              stroke={POSITIVE}
               strokeWidth={2}
               dot={false}
             />
@@ -280,7 +278,7 @@ export function InvestmentDetailPage() {
             </div>
           </div>
           {d.movements.length === 0 ? (
-            <p className="py-2 text-sm text-zinc-500">{es.investments.movementsEmpty}</p>
+            <p className="py-2 text-sm text-fg-subtle">{es.investments.movementsEmpty}</p>
           ) : (
             <ul className="divide-y divide-border-muted">
               {d.movements.map((m) => (
@@ -296,12 +294,12 @@ export function InvestmentDetailPage() {
                       <ArrowUpRight size={13} />
                     )}
                   </span>
-                  <span className="text-zinc-300">
+                  <span className="text-fg">
                     {m.kind === "deposit"
                       ? es.investments.depositNoun
                       : es.investments.withdrawalNoun}
                   </span>
-                  <span className="text-zinc-500">{m.occurredAt}</span>
+                  <span className="text-fg-subtle">{m.occurredAt}</span>
                   <span
                     className={`ml-auto tabular-nums ${
                       m.kind === "deposit" ? "text-accent" : "text-danger"
@@ -313,7 +311,7 @@ export function InvestmentDetailPage() {
                   <button
                     onClick={() => setMovementToDelete(m.id)}
                     aria-label={es.common.delete}
-                    className="rounded-md p-1 text-zinc-600 opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                    className="rounded-md p-1 text-fg-subtle opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -337,7 +335,7 @@ export function InvestmentDetailPage() {
           <ul className="divide-y divide-border-muted">
             {d.snapshots.map((s) => (
               <li key={s.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-zinc-400">{s.asOf}</span>
+                <span className="text-fg-muted">{s.asOf}</span>
                 <span className="tabular-nums">
                   {formatCents(s.valueCents, d.currencyCode)}
                 </span>

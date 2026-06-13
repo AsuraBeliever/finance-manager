@@ -82,7 +82,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
             ? format(parseISO(value), "d 'de' MMMM yyyy", { locale: esLocale })
             : es.common.pickDate}
         </span>
-        <Calendar size={15} className="shrink-0 text-zinc-500" />
+        <Calendar size={15} className="shrink-0 text-fg-subtle" />
       </button>
 
       {open && (
@@ -93,12 +93,12 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
                 <button
                   type="button"
                   onClick={() => setView((v) => addMonths(v, -12))}
-                  className="rounded-md p-1.5 text-zinc-400 hover:bg-surface-raised hover:text-zinc-200"
+                  className="rounded-md p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg"
                 >
                   <ChevronLeft size={16} />
                 </button>
                 <select
-                  className="rounded-lg border border-border-muted bg-surface py-1 pl-2 text-sm font-medium text-zinc-100 outline-none"
+                  className="rounded-lg border border-border-muted bg-surface py-1 pl-2 text-sm font-medium text-fg outline-none"
                   value={view.getFullYear()}
                   onChange={(e) =>
                     setView(new Date(Number(e.target.value), view.getMonth(), 1))
@@ -118,7 +118,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
                 <button
                   type="button"
                   onClick={() => setView((v) => addMonths(v, 12))}
-                  className="rounded-md p-1.5 text-zinc-400 hover:bg-surface-raised hover:text-zinc-200"
+                  className="rounded-md p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -145,10 +145,10 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
                       }}
                       className={`rounded-lg py-2 text-sm capitalize transition-colors ${
                         disabled
-                          ? "cursor-not-allowed text-zinc-700"
+                          ? "cursor-not-allowed text-fg-subtle"
                           : isCurrent
                             ? "bg-accent-dim/15 font-semibold text-accent hover:bg-surface-raised"
-                            : "text-zinc-300 hover:bg-surface-raised"
+                            : "text-fg hover:bg-surface-raised"
                       }`}
                     >
                       {m}
@@ -163,7 +163,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
             <button
               type="button"
               onClick={() => setView((v) => addMonths(v, -1))}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-surface-raised hover:text-zinc-200"
+              className="rounded-md p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg"
             >
               <ChevronLeft size={16} />
             </button>
@@ -178,7 +178,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
             <button
               type="button"
               onClick={() => setView((v) => addMonths(v, 1))}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-surface-raised hover:text-zinc-200"
+              className="rounded-md p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg"
             >
               <ChevronRight size={16} />
             </button>
@@ -186,7 +186,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
 
           <div className="grid grid-cols-7 gap-1 text-center">
             {WEEKDAYS.map((d, i) => (
-              <span key={i} className="py-1 text-xs font-medium text-zinc-500">
+              <span key={i} className="py-1 text-xs font-medium text-fg-subtle">
                 {d}
               </span>
             ))}
@@ -209,10 +209,10 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
                     isSelected
                       ? "bg-accent-dim font-semibold text-surface"
                       : disabled
-                        ? "cursor-not-allowed text-zinc-700"
+                        ? "cursor-not-allowed text-fg-subtle"
                         : isToday
                           ? "font-semibold text-accent hover:bg-surface-raised"
-                          : "text-zinc-300 hover:bg-surface-raised"
+                          : "text-fg hover:bg-surface-raised"
                   }`}
                 >
                   {day}

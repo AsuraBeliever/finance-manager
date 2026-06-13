@@ -254,7 +254,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
         // nowrap description and every row overflows the modal
         <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
           {catalog.isPending && (
-            <p className="py-4 text-center text-sm text-zinc-500">
+            <p className="py-4 text-center text-sm text-fg-subtle">
               {es.investments.catalogLoading}
             </p>
           )}
@@ -270,7 +270,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
               >
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium">{label.name}</span>
-                  <span className="block truncate text-xs text-zinc-500">
+                  <span className="block truncate text-xs text-fg-subtle">
                     {label.description}
                   </span>
                 </span>
@@ -280,13 +280,13 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
                       {formatBps(item.rateBps)}
                     </span>
                     {item.rateDate && (
-                      <span className="block text-xs text-zinc-600">
+                      <span className="block text-xs text-fg-subtle">
                         {es.investments.catalogRateAsOf} {item.rateDate}
                       </span>
                     )}
                   </span>
                 ) : ["nu_cajita", "fixed_rate"].includes(item.id) ? (
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs text-fg-subtle">
                     {es.investments.catalogNoRate}
                   </span>
                 ) : null}
@@ -349,7 +349,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
           </Field>
         </div>
         {calculator === "crypto" && (
-          <p className="-mt-2 text-xs text-zinc-500">
+          <p className="-mt-2 text-xs text-fg-subtle">
             {es.investments.cryptoPrincipalHint}
           </p>
         )}
@@ -395,7 +395,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
                 ? `${es.investments.banxicoCetes} (${plazo} días)`
                 : es.investments.banxicoObjetivo}
             </button>
-            {rateInfo && <p className="mt-1 text-xs text-zinc-500">{rateInfo}</p>}
+            {rateInfo && <p className="mt-1 text-xs text-fg-subtle">{rateInfo}</p>}
           </div>
         )}
 
@@ -421,7 +421,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
                 onChange={(e) => setIsrText(e.target.value)}
                 inputMode="decimal"
               />
-              <span className="mt-1 block text-xs text-zinc-500">
+              <span className="mt-1 block text-xs text-fg-subtle">
                 {es.investments.isrHint}
               </span>
             </Field>
@@ -450,7 +450,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
                 />
               </Field>
             </div>
-            <p className="-mt-2 text-xs text-zinc-500">{es.investments.bonddiaHint}</p>
+            <p className="-mt-2 text-xs text-fg-subtle">{es.investments.bonddiaHint}</p>
           </>
         )}
 
@@ -488,11 +488,11 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
               type="checkbox"
               checked={reinvest}
               onChange={(e) => setReinvest(e.target.checked)}
-              className="mt-1 accent-emerald-500"
+              className="mt-1 accent-accent"
             />
             <span>
               <span className="block text-sm font-medium">{es.investments.reinvest}</span>
-              <span className="block text-xs text-zinc-500">{es.investments.reinvestHint}</span>
+              <span className="block text-xs text-fg-subtle">{es.investments.reinvestHint}</span>
             </span>
           </label>
         )}

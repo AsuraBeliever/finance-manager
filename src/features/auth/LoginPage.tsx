@@ -48,17 +48,17 @@ export function LoginPage() {
   return (
     <div className="flex min-h-full items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center justify-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-dim/20 text-accent">
+        <div className="mb-8 flex items-center justify-center gap-2.5">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dim text-white shadow-[0_4px_14px_-4px_rgba(22,164,122,0.7)]">
             <TrendingUp size={22} />
           </span>
-          <h1 className="text-2xl font-semibold tracking-tight">{es.app.name}</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-fg">{es.app.name}</h1>
         </div>
         <form
           onSubmit={submit}
-          className="flex flex-col gap-4 rounded-2xl border border-border-muted bg-surface-raised p-6"
+          className="flex flex-col gap-4 rounded-2xl border border-border-muted bg-surface-raised p-6 shadow-card"
         >
-          <h2 className="text-lg font-medium">
+          <h2 className="font-display text-lg font-medium tracking-tight text-fg">
             {mode === "login" ? es.auth.loginTitle : es.auth.registerTitle}
           </h2>
 
@@ -68,12 +68,12 @@ export function LoginPage() {
             onClick={() => {
               window.location.href = "/api/auth/google/start";
             }}
-            className="flex items-center justify-center gap-3 rounded-lg border border-border-muted bg-white px-4 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100"
+            className="flex items-center justify-center gap-3 rounded-lg border border-border-muted bg-white px-4 py-2 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100"
           >
             <GoogleIcon size={18} />
             {es.auth.continueWithGoogle}
           </button>
-          <div className="flex items-center gap-3 text-xs text-zinc-600">
+          <div className="flex items-center gap-3 text-xs text-fg-subtle">
             <span className="h-px flex-1 bg-border-muted" />
             {es.auth.or}
             <span className="h-px flex-1 bg-border-muted" />
@@ -100,7 +100,7 @@ export function LoginPage() {
               required
             />
             {mode === "register" && (
-              <p className="mt-1 text-xs text-zinc-500">{es.auth.passwordHint}</p>
+              <p className="mt-1 text-xs text-fg-subtle">{es.auth.passwordHint}</p>
             )}
           </Field>
           {mode === "register" && (
@@ -113,7 +113,7 @@ export function LoginPage() {
                 autoComplete="off"
                 required
               />
-              <p className="mt-1 text-xs text-zinc-500">{es.auth.inviteCodeHint}</p>
+              <p className="mt-1 text-xs text-fg-subtle">{es.auth.inviteCodeHint}</p>
             </Field>
           )}
           {error && <p className="text-sm text-danger">{error}</p>}
@@ -122,7 +122,7 @@ export function LoginPage() {
           </Button>
           <button
             type="button"
-            className="text-sm text-zinc-400 transition-colors hover:text-accent"
+            className="text-sm text-fg-muted transition-colors hover:text-accent"
             onClick={() => {
               setMode(mode === "login" ? "register" : "login");
               setError(null);

@@ -36,12 +36,12 @@ export function InvestmentsPage() {
         title={es.investments.title}
         actions={
           <div className="flex items-center gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-400">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
               <input
                 type="checkbox"
                 checked={showClosed}
                 onChange={(e) => setShowClosed(e.target.checked)}
-                className="accent-emerald-500"
+                className="accent-accent"
               />
               {es.investments.showClosed}
             </label>
@@ -78,7 +78,7 @@ export function InvestmentsPage() {
               <div className="mb-2 flex items-center gap-2">
                 <span className="truncate font-medium">{inv.name}</span>
                 {inv.isClosed && (
-                  <span className="ml-auto rounded-full bg-surface-overlay px-2 py-0.5 text-xs text-zinc-500">
+                  <span className="ml-auto rounded-full bg-surface-overlay px-2 py-0.5 text-xs text-fg-subtle">
                     {es.investments.closed}
                   </span>
                 )}
@@ -95,7 +95,7 @@ export function InvestmentsPage() {
                 {gainPositive ? "+" : ""}
                 {formatCents(inv.gainCents, inv.currencyCode)}
               </p>
-              <p className="mt-2 text-xs text-zinc-500">
+              <p className="mt-2 text-xs text-fg-subtle">
                 {inv.calculator === "crypto"
                   ? cryptoSub(inv.paramsJson)
                   : (es.investments.calculators[inv.calculator] ?? inv.calculator)}

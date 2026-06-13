@@ -1,11 +1,19 @@
 import { es } from "../i18n/es";
 import type {
+  Budget,
   CalculatorId,
+  CategoryBreakdown,
   Currency,
   DashboardSummary,
   ExchangeRate,
+  GoalInput,
   InvestmentDetail,
   InvestmentWithValue,
+  SavingsGoal,
+  SpendingTrends,
+  SubInput,
+  Subscription,
+  SubscriptionList,
   Transaction,
   TransactionCategory,
   TransactionKind,
@@ -51,6 +59,13 @@ export async function rpc<T>(
   }
   return (await res.json()) as T;
 }
+
+/** Per-user key/value settings (theme, preferences). */
+export const getSetting = (key: string) =>
+  rpc<string | null>("get_setting", { key });
+
+export const setSetting = (key: string, value: string) =>
+  rpc<void>("set_setting", { key, value });
 
 export const listCurrencies = () => rpc<Currency[]>("list_currencies");
 
@@ -140,6 +155,56 @@ export const createTransactionCategory = (name: string, kind: "income" | "expens
 
 export const getDashboardSummary = () =>
   rpc<DashboardSummary>("get_dashboard_summary");
+
+export const getCategoryBreakdown = (
+  kind: "income" | "expense",
+  period: "month" | "week" | "all" = "month",
+) => rpc<CategoryBreakdown>("get_category_breakdown", { kind, period });
+
+export const getSpendingTrends = () =>
+  rpc<SpendingTrends>("get_spending_trends");
+
+// ---- savings goals ----
+export const listSavingsGoals = () => rpc<SavingsGoal[]>("list_savings_goals");
+
+export const createSavingsGoal = (input: GoalInput) =>
+  rpc<SavingsGoal>("create_savings_goal", { ...input });
+
+export const updateSavingsGoal = (id: number, input: GoalInput) =>
+  rpc<SavingsGoal>("update_savings_goal", { id, ...input });
+
+export const contributeSavingsGoal = (id: number, amountCents: number) =>
+  rpc<SavingsGoal>("contribute_savings_goal", { id, amountCents });
+
+export const deleteSavingsGoal = (id: number) =>
+  rpc<void>("delete_savings_goal", { id });
+
+// ---- budgets ----
+export const listBudgets = () => rpc<Budget[]>("list_budgets");
+
+export const setBudget = (categoryId: number | null, limitCents: number) =>
+  rpc<void>("set_budget", { categoryId, limitCents });
+
+export const deleteBudget = (id: number) => rpc<void>("delete_budget", { id });
+
+// ---- subscriptions ----
+export const listSubscriptions = () =>
+  rpc<SubscriptionList>("list_subscriptions");
+
+export const createSubscription = (input: SubInput) =>
+  rpc<Subscription>("create_subscription", { ...input });
+
+export const updateSubscription = (id: number, input: SubInput) =>
+  rpc<Subscription>("update_subscription", { id, ...input });
+
+export const setSubscriptionActive = (id: number, active: boolean) =>
+  rpc<Subscription>("set_subscription_active", { id, active });
+
+export const registerSubscriptionPayment = (id: number) =>
+  rpc<Subscription>("register_subscription_payment", { id });
+
+export const deleteSubscription = (id: number) =>
+  rpc<void>("delete_subscription", { id });
 
 export interface InvestmentInput {
   name: string;

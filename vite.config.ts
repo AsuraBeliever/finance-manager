@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
@@ -6,11 +6,33 @@ import { VitePWA } from "vite-plugin-pwa";
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+// A fresh id per build. Baked into the bundle (__BUILD_ID__) and also written
+// to dist/version.json, so a running client can compare the two and know when
+// a newer build has been deployed — the update path that works in the Tauri/
+// WebKitGTK desktop shell, where service workers don't fire update events.
+const buildId = String(Date.now());
+
+// Emit dist/version.json holding the current build id.
+const emitVersion: Plugin = {
+  name: "emit-version",
+  generateBundle() {
+    this.emitFile({
+      type: "asset",
+      fileName: "version.json",
+      source: JSON.stringify({ buildId }),
+    });
+  },
+};
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId),
+  },
   plugins: [
     react(),
     tailwindcss(),
+    emitVersion,
     VitePWA({
       // "prompt": when a new version is deployed the app shows an "Actualizar"
       // banner instead of silently swapping — see src/features/update/.
@@ -23,8 +45,8 @@ export default defineConfig(async () => ({
         lang: "es-MX",
         display: "standalone",
         start_url: "/",
-        background_color: "#0f1115",
-        theme_color: "#0f1115",
+        background_color: "#141210",
+        theme_color: "#141210",
         icons: [
           { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
@@ -42,6 +64,9 @@ export default defineConfig(async () => ({
         // and navigateFallback serves the shell offline).
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
+        // version.json must always come from the network (it's the update
+        // signal); precaching it would freeze the build id the client sees.
+        globIgnores: ["**/version.json"],
       },
     }),
   ],

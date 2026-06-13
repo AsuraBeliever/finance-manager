@@ -26,12 +26,12 @@ export function WalletsPage() {
         title={es.wallets.title}
         actions={
           <div className="flex items-center gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-400">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
               <input
                 type="checkbox"
                 checked={showArchived}
                 onChange={(e) => setShowArchived(e.target.checked)}
-                className="accent-emerald-500"
+                className="accent-accent"
               />
               {es.wallets.showArchived}
             </label>
@@ -59,24 +59,24 @@ export function WalletsPage() {
           <Link
             key={w.id}
             to={`/carteras/${w.id}`}
-            className="group rounded-xl border border-border-muted bg-surface-raised p-4 transition-colors hover:border-accent-dim/60"
+            className="group rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50"
           >
             <div className="mb-3 flex items-center gap-2">
               <span
-                className="h-3 w-3 rounded-full"
-                style={{ backgroundColor: w.color ?? "#94a3b8" }}
+                className="h-3 w-3 rounded-full ring-2 ring-white/5"
+                style={{ backgroundColor: w.color ?? "#a8a29e" }}
               />
-              <span className="truncate font-medium">{w.name}</span>
+              <span className="truncate font-medium text-fg">{w.name}</span>
               {w.isArchived && (
-                <span className="ml-auto rounded-full bg-surface-overlay px-2 py-0.5 text-xs text-zinc-500">
+                <span className="ml-auto rounded-full bg-surface-overlay px-2 py-0.5 text-xs text-fg-subtle">
                   {es.wallets.archived}
                 </span>
               )}
             </div>
-            <p className="text-xl font-semibold tabular-nums">
+            <p className="font-display text-2xl font-medium tabular-nums text-fg">
               {formatCents(w.balanceCents, w.currencyCode)}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-fg-subtle">
               {w.categoryName} · {w.currencyCode}
             </p>
           </Link>

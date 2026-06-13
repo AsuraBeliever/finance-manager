@@ -156,3 +156,102 @@ export type InvestmentDetail = InvestmentWithValue & {
   snapshots: InvestmentSnapshot[];
   movements: InvestmentMovement[];
 };
+
+// ---- analytics ----
+
+export interface CategorySlice {
+  categoryId: number | null;
+  name: string;
+  color: string | null;
+  icon: string | null;
+  mxnCents: number;
+}
+
+export interface CategoryBreakdown {
+  totalMxnCents: number;
+  slices: CategorySlice[];
+}
+
+export interface DailyFlow {
+  day: string;
+  incomeMxnCents: number;
+  expenseMxnCents: number;
+}
+
+export interface SpendingTrends {
+  incomeMxnCents: number;
+  expenseMxnCents: number;
+  incomePrevMxnCents: number;
+  expensePrevMxnCents: number;
+  incomeTrendBps: number;
+  expenseTrendBps: number;
+  daily: DailyFlow[];
+}
+
+// ---- savings goals ----
+
+export interface SavingsGoal {
+  id: number;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  currencyCode: string;
+  targetCents: number;
+  savedCents: number;
+  progressBps: number;
+}
+
+export interface GoalInput {
+  name: string;
+  icon: string | null;
+  color: string | null;
+  currencyCode: string;
+  targetCents: number;
+}
+
+// ---- budgets ----
+
+export interface Budget {
+  id: number;
+  categoryId: number | null;
+  categoryName: string | null;
+  color: string | null;
+  limitCents: number;
+  spentMxnCents: number;
+  progressBps: number;
+}
+
+// ---- subscriptions ----
+
+export type Cadence = "monthly" | "yearly";
+
+export interface Subscription {
+  id: number;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  amountCents: number;
+  currencyCode: string;
+  cadence: Cadence;
+  nextChargeDate: string;
+  walletId: number | null;
+  categoryId: number | null;
+  isActive: boolean;
+}
+
+export interface SubscriptionList {
+  subscriptions: Subscription[];
+  monthlyTotalMxnCents: number;
+}
+
+export interface SubInput {
+  name: string;
+  icon: string | null;
+  color: string | null;
+  amountCents: number;
+  currencyCode: string;
+  cadence: Cadence;
+  nextChargeDate: string;
+  walletId: number | null;
+  categoryId: number | null;
+}

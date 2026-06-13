@@ -66,7 +66,7 @@ export function TransactionList({
                         : "transfer"
                   ]}
               </p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-fg-subtle">
                 {t.occurredAt}
                 {showWallet && <> · {t.walletName}</>}
                 {t.categoryName && t.description && <> · {t.categoryName}</>}
@@ -79,7 +79,7 @@ export function TransactionList({
             <button
               onClick={() => setToDelete(t.id)}
               aria-label={es.common.delete}
-              className="rounded-md p-1.5 text-zinc-600 opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+              className="rounded-md p-1.5 text-fg-subtle opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
             >
               <Trash2 size={15} />
             </button>

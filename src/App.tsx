@@ -9,6 +9,9 @@ import {
   ArrowLeftRight,
   TrendingUp,
   Settings,
+  PiggyBank,
+  Target,
+  CreditCard,
 } from "lucide-react";
 import { es } from "./i18n/es";
 import { UNAUTHORIZED_EVENT } from "./lib/api";
@@ -17,6 +20,8 @@ import { useOnline } from "./lib/online";
 import { flush } from "./lib/outbox";
 import { LoginPage } from "./features/auth/LoginPage";
 import { UpdateBanner } from "./features/update/UpdateBanner";
+import { ThemeToggle } from "./components/ThemeToggle";
+import { hydrateThemeFromServer } from "./lib/theme";
 
 const navItems = [
   { to: "/", label: es.nav.dashboard, icon: LayoutDashboard, end: true },
@@ -29,6 +34,13 @@ const navItems = [
   },
   { to: "/inversiones", label: es.nav.investments, icon: TrendingUp, end: false },
   { to: "/ajustes", label: es.nav.settings, icon: Settings, end: false },
+];
+
+// Desktop-only secondary group (the bottom bar stays at the 5 core items).
+const planningItems = [
+  { to: "/metas", label: es.nav.goals, icon: PiggyBank },
+  { to: "/presupuestos", label: es.nav.budgets, icon: Target },
+  { to: "/suscripciones", label: es.nav.subscriptions, icon: CreditCard },
 ];
 
 export default function App() {
@@ -45,6 +57,12 @@ export default function App() {
     refetchOnMount: "always",
     retry: false,
   });
+
+  // On login, adopt the theme saved on the account (local preference wins if
+  // the call fails — offline or no server-side value yet).
+  useEffect(() => {
+    if (user) hydrateThemeFromServer();
+  }, [user?.id]);
 
   // Any 401 from the API (expired session) drops back to the login screen.
   useEffect(() => {
@@ -75,7 +93,7 @@ export default function App() {
     return (
       <div className="flex h-full flex-col">
         <UpdateBanner />
-        <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
+        <div className="flex flex-1 items-center justify-center text-sm text-fg-subtle">
           {es.auth.checkingSession}
         </div>
       </div>
@@ -103,37 +121,78 @@ export default function App() {
       )}
       <div className="flex min-h-0 flex-1">
         {/* Desktop sidebar */}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-border-muted bg-surface-raised md:flex">
-        <div className="flex items-center gap-2 px-5 py-5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-dim/20 text-accent">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-border-muted bg-surface-raised/70 md:flex">
+        <div className="flex items-center gap-2.5 px-5 py-6">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dim text-white shadow-[0_4px_12px_-4px_rgba(22,164,122,0.7)]">
             <TrendingUp size={18} />
           </span>
-          <h1 className="text-lg font-semibold tracking-tight">{es.app.name}</h1>
+          <h1 className="font-display text-xl font-semibold tracking-tight text-fg">
+            {es.app.name}
+          </h1>
         </div>
-        <nav className="flex flex-col gap-1 px-3">
+        <nav className="flex flex-col gap-0.5 px-3">
           {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
               end={end}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                   isActive
                     ? "bg-accent-dim/15 font-medium text-accent"
-                    : "text-zinc-400 hover:bg-surface-overlay hover:text-zinc-200"
+                    : "text-fg-muted hover:bg-surface-overlay hover:text-fg"
                 }`
               }
             >
-              <Icon size={17} />
-              {label}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-accent transition-opacity ${
+                      isActive ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                  <Icon size={17} />
+                  {label}
+                </>
+              )}
+            </NavLink>
+          ))}
+
+          <p className="eyebrow mt-5 mb-1 px-3">{es.nav.planning}</p>
+          {planningItems.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                  isActive
+                    ? "bg-accent-dim/15 font-medium text-accent"
+                    : "text-fg-muted hover:bg-surface-overlay hover:text-fg"
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-accent transition-opacity ${
+                      isActive ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                  <Icon size={17} />
+                  {label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto px-3 pb-4">
+        <div className="mt-auto flex flex-col gap-2 px-3 pb-4">
+          <div className="px-1">
+            <ThemeToggle />
+          </div>
           <button
             onClick={doLogout}
             title={es.auth.logout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-surface-overlay hover:text-zinc-200"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg-subtle transition-colors hover:bg-surface-overlay hover:text-fg"
           >
             <LogOut size={17} />
             <span className="truncate">{user.email}</span>
@@ -156,13 +215,20 @@ export default function App() {
             to={to}
             end={end}
             className={({ isActive }) =>
-              `flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] transition-colors ${
-                isActive ? "text-accent" : "text-zinc-500"
+              `relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] transition-colors ${
+                isActive ? "text-accent" : "text-fg-subtle"
               }`
             }
           >
-            <Icon size={20} />
-            {label}
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-accent" />
+                )}
+                <Icon size={20} />
+                {label}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>

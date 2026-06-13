@@ -1,19 +1,94 @@
 @import "tailwindcss";
 
+/* ── Design system ──────────────────────────────────────────────────────
+   Two themes share one set of semantic tokens. Tailwind utilities reference
+   the @theme tokens, which in turn resolve to per-theme CSS variables (--c-*)
+   swapped at runtime via [data-theme] on <html>. Opacity modifiers
+   (bg-accent/10) still work: Tailwind emits color-mix() around the var().
+
+   - dark  = editorial / private-banking: warm charcoal, jade + champagne gold.
+   - light = the dashboard references: lavender-white, violet primary.
+   Money stays tabular and lining; display type is Fraunces, UI is Hanken. */
 @theme {
-  --color-surface: #0f1115;
-  --color-surface-raised: #171a21;
-  --color-surface-overlay: #1f2330;
-  --color-border-muted: #2a2f3d;
-  --color-accent: #34d399;
-  --color-accent-dim: #10b981;
-  --color-danger: #f87171;
-  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --color-surface: var(--c-surface);
+  --color-surface-raised: var(--c-surface-raised);
+  --color-surface-overlay: var(--c-surface-overlay);
+  --color-border-muted: var(--c-border-muted);
+
+  --color-accent: var(--c-accent);
+  --color-accent-dim: var(--c-accent-dim);
+  --color-accent-bright: var(--c-accent-bright);
+  --color-gold: var(--c-gold);
+  --color-danger: var(--c-danger);
+
+  /* semantic text ramp (primary / secondary / tertiary) */
+  --color-fg: var(--c-fg);
+  --color-fg-muted: var(--c-fg-muted);
+  --color-fg-subtle: var(--c-fg-subtle);
+
+  --font-sans: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+
+  --shadow-card: var(--c-shadow-card);
 }
 
-html {
-  /* Native widgets (select popups, date pickers, scrollbars) render dark. */
+/* ── Dark (default): editorial jade + gold on warm charcoal ─────────────── */
+:root,
+[data-theme="dark"] {
+  --c-surface: #141210;
+  --c-surface-raised: #1c1915;
+  --c-surface-overlay: #262019;
+  --c-border-muted: #342e24;
+
+  --c-accent: #16a47a;
+  --c-accent-dim: #0e7d5b;
+  --c-accent-bright: #25c290;
+  --c-gold: #d9b45c;
+  --c-danger: #f0786b;
+
+  --c-fg: #f5f1ea;
+  --c-fg-muted: #a8a29e;
+  --c-fg-subtle: #78716c;
+
+  --c-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 12px 32px -16px rgba(0, 0, 0, 0.7);
+
+  /* atmosphere */
+  --grain-opacity: 0.035;
+  --glow-1: rgba(22, 164, 122, 0.1);
+  --glow-2: rgba(217, 180, 92, 0.05);
+  --hero-gradient: linear-gradient(176deg, #efd896 4%, #d9b45c 46%, #bb8f3a 100%);
+
   color-scheme: dark;
+}
+
+/* ── Light: violet primary on lavender-white (the reference dashboards) ─── */
+[data-theme="light"] {
+  --c-surface: #f4f4f8;
+  --c-surface-raised: #ffffff;
+  --c-surface-overlay: #eceaf4;
+  --c-border-muted: #e6e4ef;
+
+  --c-accent: #7c5cff;
+  --c-accent-dim: #6a45e6;
+  --c-accent-bright: #9277ff;
+  --c-gold: #f0a830; /* warm secondary accent (kept distinct from violet) */
+  --c-danger: #e5484d;
+
+  --c-fg: #211d35;
+  --c-fg-muted: #6b6880;
+  --c-fg-subtle: #9b98ab;
+
+  --c-shadow-card: 0 1px 2px rgba(20, 14, 50, 0.04),
+    0 14px 30px -16px rgba(80, 60, 160, 0.2);
+
+  /* lighter atmosphere: no grain, a faint violet bloom only */
+  --grain-opacity: 0;
+  --glow-1: rgba(124, 92, 255, 0.1);
+  --glow-2: rgba(124, 92, 255, 0.04);
+  --hero-gradient: linear-gradient(176deg, #9277ff 0%, #6a45e6 100%);
+
+  color-scheme: light;
 }
 
 html,
@@ -23,8 +98,58 @@ body,
 }
 
 body {
-  @apply bg-surface text-zinc-100 antialiased;
+  @apply bg-surface text-fg antialiased;
+  font-feature-settings: "ss01", "cv05";
   user-select: none;
+}
+
+/* Atmosphere: a theme-tuned radial glow + (dark only) faint film grain, both
+   behind content and inert to pointer events. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(80rem 50rem at 12% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(60rem 40rem at 100% 0%, var(--glow-2), transparent 55%);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Display type: enable optical sizing so Fraunces sets larger at hero scale. */
+.font-display {
+  font-optical-sizing: auto;
+}
+
+/* Hero figures: a per-theme gradient painted on the glyphs (gold in dark,
+   violet in light). */
+.text-gold-gradient {
+  background: var(--hero-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Editorial eyebrow: small, spaced, uppercase label above a value. */
+.eyebrow {
+  @apply text-[0.7rem] font-medium uppercase tracking-[0.18em] text-fg-muted;
 }
 
 input,
@@ -33,11 +158,11 @@ textarea {
 }
 
 /* WebKitGTK ignores dark backgrounds on native selects: drop the native
-   appearance and draw our own chevron so they match the theme. */
+   appearance and draw our own chevron (uses currentColor so it tracks theme). */
 select {
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.65rem center;
   padding-right: 2.25rem;
@@ -45,11 +170,11 @@ select {
 }
 
 select option {
-  @apply bg-surface-overlay text-zinc-100;
+  @apply bg-surface-overlay text-fg;
 }
 
 ::selection {
-  background: rgba(16, 185, 129, 0.35);
+  background: color-mix(in oklab, var(--c-accent) 35%, transparent);
 }
 
 * {

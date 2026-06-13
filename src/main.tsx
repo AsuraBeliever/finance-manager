@@ -12,6 +12,9 @@ import { TransactionsPage } from "./features/transactions/TransactionsPage";
 import { InvestmentsPage } from "./features/investments/InvestmentsPage";
 import { InvestmentDetailPage } from "./features/investments/InvestmentDetailPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { SavingsGoalsPage } from "./features/goals/SavingsGoalsPage";
+import { BudgetsPage } from "./features/budgets/BudgetsPage";
+import { SubscriptionsPage } from "./features/subscriptions/SubscriptionsPage";
 import "./index.css";
 
 // Offline reads: the query cache persists to localStorage so the PWA shows
@@ -46,6 +49,9 @@ const router = createHashRouter([
       { path: "transacciones", element: <TransactionsPage /> },
       { path: "inversiones", element: <InvestmentsPage /> },
       { path: "inversiones/:id", element: <InvestmentDetailPage /> },
+      { path: "metas", element: <SavingsGoalsPage /> },
+      { path: "presupuestos", element: <BudgetsPage /> },
+      { path: "suscripciones", element: <SubscriptionsPage /> },
       { path: "ajustes", element: <SettingsPage /> },
     ],
   },
