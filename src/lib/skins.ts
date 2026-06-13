@@ -11,7 +11,7 @@ export type SkinGroup = "banco" | "nivel" | "efectivo" | "glass";
 
 /** Decorative motif drawn on the card. Card skins get a chip; cash skins get
  *  a stylized money illustration instead. */
-export type SkinArt = "chip" | "banknote" | "wallet" | "coins" | "none";
+export type SkinArt = "chip" | "banknote" | "wallet" | "coins" | "piggy" | "none";
 
 export interface Skin {
   id: string;
@@ -63,6 +63,9 @@ export const SKINS: Skin[] = [
   { id: "monedas", label: "Monedas", group: "efectivo", accent: "#c08a2e", fg: "#fff6e6",
     art: "coins",
     background: "linear-gradient(135deg,#7a5210 0%,#d9a93a 50%,#6b450c 100%)" },
+  { id: "ahorro", label: "Ahorro", group: "efectivo", accent: "#0ea5a3", fg: "#eafdff",
+    art: "piggy",
+    background: "linear-gradient(135deg,#0b3b46 0%,#0ea5a3 55%,#0b3b46 100%)" },
 
   // ── neon glass (matches the app) ──
   { id: "neon", label: "Neón", group: "glass", accent: "#a855f7", fg: "#f4f0ff",
@@ -131,4 +134,23 @@ export function skinArt(skin: string | null | undefined): SkinArt {
   if (skin.startsWith("img:")) return "none";
   if (skin.startsWith("grad:")) return "chip";
   return BY_ID.get(skin)?.art ?? "chip";
+}
+
+/** Default skin id for a wallet category, so each category looks distinct even
+ *  before the user picks one. Matches the seeded category names (es-MX). */
+export function categoryDefaultSkin(categoryName: string | null | undefined): string {
+  const c = (categoryName ?? "").toLowerCase();
+  if (c.includes("efectivo")) return "efectivo";
+  if (c.includes("crédito") || c.includes("credito")) return "morado";
+  if (c.includes("débito") || c.includes("debito")) return "azul";
+  if (c.includes("ahorro")) return "ahorro";
+  return "neon";
+}
+
+/** The skin actually in effect: the explicit one, or the category default. */
+export function effectiveSkin(
+  skin: string | null | undefined,
+  categoryName: string | null | undefined,
+): string {
+  return skin ?? categoryDefaultSkin(categoryName);
 }

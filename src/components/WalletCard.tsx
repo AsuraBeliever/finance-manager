@@ -1,23 +1,21 @@
-import { Banknote, Coins, Wallet as WalletIcon } from "lucide-react";
+import { Banknote, Coins, PiggyBank, Wallet as WalletIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatCents } from "../lib/money";
-import { isImageSkin, resolveSkin, skinArt } from "../lib/skins";
+import { effectiveSkin, isImageSkin, resolveSkin, skinArt } from "../lib/skins";
 import type { Wallet } from "../lib/types";
 import { es } from "../i18n/es";
 
-const ART_ICON = { banknote: Banknote, wallet: WalletIcon, coins: Coins } as const;
+const ART_ICON = { banknote: Banknote, wallet: WalletIcon, coins: Coins, piggy: PiggyBank } as const;
 
-/** A wallet rendered as a crystalline card. Card skins show a chip; cash skins
- *  show a money illustration (banknotes / wallet / coins) instead. */
+/** A wallet rendered as a crystalline card. The skin (explicit, or the default
+ *  for its category) sets the look: card skins show a chip; cash/savings skins
+ *  show a money illustration instead. */
 export function WalletCard({ wallet }: { wallet: Wallet }) {
-  const { background, fg } = resolveSkin(wallet.skin, wallet.color);
-  const img = isImageSkin(wallet.skin);
-
-  // Cash wallets with no explicit skin default to a banknote motif (no chip).
-  let art = skinArt(wallet.skin);
-  if (art === "chip" && !wallet.skin && /efectivo|cash/i.test(wallet.categoryName)) {
-    art = "banknote";
-  }
+  // No explicit skin → use the category's default so each category is distinct.
+  const skin = effectiveSkin(wallet.skin, wallet.categoryName);
+  const { background, fg } = resolveSkin(skin, wallet.color);
+  const img = isImageSkin(skin);
+  const art = skinArt(skin);
   const Motif = ART_ICON[art as keyof typeof ART_ICON];
 
   return (

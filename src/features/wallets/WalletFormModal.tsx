@@ -13,7 +13,7 @@ import {
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
 import { CHART_COLORS } from "../../lib/palette";
-import { resolveSkin, skinAccent, SKINS, type SkinGroup } from "../../lib/skins";
+import { effectiveSkin, resolveSkin, skinAccent, SKINS, type SkinGroup } from "../../lib/skins";
 import type { Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 
@@ -107,12 +107,13 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
     }
     const finalCategory = categoryId ?? categories.data?.[0]?.id;
     if (finalCategory === undefined) return;
+    const catName = categories.data?.find((c) => c.id === finalCategory)?.name;
     mutation.mutate({
       name,
       categoryId: finalCategory,
       currencyCode,
       initialBalanceCents: cents,
-      color: skinAccent(skin) ?? COLORS[0],
+      color: skinAccent(effectiveSkin(skin, catName)) ?? COLORS[0],
       skin,
       notes: notes.trim() === "" ? null : notes.trim(),
     });
@@ -120,7 +121,11 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
 
   const imgSelected = !!skin && skin.startsWith("img:");
   const gradSelected = !!skin && skin.startsWith("grad:");
-  const autoBg = resolveSkin(null, COLORS[0]).background;
+  // "Auto" previews the default skin for the currently selected category.
+  const selectedCatName = categories.data?.find(
+    (c) => c.id === (categoryId ?? categories.data?.[0]?.id),
+  )?.name;
+  const autoBg = resolveSkin(effectiveSkin(null, selectedCatName)).background;
 
   return (
     <Modal
