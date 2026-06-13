@@ -4,25 +4,25 @@
 // useChartTokens().
 import { useResolvedTheme } from "./theme";
 
-// Category colors: jade and champagne-gold lead, then muted supporting hues.
-// Shared by every chart and the wallet/category color swatches.
+// Vibrant anime-pop category colors: violet · pink · cyan lead, then bright
+// supporting hues. Shared by every chart and the wallet/category swatches.
 export const CHART_COLORS = [
-  "#25c290", // jade / emerald
-  "#d9b45c", // champagne gold
-  "#7c5cff", // violet (light-theme primary)
-  "#d98a5b", // terracotta
-  "#7fa6c4", // dusty blue
-  "#b58bb5", // mauve
-  "#9bb37e", // sage
-  "#cf7f6e", // clay
+  "#a855f7", // violet
+  "#ec4899", // pink
+  "#22d3ee", // cyan
+  "#f59e0b", // amber
+  "#34d399", // emerald
+  "#60a5fa", // blue
+  "#fb7185", // rose
+  "#c084fc", // light violet
 ];
 
 // Neutral fallback for an uncolored wallet/category dot.
-export const NEUTRAL_DOT = "#a8a29e";
+export const NEUTRAL_DOT = "#9a93b5";
 
 // Flow semantics (fine on both themes).
-export const POSITIVE = "#16a47a";
-export const NEGATIVE = "#e5484d";
+export const POSITIVE = "#34d399";
+export const NEGATIVE = "#fb7185";
 
 export interface ChartTokens {
   colors: string[];
@@ -39,24 +39,24 @@ export interface ChartTokens {
 }
 
 const DARK_CHROME = {
-  axis: "#8c857a",
-  grid: "#342e24",
+  axis: "#6f6a8d",
+  grid: "rgba(255,255,255,0.08)",
   tooltip: {
-    backgroundColor: "#262019",
-    border: "1px solid #342e24",
-    borderRadius: 10,
-    color: "#f5f1ea",
+    backgroundColor: "#1b1830",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 12,
+    color: "#f2efff",
   },
 };
 
 const LIGHT_CHROME = {
-  axis: "#9b98ab",
-  grid: "#e6e4ef",
+  axis: "#9a93b5",
+  grid: "rgba(124,58,237,0.12)",
   tooltip: {
     backgroundColor: "#ffffff",
-    border: "1px solid #e6e4ef",
-    borderRadius: 10,
-    color: "#211d35",
+    border: "1px solid rgba(124,58,237,0.16)",
+    borderRadius: 12,
+    color: "#211a3a",
   },
 };
 

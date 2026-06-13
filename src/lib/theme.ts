@@ -9,7 +9,7 @@ export type ThemePref = "light" | "dark" | "system";
 type Resolved = "light" | "dark";
 
 const KEY = "finanzas.theme";
-const THEME_COLOR = { dark: "#141210", light: "#f4f4f8" } as const;
+const THEME_COLOR = { dark: "#0b0a16", light: "#f4f2ff" } as const;
 const listeners = new Set<() => void>();
 const mql = window.matchMedia("(prefers-color-scheme: dark)");
 

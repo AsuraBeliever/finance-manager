@@ -94,7 +94,7 @@ export function DashboardPage() {
     <>
       <PageHeader title={es.dashboard.title} />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {/* Net worth hero */}
         <section className="relative col-span-full overflow-hidden rounded-2xl border border-border-muted bg-surface-raised p-7 shadow-card md:p-9">
           <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />

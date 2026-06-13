@@ -12,7 +12,7 @@ interface StatWidgetProps {
 export function StatWidget({ title, action, className = "", children }: StatWidgetProps) {
   return (
     <section
-      className={`rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card ${className}`}
+      className={`group rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/40 ${className}`}
     >
       <header className="mb-4 flex items-center justify-between gap-3">
         <h3 className="font-display text-lg font-medium tracking-tight text-fg">{title}</h3>
