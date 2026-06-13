@@ -30,6 +30,8 @@ pub struct Wallet {
     /// Computed: initial balance + signed sum of transactions.
     pub balance_cents: i64,
     pub color: Option<String>,
+    /// Card skin: a catalog id ("oro"), a custom gradient, or an imported image.
+    pub skin: Option<String>,
     pub notes: Option<String>,
     pub is_archived: bool,
     pub created_at: String,

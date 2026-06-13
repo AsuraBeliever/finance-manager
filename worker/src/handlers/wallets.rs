@@ -18,7 +18,7 @@ const WALLET_SELECT: &str = "
                           WHEN 'transfer_in' THEN t.amount_cents
                           ELSE -t.amount_cents END)
              FROM transactions t WHERE t.wallet_id = w.id), 0) AS balance_cents,
-           w.color, w.notes, w.is_archived, w.created_at
+           w.color, w.skin, w.notes, w.is_archived, w.created_at
     FROM wallets w
     JOIN wallet_categories wc ON wc.id = w.category_id";
 
@@ -33,6 +33,7 @@ struct WalletRow {
     initial_balance_cents: i64,
     balance_cents: i64,
     color: Option<String>,
+    skin: Option<String>,
     notes: Option<String>,
     is_archived: i64,
     created_at: String,
@@ -49,6 +50,7 @@ impl From<WalletRow> for Wallet {
             initial_balance_cents: r.initial_balance_cents,
             balance_cents: r.balance_cents,
             color: r.color,
+            skin: r.skin,
             notes: r.notes,
             is_archived: r.is_archived != 0,
             created_at: r.created_at,
@@ -113,6 +115,7 @@ pub struct CreateWalletArgs {
     pub currency_code: String,
     pub initial_balance_cents: i64,
     pub color: Option<String>,
+    pub skin: Option<String>,
     pub notes: Option<String>,
 }
 
@@ -120,9 +123,9 @@ pub async fn create_wallet(db: &D1Database, uid: i64, a: CreateWalletArgs) -> Ap
     validate(&a.name)?;
     let res = exec(
         db,
-        "INSERT INTO wallets (user_id, name, category_id, currency_code, initial_balance_cents, color, notes)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        jsv![uid, a.name.trim(), a.category_id, a.currency_code, a.initial_balance_cents, a.color, a.notes],
+        "INSERT INTO wallets (user_id, name, category_id, currency_code, initial_balance_cents, color, skin, notes)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        jsv![uid, a.name.trim(), a.category_id, a.currency_code, a.initial_balance_cents, a.color, a.skin, a.notes],
     )
     .await?;
     fetch_wallet(db, uid, last_row_id(&res)?).await
@@ -137,6 +140,7 @@ pub struct UpdateWalletArgs {
     pub currency_code: String,
     pub initial_balance_cents: i64,
     pub color: Option<String>,
+    pub skin: Option<String>,
     pub notes: Option<String>,
 }
 
@@ -146,7 +150,7 @@ pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> Ap
         db,
         "UPDATE wallets
          SET name = ?3, category_id = ?4, currency_code = ?5,
-             initial_balance_cents = ?6, color = ?7, notes = ?8
+             initial_balance_cents = ?6, color = ?7, skin = ?8, notes = ?9
          WHERE id = ?1 AND user_id = ?2",
         jsv![
             a.id,
@@ -156,6 +160,7 @@ pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> Ap
             a.currency_code,
             a.initial_balance_cents,
             a.color,
+            a.skin,
             a.notes
         ],
     )

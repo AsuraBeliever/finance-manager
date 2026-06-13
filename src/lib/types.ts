@@ -23,6 +23,7 @@ export interface Wallet {
   initialBalanceCents: number;
   balanceCents: number;
   color: string | null;
+  skin: string | null;
   notes: string | null;
   isArchived: boolean;
   createdAt: string;
