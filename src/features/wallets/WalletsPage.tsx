@@ -26,7 +26,7 @@ export function WalletsPage() {
         title={es.wallets.title}
         actions={
           <div className="flex items-center gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-400">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
               <input
                 type="checkbox"
                 checked={showArchived}
@@ -66,17 +66,17 @@ export function WalletsPage() {
                 className="h-3 w-3 rounded-full ring-2 ring-white/5"
                 style={{ backgroundColor: w.color ?? "#a8a29e" }}
               />
-              <span className="truncate font-medium text-stone-200">{w.name}</span>
+              <span className="truncate font-medium text-fg">{w.name}</span>
               {w.isArchived && (
-                <span className="ml-auto rounded-full bg-surface-overlay px-2 py-0.5 text-xs text-stone-500">
+                <span className="ml-auto rounded-full bg-surface-overlay px-2 py-0.5 text-xs text-fg-subtle">
                   {es.wallets.archived}
                 </span>
               )}
             </div>
-            <p className="font-display text-2xl font-medium tabular-nums text-stone-50">
+            <p className="font-display text-2xl font-medium tabular-nums text-fg">
               {formatCents(w.balanceCents, w.currencyCode)}
             </p>
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-1 text-xs text-fg-subtle">
               {w.categoryName} · {w.currencyCode}
             </p>
           </Link>

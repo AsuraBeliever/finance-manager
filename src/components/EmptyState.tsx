@@ -19,8 +19,8 @@ export function EmptyState({
       <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-dim/15 text-accent ring-1 ring-accent/20">
         <Icon size={24} />
       </span>
-      <p className="font-display text-lg font-medium text-stone-100">{title}</p>
-      {description && <p className="max-w-sm text-sm text-stone-500">{description}</p>}
+      <p className="font-display text-lg font-medium text-fg">{title}</p>
+      {description && <p className="max-w-sm text-sm text-fg-subtle">{description}</p>}
       {action}
     </div>
   );

@@ -9,7 +9,10 @@ use serde_json::Value;
 use worker::{D1Database, Request, Response, RouteContext};
 
 use crate::error::{db_err, error_response};
-use crate::handlers::{dashboard, investments, settings, transactions, wallets};
+use crate::handlers::{
+    analytics, budgets, dashboard, goals, investments, settings, subscriptions, transactions,
+    wallets,
+};
 use crate::market;
 
 fn args<A: DeserializeOwned>(body: Value) -> AppResult<A> {
@@ -88,8 +91,44 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
             out(transactions::create_transaction_category(db, uid, args(body)?).await?)
         }
 
-        // ---- dashboard ----
+        // ---- dashboard / analytics ----
         "get_dashboard_summary" => out(dashboard::get_dashboard_summary(db, uid).await?),
+        "get_category_breakdown" => {
+            out(analytics::get_category_breakdown(db, uid, args(body)?).await?)
+        }
+        "get_spending_trends" => out(analytics::get_spending_trends(db, uid).await?),
+
+        // ---- savings goals ----
+        "list_savings_goals" => out(goals::list_savings_goals(db, uid).await?),
+        "create_savings_goal" => out(goals::create_savings_goal(db, uid, args(body)?).await?),
+        "update_savings_goal" => out(goals::update_savings_goal(db, uid, args(body)?).await?),
+        "contribute_savings_goal" => {
+            out(goals::contribute_savings_goal(db, uid, args(body)?).await?)
+        }
+        "delete_savings_goal" => out(goals::delete_savings_goal(db, uid, args(body)?).await?),
+
+        // ---- budgets ----
+        "list_budgets" => out(budgets::list_budgets(db, uid).await?),
+        "set_budget" => out(budgets::set_budget(db, uid, args(body)?).await?),
+        "delete_budget" => out(budgets::delete_budget(db, uid, args(body)?).await?),
+
+        // ---- subscriptions ----
+        "list_subscriptions" => out(subscriptions::list_subscriptions(db, uid).await?),
+        "create_subscription" => {
+            out(subscriptions::create_subscription(db, uid, args(body)?).await?)
+        }
+        "update_subscription" => {
+            out(subscriptions::update_subscription(db, uid, args(body)?).await?)
+        }
+        "set_subscription_active" => {
+            out(subscriptions::set_subscription_active(db, uid, args(body)?).await?)
+        }
+        "register_subscription_payment" => {
+            out(subscriptions::register_subscription_payment(db, uid, args(body)?).await?)
+        }
+        "delete_subscription" => {
+            out(subscriptions::delete_subscription(db, uid, args(body)?).await?)
+        }
 
         // ---- investments ----
         "list_calculators" => out(investments::list_calculators()),

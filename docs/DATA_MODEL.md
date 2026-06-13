@@ -198,3 +198,44 @@ CREATE TABLE crypto_prices (     -- último precio por símbolo (CoinGecko)
 );
 ```
 Ambas se refrescan con el cron trigger diario del worker y bajo demanda con `refresh_market_data_cmd`.
+
+## Metas, presupuestos y suscripciones (migración 0005)
+
+Todo por usuario (`user_id`). El dinero se agrega/convierte a MXN en Rust; el avance va en basis points calculados en el handler.
+
+```sql
+CREATE TABLE savings_goals (     -- meta con monto ahorrado manual; progreso = saved/target
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+  name TEXT NOT NULL, icon TEXT, color TEXT,
+  currency_code TEXT NOT NULL DEFAULT 'MXN' REFERENCES currencies(code),
+  target_cents INTEGER NOT NULL CHECK (target_cents > 0),
+  saved_cents INTEGER NOT NULL DEFAULT 0 CHECK (saved_cents >= 0),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE budgets (           -- límite mensual; category_id NULL = límite general
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+  category_id INTEGER REFERENCES transaction_categories(id),
+  limit_cents INTEGER NOT NULL CHECK (limit_cents > 0),
+  period TEXT NOT NULL DEFAULT 'monthly' CHECK (period IN ('monthly')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- unicidad por (usuario, categoría) incluyendo el general (NULL→0)
+CREATE UNIQUE INDEX idx_budgets_unique ON budgets(user_id, COALESCE(category_id, 0));
+
+CREATE TABLE subscriptions (     -- pagos recurrentes; "registrar pago" inserta un gasto y avanza next_charge_date
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+  name TEXT NOT NULL, icon TEXT, color TEXT,
+  amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+  currency_code TEXT NOT NULL DEFAULT 'MXN' REFERENCES currencies(code),
+  cadence TEXT NOT NULL DEFAULT 'monthly' CHECK (cadence IN ('monthly','yearly')),
+  next_charge_date TEXT NOT NULL,
+  wallet_id INTEGER REFERENCES wallets(id),
+  category_id INTEGER REFERENCES transaction_categories(id),
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+- **budgets.spent** nunca se almacena: se calcula al leer (gasto del mes en MXN, general o por categoría).
+- **subscriptions** total mensual = suma de activas normalizadas a mes (anual/12) en MXN.

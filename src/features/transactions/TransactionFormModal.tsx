@@ -129,8 +129,8 @@ export function TransactionFormModal({
             }}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors ${
               tab === t.id
-                ? "bg-surface-overlay font-medium text-stone-100"
-                : "text-stone-500 hover:text-stone-300"
+                ? "bg-surface-overlay font-medium text-fg"
+                : "text-fg-subtle hover:text-fg"
             }`}
           >
             {t.label}
@@ -204,7 +204,7 @@ export function TransactionFormModal({
               inputMode="decimal"
               required
             />
-            <span className="mt-1 block text-xs text-stone-500">
+            <span className="mt-1 block text-xs text-fg-subtle">
               {es.transactions.transferHint}
             </span>
           </Field>

@@ -52,13 +52,13 @@ export function LoginPage() {
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dim text-white shadow-[0_4px_14px_-4px_rgba(22,164,122,0.7)]">
             <TrendingUp size={22} />
           </span>
-          <h1 className="font-display text-2xl font-semibold tracking-tight text-stone-50">{es.app.name}</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-fg">{es.app.name}</h1>
         </div>
         <form
           onSubmit={submit}
           className="flex flex-col gap-4 rounded-2xl border border-border-muted bg-surface-raised p-6 shadow-card"
         >
-          <h2 className="font-display text-lg font-medium tracking-tight text-stone-100">
+          <h2 className="font-display text-lg font-medium tracking-tight text-fg">
             {mode === "login" ? es.auth.loginTitle : es.auth.registerTitle}
           </h2>
 
@@ -73,7 +73,7 @@ export function LoginPage() {
             <GoogleIcon size={18} />
             {es.auth.continueWithGoogle}
           </button>
-          <div className="flex items-center gap-3 text-xs text-stone-600">
+          <div className="flex items-center gap-3 text-xs text-fg-subtle">
             <span className="h-px flex-1 bg-border-muted" />
             {es.auth.or}
             <span className="h-px flex-1 bg-border-muted" />
@@ -100,7 +100,7 @@ export function LoginPage() {
               required
             />
             {mode === "register" && (
-              <p className="mt-1 text-xs text-stone-500">{es.auth.passwordHint}</p>
+              <p className="mt-1 text-xs text-fg-subtle">{es.auth.passwordHint}</p>
             )}
           </Field>
           {mode === "register" && (
@@ -113,7 +113,7 @@ export function LoginPage() {
                 autoComplete="off"
                 required
               />
-              <p className="mt-1 text-xs text-stone-500">{es.auth.inviteCodeHint}</p>
+              <p className="mt-1 text-xs text-fg-subtle">{es.auth.inviteCodeHint}</p>
             </Field>
           )}
           {error && <p className="text-sm text-danger">{error}</p>}
@@ -122,7 +122,7 @@ export function LoginPage() {
           </Button>
           <button
             type="button"
-            className="text-sm text-stone-400 transition-colors hover:text-accent"
+            className="text-sm text-fg-muted transition-colors hover:text-accent"
             onClick={() => {
               setMode(mode === "login" ? "register" : "login");
               setError(null);

@@ -78,7 +78,7 @@ pub async fn load_rates(db: &D1Database) -> AppResult<HashMap<String, i64>> {
     Ok(rates)
 }
 
-fn to_mxn(cents: i64, rate_micros: i64) -> i64 {
+pub(crate) fn to_mxn(cents: i64, rate_micros: i64) -> i64 {
     ((cents as i128 * rate_micros as i128) / MICROS as i128) as i64
 }
 

@@ -166,7 +166,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
 
         {error && <p className="text-sm text-danger">{error}</p>}
         {wallet && (
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-fg-subtle">
             {es.wallets.balance}: {formatCents(wallet.balanceCents, wallet.currencyCode)}
           </p>
         )}

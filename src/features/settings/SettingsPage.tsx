@@ -6,6 +6,7 @@ import { KeyRound, LogOut, Monitor, Smartphone } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
 import { PageHeader } from "../../components/PageHeader";
+import { ThemeToggle } from "../../components/ThemeToggle";
 import { listCurrencies, listWalletCategories } from "../../lib/api";
 import {
   changePassword,
@@ -91,7 +92,7 @@ function ChangePasswordForm() {
           required
         />
       </Field>
-      <p className="text-xs text-stone-500">{es.account.passwordChangeNote}</p>
+      <p className="text-xs text-fg-subtle">{es.account.passwordChangeNote}</p>
       {error && <p className="text-sm text-danger">{error}</p>}
       {done && <p className="text-sm text-accent">{es.account.passwordChanged}</p>}
       <div>
@@ -117,7 +118,7 @@ function DevicesList() {
   const list = sessions.data ?? [];
   return (
     <>
-      {sessions.isPending && <p className="text-sm text-stone-500">{es.common.loading}</p>}
+      {sessions.isPending && <p className="text-sm text-fg-subtle">{es.common.loading}</p>}
       {sessions.isError && (
         <p className="text-sm text-danger">{String(sessions.error)}</p>
       )}
@@ -126,9 +127,9 @@ function DevicesList() {
           const Icon = isMobileDevice(s.userAgent) ? Smartphone : Monitor;
           return (
             <li key={s.id} className="flex items-center gap-3 py-2.5 text-sm">
-              <Icon size={18} className="shrink-0 text-stone-500" />
+              <Icon size={18} className="shrink-0 text-fg-subtle" />
               <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 text-stone-200">
+                <p className="flex items-center gap-2 text-fg">
                   <span className="truncate">{deviceLabel(s.userAgent)}</span>
                   {s.current && (
                     <span className="rounded-full bg-accent-dim/15 px-2 py-0.5 text-[10px] font-medium text-accent">
@@ -136,7 +137,7 @@ function DevicesList() {
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-stone-500">
+                <p className="text-xs text-fg-subtle">
                   {es.account.lastSeen}: {relativeFromUtc(s.lastSeenAt ?? s.createdAt)}
                 </p>
               </div>
@@ -188,11 +189,16 @@ export function SettingsPage() {
     <>
       <PageHeader title={es.settings.title} />
       <div className="grid max-w-3xl gap-6">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="font-medium">{es.theme.label}</h3>
+          <ThemeToggle />
+        </section>
+
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-1 font-medium">{es.settings.currencies}</h3>
-          <p className="mb-3 text-xs text-stone-500">{es.settings.currenciesHint}</p>
+          <p className="mb-3 text-xs text-fg-subtle">{es.settings.currenciesHint}</p>
           {currencies.isPending && (
-            <p className="text-sm text-stone-500">{es.common.loading}</p>
+            <p className="text-sm text-fg-subtle">{es.common.loading}</p>
           )}
           {currencies.isError && (
             <p className="text-sm text-danger">{String(currencies.error)}</p>
@@ -201,8 +207,8 @@ export function SettingsPage() {
             {currencies.data?.map((c) => (
               <li key={c.code} className="flex items-center gap-3 py-2 text-sm">
                 <span className="w-12 font-mono font-medium text-accent">{c.code}</span>
-                <span className="text-stone-300">{c.name}</span>
-                <span className="ml-auto text-stone-500">{c.symbol}</span>
+                <span className="text-fg">{c.name}</span>
+                <span className="ml-auto text-fg-subtle">{c.symbol}</span>
               </li>
             ))}
           </ul>
@@ -214,7 +220,7 @@ export function SettingsPage() {
             {categories.data?.map((c) => (
               <li
                 key={c.id}
-                className="rounded-full bg-surface-overlay px-3 py-1 text-sm text-stone-300"
+                className="rounded-full bg-surface-overlay px-3 py-1 text-sm text-fg"
               >
                 {c.name}
               </li>
@@ -224,7 +230,7 @@ export function SettingsPage() {
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-3 flex items-center gap-2 font-medium">
-            <Smartphone size={16} className="text-stone-500" />
+            <Smartphone size={16} className="text-fg-subtle" />
             {es.account.devices}
           </h3>
           <DevicesList />
@@ -232,7 +238,7 @@ export function SettingsPage() {
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-3 flex items-center gap-2 font-medium">
-            <KeyRound size={16} className="text-stone-500" />
+            <KeyRound size={16} className="text-fg-subtle" />
             {es.account.changePassword}
           </h3>
           <ChangePasswordForm />
@@ -241,7 +247,7 @@ export function SettingsPage() {
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-3 font-medium">{es.settings.session}</h3>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm text-stone-300">{session.data?.email}</span>
+            <span className="text-sm text-fg">{session.data?.email}</span>
             <Button variant="ghost" onClick={doLogout}>
               <span className="flex items-center gap-2">
                 <LogOut size={16} /> {es.auth.logout}

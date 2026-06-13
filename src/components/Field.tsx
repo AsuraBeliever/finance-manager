@@ -12,7 +12,7 @@ interface FieldProps {
 export function Field({ label, children }: FieldProps) {
   return (
     <div>
-      <span className="mb-1.5 block text-[0.8rem] font-medium text-stone-400">{label}</span>
+      <span className="mb-1.5 block text-[0.8rem] font-medium text-fg-muted">{label}</span>
       {children}
     </div>
   );
@@ -20,4 +20,4 @@ export function Field({ label, children }: FieldProps) {
 
 export const inputClass =
   "w-full rounded-lg border border-border-muted bg-surface px-3 py-2 text-sm " +
-  "text-stone-100 outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/25";
+  "text-fg outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/25";

@@ -1,5 +1,9 @@
+pub mod analytics;
+pub mod budgets;
 pub mod dashboard;
+pub mod goals;
 pub mod investments;
 pub mod settings;
+pub mod subscriptions;
 pub mod transactions;
 pub mod wallets;

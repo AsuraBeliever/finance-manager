@@ -27,11 +27,11 @@ export function Modal({ title, open, onClose, children }: ModalProps) {
     >
       <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-border-muted bg-surface-raised shadow-card">
         <header className="flex items-center justify-between border-b border-border-muted px-5 py-4">
-          <h3 className="font-display text-lg font-medium tracking-tight text-stone-100">{title}</h3>
+          <h3 className="font-display text-lg font-medium tracking-tight text-fg">{title}</h3>
           <button
             onClick={onClose}
             aria-label={es.common.close}
-            className="rounded-md p-1 text-stone-400 transition-colors hover:bg-surface-overlay hover:text-stone-200"
+            className="rounded-md p-1 text-fg-muted transition-colors hover:bg-surface-overlay hover:text-fg"
           >
             <X size={18} />
           </button>
