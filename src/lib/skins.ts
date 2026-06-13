@@ -140,7 +140,7 @@ export function skinArt(skin: string | null | undefined): SkinArt {
  *  before the user picks one. Matches the seeded category names (es-MX). */
 export function categoryDefaultSkin(categoryName: string | null | undefined): string {
   const c = (categoryName ?? "").toLowerCase();
-  if (c.includes("efectivo")) return "efectivo";
+  if (c.includes("efectivo")) return "cuero"; // the wallet motif the user liked
   if (c.includes("crédito") || c.includes("credito")) return "morado";
   if (c.includes("débito") || c.includes("debito")) return "azul";
   if (c.includes("ahorro")) return "ahorro";
