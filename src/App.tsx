@@ -20,7 +20,6 @@ import { useOnline } from "./lib/online";
 import { flush } from "./lib/outbox";
 import { LoginPage } from "./features/auth/LoginPage";
 import { UpdateBanner } from "./features/update/UpdateBanner";
-import { ThemeToggle } from "./components/ThemeToggle";
 import { hydrateThemeFromServer } from "./lib/theme";
 
 const navItems = [
@@ -185,10 +184,7 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto flex flex-col gap-2 px-3 pb-4">
-          <div className="px-1">
-            <ThemeToggle />
-          </div>
+        <div className="mt-auto px-3 pb-4">
           <button
             onClick={doLogout}
             title={es.auth.logout}
