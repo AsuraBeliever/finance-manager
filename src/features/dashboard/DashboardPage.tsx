@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LayoutDashboard } from "lucide-react";
 import {
@@ -16,14 +17,31 @@ import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { getDashboardSummary } from "../../lib/api";
 import { formatCents } from "../../lib/money";
+import {
+  AXIS_STROKE,
+  CHART_COLORS,
+  NEGATIVE,
+  POSITIVE,
+  TOOLTIP_STYLE,
+} from "../../lib/palette";
 import { es } from "../../i18n/es";
-
-const FALLBACK_COLORS = ["#34d399", "#60a5fa", "#f472b6", "#fbbf24", "#a78bfa", "#f87171", "#94a3b8"];
 
 function monthLabel(month: string): string {
   const [y, m] = month.split("-");
   const names = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   return `${names[Number(m) - 1]} ${y.slice(2)}`;
+}
+
+/** Editorial chart panel: a serif heading over a framed plot. */
+function ChartCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card">
+      <h3 className="mb-4 font-display text-lg font-medium tracking-tight text-stone-100">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
 }
 
 export function DashboardPage() {
@@ -33,7 +51,7 @@ export function DashboardPage() {
   });
 
   if (summary.isPending)
-    return <p className="text-sm text-zinc-500">{es.common.loading}</p>;
+    return <p className="text-sm text-stone-500">{es.common.loading}</p>;
   if (summary.isError)
     return <p className="text-sm text-danger">{String(summary.error)}</p>;
 
@@ -45,7 +63,7 @@ export function DashboardPage() {
     .map((w, i) => ({
       name: w.name,
       value: w.balanceMxnCents / 100,
-      color: w.color ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+      color: w.color ?? CHART_COLORS[i % CHART_COLORS.length],
     }));
 
   const investmentsDonut = s.investments
@@ -53,7 +71,7 @@ export function DashboardPage() {
     .map((inv, i) => ({
       name: inv.name,
       value: inv.valueMxnCents / 100,
-      color: FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+      color: CHART_COLORS[i % CHART_COLORS.length],
     }));
 
   const barData = s.monthly.map((m) => ({
@@ -74,23 +92,39 @@ export function DashboardPage() {
         />
       ) : (
         <div className="grid gap-4">
-          <section className="rounded-xl border border-border-muted bg-surface-raised p-6">
-            <p className="text-sm text-zinc-400">{es.dashboard.netWorth}</p>
-            <p className="mt-1 text-4xl font-semibold tabular-nums text-accent">
+          <section className="relative overflow-hidden rounded-2xl border border-border-muted bg-surface-raised p-7 shadow-card md:p-9">
+            {/* Atmosphere kept inside the hero: a jade bloom and a gold hairline. */}
+            <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
+
+            <p className="eyebrow">{es.dashboard.netWorth}</p>
+            <p className="text-gold-gradient mt-3 font-display text-5xl font-semibold tracking-tight tabular-nums md:text-6xl">
               {formatCents(s.totalMxnCents + s.investmentsTotalMxnCents, "MXN")}
             </p>
             {s.investmentsTotalMxnCents > 0 && (
-              <p className="mt-1 text-sm text-zinc-400">
-                {es.nav.wallets}: {formatCents(s.totalMxnCents, "MXN")} ·{" "}
-                {es.investments.total}:{" "}
-                {formatCents(s.investmentsTotalMxnCents, "MXN")}
+              <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-stone-400">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-accent" />
+                  {es.nav.wallets}{" "}
+                  <span className="tabular-nums text-stone-300">
+                    {formatCents(s.totalMxnCents, "MXN")}
+                  </span>
+                </span>
+                <span className="text-border-muted">·</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-gold" />
+                  {es.investments.total}{" "}
+                  <span className="tabular-nums text-stone-300">
+                    {formatCents(s.investmentsTotalMxnCents, "MXN")}
+                  </span>
+                </span>
               </p>
             )}
             {s.byCurrency.length > 1 && (
-              <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1">
+              <div className="mt-5 flex flex-wrap gap-x-6 gap-y-1 border-t border-border-muted pt-4">
                 {s.byCurrency.map((c) => (
-                  <span key={c.currencyCode} className="text-sm text-zinc-400">
-                    <span className="font-mono text-zinc-300">{c.currencyCode}</span>{" "}
+                  <span key={c.currencyCode} className="text-sm text-stone-400">
+                    <span className="font-mono text-stone-300">{c.currencyCode}</span>{" "}
                     {formatCents(c.balanceCents, c.currencyCode)}
                     {!c.hasRate && (
                       <span className="text-danger"> · {es.dashboard.noRate}</span>
@@ -108,8 +142,7 @@ export function DashboardPage() {
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {donutData.length > 0 && (
-              <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
-                <h3 className="mb-2 font-medium">{es.dashboard.byWallet}</h3>
+              <ChartCard title={es.dashboard.byWallet}>
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
                     <Pie
@@ -127,21 +160,16 @@ export function DashboardPage() {
                     </Pie>
                     <Tooltip
                       formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
-                      contentStyle={{
-                        backgroundColor: "#1f2330",
-                        border: "1px solid #2a2f3d",
-                        borderRadius: 8,
-                      }}
+                      contentStyle={TOOLTIP_STYLE}
                     />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
-              </section>
+              </ChartCard>
             )}
 
             {investmentsDonut.length > 0 && (
-              <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
-                <h3 className="mb-2 font-medium">{es.dashboard.byInvestment}</h3>
+              <ChartCard title={es.dashboard.byInvestment}>
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
                     <Pie
@@ -159,40 +187,31 @@ export function DashboardPage() {
                     </Pie>
                     <Tooltip
                       formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
-                      contentStyle={{
-                        backgroundColor: "#1f2330",
-                        border: "1px solid #2a2f3d",
-                        borderRadius: 8,
-                      }}
+                      contentStyle={TOOLTIP_STYLE}
                     />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
-              </section>
+              </ChartCard>
             )}
 
             {barData.length > 0 && (
-              <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
-                <h3 className="mb-2 font-medium">{es.dashboard.monthlyFlow}</h3>
+              <ChartCard title={es.dashboard.monthlyFlow}>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={barData}>
-                    <XAxis dataKey="month" stroke="#71717a" fontSize={12} />
-                    <YAxis stroke="#71717a" fontSize={12} />
+                    <XAxis dataKey="month" stroke={AXIS_STROKE} fontSize={12} />
+                    <YAxis stroke={AXIS_STROKE} fontSize={12} />
                     <Tooltip
                       formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
-                      contentStyle={{
-                        backgroundColor: "#1f2330",
-                        border: "1px solid #2a2f3d",
-                        borderRadius: 8,
-                      }}
-                      cursor={{ fill: "#2a2f3d55" }}
+                      contentStyle={TOOLTIP_STYLE}
+                      cursor={{ fill: "#342e2455" }}
                     />
                     <Legend />
-                    <Bar dataKey={es.dashboard.incomes} fill="#34d399" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey={es.dashboard.expenses} fill="#f87171" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey={es.dashboard.incomes} fill={POSITIVE} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={es.dashboard.expenses} fill={NEGATIVE} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </section>
+              </ChartCard>
             )}
           </div>
         </div>

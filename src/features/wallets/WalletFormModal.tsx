@@ -11,10 +11,11 @@ import {
   type WalletInput,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
+import { CHART_COLORS } from "../../lib/palette";
 import type { Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 
-const COLORS = ["#34d399", "#60a5fa", "#f472b6", "#fbbf24", "#a78bfa", "#f87171", "#94a3b8"];
+const COLORS = CHART_COLORS;
 
 interface WalletFormModalProps {
   open: boolean;
@@ -147,7 +148,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
                 type="button"
                 onClick={() => setColor(c)}
                 className={`h-7 w-7 rounded-full transition-transform ${
-                  color === c ? "scale-110 ring-2 ring-zinc-200" : ""
+                  color === c ? "scale-110 ring-2 ring-stone-200" : ""
                 }`}
                 style={{ backgroundColor: c }}
               />
@@ -165,7 +166,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
 
         {error && <p className="text-sm text-danger">{error}</p>}
         {wallet && (
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-stone-500">
             {es.wallets.balance}: {formatCents(wallet.balanceCents, wallet.currencyCode)}
           </p>
         )}

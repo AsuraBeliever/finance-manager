@@ -15,12 +15,12 @@ export function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border-muted py-16 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-overlay text-zinc-400">
-        <Icon size={22} />
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border-muted bg-surface-raised/40 py-16 text-center">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-dim/15 text-accent ring-1 ring-accent/20">
+        <Icon size={24} />
       </span>
-      <p className="font-medium text-zinc-200">{title}</p>
-      {description && <p className="max-w-sm text-sm text-zinc-500">{description}</p>}
+      <p className="font-display text-lg font-medium text-stone-100">{title}</p>
+      {description && <p className="max-w-sm text-sm text-stone-500">{description}</p>}
       {action}
     </div>
   );

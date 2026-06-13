@@ -1,14 +1,34 @@
 @import "tailwindcss";
 
+/* ── Design system ──────────────────────────────────────────────────────
+   Editorial / private-banking. Warm charcoal canvas, jade as the working
+   accent, a single champagne-gold note reserved for hero figures. Display
+   type is Fraunces (an editorial serif with optical sizing); the UI runs on
+   Hanken Grotesk. Money stays tabular and lining. */
 @theme {
-  --color-surface: #0f1115;
-  --color-surface-raised: #171a21;
-  --color-surface-overlay: #1f2330;
-  --color-border-muted: #2a2f3d;
-  --color-accent: #34d399;
-  --color-accent-dim: #10b981;
-  --color-danger: #f87171;
-  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  /* Warm near-black canvas (faint amber undertone, not brown). */
+  --color-surface: #141210;
+  --color-surface-raised: #1c1915;
+  --color-surface-overlay: #262019;
+  --color-border-muted: #342e24;
+
+  /* Jade — the working accent: buttons, active nav, assets, positive flow. */
+  --color-accent: #16a47a;
+  --color-accent-dim: #0e7d5b;
+  --color-accent-bright: #25c290;
+
+  /* Champagne gold — reserved for hero figures and hairline flourishes. */
+  --color-gold: #d9b45c;
+
+  /* Warm red so loss/danger sits in the same temperature as the canvas. */
+  --color-danger: #f0786b;
+
+  --font-sans: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+
+  /* Cards: an inset top hairline for a lit edge + a soft, deep drop shadow. */
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 12px 32px -16px rgba(0, 0, 0, 0.7);
 }
 
 html {
@@ -23,8 +43,58 @@ body,
 }
 
 body {
-  @apply bg-surface text-zinc-100 antialiased;
+  @apply bg-surface text-stone-100 antialiased;
+  font-feature-settings: "ss01", "cv05";
   user-select: none;
+}
+
+/* Atmosphere: a warm radial glow anchored top-left and a faint film grain
+   over the whole canvas, so flat fills gain depth and texture. Both sit
+   behind content and never intercept pointer events. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(80rem 50rem at 12% -10%, rgba(22, 164, 122, 0.1), transparent 60%),
+    radial-gradient(60rem 40rem at 100% 0%, rgba(217, 180, 92, 0.05), transparent 55%);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Display type: enable optical sizing so Fraunces sets larger at hero scale. */
+.font-display {
+  font-optical-sizing: auto;
+}
+
+/* Hero figures: champagne-gold drawn as a vertical gradient on the glyphs. */
+.text-gold-gradient {
+  background: linear-gradient(176deg, #efd896 4%, #d9b45c 46%, #bb8f3a 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Editorial eyebrow: small, spaced, uppercase label above a value. */
+.eyebrow {
+  @apply text-[0.7rem] font-medium uppercase tracking-[0.18em] text-stone-400;
 }
 
 input,
@@ -37,7 +107,7 @@ textarea {
 select {
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8a29e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.65rem center;
   padding-right: 2.25rem;
@@ -45,11 +115,11 @@ select {
 }
 
 select option {
-  @apply bg-surface-overlay text-zinc-100;
+  @apply bg-surface-overlay text-stone-100;
 }
 
 ::selection {
-  background: rgba(16, 185, 129, 0.35);
+  background: rgba(22, 164, 122, 0.35);
 }
 
 * {

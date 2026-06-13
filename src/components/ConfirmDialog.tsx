@@ -28,7 +28,7 @@ export function ConfirmDialog({
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger">
           <TriangleAlert size={17} />
         </span>
-        <p className="pt-1.5 text-sm text-zinc-300">{message}</p>
+        <p className="pt-1.5 text-sm text-stone-300">{message}</p>
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose} autoFocus>
