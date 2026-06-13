@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Check, Upload } from "lucide-react";
+import { Check, Palette, Upload } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
 import { Modal } from "../../components/Modal";
@@ -13,7 +13,7 @@ import {
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
 import { CHART_COLORS } from "../../lib/palette";
-import { resolveSkin, SKINS, type SkinGroup } from "../../lib/skins";
+import { resolveSkin, skinAccent, SKINS, type SkinGroup } from "../../lib/skins";
 import type { Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 
@@ -59,8 +59,8 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [currencyCode, setCurrencyCode] = useState("MXN");
   const [balanceText, setBalanceText] = useState("");
-  const [color, setColor] = useState(COLORS[0]);
   const [skin, setSkin] = useState<string | null>(null);
+  const [customColor, setCustomColor] = useState(COLORS[0]);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -71,8 +71,8 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
     setCategoryId(wallet?.categoryId ?? null);
     setCurrencyCode(wallet?.currencyCode ?? "MXN");
     setBalanceText(wallet ? (wallet.initialBalanceCents / 100).toFixed(2) : "");
-    setColor(wallet?.color ?? COLORS[0]);
     setSkin(wallet?.skin ?? null);
+    setCustomColor(skinAccent(wallet?.skin) ?? wallet?.color ?? COLORS[0]);
     setNotes(wallet?.notes ?? "");
     setError(null);
   }, [open, wallet]);
@@ -112,14 +112,15 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
       categoryId: finalCategory,
       currencyCode,
       initialBalanceCents: cents,
-      color,
+      color: skinAccent(skin) ?? COLORS[0],
       skin,
       notes: notes.trim() === "" ? null : notes.trim(),
     });
   }
 
   const imgSelected = !!skin && skin.startsWith("img:");
-  const autoBg = resolveSkin(null, color).background;
+  const gradSelected = !!skin && skin.startsWith("grad:");
+  const autoBg = resolveSkin(null, COLORS[0]).background;
 
   return (
     <Modal
@@ -189,8 +190,37 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
                 selected={!skin}
                 onClick={() => setSkin(null)}
               />
+              {/* Custom color: opens the OS color palette and builds a gradient */}
+              <label
+                title={es.wallets.skinCustom}
+                className={`relative h-11 w-[4.5rem] cursor-pointer overflow-hidden rounded-lg ring-1 ring-inset ring-white/15 transition-transform hover:scale-105 ${
+                  gradSelected ? "scale-105 outline outline-2 outline-accent" : ""
+                }`}
+                style={{ background: resolveSkin(`grad:${customColor}`).background }}
+              >
+                <span
+                  className="pointer-events-none absolute inset-0"
+                  style={{ background: "linear-gradient(120deg, rgba(255,255,255,0.35) 0%, transparent 45%)" }}
+                />
+                <span className="absolute inset-0 flex items-center justify-center">
+                  {gradSelected ? (
+                    <Check size={16} className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
+                  ) : (
+                    <Palette size={15} className="text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
+                  )}
+                </span>
+                <input
+                  type="color"
+                  value={customColor}
+                  onChange={(e) => {
+                    setCustomColor(e.target.value);
+                    setSkin(`grad:${e.target.value}`);
+                  }}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                />
+              </label>
               {imgSelected && (
-                <SkinSwatch background={resolveSkin(skin, color).background} selected onClick={() => {}} />
+                <SkinSwatch background={resolveSkin(skin).background} selected onClick={() => {}} />
               )}
               <button
                 type="button"
@@ -231,22 +261,6 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
                 </div>
               );
             })}
-          </div>
-        </Field>
-
-        <Field label={es.wallets.color}>
-          <div className="flex flex-wrap gap-2">
-            {COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={`h-7 w-7 rounded-full transition-transform ${
-                  color === c ? "scale-110 ring-2 ring-fg" : ""
-                }`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
           </div>
         </Field>
 

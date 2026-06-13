@@ -131,6 +131,7 @@ export const es = {
     skin: "Diseño de tarjeta",
     skinAuto: "Auto",
     skinImport: "Importar imagen",
+    skinCustom: "Color personalizado",
     skinImportHint: "Sube una foto de tu tarjeta para usarla de fondo.",
     skinGroupBanco: "Color",
     skinGroupNivel: "Nivel",
