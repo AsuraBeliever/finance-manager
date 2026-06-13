@@ -73,12 +73,14 @@ fn enc(s: &str) -> String {
     out
 }
 
-fn redirect_with_cookies(location: &str, cookies: &[String]) -> worker::Result<Response> {
+/// 302 with exactly one Set-Cookie. Cloudflare's Headers folds multiple
+/// Set-Cookie into one comma-joined header that browsers reject, so we never
+/// emit more than one — the session cookie on success, or the state-clear on
+/// failure (the state cookie also self-expires via Max-Age).
+fn redirect(location: &str, set_cookie: &str) -> worker::Result<Response> {
     let headers = Headers::new();
     headers.set("Location", location)?;
-    for c in cookies {
-        headers.append("Set-Cookie", c)?;
-    }
+    headers.set("Set-Cookie", set_cookie)?;
     Ok(Response::empty()?.with_status(302).with_headers(headers))
 }
 
@@ -91,7 +93,7 @@ pub async fn start(req: Request, ctx: RouteContext<()>) -> worker::Result<Respon
         Ok(v) => v,
         Err(e) => return crate::error::error_response(&e),
     };
-    let redirect = match redirect_uri(&req) {
+    let redirect_url = match redirect_uri(&req) {
         Ok(v) => v,
         Err(e) => return crate::error::error_response(&e),
     };
@@ -99,11 +101,11 @@ pub async fn start(req: Request, ctx: RouteContext<()>) -> worker::Result<Respon
     let url = format!(
         "{AUTH_URL}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&prompt=select_account",
         enc(&cid),
-        enc(&redirect),
+        enc(&redirect_url),
         enc("openid email profile"),
         enc(&state),
     );
-    redirect_with_cookies(&url, &[state_cookie(&state, 600)])
+    redirect(&url, &state_cookie(&state, 600))
 }
 
 #[derive(Deserialize)]
@@ -224,7 +226,7 @@ async fn find_or_create_user(db: &worker::D1Database, sub: &str, email: &str) ->
 }
 
 pub async fn callback(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    let fail = || redirect_with_cookies("/?authError=google", &[state_cookie("", 0)]);
+    let fail = || redirect("/?authError=google", &state_cookie("", 0));
 
     let url = match req.url() {
         Ok(u) => u,
@@ -240,16 +242,21 @@ pub async fn callback(req: Request, ctx: RouteContext<()>) -> worker::Result<Res
         }
     }
     let (Some(code), Some(state)) = (code, state) else {
+        worker::console_error!("google callback: faltan code/state en el query");
         return fail();
     };
     // CSRF: the state must match the cookie we set in /start
     if cookie(&req, STATE_COOKIE).as_deref() != Some(state.as_str()) {
+        worker::console_error!(
+            "google callback: state no coincide (cookie {:?})",
+            cookie(&req, STATE_COOKIE).is_some()
+        );
         return fail();
     }
 
     let result: AppResult<(i64, String)> = async {
-        let redirect = redirect_uri(&req)?;
-        let id_token = exchange_code(&ctx, &code, &redirect).await?;
+        let redirect_url = redirect_uri(&req)?;
+        let id_token = exchange_code(&ctx, &code, &redirect_url).await?;
         let claims = parse_id_token(&id_token)?;
         if claims.email_verified != Some(true) {
             return Err(AppError::Unauthorized(
@@ -269,14 +276,12 @@ pub async fn callback(req: Request, ctx: RouteContext<()>) -> worker::Result<Res
     .await;
 
     match result {
-        Ok((_, token)) => redirect_with_cookies(
-            "/",
-            &[
-                session_cookie(&token, SESSION_MAX_AGE_SECS),
-                state_cookie("", 0),
-            ],
-        ),
-        Err(_) => fail(),
+        // one Set-Cookie only: the session. oauth_state self-expires (Max-Age).
+        Ok((_, token)) => redirect("/", &session_cookie(&token, SESSION_MAX_AGE_SECS)),
+        Err(e) => {
+            worker::console_error!("google callback falló: {e}");
+            fail()
+        }
     }
 }
 

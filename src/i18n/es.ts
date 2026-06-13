@@ -257,6 +257,10 @@ export const es = {
     unknownDevice: "Dispositivo desconocido",
     desktopApp: "App de escritorio",
   },
+  update: {
+    available: "Hay una nueva versión",
+    action: "Actualizar",
+  },
   offline: {
     banner: "Sin conexión — mostrando los últimos datos sincronizados",
     savedPending: "Sin conexión: el movimiento se guardó y se sincronizará al reconectar.",
