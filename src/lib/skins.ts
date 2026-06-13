@@ -9,6 +9,10 @@
 
 export type SkinGroup = "banco" | "nivel" | "efectivo" | "glass";
 
+/** Decorative motif drawn on the card. Card skins get a chip; cash skins get
+ *  a stylized money illustration instead. */
+export type SkinArt = "chip" | "banknote" | "wallet" | "coins" | "none";
+
 export interface Skin {
   id: string;
   label: string;
@@ -18,6 +22,8 @@ export interface Skin {
   accent: string;
   /** Text/foreground color that reads on this background. */
   fg: string;
+  /** Motif; defaults to "chip" when omitted. */
+  art?: SkinArt;
 }
 
 export const SKINS: Skin[] = [
@@ -47,13 +53,16 @@ export const SKINS: Skin[] = [
   { id: "infinite", label: "Infinite", group: "nivel", accent: "#1e2a78", fg: "#e7eeff",
     background: "linear-gradient(135deg,#0b1026 0%,#1e2a78 50%,#0b1026 100%)" },
 
-  // ── efectivo (cash / wallet) ──
-  { id: "efectivo", label: "Efectivo", group: "efectivo", accent: "#2f9e63", fg: "#eafff0",
+  // ── efectivo (cash) — money illustrations, no chip ──
+  { id: "efectivo", label: "Billetes", group: "efectivo", accent: "#2f9e63", fg: "#eafff0",
+    art: "banknote",
     background: "linear-gradient(135deg,#1b5e3a 0%,#2f9e63 50%,#1b5e3a 100%)" },
-  { id: "cuero", label: "Cuero", group: "efectivo", accent: "#8a5a2b", fg: "#fbeede",
+  { id: "cuero", label: "Cartera", group: "efectivo", accent: "#8a5a2b", fg: "#fbeede",
+    art: "wallet",
     background: "linear-gradient(135deg,#5a3413 0%,#8a5a2b 55%,#4a2a0f 100%)" },
-  { id: "billete", label: "Billete", group: "efectivo", accent: "#22663c", fg: "#eafdf2",
-    background: "linear-gradient(135deg,#14532d 0%,#22663c 50%,#0f3d22 100%)" },
+  { id: "monedas", label: "Monedas", group: "efectivo", accent: "#c08a2e", fg: "#fff6e6",
+    art: "coins",
+    background: "linear-gradient(135deg,#7a5210 0%,#d9a93a 50%,#6b450c 100%)" },
 
   // ── neon glass (matches the app) ──
   { id: "neon", label: "Neón", group: "glass", accent: "#a855f7", fg: "#f4f0ff",
@@ -114,4 +123,12 @@ export function skinAccent(skin: string | null | undefined): string | null {
 /** Whether the skin carries its own image (so the card adds a legibility scrim). */
 export function isImageSkin(skin: string | null | undefined): boolean {
   return !!skin && skin.startsWith("img:");
+}
+
+/** Decorative motif for a skin: card skins → chip, cash skins → money art. */
+export function skinArt(skin: string | null | undefined): SkinArt {
+  if (!skin) return "chip";
+  if (skin.startsWith("img:")) return "none";
+  if (skin.startsWith("grad:")) return "chip";
+  return BY_ID.get(skin)?.art ?? "chip";
 }

@@ -1,14 +1,24 @@
+import { Banknote, Coins, Wallet as WalletIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatCents } from "../lib/money";
-import { isImageSkin, resolveSkin } from "../lib/skins";
+import { isImageSkin, resolveSkin, skinArt } from "../lib/skins";
 import type { Wallet } from "../lib/types";
 import { es } from "../i18n/es";
 
-/** A wallet rendered as a crystalline payment card. The skin sets the
- *  background; a glass sheen + chip are layered on top. */
+const ART_ICON = { banknote: Banknote, wallet: WalletIcon, coins: Coins } as const;
+
+/** A wallet rendered as a crystalline card. Card skins show a chip; cash skins
+ *  show a money illustration (banknotes / wallet / coins) instead. */
 export function WalletCard({ wallet }: { wallet: Wallet }) {
   const { background, fg } = resolveSkin(wallet.skin, wallet.color);
   const img = isImageSkin(wallet.skin);
+
+  // Cash wallets with no explicit skin default to a banknote motif (no chip).
+  let art = skinArt(wallet.skin);
+  if (art === "chip" && !wallet.skin && /efectivo|cash/i.test(wallet.categoryName)) {
+    art = "banknote";
+  }
+  const Motif = ART_ICON[art as keyof typeof ART_ICON];
 
   return (
     <Link
@@ -28,6 +38,14 @@ export function WalletCard({ wallet }: { wallet: Wallet }) {
         className="pointer-events-none absolute -top-1/3 -left-1/4 h-2/3 w-2/3 rounded-full opacity-70"
         style={{ background: "radial-gradient(closest-side, rgba(255,255,255,0.28), transparent)" }}
       />
+      {/* big faint money motif watermark for cash skins */}
+      {Motif && (
+        <Motif
+          className="pointer-events-none absolute -right-2 top-1/2 -translate-y-1/2 opacity-[0.14]"
+          size={150}
+          strokeWidth={1.25}
+        />
+      )}
       {/* legibility scrim for imported photos */}
       {img && (
         <span
@@ -50,18 +68,26 @@ export function WalletCard({ wallet }: { wallet: Wallet }) {
               {es.wallets.archived}
             </span>
           ) : (
-            <span className="shrink-0 text-xs font-medium opacity-80">
-              {wallet.currencyCode}
-            </span>
+            <span className="shrink-0 text-xs font-medium opacity-80">{wallet.currencyCode}</span>
           )}
         </div>
 
-        {/* EMV-style chip */}
-        <div className="h-7 w-10 rounded-[5px] bg-gradient-to-br from-amber-100/95 to-amber-400/85 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]">
-          <div className="mx-auto mt-1 h-0.5 w-6 rounded-full bg-black/15" />
-          <div className="mx-auto mt-1 h-0.5 w-6 rounded-full bg-black/15" />
-          <div className="mx-auto mt-1 h-0.5 w-6 rounded-full bg-black/15" />
-        </div>
+        {/* motif slot: chip for cards, a small money icon for cash, else spacer */}
+        {art === "chip" ? (
+          <div className="h-7 w-10 rounded-[5px] bg-gradient-to-br from-amber-100/95 to-amber-400/85 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]">
+            <div className="mx-auto mt-1 h-0.5 w-6 rounded-full bg-black/15" />
+            <div className="mx-auto mt-1 h-0.5 w-6 rounded-full bg-black/15" />
+            <div className="mx-auto mt-1 h-0.5 w-6 rounded-full bg-black/15" />
+          </div>
+        ) : Motif ? (
+          <Motif
+            size={30}
+            strokeWidth={2}
+            className="[filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.35))]"
+          />
+        ) : (
+          <div className="h-7" />
+        )}
 
         <div>
           <p className="font-display text-2xl font-semibold tabular-nums [text-shadow:0_1px_4px_rgba(0,0,0,0.3)]">
