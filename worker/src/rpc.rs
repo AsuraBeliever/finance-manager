@@ -76,6 +76,7 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "create_wallet" => out(wallets::create_wallet(db, uid, args(body)?).await?),
         "update_wallet" => out(wallets::update_wallet(db, uid, args(body)?).await?),
         "archive_wallet" => out(wallets::archive_wallet(db, uid, args(body)?).await?),
+        "reorder_wallets" => out(wallets::reorder_wallets(db, uid, args(body)?).await?),
         "delete_wallet" => out(wallets::delete_wallet(db, uid, args(body)?).await?),
 
         // ---- transactions ----

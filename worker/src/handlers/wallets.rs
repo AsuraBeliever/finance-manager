@@ -89,7 +89,9 @@ pub async fn list_wallets(
     } else {
         " AND w.is_archived = 0"
     };
-    let sql = format!("{WALLET_SELECT} WHERE w.user_id = ?1{filter} ORDER BY w.created_at, w.id");
+    let sql = format!(
+        "{WALLET_SELECT} WHERE w.user_id = ?1{filter} ORDER BY w.sort_order, w.created_at, w.id"
+    );
     Ok(all::<WalletRow>(db, &sql, jsv![uid])
         .await?
         .into_iter()
@@ -123,8 +125,9 @@ pub async fn create_wallet(db: &D1Database, uid: i64, a: CreateWalletArgs) -> Ap
     validate(&a.name)?;
     let res = exec(
         db,
-        "INSERT INTO wallets (user_id, name, category_id, currency_code, initial_balance_cents, color, skin, notes)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO wallets (user_id, name, category_id, currency_code, initial_balance_cents, color, skin, notes, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
+                 COALESCE((SELECT MAX(sort_order) + 1 FROM wallets WHERE user_id = ?1), 0))",
         jsv![uid, a.name.trim(), a.category_id, a.currency_code, a.initial_balance_cents, a.color, a.skin, a.notes],
     )
     .await?;
@@ -188,6 +191,36 @@ pub async fn archive_wallet(db: &D1Database, uid: i64, a: ArchiveWalletArgs) -> 
     if changes(&res) == 0 {
         return Err(AppError::NotFound("cartera"));
     }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReorderWalletsArgs {
+    /// Wallet ids in the desired display order (front to back).
+    pub ids: Vec<i64>,
+}
+
+/// Persists a new wallet order: each id's `sort_order` becomes its index in
+/// the list. Scoped by user, so an id the caller doesn't own simply matches
+/// no row. One atomic batch.
+pub async fn reorder_wallets(db: &D1Database, uid: i64, a: ReorderWalletsArgs) -> AppResult<()> {
+    if a.ids.is_empty() {
+        return Ok(());
+    }
+    let stmts = a
+        .ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| {
+            stmt(
+                db,
+                "UPDATE wallets SET sort_order = ?3 WHERE id = ?1 AND user_id = ?2",
+                jsv![id, uid, i as i64],
+            )
+        })
+        .collect::<AppResult<Vec<_>>>()?;
+    batch(db, stmts).await?;
     Ok(())
 }
 

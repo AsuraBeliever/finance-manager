@@ -104,6 +104,10 @@ export const updateWallet = (id: number, input: WalletInput) =>
 export const archiveWallet = (id: number, archived: boolean) =>
   rpc<void>("archive_wallet", { id, archived });
 
+/** Persist a new wallet display order. `ids` are wallet ids front-to-back. */
+export const reorderWallets = (ids: number[]) =>
+  rpc<void>("reorder_wallets", { ids });
+
 export const deleteWallet = (id: number) => rpc<void>("delete_wallet", { id });
 
 export interface SimpleTxInput {

@@ -147,6 +147,7 @@ export const es = {
     deleteConfirmMessage:
       "Se eliminará la cartera con todo su historial de transacciones, incluidas ambas partes de sus transferencias con otras carteras. Esta acción no se puede deshacer. Si solo quieres ocultarla, mejor archívala.",
     showArchived: "Mostrar archivadas",
+    reorder: "Arrastra para reordenar",
     emptyTitle: "Aún no tienes carteras",
     emptyDescription:
       "Crea tu primera cartera: efectivo, tarjeta, cuenta de ahorro o lo que necesites.",

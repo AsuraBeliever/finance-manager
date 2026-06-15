@@ -241,3 +241,5 @@ CREATE TABLE subscriptions (     -- pagos recurrentes; "registrar pago" inserta 
 - **subscriptions** total mensual = suma de activas normalizadas a mes (anual/12) en MXN.
 
 - **wallets.skin** (migración 0006): estilo de tarjeta — id de catálogo, `grad:<from>,<to>,<angle>` o `img:<data-url>`; NULL = derivado del color.
+
+- **wallets.sort_order** (migración 0007): orden de despliegue definido por el usuario (arrastrar para reordenar). Menor = primero; empates por `created_at, id`. Carteras nuevas van al final (`MAX(sort_order)+1`). `reorder_wallets` reescribe el `sort_order` de cada id según su índice (batch atómico, scoped por usuario).
