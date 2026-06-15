@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { inputClass } from "../../components/Field";
-import { Modal } from "../../components/Modal";
+import { PageHeader } from "../../components/PageHeader";
 import {
   createTransactionCategory,
   deleteTransactionCategory,
@@ -17,6 +17,16 @@ import type { TransactionCategory } from "../../lib/types";
 import { es } from "../../i18n/es";
 
 type Kind = "income" | "expense";
+
+// Any cache that renders a category name/color or aggregates by category.
+const AFFECTED_KEYS = [
+  "manageCategories",
+  "transactionCategories",
+  "transactions",
+  "dashboard",
+  "breakdown",
+  "budgets",
+];
 
 /** A compact swatch row: the chart palette plus a "no color" choice. */
 function ColorPicker({
@@ -66,16 +76,7 @@ function CategoryRow({
   const [color, setColor] = useState<string | null>(cat.color);
 
   const invalidate = () => {
-    for (const k of [
-      "manageCategories",
-      "transactionCategories",
-      "transactions",
-      "dashboard",
-      "breakdown",
-      "budgets",
-    ]) {
-      queryClient.invalidateQueries({ queryKey: [k] });
-    }
+    for (const k of AFFECTED_KEYS) queryClient.invalidateQueries({ queryKey: [k] });
   };
 
   const save = useMutation({
@@ -92,7 +93,7 @@ function CategoryRow({
 
   if (editing) {
     return (
-      <li className="flex flex-col gap-2 py-2">
+      <li className="flex flex-col gap-2 py-2.5">
         <div className="flex items-center gap-2">
           <input
             autoFocus
@@ -129,7 +130,7 @@ function CategoryRow({
   }
 
   return (
-    <li className={`flex items-center gap-2.5 py-2 ${cat.isHidden ? "opacity-50" : ""}`}>
+    <li className={`flex items-center gap-2.5 py-2.5 ${cat.isHidden ? "opacity-50" : ""}`}>
       <span
         className="h-2.5 w-2.5 shrink-0 rounded-full"
         style={{ backgroundColor: cat.color ?? NEUTRAL_DOT }}
@@ -190,7 +191,7 @@ function AddCategory({ kind }: { kind: Kind }) {
     },
   });
   return (
-    <div className="mt-2 flex items-center gap-2">
+    <div className="mt-3 flex items-center gap-2">
       <input
         className={inputClass}
         placeholder={es.categories.addPlaceholder}
@@ -219,25 +220,16 @@ function Group({ kind, cats }: { kind: Kind; cats: TransactionCategory[] }) {
   const del = useMutation({
     mutationFn: (id: number) => deleteTransactionCategory(id),
     onSuccess: () => {
-      for (const k of [
-        "manageCategories",
-        "transactionCategories",
-        "transactions",
-        "dashboard",
-        "breakdown",
-        "budgets",
-      ]) {
-        queryClient.invalidateQueries({ queryKey: [k] });
-      }
+      for (const k of AFFECTED_KEYS) queryClient.invalidateQueries({ queryKey: [k] });
       setToDelete(null);
     },
   });
 
   return (
-    <section>
-      <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+    <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+      <h3 className="mb-1 font-medium">
         {kind === "income" ? es.categories.income : es.categories.expense}
-      </h4>
+      </h3>
       {cats.length === 0 ? (
         <p className="py-2 text-sm text-fg-subtle">{es.categories.empty}</p>
       ) : (
@@ -265,24 +257,22 @@ function Group({ kind, cats }: { kind: Kind; cats: TransactionCategory[] }) {
   );
 }
 
-export function CategoryManagerModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function CategoriesPage() {
   const cats = useQuery({ queryKey: ["manageCategories"], queryFn: listManageCategories });
   const list = cats.data ?? [];
 
   return (
-    <Modal title={es.categories.title} open={open} onClose={onClose}>
+    <div className="mx-auto w-full max-w-2xl">
+      <PageHeader title={es.categories.title} />
+      <p className="mb-5 -mt-3 text-sm text-fg-subtle">{es.categories.settingsHint}</p>
+
       {cats.isPending && <p className="text-sm text-fg-subtle">{es.common.loading}</p>}
       {cats.isError && <p className="text-sm text-danger">{String(cats.error)}</p>}
+
       <div className="flex flex-col gap-6">
         <Group kind="income" cats={list.filter((c) => c.kind === "income")} />
         <Group kind="expense" cats={list.filter((c) => c.kind === "expense")} />
       </div>
-    </Modal>
+    </div>
   );
 }

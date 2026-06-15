@@ -2,13 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es as dateLocaleEs } from "date-fns/locale";
-import { Info, KeyRound, LogOut, Monitor, Smartphone, Tags } from "lucide-react";
+import { ChevronRight, Info, KeyRound, LogOut, Monitor, Smartphone, Tags } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
 import { PageHeader } from "../../components/PageHeader";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { listWalletCategories } from "../../lib/api";
-import { CategoryManagerModal } from "./CategoryManagerModal";
 import {
   changePassword,
   listSessions,
@@ -178,7 +178,6 @@ export function SettingsPage() {
     queryFn: listWalletCategories,
   });
   const session = useQuery({ queryKey: ["me"], queryFn: me, staleTime: Infinity });
-  const [catMgrOpen, setCatMgrOpen] = useState(false);
 
   const doLogout = async () => {
     await logout().catch(() => {});
@@ -201,9 +200,13 @@ export function SettingsPage() {
             {es.categories.title}
           </h3>
           <p className="mb-3 text-xs text-fg-subtle">{es.categories.settingsHint}</p>
-          <Button variant="ghost" onClick={() => setCatMgrOpen(true)}>
+          <Link
+            to="/categorias"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
+          >
             {es.categories.manage}
-          </Button>
+            <ChevronRight size={15} />
+          </Link>
         </section>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
@@ -259,8 +262,6 @@ export function SettingsPage() {
           </div>
         </section>
       </div>
-
-      <CategoryManagerModal open={catMgrOpen} onClose={() => setCatMgrOpen(false)} />
     </div>
   );
 }

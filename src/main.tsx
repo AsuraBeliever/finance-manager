@@ -15,6 +15,7 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { SavingsGoalsPage } from "./features/goals/SavingsGoalsPage";
 import { BudgetsPage } from "./features/budgets/BudgetsPage";
 import { SubscriptionsPage } from "./features/subscriptions/SubscriptionsPage";
+import { CategoriesPage } from "./features/categories/CategoriesPage";
 import "./index.css";
 
 // Offline reads: the query cache persists to localStorage so the PWA shows
@@ -52,6 +53,7 @@ const router = createHashRouter([
       { path: "metas", element: <SavingsGoalsPage /> },
       { path: "presupuestos", element: <BudgetsPage /> },
       { path: "suscripciones", element: <SubscriptionsPage /> },
+      { path: "categorias", element: <CategoriesPage /> },
       { path: "ajustes", element: <SettingsPage /> },
     ],
   },
