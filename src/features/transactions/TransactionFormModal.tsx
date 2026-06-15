@@ -12,12 +12,6 @@ import { es } from "../../i18n/es";
 
 type Tab = "income" | "expense" | "transfer";
 
-const tabs: { id: Tab; label: string }[] = [
-  { id: "income", label: es.transactions.income },
-  { id: "expense", label: es.transactions.expense },
-  { id: "transfer", label: es.transactions.transfer },
-];
-
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -39,6 +33,11 @@ export function TransactionFormModal({
   transaction,
 }: TransactionFormModalProps) {
   const isEdit = transaction !== undefined;
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "income", label: es.transactions.income },
+    { id: "expense", label: es.transactions.expense },
+    { id: "transfer", label: es.transactions.transfer },
+  ];
   const queryClient = useQueryClient();
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
   const categories = useQuery({

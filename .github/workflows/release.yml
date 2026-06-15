@@ -64,12 +64,22 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Finanzas ${{ github.ref_name }}"
           releaseBody: |
-            Instaladores de la app de escritorio de Finanzas / Finanzas desktop app installers.
+            ## English
+            Finanzas desktop app installers.
 
-            - **Windows:** descarga el `.msi` (o `.exe`).
+            - **Windows:** download the `.msi` (or the `.exe` setup).
+            - **Linux (any distro):** `.AppImage` — make it executable and run it.
+            - **Debian/Ubuntu/Mint:** `.deb` · **Fedora/openSUSE:** `.rpm`.
+
+            The web app is always at https://finanzas.aseth.workers.dev
+
+            ## Español
+            Instaladores de la app de escritorio de Finanzas.
+
+            - **Windows:** descarga el `.msi` (o el instalador `.exe`).
             - **Linux (cualquier distro):** `.AppImage` — dale permiso de ejecución y ábrelo.
             - **Debian/Ubuntu/Mint:** `.deb` · **Fedora/openSUSE:** `.rpm`.
 
-            La app web está siempre en https://finanzas.aseth.workers.dev
+            La app web siempre está en https://finanzas.aseth.workers.dev
           releaseDraft: false
           prerelease: false

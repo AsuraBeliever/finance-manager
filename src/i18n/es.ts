@@ -1,5 +1,8 @@
-// All user-facing UI strings live here (es-MX).
-export const es = {
+// Spanish (es-MX) — the canonical dictionary whose shape every locale follows.
+import { en } from "./en";
+import { getLocale, type Locale } from "./store";
+
+export const esDict = {
   app: {
     name: "Finanzas",
   },
@@ -342,6 +345,7 @@ export const es = {
   },
   settings: {
     title: "Ajustes",
+    language: "Idioma",
     currencies: "Monedas",
     currenciesHint:
       "Los tipos de cambio se obtienen y actualizan solos al usar cualquier moneda distinta de MXN.",
@@ -401,3 +405,18 @@ export const es = {
     retry: "Reintentar",
   },
 } as const;
+
+// Widen string-literal leaves to `string` so other locales can word things
+// differently while keeping the exact same structure.
+type Deep<T> = { [K in keyof T]: T[K] extends string ? string : Deep<T[K]> };
+export type Dict = Deep<typeof esDict>;
+
+const dicts: Record<Locale, Dict> = { es: esDict, en };
+
+// Everything imports `es`; it's a live proxy onto the active locale's strings,
+// so changing language updates every `es.x` read on the next render.
+export const es: Dict = new Proxy({} as Dict, {
+  get(_target, prop: string) {
+    return (dicts[getLocale()] as Record<string, unknown>)[prop];
+  },
+});

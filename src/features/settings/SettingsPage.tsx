@@ -20,6 +20,7 @@ import {
 } from "../../lib/auth";
 import { deviceLabel, isMobileDevice } from "../../lib/device";
 import { es } from "../../i18n/es";
+import { setLocale, useLocale, type Locale } from "../../i18n/store";
 
 /** SQLite UTC timestamp ("YYYY-MM-DD HH:MM:SS") → relative es-MX phrase. */
 function relativeFromUtc(ts: string | null): string {
@@ -179,6 +180,7 @@ export function SettingsPage() {
     queryFn: listWalletCategories,
   });
   const session = useQuery({ queryKey: ["me"], queryFn: me, staleTime: Infinity });
+  const locale = useLocale();
 
   const doLogout = async () => {
     await logout().catch(() => {});
@@ -193,6 +195,31 @@ export function SettingsPage() {
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="font-medium">{es.theme.label}</h3>
           <ThemeToggle />
+        </section>
+
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="font-medium">{es.settings.language}</h3>
+          <div className="flex rounded-lg bg-surface p-1">
+            {(
+              [
+                { code: "es", label: "Español" },
+                { code: "en", label: "English" },
+              ] as { code: Locale; label: string }[]
+            ).map((l) => (
+              <button
+                key={l.code}
+                type="button"
+                onClick={() => setLocale(l.code)}
+                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  locale === l.code
+                    ? "bg-surface-overlay font-medium text-fg"
+                    : "text-fg-subtle hover:text-fg"
+                }`}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
         </section>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">

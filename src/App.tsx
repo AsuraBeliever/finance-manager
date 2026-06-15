@@ -22,29 +22,28 @@ import { LoginPage } from "./features/auth/LoginPage";
 import { UpdateBanner } from "./features/update/UpdateBanner";
 import { hydrateThemeFromServer } from "./lib/theme";
 
-const navItems = [
-  { to: "/", label: es.nav.dashboard, icon: LayoutDashboard, end: true },
-  { to: "/carteras", label: es.nav.wallets, icon: Wallet, end: false },
-  {
-    to: "/transacciones",
-    label: es.nav.transactions,
-    icon: ArrowLeftRight,
-    end: false,
-  },
-  { to: "/inversiones", label: es.nav.investments, icon: TrendingUp, end: false },
-  { to: "/ajustes", label: es.nav.settings, icon: Settings, end: false },
-];
-
-// Desktop-only secondary group (the bottom bar stays at the 5 core items).
-const planningItems = [
-  { to: "/metas", label: es.nav.goals, icon: PiggyBank },
-  { to: "/presupuestos", label: es.nav.budgets, icon: Target },
-  { to: "/suscripciones", label: es.nav.subscriptions, icon: CreditCard },
-];
-
 export default function App() {
   const queryClient = useQueryClient();
   const online = useOnline();
+
+  const navItems = [
+    { to: "/", label: es.nav.dashboard, icon: LayoutDashboard, end: true },
+    { to: "/carteras", label: es.nav.wallets, icon: Wallet, end: false },
+    {
+      to: "/transacciones",
+      label: es.nav.transactions,
+      icon: ArrowLeftRight,
+      end: false,
+    },
+    { to: "/inversiones", label: es.nav.investments, icon: TrendingUp, end: false },
+    { to: "/ajustes", label: es.nav.settings, icon: Settings, end: false },
+  ];
+  // Desktop-only secondary group (the bottom bar stays at the 5 core items).
+  const planningItems = [
+    { to: "/metas", label: es.nav.goals, icon: PiggyBank },
+    { to: "/presupuestos", label: es.nav.budgets, icon: Target },
+    { to: "/suscripciones", label: es.nav.subscriptions, icon: CreditCard },
+  ];
   // Always revalidate the session against the server on load: after a Google
   // OAuth redirect there is no JS continuity to setQueryData, so the app must
   // re-check /me. The persisted cache still provides instant offline render

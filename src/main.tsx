@@ -16,6 +16,7 @@ import { SavingsGoalsPage } from "./features/goals/SavingsGoalsPage";
 import { BudgetsPage } from "./features/budgets/BudgetsPage";
 import { SubscriptionsPage } from "./features/subscriptions/SubscriptionsPage";
 import { CategoriesPage } from "./features/categories/CategoriesPage";
+import { useLocale } from "./i18n/store";
 import "./index.css";
 
 // Offline reads: the query cache persists to localStorage so the PWA shows
@@ -59,6 +60,13 @@ const router = createHashRouter([
   },
 ]);
 
+// Remount the whole router when the locale changes so every string (including
+// values computed at render) re-reads the active dictionary.
+function Root() {
+  const locale = useLocale();
+  return <RouterProvider key={locale} router={router} />;
+}
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <PersistQueryClientProvider
@@ -69,7 +77,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         buster: "v2.1.0", // bump on breaking cache-shape changes
       }}
     >
-      <RouterProvider router={router} />
+      <Root />
     </PersistQueryClientProvider>
   </React.StrictMode>,
 );
