@@ -153,6 +153,31 @@ export const es = {
       "Crea tu primera cartera: efectivo, tarjeta, cuenta de ahorro o lo que necesites.",
     invalidAmount: "Monto inválido",
   },
+  categories: {
+    title: "Categorías",
+    manage: "Gestionar categorías",
+    settingsHint:
+      "Agrega tus propias categorías de ingresos y gastos, edítalas u oculta las que no uses.",
+    income: "Ingresos",
+    expense: "Gastos",
+    defaultBadge: "Predeterminada",
+    addPlaceholder: "Nueva categoría…",
+    add: "Agregar",
+    rename: "Renombrar",
+    color: "Color",
+    noColor: "Sin color",
+    save: "Guardar",
+    hide: "Ocultar",
+    restore: "Restaurar",
+    delete: "Eliminar",
+    hiddenLabel: "Oculta",
+    deleteConfirmTitle: "Eliminar categoría",
+    deleteConfirmMessage:
+      "Tus transacciones con esta categoría se conservan, solo quedarán sin categoría. Su presupuesto (si tiene) se eliminará. Esta acción no se puede deshacer.",
+    hideConfirmMessage:
+      "Es una categoría predeterminada, así que solo se ocultará para ti; tus transacciones que ya la usan no cambian. Podrás restaurarla cuando quieras.",
+    empty: "Aún no hay categorías de este tipo.",
+  },
   transactions: {
     title: "Transacciones",
     newTransaction: "Nueva transacción",

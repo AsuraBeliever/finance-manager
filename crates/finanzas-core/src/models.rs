@@ -46,6 +46,9 @@ pub struct TransactionCategory {
     pub icon: Option<String>,
     pub color: Option<String>,
     pub is_system: bool,
+    /// True when this (system/seed) category is hidden for the current user.
+    /// Always false for the user's own categories. Used by the category manager.
+    pub is_hidden: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

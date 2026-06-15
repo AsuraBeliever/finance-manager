@@ -8,7 +8,7 @@ use serde::Deserialize;
 use wasm_bindgen::JsValue;
 use worker::D1Database;
 
-use crate::db::{all, batch, exec, first, last_row_id, new_group_id, stmt, CountRow, ToJs};
+use crate::db::{all, batch, changes, exec, first, last_row_id, new_group_id, stmt, CountRow, ToJs};
 use crate::jsv;
 
 fn validate_amount(amount_cents: i64) -> AppResult<()> {
@@ -322,31 +322,72 @@ struct CategoryRow {
     icon: Option<String>,
     color: Option<String>,
     is_system: i64,
+    is_hidden: i64,
 }
 
-pub async fn list_transaction_categories(
-    db: &D1Database,
-    uid: i64,
-) -> AppResult<Vec<TransactionCategory>> {
-    let rows: Vec<CategoryRow> = all(
-        db,
-        "SELECT id, name, kind, icon, color, is_system FROM transaction_categories
-         WHERE user_id IS NULL OR user_id = ?1
-         ORDER BY kind, id",
-        jsv![uid],
-    )
-    .await?;
-    Ok(rows
-        .into_iter()
-        .map(|r| TransactionCategory {
+impl From<CategoryRow> for TransactionCategory {
+    fn from(r: CategoryRow) -> Self {
+        TransactionCategory {
             id: r.id,
             name: r.name,
             kind: r.kind,
             icon: r.icon,
             color: r.color,
             is_system: r.is_system != 0,
-        })
-        .collect())
+            is_hidden: r.is_hidden != 0,
+        }
+    }
+}
+
+/// Categories offered in the pickers: the user's own plus the seeds they
+/// haven't hidden. `is_hidden` is always false here.
+pub async fn list_transaction_categories(
+    db: &D1Database,
+    uid: i64,
+) -> AppResult<Vec<TransactionCategory>> {
+    let rows: Vec<CategoryRow> = all(
+        db,
+        "SELECT tc.id, tc.name, tc.kind, tc.icon, tc.color, tc.is_system, 0 AS is_hidden
+         FROM transaction_categories tc
+         WHERE (tc.user_id IS NULL OR tc.user_id = ?1)
+           AND NOT EXISTS (
+             SELECT 1 FROM hidden_categories h
+             WHERE h.user_id = ?1 AND h.category_id = tc.id)
+         ORDER BY tc.kind, tc.is_system DESC, tc.id",
+        jsv![uid],
+    )
+    .await?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+/// Everything the user can manage: own categories + all seeds, each flagged
+/// with `is_hidden` so the manager can show hidden seeds with a restore action.
+pub async fn list_manage_categories(
+    db: &D1Database,
+    uid: i64,
+) -> AppResult<Vec<TransactionCategory>> {
+    let rows: Vec<CategoryRow> = all(
+        db,
+        "SELECT tc.id, tc.name, tc.kind, tc.icon, tc.color, tc.is_system,
+                EXISTS (SELECT 1 FROM hidden_categories h
+                        WHERE h.user_id = ?1 AND h.category_id = tc.id) AS is_hidden
+         FROM transaction_categories tc
+         WHERE tc.user_id IS NULL OR tc.user_id = ?1
+         ORDER BY tc.kind, tc.is_system DESC, tc.id",
+        jsv![uid],
+    )
+    .await?;
+    Ok(rows.into_iter().map(Into::into).collect())
+}
+
+fn validate_category(name: &str, kind: &str) -> AppResult<()> {
+    if name.trim().is_empty() {
+        return Err(AppError::InvalidInput("el nombre es obligatorio".into()));
+    }
+    if kind != "income" && kind != "expense" {
+        return Err(AppError::InvalidInput("tipo inválido".into()));
+    }
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -354,6 +395,7 @@ pub async fn list_transaction_categories(
 pub struct CreateCategoryArgs {
     pub name: String,
     pub kind: String,
+    pub color: Option<String>,
 }
 
 pub async fn create_transaction_category(
@@ -361,17 +403,130 @@ pub async fn create_transaction_category(
     uid: i64,
     a: CreateCategoryArgs,
 ) -> AppResult<i64> {
-    if a.name.trim().is_empty() {
-        return Err(AppError::InvalidInput("el nombre es obligatorio".into()));
-    }
-    if a.kind != "income" && a.kind != "expense" {
-        return Err(AppError::InvalidInput("tipo inválido".into()));
-    }
+    validate_category(&a.name, &a.kind)?;
     let res = exec(
         db,
-        "INSERT INTO transaction_categories (user_id, name, kind) VALUES (?1, ?2, ?3)",
-        jsv![uid, a.name.trim(), a.kind],
+        "INSERT INTO transaction_categories (user_id, name, kind, color) VALUES (?1, ?2, ?3, ?4)",
+        jsv![uid, a.name.trim(), a.kind, a.color],
     )
     .await?;
     last_row_id(&res)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCategoryArgs {
+    pub id: i64,
+    pub name: String,
+    pub color: Option<String>,
+}
+
+/// Renames / recolors one of the user's OWN categories. Seeds (user_id NULL)
+/// are shared and can't be edited, so they match no row here.
+pub async fn update_transaction_category(
+    db: &D1Database,
+    uid: i64,
+    a: UpdateCategoryArgs,
+) -> AppResult<()> {
+    if a.name.trim().is_empty() {
+        return Err(AppError::InvalidInput("el nombre es obligatorio".into()));
+    }
+    let res = exec(
+        db,
+        "UPDATE transaction_categories SET name = ?3, color = ?4
+         WHERE id = ?1 AND user_id = ?2",
+        jsv![a.id, uid, a.name.trim(), a.color],
+    )
+    .await?;
+    if changes(&res) == 0 {
+        return Err(AppError::NotFound("categoría"));
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryIdArgs {
+    pub id: i64,
+}
+
+/// "Removes" a category. Own category → reassign its transactions to NULL,
+/// drop its budget (the per-user unique index forbids a second NULL-category
+/// budget) and uncategorize its subscriptions, then delete it — one atomic
+/// batch so history survives intact. Seed category → just hide it for this
+/// user (it stays shared and its existing transactions keep their label).
+pub async fn delete_transaction_category(
+    db: &D1Database,
+    uid: i64,
+    a: CategoryIdArgs,
+) -> AppResult<()> {
+    // is this an own category, a seed, or not visible to the caller?
+    let owner: Option<CountRow> = first(
+        db,
+        "SELECT COUNT(*) AS n FROM transaction_categories
+         WHERE id = ?1 AND user_id = ?2",
+        jsv![a.id, uid],
+    )
+    .await?;
+    let is_own = owner.map(|r| r.n).unwrap_or(0) > 0;
+
+    if is_own {
+        let stmts = vec![
+            stmt(
+                db,
+                "UPDATE transactions SET category_id = NULL WHERE category_id = ?1",
+                jsv![a.id],
+            )?,
+            stmt(
+                db,
+                "UPDATE subscriptions SET category_id = NULL WHERE category_id = ?1 AND user_id = ?2",
+                jsv![a.id, uid],
+            )?,
+            stmt(
+                db,
+                "DELETE FROM budgets WHERE category_id = ?1 AND user_id = ?2",
+                jsv![a.id, uid],
+            )?,
+            stmt(
+                db,
+                "DELETE FROM transaction_categories WHERE id = ?1 AND user_id = ?2",
+                jsv![a.id, uid],
+            )?,
+        ];
+        batch(db, stmts).await?;
+        return Ok(());
+    }
+
+    // Seed (or unknown id): hide it for this user. Confirm it's a visible seed.
+    let seed: Option<CountRow> = first(
+        db,
+        "SELECT COUNT(*) AS n FROM transaction_categories WHERE id = ?1 AND user_id IS NULL",
+        jsv![a.id],
+    )
+    .await?;
+    if seed.map(|r| r.n).unwrap_or(0) == 0 {
+        return Err(AppError::NotFound("categoría"));
+    }
+    exec(
+        db,
+        "INSERT OR IGNORE INTO hidden_categories (user_id, category_id) VALUES (?1, ?2)",
+        jsv![uid, a.id],
+    )
+    .await?;
+    Ok(())
+}
+
+/// Un-hides a previously hidden seed category for this user.
+pub async fn restore_transaction_category(
+    db: &D1Database,
+    uid: i64,
+    a: CategoryIdArgs,
+) -> AppResult<()> {
+    exec(
+        db,
+        "DELETE FROM hidden_categories WHERE user_id = ?1 AND category_id = ?2",
+        jsv![uid, a.id],
+    )
+    .await?;
+    Ok(())
 }

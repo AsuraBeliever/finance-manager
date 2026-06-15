@@ -155,8 +155,29 @@ export const deleteTransaction = (id: number) =>
 export const listTransactionCategories = () =>
   rpc<TransactionCategory[]>("list_transaction_categories");
 
-export const createTransactionCategory = (name: string, kind: "income" | "expense") =>
-  rpc<number>("create_transaction_category", { name, kind });
+/** Full set for the category manager: own + all seeds, each with `isHidden`. */
+export const listManageCategories = () =>
+  rpc<TransactionCategory[]>("list_manage_categories");
+
+export const createTransactionCategory = (
+  name: string,
+  kind: "income" | "expense",
+  color?: string | null,
+) => rpc<number>("create_transaction_category", { name, kind, color: color ?? null });
+
+export const updateTransactionCategory = (
+  id: number,
+  name: string,
+  color?: string | null,
+) => rpc<void>("update_transaction_category", { id, name, color: color ?? null });
+
+/** Own category → deleted (its transactions become uncategorized); seed
+ *  category → hidden just for this user. */
+export const deleteTransactionCategory = (id: number) =>
+  rpc<void>("delete_transaction_category", { id });
+
+export const restoreTransactionCategory = (id: number) =>
+  rpc<void>("restore_transaction_category", { id });
 
 export const getDashboardSummary = () =>
   rpc<DashboardSummary>("get_dashboard_summary");

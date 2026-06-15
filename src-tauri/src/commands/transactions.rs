@@ -288,6 +288,8 @@ pub fn list_transaction_categories(db: State<Db>) -> AppResult<Vec<TransactionCa
                 icon: r.get(3)?,
                 color: r.get(4)?,
                 is_system: r.get::<_, i64>(5)? != 0,
+                // Single-user desktop DB: no per-user hiding.
+                is_hidden: false,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

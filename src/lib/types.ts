@@ -38,6 +38,8 @@ export interface TransactionCategory {
   icon: string | null;
   color: string | null;
   isSystem: boolean;
+  /** A seed category hidden for this user. Always false for own categories. */
+  isHidden: boolean;
 }
 
 export interface Transaction {
