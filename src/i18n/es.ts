@@ -153,6 +153,16 @@ export const es = {
       "Crea tu primera cartera: efectivo, tarjeta, cuenta de ahorro o lo que necesites.",
     invalidAmount: "Monto inválido",
   },
+  install: {
+    title: "Instalar app",
+    hint: "Instálala en tu dispositivo para abrirla como una app, con su propia ventana e ícono.",
+    action: "Instalar app",
+    installed: "Ya está instalada en este dispositivo ✓",
+    iosHint:
+      "En iPhone o iPad: toca el botón Compartir y luego «Agregar a pantalla de inicio».",
+    manualHint:
+      "Si no aparece el botón, abre el menú de tu navegador y elige «Instalar app» o «Agregar a pantalla de inicio».",
+  },
   categories: {
     title: "Categorías",
     manage: "Gestionar categorías",

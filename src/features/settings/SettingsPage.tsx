@@ -2,9 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es as dateLocaleEs } from "date-fns/locale";
-import { ChevronRight, Info, KeyRound, LogOut, Monitor, Smartphone, Tags } from "lucide-react";
+import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Smartphone, Tags } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
+import { InstallButton } from "../../components/InstallButton";
 import { Field, inputClass } from "../../components/Field";
 import { PageHeader } from "../../components/PageHeader";
 import { ThemeToggle } from "../../components/ThemeToggle";
@@ -192,6 +193,15 @@ export function SettingsPage() {
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="font-medium">{es.theme.label}</h3>
           <ThemeToggle />
+        </section>
+
+        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="mb-1 flex items-center gap-2 font-medium">
+            <Download size={16} className="text-fg-subtle" />
+            {es.install.title}
+          </h3>
+          <p className="mb-3 text-xs text-fg-subtle">{es.install.hint}</p>
+          <InstallButton showInstalled />
         </section>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">

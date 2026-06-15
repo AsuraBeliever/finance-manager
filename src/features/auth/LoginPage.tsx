@@ -4,6 +4,7 @@ import { TrendingUp } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
 import { GoogleIcon } from "../../components/GoogleIcon";
+import { InstallButton } from "../../components/InstallButton";
 import { es } from "../../i18n/es";
 import { login, register } from "../../lib/auth";
 
@@ -117,6 +118,10 @@ export function LoginPage() {
             {mode === "login" ? es.auth.switchToRegister : es.auth.switchToLogin}
           </button>
         </form>
+
+        <div className="mt-4 flex justify-center">
+          <InstallButton />
+        </div>
       </div>
     </div>
   );
