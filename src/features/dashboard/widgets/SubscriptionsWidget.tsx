@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { BrandLogo } from "../../../components/BrandLogo";
 import { StatWidget } from "../../../components/StatWidget";
 import { listSubscriptions } from "../../../lib/api";
 import { formatCents } from "../../../lib/money";
@@ -35,7 +36,7 @@ export function SubscriptionsWidget() {
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white"
                 style={{ backgroundColor: color }}
               >
-                {s.name.charAt(0).toUpperCase()}
+                <BrandLogo slug={s.icon} size={20} fallback={s.name.charAt(0).toUpperCase()} />
               </span>
               <div className="min-w-0 flex-1">
                 <p className={`truncate text-sm font-medium ${s.isActive ? "text-fg" : "text-fg-subtle"}`}>
