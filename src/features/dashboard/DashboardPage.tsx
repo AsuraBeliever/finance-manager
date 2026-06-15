@@ -32,6 +32,24 @@ function monthLabel(month: string): string {
   return `${names[Number(m) - 1]} ${y.slice(2)}`;
 }
 
+const longDateFmt = new Intl.DateTimeFormat("es-MX", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+// The daily flow chart spans the current month, so its axis only carries the
+// day-of-month ('DD'); expand it to a full localized date for the tooltip.
+function dayLabel(day: string): string {
+  const n = Number(day);
+  if (!Number.isFinite(n)) return day;
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth(), n);
+  const full = longDateFmt.format(date);
+  return full.charAt(0).toUpperCase() + full.slice(1);
+}
+
 export function DashboardPage() {
   const chart = useChartTokens();
   const [hidden, toggleHidden] = useHideBalance();
@@ -176,6 +194,7 @@ export function DashboardPage() {
                 <XAxis dataKey="day" stroke={chart.axis} fontSize={11} />
                 <YAxis stroke={chart.axis} fontSize={11} width={40} />
                 <Tooltip
+                  labelFormatter={(label) => dayLabel(String(label))}
                   formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
                   contentStyle={chart.tooltip}
                   cursor={{ fill: "color-mix(in oklab, var(--color-border-muted) 40%, transparent)" }}
