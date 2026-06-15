@@ -342,8 +342,6 @@ export const es = {
     emailPlaceholder: "tu@correo.com",
     password: "Contraseña",
     passwordHint: "Mínimo 8 caracteres",
-    inviteCode: "Código de invitación",
-    inviteCodeHint: "Pídeselo a quien administra la app.",
     login: "Entrar",
     register: "Crear cuenta",
     switchToRegister: "¿No tienes cuenta? Regístrate",

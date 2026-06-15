@@ -1,7 +1,7 @@
 //! Accounts and cookie sessions.
 //!
-//! - Registration is gated by an invite code (secret INVITE_CODE) so a public
-//!   URL doesn't accumulate strangers' accounts.
+//! - Registration is open to anyone, but capped at MAX_USERS total accounts so
+//!   the single free-plan D1 database (500 MB) can never fill and start erroring.
 //! - Session token: 32 random bytes (hex) in an HttpOnly cookie; D1 stores
 //!   only its SHA-256, so a DB leak can't impersonate sessions.
 //! - Sliding expiry: 30 days, refreshed on use (at most once a day).
@@ -14,7 +14,7 @@ use finanzas_core::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use worker::{D1Database, Request, Response, RouteContext};
 
-use crate::db::{exec, first, random_bytes, sha256_hex};
+use crate::db::{exec, first, random_bytes, sha256_hex, CountRow};
 use crate::error::{db_err, error_response, json_response};
 use crate::jsv;
 
@@ -156,7 +156,6 @@ struct UserInfo {
 struct RegisterArgs {
     email: String,
     password: String,
-    invite_code: String,
 }
 
 fn pbkdf2_iterations(ctx: &RouteContext<()>) -> u32 {
@@ -167,17 +166,16 @@ fn pbkdf2_iterations(ctx: &RouteContext<()>) -> u32 {
         .unwrap_or(password::DEFAULT_ITERATIONS)
 }
 
-fn invite_code(ctx: &RouteContext<()>) -> AppResult<String> {
-    // secret in production; plain var works for local dev (.dev.vars)
-    if let Ok(s) = ctx.env.secret("INVITE_CODE") {
-        return Ok(s.to_string());
-    }
-    if let Ok(v) = ctx.env.var("INVITE_CODE") {
-        return Ok(v.to_string());
-    }
-    Err(AppError::Internal(
-        "INVITE_CODE no está configurado; regístrate tras configurarlo".into(),
-    ))
+/// Hard cap on total accounts so the single D1 database (free plan: 500 MB)
+/// can never fill up and start erroring. Configurable via the MAX_USERS var;
+/// 0 or unset means no cap. We start conservative and raise it as real usage
+/// is observed.
+fn max_users(ctx: &RouteContext<()>) -> Option<i64> {
+    ctx.env
+        .var("MAX_USERS")
+        .ok()
+        .and_then(|v| v.to_string().parse::<i64>().ok())
+        .filter(|n| *n > 0)
 }
 
 pub async fn register(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
@@ -204,12 +202,6 @@ async fn do_register(
     args: RegisterArgs,
     ua: Option<String>,
 ) -> AppResult<(UserInfo, String)> {
-    let expected = invite_code(ctx)?;
-    if args.invite_code.trim() != expected {
-        return Err(AppError::Unauthorized(
-            "código de invitación incorrecto".into(),
-        ));
-    }
     let email = args.email.trim().to_lowercase();
     if !email.contains('@') || email.len() < 5 {
         return Err(AppError::InvalidInput("correo inválido".into()));
@@ -220,6 +212,18 @@ async fn do_register(
         ));
     }
     let db = ctx.env.d1("DB").map_err(db_err)?;
+    // Enforce the user cap before creating the account.
+    if let Some(cap) = max_users(ctx) {
+        let count = first::<CountRow>(&db, "SELECT COUNT(*) AS n FROM users", jsv![])
+            .await?
+            .map(|r| r.n)
+            .unwrap_or(0);
+        if count >= cap {
+            return Err(AppError::InvalidInput(
+                "Por ahora el registro está cerrado: alcanzamos el cupo máximo de cuentas. Vuelve a intentarlo más adelante.".into(),
+            ));
+        }
+    }
     let hash = password::hash_password(&args.password, pbkdf2_iterations(ctx)).await?;
     let res = exec(
         &db,

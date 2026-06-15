@@ -14,7 +14,6 @@ export function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -35,7 +34,7 @@ export function LoginPage() {
       const user =
         mode === "login"
           ? await login(email, password)
-          : await register(email, password, inviteCode);
+          : await register(email, password);
       queryClient.setQueryData(["me"], user);
       queryClient.invalidateQueries();
     } catch (err) {
@@ -103,19 +102,6 @@ export function LoginPage() {
               <p className="mt-1 text-xs text-fg-subtle">{es.auth.passwordHint}</p>
             )}
           </Field>
-          {mode === "register" && (
-            <Field label={es.auth.inviteCode}>
-              <input
-                type="text"
-                className={inputClass}
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                autoComplete="off"
-                required
-              />
-              <p className="mt-1 text-xs text-fg-subtle">{es.auth.inviteCodeHint}</p>
-            </Field>
-          )}
           {error && <p className="text-sm text-danger">{error}</p>}
           <Button type="submit" disabled={busy}>
             {mode === "login" ? es.auth.login : es.auth.register}

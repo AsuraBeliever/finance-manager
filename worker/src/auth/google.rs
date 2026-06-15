@@ -189,8 +189,15 @@ async fn exchange_code(ctx: &RouteContext<()>, code: &str, redirect: &str) -> Ap
         .ok_or_else(|| AppError::Internal("Google no regresó id_token".into()))
 }
 
-/// Find by google_sub, else link to the verified email, else create.
-async fn find_or_create_user(db: &worker::D1Database, sub: &str, email: &str) -> AppResult<i64> {
+/// Find by google_sub, else link to the verified email, else create. `max` is
+/// the MAX_USERS cap: existing users always sign in, but a brand-new account is
+/// refused once the cap is reached (same limit as email registration).
+async fn find_or_create_user(
+    db: &worker::D1Database,
+    sub: &str,
+    email: &str,
+    max: Option<i64>,
+) -> AppResult<i64> {
     #[derive(Deserialize)]
     struct IdRow {
         id: i64,
@@ -215,6 +222,18 @@ async fn find_or_create_user(db: &worker::D1Database, sub: &str, email: &str) ->
         )
         .await?;
         return Ok(row.id);
+    }
+    // New account: enforce the cap.
+    if let Some(cap) = max {
+        let count = first::<crate::db::CountRow>(db, "SELECT COUNT(*) AS n FROM users", jsv![])
+            .await?
+            .map(|r| r.n)
+            .unwrap_or(0);
+        if count >= cap {
+            return Err(AppError::InvalidInput(
+                "Por ahora el registro está cerrado: alcanzamos el cupo máximo de cuentas. Vuelve a intentarlo más adelante.".into(),
+            ));
+        }
     }
     let res = exec(
         db,
@@ -269,7 +288,7 @@ pub async fn callback(req: Request, ctx: RouteContext<()>) -> worker::Result<Res
             .trim()
             .to_lowercase();
         let db = ctx.env.d1("DB").map_err(db_err)?;
-        let uid = find_or_create_user(&db, &claims.sub, &email).await?;
+        let uid = find_or_create_user(&db, &claims.sub, &email, super::max_users(&ctx)).await?;
         let token = create_session(&db, uid, user_agent(&req)).await?;
         Ok((uid, token))
     }

@@ -19,8 +19,8 @@ async function authPost<T>(path: string, body: Record<string, unknown>): Promise
   return (await res.json()) as T;
 }
 
-export const register = (email: string, password: string, inviteCode: string) =>
-  authPost<AuthUser>("register", { email, password, inviteCode });
+export const register = (email: string, password: string) =>
+  authPost<AuthUser>("register", { email, password });
 
 export const login = (email: string, password: string) =>
   authPost<AuthUser>("login", { email, password });

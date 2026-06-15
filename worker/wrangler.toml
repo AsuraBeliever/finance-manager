@@ -32,7 +32,10 @@ migrations_dir = "migrations"
 crons = ["0 7 * * *"]
 
 [vars]
-# Secrets (INVITE_CODE, GOOGLE_CLIENT_SECRET) via `wrangler secret put`.
+# Secrets (GOOGLE_CLIENT_SECRET) via `wrangler secret put`. Registration is open
+# (no invite code) but capped at MAX_USERS so the free-plan D1 database (500 MB)
+# can never fill up. Raise this as real usage is observed; 0/unset = no cap.
+MAX_USERS = "500"
 PBKDF2_ITERATIONS = "100000"
 # Google OAuth client id (not secret; appears in the consent URL). Set to the
 # real id before deploy: the Client ID from Google Cloud → Credentials.
