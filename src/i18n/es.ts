@@ -346,6 +346,8 @@ export const es = {
   update: {
     available: "Hay una nueva versión",
     action: "Actualizar",
+    updating: "Actualizando…",
+    updatingHint: "Aplicando la nueva versión, no cierres la app.",
   },
   offline: {
     banner: "Sin conexión — mostrando los últimos datos sincronizados",
