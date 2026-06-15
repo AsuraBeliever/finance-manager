@@ -59,6 +59,12 @@ Rust), un frontend PWA en **React 19** y un shell de escritorio en **Tauri 2**.
 El dinero se guarda en centavos enteros. La arquitectura, el modelo de datos y las
 fórmulas de inversión están en [`docs/`](docs/PLAN.md).
 
+## 📄 Licencia
+
+Código disponible bajo la **[PolyForm Noncommercial License 1.0.0](LICENSE.md)**: puedes
+usarlo, estudiarlo, modificarlo y compartirlo para cualquier fin **no comercial**, pero
+**no se permite el uso comercial**. El autor se reserva todos los derechos comerciales.
+
 ---
 
 <div align="center">

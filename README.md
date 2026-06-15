@@ -57,6 +57,12 @@ Rust on **Cloudflare Workers** + **D1** (all money math lives in Rust), a **Reac
 PWA frontend, and a **Tauri 2** desktop shell. Money is stored as integer cents.
 Architecture, data model and investment formulas live in [`docs/`](docs/PLAN.md).
 
+## 📄 License
+
+Source-available under the **[PolyForm Noncommercial License 1.0.0](LICENSE.md)**: you
+may use, study, modify and share it for any **noncommercial** purpose, but commercial
+use is not permitted. All commercial rights are reserved by the author.
+
 ---
 
 <div align="center">
