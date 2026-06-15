@@ -1,5 +1,6 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveGridLayout,
   useContainerWidth,
@@ -9,8 +10,10 @@ import {
   type ResponsiveLayouts,
 } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
+import { getSetting, setSetting } from "../lib/api";
 
-const STORAGE_KEY = "finanzas.dashboardLayout.v1";
+// Per-user setting key — synced across all devices (server-side).
+const SETTING_KEY = "dashboardLayout";
 const COLS = { lg: 12, md: 12, sm: 6, xs: 4, xxs: 2 };
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
 const ROW_HEIGHT = 72;
@@ -46,10 +49,10 @@ function defaultLayout(items: GridItemSpec[]): LayoutItem[] {
   });
 }
 
-function loadSaved(): ResponsiveLayouts | null {
+function parse(raw: string | null | undefined): ResponsiveLayouts | null {
+  if (!raw) return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as ResponsiveLayouts) : null;
+    return JSON.parse(raw) as ResponsiveLayouts;
   } catch {
     return null;
   }
@@ -57,7 +60,8 @@ function loadSaved(): ResponsiveLayouts | null {
 
 /** A draggable, resizable dashboard grid (react-grid-layout v2, React 19 safe).
  *  Each cell drags from its grip handle (so controls/links inside keep working)
- *  and resizes from the corner. The arrangement is saved per device. */
+ *  and resizes from the corner. The arrangement is saved per user on the server,
+ *  so it follows you across web, desktop and phone. */
 export function DashboardGrid({
   items,
   resetSignal,
@@ -68,27 +72,47 @@ export function DashboardGrid({
 }) {
   const { width, containerRef } = useContainerWidth();
   const base = useMemo(() => defaultLayout(items), [items]);
-  const [layouts, setLayouts] = useState<ResponsiveLayouts>(() => loadSaved() ?? { lg: base });
-  const [seenReset, setSeenReset] = useState(resetSignal);
 
-  if (resetSignal !== seenReset) {
-    setSeenReset(resetSignal);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-    setLayouts({ lg: base });
+  // Source of truth: the per-user setting. We hold a local copy once loaded.
+  const saved = useQuery({
+    queryKey: ["dashboardLayout"],
+    queryFn: () => getSetting(SETTING_KEY),
+    staleTime: Infinity,
+  });
+  const persist = useMutation({
+    mutationFn: (layouts: ResponsiveLayouts) => setSetting(SETTING_KEY, JSON.stringify(layouts)),
+  });
+
+  const [layouts, setLayouts] = useState<ResponsiveLayouts | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const baseRef = useRef(base);
+  baseRef.current = base;
+
+  // Initialize from the server value the first time it resolves.
+  if (layouts === null && saved.isSuccess) {
+    setLayouts(parse(saved.data) ?? { lg: base });
   }
+
+  // Reset: snap to defaults and persist (so every device resets too).
+  const firstReset = useRef(resetSignal);
+  useEffect(() => {
+    if (resetSignal === firstReset.current) return;
+    const reset = { lg: baseRef.current };
+    setLayouts(reset);
+    persist.mutate(reset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetSignal]);
 
   const onLayoutChange = (_current: Layout, all: ResponsiveLayouts) => {
     setLayouts(all);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-    } catch {
-      /* ignore quota / private-mode errors */
-    }
+    // Debounce the server write so a drag/resize gesture saves once.
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => persist.mutate(all), 600);
   };
+
+  if (layouts === null) {
+    return <div ref={containerRef} className="min-h-24" />;
+  }
 
   return (
     <div ref={containerRef} className="-mx-1">
