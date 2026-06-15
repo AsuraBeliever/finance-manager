@@ -56,7 +56,7 @@ npm run tauri dev                            # shell de escritorio
 
 - **Dinero**: centavos enteros `i64`. **Tipos de cambio**: micros. **Tasas**: basis points. **Fechas de negocio**: TEXT `YYYY-MM-DD`.
 - serde `rename_all = "camelCase"` en todo lo que cruza HTTP.
-- Strings de UI SOLO en `src/i18n/es.ts` (español); nada hardcodeado en componentes.
+- Strings de UI SOLO en `src/i18n/` (bilingüe es/en); nada hardcodeado en componentes. `es.ts` es la forma canónica (`esDict`); al agregar una clave, agrégala también en `en.ts`. Los componentes importan `es` (un proxy al idioma activo) y usan `es.x`; el idioma se cambia en Ajustes (`src/i18n/store.ts`) y el router se remonta al cambiar. OJO: textos a nivel de módulo (fuera de un componente) quedan congelados al idioma inicial — defínelos dentro del componente.
 - **Cambios de esquema**: solo vía migración nueva en `worker/migrations/*.sql` + actualizar `docs/DATA_MODEL.md`.
 - **Calculadoras de inversión nuevas**: implementar `InvestmentCalculator` en finanzas-core + registry + tests + cargar su `CalcContext` en ambos loaders (worker y src-tauri) + form; guía en `docs/INVESTMENTS.md`.
 - Git: conventional commits; milestone por branch `feat/<nombre>`, merge `--no-ff` a `main`, tag semver al completar. Fixes triviales directo a `main`.
