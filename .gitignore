@@ -38,3 +38,6 @@ migration-data.sql
 worker/.wrangler
 worker/build
 worker/.dev.vars
+
+# Claude Code local tooling (not part of the app)
+.claude/
