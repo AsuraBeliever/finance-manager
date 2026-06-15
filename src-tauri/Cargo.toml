@@ -1,6 +1,6 @@
 [package]
 name = "finanzas"
-version = "2.2.0"
+version = "2.4.0"
 description = "Personal finance desktop app"
 authors = ["AsuraBeliever"]
 edition = "2021"

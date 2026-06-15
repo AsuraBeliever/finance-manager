@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es as dateLocaleEs } from "date-fns/locale";
-import { KeyRound, LogOut, Monitor, Smartphone } from "lucide-react";
+import { Info, KeyRound, LogOut, Monitor, Smartphone } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
 import { PageHeader } from "../../components/PageHeader";
@@ -185,9 +185,9 @@ export function SettingsPage() {
   };
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-5xl">
       <PageHeader title={es.settings.title} />
-      <div className="grid max-w-3xl gap-6">
+      <div className="gap-6 lg:columns-2 [&>section]:mb-6 [&>section]:break-inside-avoid">
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="font-medium">{es.theme.label}</h3>
           <ThemeToggle />
@@ -234,7 +234,18 @@ export function SettingsPage() {
             </Button>
           </div>
         </section>
+
+        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="mb-3 flex items-center gap-2 font-medium">
+            <Info size={16} className="text-fg-subtle" />
+            {es.settings.about}
+          </h3>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-fg-muted">{es.settings.version}</span>
+            <span className="font-mono text-fg">v{__APP_VERSION__}</span>
+          </div>
+        </section>
       </div>
-    </>
+    </div>
   );
 }

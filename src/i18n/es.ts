@@ -306,6 +306,8 @@ export const es = {
       "Los tipos de cambio se obtienen y actualizan solos al usar cualquier moneda distinta de MXN.",
     walletCategories: "Categorías de cartera",
     session: "Sesión",
+    about: "Acerca de",
+    version: "Versión",
   },
   auth: {
     loginTitle: "Inicia sesión",
