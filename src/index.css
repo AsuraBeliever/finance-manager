@@ -218,3 +218,28 @@ select option {
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-muted) transparent;
 }
+
+/* react-grid-layout (dashboard): theme-aware drag placeholder + resize handle */
+.react-grid-item.react-grid-placeholder {
+  background: color-mix(in oklab, var(--c-accent) 30%, transparent);
+  border-radius: 1rem;
+  opacity: 0.5;
+}
+.react-grid-item > .react-resizable-handle {
+  width: 18px;
+  height: 18px;
+  bottom: 4px;
+  right: 4px;
+}
+.react-grid-item > .react-resizable-handle::after {
+  border-right-color: var(--color-fg-subtle);
+  border-bottom-color: var(--color-fg-subtle);
+  width: 8px;
+  height: 8px;
+  right: 4px;
+  bottom: 4px;
+}
+.react-grid-item.react-draggable-dragging,
+.react-grid-item.resizing {
+  z-index: 20;
+}

@@ -96,6 +96,7 @@ export const es = {
   },
   dashboard: {
     title: "Resumen",
+    resetLayout: "Restablecer vista",
     netWorth: "Patrimonio total",
     byCurrency: "Por moneda",
     byWallet: "Por cartera",

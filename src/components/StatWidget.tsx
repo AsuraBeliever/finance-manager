@@ -12,13 +12,13 @@ interface StatWidgetProps {
 export function StatWidget({ title, action, className = "", children }: StatWidgetProps) {
   return (
     <section
-      className={`group rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/40 ${className}`}
+      className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card transition-colors duration-300 hover:border-accent/40 ${className}`}
     >
       <header className="mb-4 flex items-center justify-between gap-3">
         <h3 className="font-display text-lg font-medium tracking-tight text-fg">{title}</h3>
         {action}
       </header>
-      {children}
+      <div className="min-h-0 flex-1 overflow-auto">{children}</div>
     </section>
   );
 }
