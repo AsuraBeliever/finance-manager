@@ -158,6 +158,7 @@ export const es = {
     hint: "Instálala en tu dispositivo para abrirla como una app, con su propia ventana e ícono.",
     action: "Instalar app",
     installed: "Ya está instalada en este dispositivo ✓",
+    desktopApp: "Ya estás usando la app de escritorio ✓",
     iosHint:
       "En iPhone o iPad: toca el botón Compartir y luego «Agregar a pantalla de inicio».",
     manualHint:

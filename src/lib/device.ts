@@ -41,3 +41,16 @@ export function deviceLabel(ua: string | null): string {
 export function isMobileDevice(ua: string | null): boolean {
   return !!ua && /iPhone|iPad|Android|Mobile/.test(ua);
 }
+
+/** True when running inside the Tauri desktop shell (which loads the deployed
+ *  URL in a WebKitGTK webview) rather than a normal browser. Prefer the Tauri
+ *  globals; fall back to the UA signature (Linux + WebKit Safari, not Chrome),
+ *  which is how the desktop shell reports itself. Used to suppress the "install
+ *  app" affordance there — it's already the installed desktop app. */
+export function isDesktopShell(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as unknown as Record<string, unknown>;
+  if ("__TAURI__" in w || "__TAURI_INTERNALS__" in w || "isTauri" in w) return true;
+  const ua = navigator.userAgent;
+  return /Linux/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|Android/.test(ua);
+}

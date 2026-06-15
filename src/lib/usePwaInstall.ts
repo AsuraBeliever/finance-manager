@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isDesktopShell } from "./device";
 
 /** The non-standard event Chromium fires when the PWA is installable. */
 interface BeforeInstallPromptEvent extends Event {
@@ -51,6 +52,7 @@ export function usePwaInstall() {
 
   return {
     installed,
+    desktop: isDesktopShell(),
     canPrompt: deferred !== null,
     ios: isIos(),
     promptInstall,

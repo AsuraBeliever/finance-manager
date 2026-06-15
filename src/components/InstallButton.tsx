@@ -7,7 +7,12 @@ import { es } from "../i18n/es";
  *  gets the share-sheet instructions; anything else gets a manual hint. Renders
  *  nothing once installed unless `showInstalled` is set. */
 export function InstallButton({ showInstalled = false }: { showInstalled?: boolean }) {
-  const { installed, canPrompt, ios, promptInstall } = usePwaInstall();
+  const { installed, desktop, canPrompt, ios, promptInstall } = usePwaInstall();
+
+  // The desktop shell IS the installed app; never offer to install there.
+  if (desktop) {
+    return showInstalled ? <p className="text-sm text-fg-subtle">{es.install.desktopApp}</p> : null;
+  }
 
   if (installed) {
     return showInstalled ? <p className="text-sm text-fg-subtle">{es.install.installed}</p> : null;
@@ -32,5 +37,7 @@ export function InstallButton({ showInstalled = false }: { showInstalled?: boole
     );
   }
 
-  return <p className="text-sm text-fg-subtle">{es.install.manualHint}</p>;
+  // Browsers without a prompt (e.g. Firefox): a hint only in the detailed
+  // (Settings) context; nothing floating on the login screen.
+  return showInstalled ? <p className="text-sm text-fg-subtle">{es.install.manualHint}</p> : null;
 }
