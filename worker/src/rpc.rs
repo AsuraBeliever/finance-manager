@@ -102,6 +102,9 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "restore_transaction_category" => {
             out(transactions::restore_transaction_category(db, uid, args(body)?).await?)
         }
+        "reorder_transaction_categories" => {
+            out(transactions::reorder_transaction_categories(db, uid, args(body)?).await?)
+        }
 
         // ---- dashboard / analytics ----
         "get_dashboard_summary" => out(dashboard::get_dashboard_summary(db, uid).await?),

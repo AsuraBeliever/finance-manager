@@ -2,12 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CreditCard, Pause, Pencil, Play, Plus, Receipt, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
+import { BrandLogo } from "../../components/BrandLogo";
+import { ColorPicker } from "../../components/ColorPicker";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { DateInput } from "../../components/DateInput";
 import { EmptyState } from "../../components/EmptyState";
 import { Field, inputClass } from "../../components/Field";
 import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
+import { matchBrand } from "../../lib/brandIcons";
 import {
   createSubscription,
   deleteSubscription,
@@ -100,7 +103,7 @@ export function SubscriptionsPage() {
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-semibold text-white"
                 style={{ backgroundColor: color }}
               >
-                {sub.name.charAt(0).toUpperCase()}
+                <BrandLogo slug={sub.icon} size={22} fallback={sub.name.charAt(0).toUpperCase()} />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-fg">{sub.name}</p>
@@ -199,7 +202,22 @@ function SubscriptionFormModal({
   const [walletId, setWalletId] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [color, setColor] = useState<string>(CHART_COLORS[0]);
+  const [icon, setIcon] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // As the name is typed, detect a known brand and adopt its logo + color.
+  // Only re-applies the color when the matched brand actually changes, so a
+  // manual color tweak isn't overwritten on every keystroke.
+  const onNameChange = (value: string) => {
+    setName(value);
+    const brand = matchBrand(value);
+    if (brand && brand.slug !== icon) {
+      setIcon(brand.slug);
+      setColor(`#${brand.hex}`);
+    } else if (!brand && icon) {
+      setIcon(null);
+    }
+  };
 
   const [lastKey, setLastKey] = useState("");
   const key = `${open}-${sub?.id ?? "new"}`;
@@ -213,6 +231,7 @@ function SubscriptionFormModal({
     setWalletId(sub?.walletId != null ? String(sub.walletId) : "");
     setCategoryId(sub?.categoryId != null ? String(sub.categoryId) : "");
     setColor(sub?.color ?? CHART_COLORS[0]);
+    setIcon(sub?.icon ?? null);
     setError(null);
   }
 
@@ -225,7 +244,7 @@ function SubscriptionFormModal({
         return Promise.reject(new Error(es.investments.invalidAmount));
       const input = {
         name: name.trim(),
-        icon: null,
+        icon,
         color,
         amountCents: cents,
         currencyCode: currency,
@@ -251,7 +270,22 @@ function SubscriptionFormModal({
     >
       <div className="flex flex-col gap-4">
         <Field label={es.subscriptions.name}>
-          <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="flex items-center gap-2">
+            {icon && (
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white"
+                style={{ backgroundColor: color }}
+              >
+                <BrandLogo slug={icon} size={18} />
+              </span>
+            )}
+            <input
+              className={inputClass}
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              placeholder="Ej. Spotify, Netflix…"
+            />
+          </div>
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={es.subscriptions.amount}>
@@ -320,19 +354,7 @@ function SubscriptionFormModal({
           </select>
         </Field>
         <Field label={es.common.color}>
-          <div className="flex flex-wrap gap-2">
-            {CHART_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={`h-7 w-7 rounded-full transition-transform ${
-                  color === c ? "scale-110 ring-2 ring-fg" : ""
-                }`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
+          <ColorPicker value={color} onChange={setColor} />
         </Field>
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">

@@ -242,4 +242,6 @@ CREATE TABLE subscriptions (     -- pagos recurrentes; "registrar pago" inserta 
 
 - **wallets.skin** (migración 0006): estilo de tarjeta — id de catálogo, `grad:<from>,<to>,<angle>` o `img:<data-url>`; NULL = derivado del color.
 
+- **categorías (migración 0009)**: cada `transaction_categories` trae un `color` por defecto distinto (seeds asignados por nombre; resto por `id % paleta`; ver `CATEGORY_PALETTE` en `src/lib/palette.ts`). Orden de despliegue por usuario en `category_order(user_id, category_id, position)` (PK compuesta): el manager lo reordena arrastrando; los listados hacen LEFT JOIN y ordenan por `kind, (position IS NULL), position, is_system DESC, id`. Por-usuario, así que reordenar seeds compartidos no afecta a otros. RPC `reorder_transaction_categories`.
+
 - **wallets.sort_order** (migración 0007): orden de despliegue definido por el usuario (arrastrar para reordenar). Menor = primero; empates por `created_at, id`. Carteras nuevas van al final (`MAX(sort_order)+1`). `reorder_wallets` reescribe el `sort_order` de cada id según su índice (batch atómico, scoped por usuario).

@@ -177,6 +177,8 @@ export const es = {
     rename: "Renombrar",
     color: "Color",
     noColor: "Sin color",
+    customColor: "Color personalizado",
+    reorder: "Arrastra para reordenar",
     save: "Guardar",
     hide: "Ocultar",
     restore: "Restaurar",

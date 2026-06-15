@@ -183,6 +183,10 @@ export const deleteTransactionCategory = (id: number) =>
 export const restoreTransactionCategory = (id: number) =>
   rpc<void>("restore_transaction_category", { id });
 
+/** Persist this user's category order (ids within a kind, front to back). */
+export const reorderTransactionCategories = (ids: number[]) =>
+  rpc<void>("reorder_transaction_categories", { ids });
+
 export const getDashboardSummary = () =>
   rpc<DashboardSummary>("get_dashboard_summary");
 

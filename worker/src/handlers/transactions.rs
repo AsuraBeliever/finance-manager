@@ -408,11 +408,12 @@ pub async fn list_transaction_categories(
         db,
         "SELECT tc.id, tc.name, tc.kind, tc.icon, tc.color, tc.is_system, 0 AS is_hidden
          FROM transaction_categories tc
+         LEFT JOIN category_order co ON co.user_id = ?1 AND co.category_id = tc.id
          WHERE (tc.user_id IS NULL OR tc.user_id = ?1)
            AND NOT EXISTS (
              SELECT 1 FROM hidden_categories h
              WHERE h.user_id = ?1 AND h.category_id = tc.id)
-         ORDER BY tc.kind, tc.is_system DESC, tc.id",
+         ORDER BY tc.kind, (co.position IS NULL), co.position, tc.is_system DESC, tc.id",
         jsv![uid],
     )
     .await?;
@@ -431,8 +432,9 @@ pub async fn list_manage_categories(
                 EXISTS (SELECT 1 FROM hidden_categories h
                         WHERE h.user_id = ?1 AND h.category_id = tc.id) AS is_hidden
          FROM transaction_categories tc
+         LEFT JOIN category_order co ON co.user_id = ?1 AND co.category_id = tc.id
          WHERE tc.user_id IS NULL OR tc.user_id = ?1
-         ORDER BY tc.kind, tc.is_system DESC, tc.id",
+         ORDER BY tc.kind, (co.position IS NULL), co.position, tc.is_system DESC, tc.id",
         jsv![uid],
     )
     .await?;
@@ -587,5 +589,40 @@ pub async fn restore_transaction_category(
         jsv![uid, a.id],
     )
     .await?;
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReorderCategoriesArgs {
+    /// Category ids in the desired display order (within a kind).
+    pub ids: Vec<i64>,
+}
+
+/// Persists this user's display order for the given categories: each id's
+/// position becomes its index. Per-user, so it works for shared seeds and the
+/// user's own categories without affecting anyone else. One atomic batch.
+pub async fn reorder_transaction_categories(
+    db: &D1Database,
+    uid: i64,
+    a: ReorderCategoriesArgs,
+) -> AppResult<()> {
+    if a.ids.is_empty() {
+        return Ok(());
+    }
+    let stmts = a
+        .ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| {
+            stmt(
+                db,
+                "INSERT INTO category_order (user_id, category_id, position) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(user_id, category_id) DO UPDATE SET position = excluded.position",
+                jsv![uid, id, i as i64],
+            )
+        })
+        .collect::<AppResult<Vec<_>>>()?;
+    batch(db, stmts).await?;
     Ok(())
 }

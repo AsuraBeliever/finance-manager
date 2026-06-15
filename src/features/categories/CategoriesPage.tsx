@@ -1,7 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, EyeOff, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Check, EyeOff, GripVertical, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/Button";
+import { ColorPicker } from "../../components/ColorPicker";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { inputClass } from "../../components/Field";
 import { PageHeader } from "../../components/PageHeader";
@@ -9,10 +27,11 @@ import {
   createTransactionCategory,
   deleteTransactionCategory,
   listManageCategories,
+  reorderTransactionCategories,
   restoreTransactionCategory,
   updateTransactionCategory,
 } from "../../lib/api";
-import { CHART_COLORS, NEUTRAL_DOT } from "../../lib/palette";
+import { CATEGORY_PALETTE, NEUTRAL_DOT } from "../../lib/palette";
 import type { TransactionCategory } from "../../lib/types";
 import { es } from "../../i18n/es";
 
@@ -28,39 +47,11 @@ const AFFECTED_KEYS = [
   "budgets",
 ];
 
-/** A compact swatch row: the chart palette plus a "no color" choice. */
-function ColorPicker({
-  value,
-  onChange,
-}: {
-  value: string | null;
-  onChange: (c: string | null) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <button
-        type="button"
-        title={es.categories.noColor}
-        onClick={() => onChange(null)}
-        className={`flex h-5 w-5 items-center justify-center rounded-full border border-border-muted text-fg-subtle ${
-          value === null ? "ring-2 ring-accent ring-offset-1 ring-offset-surface-raised" : ""
-        }`}
-      >
-        <X size={11} />
-      </button>
-      {CHART_COLORS.map((c) => (
-        <button
-          key={c}
-          type="button"
-          onClick={() => onChange(c)}
-          style={{ backgroundColor: c }}
-          className={`h-5 w-5 rounded-full ${
-            value === c ? "ring-2 ring-accent ring-offset-1 ring-offset-surface-raised" : ""
-          }`}
-        />
-      ))}
-    </div>
-  );
+/** First palette color not already used by an existing category, so new ones
+ *  come out a different color; cycles once the palette is exhausted. */
+function nextColor(existing: TransactionCategory[]): string {
+  const used = new Set(existing.map((c) => c.color));
+  return CATEGORY_PALETTE.find((c) => !used.has(c)) ?? CATEGORY_PALETTE[existing.length % CATEGORY_PALETTE.length];
 }
 
 function CategoryRow({
@@ -71,9 +62,18 @@ function CategoryRow({
   onAskDelete: (cat: TransactionCategory) => void;
 }) {
   const queryClient = useQueryClient();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: cat.id,
+  });
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(cat.name);
   const [color, setColor] = useState<string | null>(cat.color);
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  };
 
   const invalidate = () => {
     for (const k of AFFECTED_KEYS) queryClient.invalidateQueries({ queryKey: [k] });
@@ -93,7 +93,7 @@ function CategoryRow({
 
   if (editing) {
     return (
-      <li className="flex flex-col gap-2 py-2.5">
+      <li ref={setNodeRef} style={style} className="flex flex-col gap-2 py-2.5">
         <div className="flex items-center gap-2">
           <input
             autoFocus
@@ -130,7 +130,21 @@ function CategoryRow({
   }
 
   return (
-    <li className={`flex items-center gap-2.5 py-2.5 ${cat.isHidden ? "opacity-50" : ""}`}>
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 py-2.5 ${cat.isHidden ? "opacity-50" : ""}`}
+    >
+      <button
+        type="button"
+        aria-label={es.categories.reorder}
+        title={es.categories.reorder}
+        {...attributes}
+        {...listeners}
+        className="cursor-grab touch-none rounded-md p-1 text-fg-subtle hover:text-fg active:cursor-grabbing"
+      >
+        <GripVertical size={15} />
+      </button>
       <span
         className="h-2.5 w-2.5 shrink-0 rounded-full"
         style={{ backgroundColor: cat.color ?? NEUTRAL_DOT }}
@@ -179,11 +193,11 @@ function CategoryRow({
   );
 }
 
-function AddCategory({ kind }: { kind: Kind }) {
+function AddCategory({ kind, existing }: { kind: Kind; existing: TransactionCategory[] }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const add = useMutation({
-    mutationFn: () => createTransactionCategory(name.trim(), kind),
+    mutationFn: () => createTransactionCategory(name.trim(), kind, nextColor(existing)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["manageCategories"] });
       queryClient.invalidateQueries({ queryKey: ["transactionCategories"] });
@@ -217,6 +231,11 @@ function Group({ kind, cats }: { kind: Kind; cats: TransactionCategory[] }) {
   const queryClient = useQueryClient();
   const [toDelete, setToDelete] = useState<TransactionCategory | null>(null);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   const del = useMutation({
     mutationFn: (id: number) => deleteTransactionCategory(id),
     onSuccess: () => {
@@ -224,6 +243,25 @@ function Group({ kind, cats }: { kind: Kind; cats: TransactionCategory[] }) {
       setToDelete(null);
     },
   });
+
+  const reorder = useMutation({
+    mutationFn: (ids: number[]) => reorderTransactionCategories(ids),
+    onError: () => queryClient.invalidateQueries({ queryKey: ["manageCategories"] }),
+  });
+
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIndex = cats.findIndex((c) => c.id === active.id);
+    const newIndex = cats.findIndex((c) => c.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(cats, oldIndex, newIndex);
+    queryClient.setQueryData<TransactionCategory[]>(["manageCategories"], (old) => {
+      const rest = (old ?? []).filter((c) => c.kind !== kind);
+      return [...rest, ...next];
+    });
+    reorder.mutate(next.map((c) => c.id));
+  };
 
   return (
     <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
@@ -233,21 +271,23 @@ function Group({ kind, cats }: { kind: Kind; cats: TransactionCategory[] }) {
       {cats.length === 0 ? (
         <p className="py-2 text-sm text-fg-subtle">{es.categories.empty}</p>
       ) : (
-        <ul className="divide-y divide-border-muted">
-          {cats.map((c) => (
-            <CategoryRow key={c.id} cat={c} onAskDelete={setToDelete} />
-          ))}
-        </ul>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={cats.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            <ul className="divide-y divide-border-muted">
+              {cats.map((c) => (
+                <CategoryRow key={c.id} cat={c} onAskDelete={setToDelete} />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
       )}
-      <AddCategory kind={kind} />
+      <AddCategory kind={kind} existing={cats} />
 
       <ConfirmDialog
         open={toDelete !== null}
         title={es.categories.deleteConfirmTitle}
         message={
-          toDelete?.isSystem
-            ? es.categories.hideConfirmMessage
-            : es.categories.deleteConfirmMessage
+          toDelete?.isSystem ? es.categories.hideConfirmMessage : es.categories.deleteConfirmMessage
         }
         confirmLabel={toDelete?.isSystem ? es.categories.hide : es.categories.delete}
         onConfirm={() => toDelete && del.mutate(toDelete.id)}

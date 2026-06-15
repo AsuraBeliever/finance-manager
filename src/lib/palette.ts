@@ -17,6 +17,28 @@ export const CHART_COLORS = [
   "#c084fc", // light violet
 ];
 
+// Distinct preset swatches offered for categories (and used to seed/auto-assign
+// a different default color per category). Superset of CHART_COLORS; the first
+// 11 match the seed categories' default colors in migration 0009 — keep in sync.
+export const CATEGORY_PALETTE = [
+  "#34d399", // emerald
+  "#f472b6", // pink
+  "#fbbf24", // amber
+  "#38bdf8", // sky
+  "#f97316", // orange
+  "#a855f7", // violet
+  "#22d3ee", // cyan
+  "#ec4899", // magenta
+  "#ef4444", // red
+  "#8b5cf6", // purple
+  "#94a3b8", // slate
+  "#10b981", // green
+  "#eab308", // yellow
+  "#3b82f6", // blue
+  "#fb7185", // rose
+  "#14b8a6", // teal
+];
+
 // Neutral fallback for an uncolored wallet/category dot.
 export const NEUTRAL_DOT = "#9a93b5";
 

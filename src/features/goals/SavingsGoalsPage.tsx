@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pencil, PiggyBank, Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
+import { ColorPicker } from "../../components/ColorPicker";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { Field, inputClass } from "../../components/Field";
@@ -238,19 +239,7 @@ function GoalFormModal({
           </Field>
         </div>
         <Field label={es.common.color ?? "Color"}>
-          <div className="flex flex-wrap gap-2">
-            {CHART_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={`h-7 w-7 rounded-full transition-transform ${
-                  color === c ? "scale-110 ring-2 ring-fg" : ""
-                }`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
+          <ColorPicker value={color} onChange={setColor} />
         </Field>
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">
