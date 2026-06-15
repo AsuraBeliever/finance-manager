@@ -7,7 +7,7 @@ import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
 import { PageHeader } from "../../components/PageHeader";
 import { ThemeToggle } from "../../components/ThemeToggle";
-import { listCurrencies, listWalletCategories } from "../../lib/api";
+import { listWalletCategories } from "../../lib/api";
 import {
   changePassword,
   listSessions,
@@ -172,7 +172,6 @@ function DevicesList() {
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
-  const currencies = useQuery({ queryKey: ["currencies"], queryFn: listCurrencies });
   const categories = useQuery({
     queryKey: ["walletCategories"],
     queryFn: listWalletCategories,
@@ -192,26 +191,6 @@ export function SettingsPage() {
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="font-medium">{es.theme.label}</h3>
           <ThemeToggle />
-        </section>
-
-        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
-          <h3 className="mb-1 font-medium">{es.settings.currencies}</h3>
-          <p className="mb-3 text-xs text-fg-subtle">{es.settings.currenciesHint}</p>
-          {currencies.isPending && (
-            <p className="text-sm text-fg-subtle">{es.common.loading}</p>
-          )}
-          {currencies.isError && (
-            <p className="text-sm text-danger">{String(currencies.error)}</p>
-          )}
-          <ul className="divide-y divide-border-muted">
-            {currencies.data?.map((c) => (
-              <li key={c.code} className="flex items-center gap-3 py-2 text-sm">
-                <span className="w-12 font-mono font-medium text-accent">{c.code}</span>
-                <span className="text-fg">{c.name}</span>
-                <span className="ml-auto text-fg-subtle">{c.symbol}</span>
-              </li>
-            ))}
-          </ul>
         </section>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
