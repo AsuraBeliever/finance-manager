@@ -4,7 +4,7 @@
 
 **Finanzas personales en la nube — carteras, transacciones e inversiones.**
 
-🌐 **[Abre la app → finanzas.asura.workers.dev](https://finanzas.asura.workers.dev)**
+🌐 **[Abre la app → finanzas.aseth.workers.dev](https://finanzas.aseth.workers.dev)**
 
 [English](README.md) · [**Español**](README.es.md)
 
@@ -21,7 +21,7 @@ dispositivo, y como app de escritorio nativa para Windows y Linux.
 
 ### En la web (cualquier dispositivo — recomendado)
 
-1. Abre **[finanzas.asura.workers.dev](https://finanzas.asura.workers.dev)** en Chrome, Edge u otro navegador Chromium.
+1. Abre **[finanzas.aseth.workers.dev](https://finanzas.aseth.workers.dev)** en Chrome, Edge u otro navegador Chromium.
 2. Pulsa **Instalar app** (en la barra de direcciones, o dentro de la app en *Ajustes → Instalar app*).
 3. En **iPhone/iPad** (Safari): toca **Compartir → Agregar a pantalla de inicio**.
 

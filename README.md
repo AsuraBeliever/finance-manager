@@ -4,7 +4,7 @@
 
 **Personal finance in the cloud — wallets, transactions & investments.**
 
-🌐 **[Open the app → finanzas.asura.workers.dev](https://finanzas.asura.workers.dev)**
+🌐 **[Open the app → finanzas.aseth.workers.dev](https://finanzas.aseth.workers.dev)**
 
 [**English**](README.md) · [Español](README.es.md)
 
@@ -21,7 +21,7 @@ a native desktop app for Windows and Linux.
 
 ### On the web (any device — recommended)
 
-1. Open **[finanzas.asura.workers.dev](https://finanzas.asura.workers.dev)** in Chrome, Edge or another Chromium browser.
+1. Open **[finanzas.aseth.workers.dev](https://finanzas.aseth.workers.dev)** in Chrome, Edge or another Chromium browser.
 2. Click **Install app** (in the address bar, or inside the app under *Settings → Install app*).
 3. On **iPhone/iPad** (Safari): tap **Share → Add to Home Screen**.
 

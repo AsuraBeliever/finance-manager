@@ -41,7 +41,7 @@ App de finanzas personales para gestionar carteras ilimitadas, transacciones e i
 - [x] **M2 — Auth**: registro con código de invitación (secret), PBKDF2-SHA256 vía SubtleCrypto, sesiones cookie HttpOnly (hash en DB, expiración deslizante), aislamiento por `user_id` verificado.
 - [x] **M3 — Mercado**: fetch de Banxico/open.er-api/BONDDIA/CoinGecko vía worker Fetch + cron trigger diario (07:00 UTC).
 - [x] **M4 — PWA**: api.ts → fetch RPC, login/registro, manifest + íconos + metas iOS, bottom-nav móvil, service worker (jamás cachea /api/*).
-- [x] **M5 — Deploy + migración**: https://finanzas.asura.workers.dev, datos locales migrados a D1 con checksums verificados (conteos y saldos al centavo); `finanzas.db` local conservada como respaldo de solo lectura.
+- [x] **M5 — Deploy + migración**: https://finanzas.aseth.workers.dev, datos locales migrados a D1 con checksums verificados (conteos y saldos al centavo); `finanzas.db` local conservada como respaldo de solo lectura.
 - [x] **M6 — Escritorio shell**: la ventana Tauri carga la URL desplegada; docs actualizadas; merge + tag v2.0.0.
 
 ### v2.1.0 — cuenta y offline (`feat/account-offline`)

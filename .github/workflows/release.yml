@@ -70,6 +70,6 @@ jobs:
             - **Linux (cualquier distro):** `.AppImage` — dale permiso de ejecución y ábrelo.
             - **Debian/Ubuntu/Mint:** `.deb` · **Fedora/openSUSE:** `.rpm`.
 
-            La app web está siempre en https://finanzas.asura.workers.dev
+            La app web está siempre en https://finanzas.aseth.workers.dev
           releaseDraft: false
           prerelease: false
