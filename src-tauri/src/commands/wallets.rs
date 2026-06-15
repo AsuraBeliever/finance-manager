@@ -29,6 +29,9 @@ fn wallet_from_row(r: &Row) -> rusqlite::Result<Wallet> {
         initial_balance_cents: r.get("initial_balance_cents")?,
         balance_cents: r.get("balance_cents")?,
         color: r.get("color")?,
+        // Card skins are a cloud-only feature; the legacy local DB has no such
+        // column. This desktop path is dead (the shell loads the web app).
+        skin: None,
         notes: r.get("notes")?,
         is_archived: r.get::<_, i64>("is_archived")? != 0,
         created_at: r.get("created_at")?,
