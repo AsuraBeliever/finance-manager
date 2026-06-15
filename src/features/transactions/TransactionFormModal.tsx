@@ -4,9 +4,10 @@ import { Button } from "../../components/Button";
 import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
 import { Modal } from "../../components/Modal";
-import { listTransactionCategories, listWallets } from "../../lib/api";
+import { listTransactionCategories, listWallets, updateTransaction } from "../../lib/api";
 import { submitOrQueue } from "../../lib/outbox";
 import { parseToCents } from "../../lib/money";
+import type { Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
 
 type Tab = "income" | "expense" | "transfer";
@@ -26,13 +27,18 @@ interface TransactionFormModalProps {
   onClose: () => void;
   /** Preselected wallet (e.g. when opened from a wallet detail page). */
   defaultWalletId?: number;
+  /** When set, the modal edits this transaction instead of creating one.
+   *  Only income/expense are editable (transfers are delete + recreate). */
+  transaction?: Transaction;
 }
 
 export function TransactionFormModal({
   open,
   onClose,
   defaultWalletId,
+  transaction,
 }: TransactionFormModalProps) {
+  const isEdit = transaction !== undefined;
   const queryClient = useQueryClient();
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
   const categories = useQuery({
@@ -52,16 +58,26 @@ export function TransactionFormModal({
 
   useEffect(() => {
     if (!open) return;
-    setTab("income");
-    setWalletId(defaultWalletId ?? null);
-    setToWalletId(null);
-    setAmountText("");
-    setAmountToText("");
-    setCategoryId(null);
-    setDescription("");
-    setDate(today());
     setError(null);
-  }, [open, defaultWalletId]);
+    setToWalletId(null);
+    setAmountToText("");
+    if (transaction) {
+      // Edit mode: prefill from the existing income/expense.
+      setTab(transaction.kind === "expense" ? "expense" : "income");
+      setWalletId(transaction.walletId);
+      setAmountText((transaction.amountCents / 100).toFixed(2));
+      setCategoryId(transaction.categoryId);
+      setDescription(transaction.description ?? "");
+      setDate(transaction.occurredAt);
+    } else {
+      setTab("income");
+      setWalletId(defaultWalletId ?? null);
+      setAmountText("");
+      setCategoryId(null);
+      setDescription("");
+      setDate(today());
+    }
+  }, [open, defaultWalletId, transaction]);
 
   const walletList = wallets.data ?? [];
   const fromWallet = walletList.find((w) => w.id === (walletId ?? walletList[0]?.id));
@@ -87,6 +103,8 @@ export function TransactionFormModal({
         description: description.trim() === "" ? null : description.trim(),
         occurredAt: date,
       };
+      // Edits go straight to the server (online-only, like delete); no outbox.
+      if (transaction) return updateTransaction(transaction.id, common);
       // Captures go through the offline outbox: sent right away when online,
       // queued (and replayed idempotently) when there is no connection.
       if (tab === "income") return submitOrQueue("add_income", common);
@@ -116,27 +134,33 @@ export function TransactionFormModal({
   });
 
   return (
-    <Modal title={es.transactions.newTransaction} open={open} onClose={onClose}>
-      <div className="mb-4 flex rounded-lg bg-surface p-1">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => {
-              setTab(t.id);
-              setCategoryId(null);
-              setError(null);
-            }}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors ${
-              tab === t.id
-                ? "bg-surface-overlay font-medium text-fg"
-                : "text-fg-subtle hover:text-fg"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <Modal
+      title={isEdit ? es.transactions.editTransaction : es.transactions.newTransaction}
+      open={open}
+      onClose={onClose}
+    >
+      {!isEdit && (
+        <div className="mb-4 flex rounded-lg bg-surface p-1">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                setTab(t.id);
+                setCategoryId(null);
+                setError(null);
+              }}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                tab === t.id
+                  ? "bg-surface-overlay font-medium text-fg"
+                  : "text-fg-subtle hover:text-fg"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form
         onSubmit={(e) => {

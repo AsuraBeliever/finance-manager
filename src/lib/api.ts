@@ -149,6 +149,10 @@ export const addTransfer = (input: TransferInput) =>
 export const listTransactions = (filter: TxFilter = {}) =>
   rpc<Transaction[]>("list_transactions", { filter });
 
+/** Edit an income/expense transaction. Transfers aren't editable (delete + recreate). */
+export const updateTransaction = (id: number, input: SimpleTxInput) =>
+  rpc<void>("update_transaction", { id, ...input });
+
 export const deleteTransaction = (id: number) =>
   rpc<void>("delete_transaction", { id });
 

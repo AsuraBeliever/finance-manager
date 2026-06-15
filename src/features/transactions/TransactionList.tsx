@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { deleteTransaction } from "../../lib/api";
@@ -22,12 +22,15 @@ interface TransactionListProps {
   /** Currency for amounts; falls back to MXN per row if not provided. */
   currencyByWallet?: Map<number, string>;
   showWallet?: boolean;
+  /** When provided, income/expense rows get an edit button (transfers don't). */
+  onEdit?: (t: Transaction) => void;
 }
 
 export function TransactionList({
   transactions,
   currencyByWallet,
   showWallet = true,
+  onEdit,
 }: TransactionListProps) {
   const queryClient = useQueryClient();
   const [toDelete, setToDelete] = useState<number | null>(null);
@@ -76,6 +79,15 @@ export function TransactionList({
               {meta.sign}
               {formatCents(t.amountCents, currency)}
             </span>
+            {onEdit && (t.kind === "income" || t.kind === "expense") && (
+              <button
+                onClick={() => onEdit(t)}
+                aria-label={es.common.edit}
+                className="rounded-md p-1.5 text-fg-subtle opacity-0 transition-all hover:bg-surface-overlay hover:text-fg group-hover:opacity-100"
+              >
+                <Pencil size={15} />
+              </button>
+            )}
             <button
               onClick={() => setToDelete(t.id)}
               aria-label={es.common.delete}

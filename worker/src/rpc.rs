@@ -84,6 +84,7 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "add_expense" => out(transactions::add_expense(db, uid, args(body)?).await?),
         "add_transfer" => out(transactions::add_transfer(db, uid, args(body)?).await?),
         "list_transactions" => out(transactions::list_transactions(db, uid, args(body)?).await?),
+        "update_transaction" => out(transactions::update_transaction(db, uid, args(body)?).await?),
         "delete_transaction" => out(transactions::delete_transaction(db, uid, args(body)?).await?),
         "list_transaction_categories" => {
             out(transactions::list_transaction_categories(db, uid).await?)

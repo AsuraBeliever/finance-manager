@@ -6,7 +6,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { inputClass } from "../../components/Field";
 import { listTransactions, listWallets, type TxFilter } from "../../lib/api";
-import type { TransactionKind } from "../../lib/types";
+import type { Transaction, TransactionKind } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { TransactionFormModal } from "./TransactionFormModal";
 import { TransactionList } from "./TransactionList";
@@ -14,6 +14,7 @@ import { OutboxPanel } from "./OutboxPanel";
 
 export function TransactionsPage() {
   const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Transaction | null>(null);
   const [walletId, setWalletId] = useState<number | "">("");
   const [kind, setKind] = useState<TransactionKind | "">("");
 
@@ -95,11 +96,19 @@ export function TransactionsPage() {
           <TransactionList
             transactions={transactions.data}
             currencyByWallet={currencyByWallet}
+            onEdit={setEditing}
           />
         )
       )}
 
-      <TransactionFormModal open={formOpen} onClose={() => setFormOpen(false)} />
+      <TransactionFormModal
+        open={formOpen || editing !== null}
+        transaction={editing ?? undefined}
+        onClose={() => {
+          setFormOpen(false);
+          setEditing(null);
+        }}
+      />
     </>
   );
 }

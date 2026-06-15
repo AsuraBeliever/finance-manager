@@ -192,6 +192,7 @@ export const es = {
   transactions: {
     title: "Transacciones",
     newTransaction: "Nueva transacción",
+    editTransaction: "Editar transacción",
     income: "Ingreso",
     expense: "Gasto",
     transfer: "Transferencia",

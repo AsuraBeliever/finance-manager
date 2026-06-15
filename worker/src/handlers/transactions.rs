@@ -215,6 +215,65 @@ pub async fn delete_transaction(db: &D1Database, uid: i64, a: IdArgs) -> AppResu
     }
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateTxArgs {
+    pub id: i64,
+    pub wallet_id: i64,
+    pub amount_cents: i64,
+    pub category_id: Option<i64>,
+    pub description: Option<String>,
+    pub occurred_at: String,
+}
+
+/// Edits an income/expense transaction (amount, wallet, category, note, date).
+/// Transfers aren't editable here — they're two linked legs; delete & recreate.
+pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> AppResult<()> {
+    validate_amount(a.amount_cents)?;
+    validate_date(&a.occurred_at)?;
+    wallet_exists(db, uid, a.wallet_id).await?;
+
+    #[derive(Deserialize)]
+    struct KindRow {
+        kind: String,
+        transfer_group_id: Option<String>,
+    }
+    // Confirm ownership (JOIN wallets) and that it's a plain income/expense.
+    let row: Option<KindRow> = first(
+        db,
+        "SELECT t.kind, t.transfer_group_id FROM transactions t
+         JOIN wallets w ON w.id = t.wallet_id AND w.user_id = ?2
+         WHERE t.id = ?1",
+        jsv![a.id, uid],
+    )
+    .await?;
+    let row = row.ok_or(AppError::NotFound("transacción"))?;
+    if row.transfer_group_id.is_some() || (row.kind != "income" && row.kind != "expense") {
+        return Err(AppError::InvalidInput(
+            "las transferencias no se pueden editar; elimínala y créala de nuevo".into(),
+        ));
+    }
+    let res = exec(
+        db,
+        "UPDATE transactions
+         SET wallet_id = ?2, amount_cents = ?3, category_id = ?4, description = ?5, occurred_at = ?6
+         WHERE id = ?1",
+        jsv![
+            a.id,
+            a.wallet_id,
+            a.amount_cents,
+            a.category_id,
+            a.description,
+            a.occurred_at
+        ],
+    )
+    .await?;
+    if changes(&res) == 0 {
+        return Err(AppError::NotFound("transacción"));
+    }
+    Ok(())
+}
+
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TxFilter {
