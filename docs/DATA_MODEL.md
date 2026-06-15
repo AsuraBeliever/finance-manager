@@ -239,3 +239,5 @@ CREATE TABLE subscriptions (     -- pagos recurrentes; "registrar pago" inserta 
 
 - **budgets.spent** nunca se almacena: se calcula al leer (gasto del mes en MXN, general o por categoría).
 - **subscriptions** total mensual = suma de activas normalizadas a mes (anual/12) en MXN.
+
+- **wallets.skin** (migración 0006): estilo de tarjeta — id de catálogo, `grad:<from>,<to>,<angle>` o `img:<data-url>`; NULL = derivado del color.

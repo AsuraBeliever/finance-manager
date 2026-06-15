@@ -86,6 +86,7 @@ export interface WalletInput {
   currencyCode: string;
   initialBalanceCents: number;
   color: string | null;
+  skin: string | null;
   notes: string | null;
 }
 

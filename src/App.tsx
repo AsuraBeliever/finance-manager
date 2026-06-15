@@ -20,7 +20,6 @@ import { useOnline } from "./lib/online";
 import { flush } from "./lib/outbox";
 import { LoginPage } from "./features/auth/LoginPage";
 import { UpdateBanner } from "./features/update/UpdateBanner";
-import { ThemeToggle } from "./components/ThemeToggle";
 import { hydrateThemeFromServer } from "./lib/theme";
 
 const navItems = [
@@ -121,7 +120,7 @@ export default function App() {
       )}
       <div className="flex min-h-0 flex-1">
         {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border-muted bg-surface-raised/70 md:flex">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-border-muted bg-surface md:flex">
         <div className="flex items-center gap-2.5 px-5 py-6">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dim text-white shadow-[0_4px_12px_-4px_rgba(22,164,122,0.7)]">
             <TrendingUp size={18} />
@@ -185,10 +184,7 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto flex flex-col gap-2 px-3 pb-4">
-          <div className="px-1">
-            <ThemeToggle />
-          </div>
+        <div className="mt-auto px-3 pb-4">
           <button
             onClick={doLogout}
             title={es.auth.logout}

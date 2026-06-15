@@ -86,7 +86,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-muted bg-surface-overlay p-3 shadow-2xl">
+        <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-muted bg-surface-overlay p-3 shadow-2xl">
           {mode === "months" ? (
             <>
               <div className="mb-3 flex items-center justify-center gap-2">

@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
-/* ── Design system ──────────────────────────────────────────────────────
-   Two themes share one set of semantic tokens. Tailwind utilities reference
-   the @theme tokens, which in turn resolve to per-theme CSS variables (--c-*)
-   swapped at runtime via [data-theme] on <html>. Opacity modifiers
-   (bg-accent/10) still work: Tailwind emits color-mix() around the var().
+/* ── Design system — "neon glass" ───────────────────────────────────────
+   Anime-pop palette (violet · pink · cyan) on a soft gradient-mesh canvas,
+   with translucent frosted-glass cards. One token set, two themes, swapped at
+   runtime via [data-theme] on <html>. Utilities reference the @theme tokens,
+   which resolve to per-theme CSS variables (--c-*); opacity modifiers
+   (bg-accent/10) still work via color-mix().
 
-   - dark  = editorial / private-banking: warm charcoal, jade + champagne gold.
-   - light = the dashboard references: lavender-white, violet primary.
-   Money stays tabular and lining; display type is Fraunces, UI is Hanken. */
+   - dark  = deep indigo glass, neon violet/cyan glow.
+   - light = lavender-white glass, vivid violet/cyan.
+   Display type is Sora (geometric, modern); UI is Hanken Grotesk. */
 @theme {
   --color-surface: var(--c-surface);
   --color-surface-raised: var(--c-surface-raised);
@@ -18,75 +19,74 @@
   --color-accent: var(--c-accent);
   --color-accent-dim: var(--c-accent-dim);
   --color-accent-bright: var(--c-accent-bright);
-  --color-gold: var(--c-gold);
+  --color-gold: var(--c-gold); /* repurposed as the cyan "pop" secondary */
   --color-danger: var(--c-danger);
 
-  /* semantic text ramp (primary / secondary / tertiary) */
   --color-fg: var(--c-fg);
   --color-fg-muted: var(--c-fg-muted);
   --color-fg-subtle: var(--c-fg-subtle);
 
   --font-sans: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-display: "Sora", "Hanken Grotesk", system-ui, sans-serif;
 
   --shadow-card: var(--c-shadow-card);
 }
 
-/* ── Dark (default): editorial jade + gold on warm charcoal ─────────────── */
+/* ── Dark: deep indigo glass, neon violet + cyan ───────────────────────── */
 :root,
 [data-theme="dark"] {
-  --c-surface: #141210;
-  --c-surface-raised: #1c1915;
-  --c-surface-overlay: #262019;
-  --c-border-muted: #342e24;
+  --c-surface: #0b0a16;
+  --c-surface-raised: rgba(26, 23, 48, 0.6);
+  --c-surface-overlay: #1b1830;
+  --c-border-muted: rgba(255, 255, 255, 0.1);
 
-  --c-accent: #16a47a;
-  --c-accent-dim: #0e7d5b;
-  --c-accent-bright: #25c290;
-  --c-gold: #d9b45c;
-  --c-danger: #f0786b;
+  --c-accent: #a855f7;
+  --c-accent-dim: #7c3aed;
+  --c-accent-bright: #c084fc;
+  --c-gold: #22d3ee;
+  --c-danger: #fb7185;
 
-  --c-fg: #f5f1ea;
-  --c-fg-muted: #a8a29e;
-  --c-fg-subtle: #78716c;
+  --c-fg: #f2efff;
+  --c-fg-muted: #a8a2c8;
+  --c-fg-subtle: #6f6a8d;
 
-  --c-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 12px 32px -16px rgba(0, 0, 0, 0.7);
+  --c-shadow-card: 0 8px 36px -16px rgba(124, 58, 237, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 
-  /* atmosphere */
-  --grain-opacity: 0.035;
-  --glow-1: rgba(22, 164, 122, 0.1);
-  --glow-2: rgba(217, 180, 92, 0.05);
-  --hero-gradient: linear-gradient(176deg, #efd896 4%, #d9b45c 46%, #bb8f3a 100%);
+  --mesh-1: rgba(168, 85, 247, 0.22);
+  --mesh-2: rgba(236, 72, 153, 0.14);
+  --mesh-3: rgba(34, 211, 238, 0.14);
+  --hero-gradient: linear-gradient(110deg, #c084fc 0%, #f472b6 45%, #22d3ee 100%);
+  --hero-glow: 0 0 38px rgba(192, 132, 252, 0.45);
 
   color-scheme: dark;
 }
 
-/* ── Light: violet primary on lavender-white (the reference dashboards) ─── */
+/* ── Light: lavender-white glass, vivid violet + cyan ──────────────────── */
 [data-theme="light"] {
-  --c-surface: #f4f4f8;
-  --c-surface-raised: #ffffff;
-  --c-surface-overlay: #eceaf4;
-  --c-border-muted: #e6e4ef;
+  --c-surface: #f4f2ff;
+  --c-surface-raised: rgba(255, 255, 255, 0.66);
+  --c-surface-overlay: #ece9fb;
+  --c-border-muted: rgba(124, 58, 237, 0.16);
 
-  --c-accent: #7c5cff;
-  --c-accent-dim: #6a45e6;
-  --c-accent-bright: #9277ff;
-  --c-gold: #f0a830; /* warm secondary accent (kept distinct from violet) */
+  --c-accent: #8b5cf6;
+  --c-accent-dim: #7c3aed;
+  --c-accent-bright: #a78bfa;
+  --c-gold: #06b6d4;
   --c-danger: #e5484d;
 
-  --c-fg: #211d35;
-  --c-fg-muted: #6b6880;
-  --c-fg-subtle: #9b98ab;
+  --c-fg: #211a3a;
+  --c-fg-muted: #6b6488;
+  --c-fg-subtle: #9a93b5;
 
-  --c-shadow-card: 0 1px 2px rgba(20, 14, 50, 0.04),
-    0 14px 30px -16px rgba(80, 60, 160, 0.2);
+  --c-shadow-card: 0 10px 34px -16px rgba(124, 58, 237, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
 
-  /* lighter atmosphere: no grain, a faint violet bloom only */
-  --grain-opacity: 0;
-  --glow-1: rgba(124, 92, 255, 0.1);
-  --glow-2: rgba(124, 92, 255, 0.04);
-  --hero-gradient: linear-gradient(176deg, #9277ff 0%, #6a45e6 100%);
+  --mesh-1: rgba(139, 92, 246, 0.2);
+  --mesh-2: rgba(236, 72, 153, 0.12);
+  --mesh-3: rgba(6, 182, 212, 0.12);
+  --hero-gradient: linear-gradient(110deg, #8b5cf6 0%, #ec4899 50%, #06b6d4 100%);
+  --hero-glow: 0 0 26px rgba(139, 92, 246, 0.28);
 
   color-scheme: light;
 }
@@ -99,32 +99,33 @@ body,
 
 body {
   @apply bg-surface text-fg antialiased;
-  font-feature-settings: "ss01", "cv05";
+  font-feature-settings: "ss01";
   user-select: none;
 }
 
-/* Atmosphere: a theme-tuned radial glow + (dark only) faint film grain, both
-   behind content and inert to pointer events. */
+/* Simple gradient-mesh canvas: three soft color blobs that drift slowly.
+   Sits behind everything and is inert to pointer events; gives the frosted
+   cards something to blur. */
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
+  inset: -20%;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(80rem 50rem at 12% -10%, var(--glow-1), transparent 60%),
-    radial-gradient(60rem 40rem at 100% 0%, var(--glow-2), transparent 55%);
+    radial-gradient(38rem 38rem at 18% 12%, var(--mesh-1), transparent 60%),
+    radial-gradient(34rem 34rem at 85% 8%, var(--mesh-3), transparent 60%),
+    radial-gradient(40rem 40rem at 75% 88%, var(--mesh-2), transparent 62%);
+  animation: mesh-drift 26s ease-in-out infinite alternate;
 }
 
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: var(--grain-opacity);
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+@keyframes mesh-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-3%, 2%, 0) scale(1.08);
+  }
 }
 
 #root {
@@ -132,19 +133,55 @@ body::after {
   z-index: 1;
 }
 
-/* Display type: enable optical sizing so Fraunces sets larger at hero scale. */
+/* Frosted glass: every raised surface (cards, modals, nav) gets a backdrop
+   blur, whatever its opacity modifier. Targets the class substring so
+   bg-surface-raised/70 etc. are covered too. */
+[class*="bg-surface-raised"] {
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* Card entrance: a gentle rise-in on mount (disabled for reduced-motion). */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .animate-rise {
+    animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  /* Stagger direct children (e.g. the dashboard widget grid). */
+  .stagger > * {
+    animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .stagger > *:nth-child(2) { animation-delay: 0.05s; }
+  .stagger > *:nth-child(3) { animation-delay: 0.1s; }
+  .stagger > *:nth-child(4) { animation-delay: 0.15s; }
+  .stagger > *:nth-child(5) { animation-delay: 0.2s; }
+  .stagger > *:nth-child(6) { animation-delay: 0.25s; }
+  .stagger > *:nth-child(7) { animation-delay: 0.3s; }
+  .stagger > *:nth-child(n + 8) { animation-delay: 0.35s; }
+}
+
+/* Display type. */
 .font-display {
   font-optical-sizing: auto;
 }
 
-/* Hero figures: a per-theme gradient painted on the glyphs (gold in dark,
-   violet in light). */
+/* Hero figures: a vibrant violet→pink→cyan gradient on the glyphs + glow. */
 .text-gold-gradient {
   background: var(--hero-gradient);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
+  filter: drop-shadow(var(--hero-glow));
 }
 
 /* Editorial eyebrow: small, spaced, uppercase label above a value. */
@@ -158,7 +195,7 @@ textarea {
 }
 
 /* WebKitGTK ignores dark backgrounds on native selects: drop the native
-   appearance and draw our own chevron (uses currentColor so it tracks theme). */
+   appearance and draw our own chevron. */
 select {
   appearance: none;
   -webkit-appearance: none;
@@ -174,7 +211,7 @@ select option {
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--c-accent) 35%, transparent);
+  background: color-mix(in oklab, var(--c-accent) 40%, transparent);
 }
 
 * {

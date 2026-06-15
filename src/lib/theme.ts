@@ -9,7 +9,7 @@ export type ThemePref = "light" | "dark" | "system";
 type Resolved = "light" | "dark";
 
 const KEY = "finanzas.theme";
-const THEME_COLOR = { dark: "#141210", light: "#f4f4f8" } as const;
+const THEME_COLOR = { dark: "#0b0a16", light: "#f4f2ff" } as const;
 const listeners = new Set<() => void>();
 const mql = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -43,16 +43,19 @@ export function setThemePref(pref: ThemePref) {
   setSetting("theme", pref).catch(() => {});
 }
 
-/** On login, adopt the account's saved theme if it differs from the local one. */
+/** On first login on a device with no local preference yet, seed the theme
+ *  from the account. If the device already has an explicit choice, that wins —
+ *  never override it (doing so caused a visible flip on every load). */
 export async function hydrateThemeFromServer(): Promise<void> {
+  if (localStorage.getItem(KEY)) return; // device already has an explicit pref
   try {
     const remote = await getSetting("theme");
-    if (isPref(remote) && remote !== getThemePref()) {
+    if (isPref(remote)) {
       localStorage.setItem(KEY, remote);
       apply(remote);
     }
   } catch {
-    /* offline or unauthenticated: keep the local preference */
+    /* offline or unauthenticated: keep the system default */
   }
 }
 
