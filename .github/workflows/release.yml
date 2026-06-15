@@ -1,0 +1,75 @@
+name: Release desktop apps
+
+# Build the Tauri desktop shell for Windows and Linux and attach the installers
+# to a GitHub Release whenever a version tag is pushed. The desktop app is a thin
+# native window that loads the deployed PWA, so these installers rarely change —
+# they only need a rebuild when src-tauri/ changes or to cut a fresh download.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: # allow building installers on demand from the Actions tab
+
+jobs:
+  build:
+    permissions:
+      contents: write # create the release and upload the installers
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux: builds .AppImage (runs on any distro), .deb and .rpm.
+          # 22.04 keeps the AppImage's glibc baseline broad.
+          - platform: ubuntu-22.04
+          # Windows: builds .msi and .exe (NSIS) installers.
+          - platform: windows-latest
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          # The desktop app is a workspace member; cargo builds into /target.
+          workspaces: ". -> target"
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            librsvg2-dev \
+            libayatana-appindicator3-dev \
+            patchelf
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build and publish installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Finanzas ${{ github.ref_name }}"
+          releaseBody: |
+            Instaladores de la app de escritorio de Finanzas / Finanzas desktop app installers.
+
+            - **Windows:** descarga el `.msi` (o `.exe`).
+            - **Linux (cualquier distro):** `.AppImage` — dale permiso de ejecución y ábrelo.
+            - **Debian/Ubuntu/Mint:** `.deb` · **Fedora/openSUSE:** `.rpm`.
+
+            La app web está siempre en https://finanzas.asura.workers.dev
+          releaseDraft: false
+          prerelease: false
