@@ -1,6 +1,6 @@
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { es } from "../../i18n/es";
 
 // Re-check for a new deployment hourly and whenever the window regains focus,
@@ -32,12 +32,14 @@ async function deployedBuildId(): Promise<string | null> {
  *     this bundle against the deployed version.json and, when they differ,
  *     offer a hard reload. Runs independently of SW registration. */
 export function UpdateBanner() {
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_url, registration) {
       if (!registration) return;
+      registrationRef.current = registration;
       const check = () => {
         if (navigator.onLine) registration.update();
       };
@@ -72,12 +74,38 @@ export function UpdateBanner() {
 
   if (!needRefresh && !remoteStale) return null;
 
-  const apply = () => {
-    // A waiting SW (web/iPhone) must be activated to swap the cached shell; a
-    // plain reload there would re-serve the old precached assets. The desktop
-    // shell has no controlling SW, so a hard reload fetches the new build.
-    if (needRefresh) updateServiceWorker(true);
-    else window.location.reload();
+  const apply = async () => {
+    // What matters is whether a service worker controls this page, not which
+    // detector fired: the version.json poll often flips `remoteStale` before
+    // the SW reaches its waiting state, so keying off `needRefresh` here would
+    // wrongly take the plain-reload branch on web/iPhone — and a reload there
+    // just re-serves the old precached shell, leaving the banner stuck.
+    const registration = registrationRef.current;
+    if (!navigator.serviceWorker?.controller || !registration) {
+      // Desktop shell (WebKitGTK): no controlling SW, so a hard reload fetches
+      // the freshly deployed build directly.
+      window.location.reload();
+      return;
+    }
+
+    // Web / installed PWA: activate the new worker so it swaps the precached
+    // shell, then reload (updateServiceWorker(true) handles the controllerchange
+    // reload). If the new worker hasn't reached `waiting` yet, kick an update
+    // and wait for it before skipping it.
+    if (registration.waiting) {
+      updateServiceWorker(true);
+      return;
+    }
+    registration.addEventListener("updatefound", () => {
+      const installing = registration.installing;
+      installing?.addEventListener("statechange", () => {
+        if (installing.state === "installed" && registration.waiting) {
+          updateServiceWorker(true);
+        }
+      });
+    });
+    await registration.update();
+    if (registration.waiting) updateServiceWorker(true);
   };
 
   return (
