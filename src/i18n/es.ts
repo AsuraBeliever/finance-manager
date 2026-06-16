@@ -195,6 +195,9 @@ export const esDict = {
       "En iPhone o iPad: toca el botón Compartir y luego «Agregar a pantalla de inicio».",
     manualHint:
       "Si no aparece el botón, abre el menú de tu navegador y elige «Instalar app» o «Agregar a pantalla de inicio».",
+    downloadWindows: "Descargar para Windows",
+    downloadLinux: "Descargar para Linux",
+    otherFormats: "Otras opciones de Linux (.deb, .rpm)…",
   },
   categories: {
     title: "Categorías",

@@ -192,6 +192,9 @@ export const en: Dict = {
     iosHint: "On iPhone or iPad: tap the Share button, then “Add to Home Screen”.",
     manualHint:
       "If you don't see the button, open your browser menu and choose “Install app” or “Add to Home Screen”.",
+    downloadWindows: "Download for Windows",
+    downloadLinux: "Download for Linux",
+    otherFormats: "Other Linux options (.deb, .rpm)…",
   },
   categories: {
     title: "Categories",
