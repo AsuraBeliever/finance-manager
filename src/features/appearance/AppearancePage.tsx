@@ -77,6 +77,16 @@ export function AppearancePage() {
         {/* Colors */}
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-4 font-medium">{es.appearance.colors}</h3>
+          {/* Live preview: accent → secondary, like the net-worth headline. */}
+          <div className="mb-5 flex flex-wrap items-center gap-4 rounded-lg bg-surface p-4">
+            <span className="text-gold-gradient font-display text-3xl font-semibold tabular-nums">
+              $12,345.00
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-sm text-fg-muted">
+              <span className="h-3 w-3 rounded-full bg-accent" /> {es.appearance.accent}
+              <span className="ml-3 h-3 w-3 rounded-full bg-gold" /> {es.appearance.secondary}
+            </span>
+          </div>
           <div className="flex flex-col gap-4">
             <Field label={es.appearance.accent}>
               <ColorPicker
