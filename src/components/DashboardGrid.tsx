@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -73,20 +73,29 @@ export function DashboardGrid({
   const { width, containerRef } = useContainerWidth();
   const base = useMemo(() => defaultLayout(items), [items]);
 
-  // Source of truth: the per-user setting. We hold a local copy once loaded.
+  const queryClient = useQueryClient();
+  // Source of truth: the per-user setting. Refetch on mount so a change made on
+  // another device is picked up; the persisted cache gives an instant first paint.
   const saved = useQuery({
     queryKey: ["dashboardLayout"],
     queryFn: () => getSetting(SETTING_KEY),
-    staleTime: Infinity,
-  });
-  const persist = useMutation({
-    mutationFn: (layouts: ResponsiveLayouts) => setSetting(SETTING_KEY, JSON.stringify(layouts)),
+    staleTime: 0,
   });
 
   const [layouts, setLayouts] = useState<ResponsiveLayouts | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const baseRef = useRef(base);
   baseRef.current = base;
+
+  // Save: keep the query cache in sync immediately (so a reload reads the new
+  // layout from cache, not the stale previous value) and write to the server
+  // debounced (once per gesture).
+  const save = useRef((next: ResponsiveLayouts) => {
+    const serialized = JSON.stringify(next);
+    queryClient.setQueryData(["dashboardLayout"], serialized);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => setSetting(SETTING_KEY, serialized), 600);
+  });
 
   // Initialize from the server value the first time it resolves.
   if (layouts === null && saved.isSuccess) {
@@ -99,15 +108,12 @@ export function DashboardGrid({
     if (resetSignal === firstReset.current) return;
     const reset = { lg: baseRef.current };
     setLayouts(reset);
-    persist.mutate(reset);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    save.current(reset);
   }, [resetSignal]);
 
   const onLayoutChange = (_current: Layout, all: ResponsiveLayouts) => {
     setLayouts(all);
-    // Debounce the server write so a drag/resize gesture saves once.
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => persist.mutate(all), 600);
+    save.current(all);
   };
 
   if (layouts === null) {
