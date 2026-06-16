@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es as dateLocaleEs } from "date-fns/locale";
-import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Smartphone, Tags } from "lucide-react";
+import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Tags } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { InstallButton } from "../../components/InstallButton";
@@ -220,6 +220,21 @@ export function SettingsPage() {
               </button>
             ))}
           </div>
+        </section>
+
+        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="mb-1 flex items-center gap-2 font-medium">
+            <Palette size={16} className="text-fg-subtle" />
+            {es.appearance.title}
+          </h3>
+          <p className="mb-3 text-xs text-fg-subtle">{es.appearance.settingsHint}</p>
+          <Link
+            to="/apariencia"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
+          >
+            {es.appearance.manage}
+            <ChevronRight size={15} />
+          </Link>
         </section>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">

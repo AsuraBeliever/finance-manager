@@ -38,6 +38,20 @@
           if (meta) meta.setAttribute("content", dark ? "#0b0a16" : "#f4f2ff");
         } catch (e) {}
       })();
+      // Apply the saved accent/secondary colors before first paint (no flash).
+      // Mirrors src/lib/appearance.ts; fonts are applied by the bundle.
+      (function () {
+        try {
+          var a = JSON.parse(localStorage.getItem("finanzas.appearance") || "{}");
+          var r = document.documentElement;
+          if (a.accent) {
+            r.style.setProperty("--c-accent", a.accent);
+            r.style.setProperty("--c-accent-dim", "color-mix(in oklab, " + a.accent + " 78%, #000)");
+            r.style.setProperty("--c-accent-bright", "color-mix(in oklab, " + a.accent + " 72%, #fff)");
+          }
+          if (a.gold) r.style.setProperty("--c-gold", a.gold);
+        } catch (e) {}
+      })();
     </script>
   </head>
 

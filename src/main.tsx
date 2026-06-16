@@ -16,8 +16,13 @@ import { SavingsGoalsPage } from "./features/goals/SavingsGoalsPage";
 import { BudgetsPage } from "./features/budgets/BudgetsPage";
 import { SubscriptionsPage } from "./features/subscriptions/SubscriptionsPage";
 import { CategoriesPage } from "./features/categories/CategoriesPage";
+import { AppearancePage } from "./features/appearance/AppearancePage";
 import { useLocale } from "./i18n/store";
+import { applyAppearance, getAppearance } from "./lib/appearance";
 import "./index.css";
+
+// Apply saved appearance (fonts; colors already pre-painted in index.html).
+applyAppearance(getAppearance());
 
 // Offline reads: the query cache persists to localStorage so the PWA shows
 // the last-synced data without a network (with a visible offline banner —
@@ -55,6 +60,7 @@ const router = createHashRouter([
       { path: "presupuestos", element: <BudgetsPage /> },
       { path: "suscripciones", element: <SubscriptionsPage /> },
       { path: "categorias", element: <CategoriesPage /> },
+      { path: "apariencia", element: <AppearancePage /> },
       { path: "ajustes", element: <SettingsPage /> },
     ],
   },

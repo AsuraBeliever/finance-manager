@@ -21,10 +21,13 @@ import { flush } from "./lib/outbox";
 import { LoginPage } from "./features/auth/LoginPage";
 import { UpdateBanner } from "./features/update/UpdateBanner";
 import { hydrateThemeFromServer } from "./lib/theme";
+import { hydrateAppearanceFromServer, useAppearance, ICONS } from "./lib/appearance";
 
 export default function App() {
   const queryClient = useQueryClient();
   const online = useOnline();
+  const appearance = useAppearance();
+  const BrandIcon = ICONS[appearance.icon] ?? ICONS["trending-up"];
 
   const navItems = [
     { to: "/", label: es.nav.dashboard, icon: LayoutDashboard, end: true },
@@ -59,7 +62,10 @@ export default function App() {
   // On login, adopt the theme saved on the account (local preference wins if
   // the call fails — offline or no server-side value yet).
   useEffect(() => {
-    if (user) hydrateThemeFromServer();
+    if (user) {
+      hydrateThemeFromServer();
+      hydrateAppearanceFromServer();
+    }
   }, [user?.id]);
 
   // Any 401 from the API (expired session) drops back to the login screen.
@@ -121,11 +127,19 @@ export default function App() {
         {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-border-muted bg-surface md:flex">
         <div className="flex items-center gap-2.5 px-5 py-6">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dim text-white shadow-[0_4px_12px_-4px_rgba(22,164,122,0.7)]">
-            <TrendingUp size={18} />
-          </span>
-          <h1 className="font-display text-xl font-semibold tracking-tight text-fg">
-            {es.app.name}
+          {appearance.logo ? (
+            <img
+              src={appearance.logo}
+              alt=""
+              className="h-9 w-9 shrink-0 rounded-xl object-cover"
+            />
+          ) : (
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-dim text-white shadow-[0_4px_12px_-4px_rgba(22,164,122,0.7)]">
+              <BrandIcon size={18} />
+            </span>
+          )}
+          <h1 className="truncate font-display text-xl font-semibold tracking-tight text-fg">
+            {appearance.appName || es.app.name}
           </h1>
         </div>
         <nav className="flex flex-col gap-0.5 px-3">
