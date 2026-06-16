@@ -100,6 +100,13 @@ export function AppearancePage() {
                 onChange={(c) => setAppearance({ gold: c })}
               />
             </Field>
+            <Field label={es.appearance.background}>
+              <ColorPicker
+                value={a.surface}
+                onChange={(c) => setAppearance({ surface: c })}
+              />
+              <p className="mt-1.5 text-xs text-fg-subtle">{es.appearance.backgroundHint}</p>
+            </Field>
           </div>
         </section>
 

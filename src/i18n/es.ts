@@ -31,6 +31,8 @@ export const esDict = {
     colors: "Colores",
     accent: "Color de acento",
     secondary: "Color secundario",
+    background: "Color de fondo",
+    backgroundHint: "Tiñe el fondo conservando el tema claro/oscuro.",
     font: "Tipografía",
     fonts: {
       default: "Predeterminada",

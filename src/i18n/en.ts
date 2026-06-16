@@ -30,6 +30,8 @@ export const en: Dict = {
     colors: "Colors",
     accent: "Accent color",
     secondary: "Secondary color",
+    background: "Background color",
+    backgroundHint: "Tints the background while keeping the light/dark theme.",
     font: "Typography",
     fonts: {
       default: "Default",

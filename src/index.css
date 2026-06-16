@@ -35,9 +35,14 @@
 /* ── Dark: deep indigo glass, neon violet + cyan ───────────────────────── */
 :root,
 [data-theme="dark"] {
-  --c-surface: #0b0a16;
-  --c-surface-raised: rgba(26, 23, 48, 0.6);
-  --c-surface-overlay: #1b1830;
+  /* Optional background tint (set by the appearance settings). The surfaces mix
+     the chosen hue over the theme base, preserving the theme's light/dark so
+     text stays readable. Default amount 0% = the untouched theme background. */
+  --bg-tint: transparent;
+  --bg-tint-amt: 0%;
+  --c-surface: color-mix(in oklab, var(--bg-tint) var(--bg-tint-amt), #0b0a16);
+  --c-surface-raised: color-mix(in oklab, var(--bg-tint) var(--bg-tint-amt), rgba(26, 23, 48, 0.6));
+  --c-surface-overlay: color-mix(in oklab, var(--bg-tint) var(--bg-tint-amt), #1b1830);
   --c-border-muted: rgba(255, 255, 255, 0.1);
 
   --c-accent: #a855f7;
@@ -70,9 +75,9 @@
 
 /* ── Light: lavender-white glass, vivid violet + cyan ──────────────────── */
 [data-theme="light"] {
-  --c-surface: #f4f2ff;
-  --c-surface-raised: rgba(255, 255, 255, 0.66);
-  --c-surface-overlay: #ece9fb;
+  --c-surface: color-mix(in oklab, var(--bg-tint) var(--bg-tint-amt), #f4f2ff);
+  --c-surface-raised: color-mix(in oklab, var(--bg-tint) var(--bg-tint-amt), rgba(255, 255, 255, 0.66));
+  --c-surface-overlay: color-mix(in oklab, var(--bg-tint) var(--bg-tint-amt), #ece9fb);
   --c-border-muted: rgba(124, 58, 237, 0.16);
 
   --c-accent: #8b5cf6;

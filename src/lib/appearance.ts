@@ -34,6 +34,7 @@ export type IconKey =
 export interface Appearance {
   accent: string | null; // null = keep the built-in per-theme accent
   gold: string | null; // secondary "pop" color
+  surface: string | null; // background tint (mixed over the theme base)
   font: FontKey;
   appName: string;
   icon: IconKey;
@@ -43,11 +44,16 @@ export interface Appearance {
 export const DEFAULT_APPEARANCE: Appearance = {
   accent: null,
   gold: null,
+  surface: null,
   font: "default",
   appName: "Finanzas",
   icon: "trending-up",
   logo: "",
 };
+
+// How strongly a chosen background tint is mixed over the theme base. Modest so
+// the theme's light/dark dominates and text stays readable.
+const TINT_AMOUNT = "28%";
 
 export const ICONS: Record<IconKey, LucideIcon> = {
   "trending-up": TrendingUp,
@@ -126,6 +132,15 @@ export function applyAppearance(a: Appearance): void {
   }
   if (a.gold) root.style.setProperty("--c-gold", a.gold);
   else root.style.removeProperty("--c-gold");
+
+  // Background tint — mixed over the theme base via index.css.
+  if (a.surface) {
+    root.style.setProperty("--bg-tint", a.surface);
+    root.style.setProperty("--bg-tint-amt", TINT_AMOUNT);
+  } else {
+    root.style.removeProperty("--bg-tint");
+    root.style.removeProperty("--bg-tint-amt");
+  }
 
   // Fonts.
   const f = FONTS[a.font] ?? FONTS.default;

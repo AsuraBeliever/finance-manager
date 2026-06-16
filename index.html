@@ -50,6 +50,10 @@
             r.style.setProperty("--c-accent-bright", "color-mix(in oklab, " + a.accent + " 72%, #fff)");
           }
           if (a.gold) r.style.setProperty("--c-gold", a.gold);
+          if (a.surface) {
+            r.style.setProperty("--bg-tint", a.surface);
+            r.style.setProperty("--bg-tint-amt", "28%");
+          }
         } catch (e) {}
       })();
     </script>
