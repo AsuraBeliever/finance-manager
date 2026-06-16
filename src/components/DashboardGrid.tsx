@@ -83,7 +83,9 @@ export function DashboardGrid({
   });
 
   const [layouts, setLayouts] = useState<ResponsiveLayouts | null>(null);
+  const layoutsRef = useRef<ResponsiveLayouts | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touched = useRef(false); // the user has dragged/resized this session
   const baseRef = useRef(base);
   baseRef.current = base;
 
@@ -97,23 +99,38 @@ export function DashboardGrid({
     saveTimer.current = setTimeout(() => setSetting(SETTING_KEY, serialized), 600);
   });
 
-  // Initialize from the server value the first time it resolves.
-  if (layouts === null && saved.isSuccess) {
-    setLayouts(parse(saved.data) ?? { lg: base });
-  }
+  // Adopt the server layout on load and on refetch, UNTIL the user changes
+  // something this session. This restores the saved arrangement even if the
+  // first paint used a stale cached value (or the default).
+  useEffect(() => {
+    if (touched.current || !saved.isSuccess) return;
+    const next = parse(saved.data) ?? { lg: baseRef.current };
+    layoutsRef.current = next;
+    setLayouts(next);
+  }, [saved.isSuccess, saved.data]);
 
   // Reset: snap to defaults and persist (so every device resets too).
   const firstReset = useRef(resetSignal);
   useEffect(() => {
     if (resetSignal === firstReset.current) return;
     const reset = { lg: baseRef.current };
+    touched.current = true;
+    layoutsRef.current = reset;
     setLayouts(reset);
     save.current(reset);
   }, [resetSignal]);
 
+  // Keep UI state in sync with RGL's own changes (mount, compaction, new cells)
+  // without saving — those aren't user intent.
   const onLayoutChange = (_current: Layout, all: ResponsiveLayouts) => {
+    layoutsRef.current = all;
     setLayouts(all);
-    save.current(all);
+  };
+
+  // Only a real drag/resize is a user preference worth saving.
+  const onUserChange = () => {
+    touched.current = true;
+    if (layoutsRef.current) save.current(layoutsRef.current);
   };
 
   if (layouts === null) {
@@ -133,6 +150,8 @@ export function DashboardGrid({
           compactor={verticalCompactor}
           dragConfig={{ handle: ".dash-drag" }}
           onLayoutChange={onLayoutChange}
+          onDragStop={onUserChange}
+          onResizeStop={onUserChange}
         >
           {items.map((it) => (
             <div key={it.key} className="group/cell relative h-full">
