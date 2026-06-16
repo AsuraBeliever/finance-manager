@@ -56,8 +56,14 @@
   --mesh-1: rgba(168, 85, 247, 0.22);
   --mesh-2: rgba(236, 72, 153, 0.14);
   --mesh-3: rgba(34, 211, 238, 0.14);
-  --hero-gradient: linear-gradient(110deg, #c084fc 0%, #f472b6 45%, #22d3ee 100%);
-  --hero-glow: 0 0 38px rgba(192, 132, 252, 0.45);
+  /* Driven by the accent + secondary vars so it follows custom colors. */
+  --hero-gradient: linear-gradient(
+    110deg,
+    var(--c-accent-bright) 0%,
+    var(--c-accent) 45%,
+    var(--c-gold) 100%
+  );
+  --hero-glow: 0 0 38px color-mix(in oklab, var(--c-accent) 45%, transparent);
 
   color-scheme: dark;
 }
@@ -85,8 +91,13 @@
   --mesh-1: rgba(139, 92, 246, 0.2);
   --mesh-2: rgba(236, 72, 153, 0.12);
   --mesh-3: rgba(6, 182, 212, 0.12);
-  --hero-gradient: linear-gradient(110deg, #8b5cf6 0%, #ec4899 50%, #06b6d4 100%);
-  --hero-glow: 0 0 26px rgba(139, 92, 246, 0.28);
+  --hero-gradient: linear-gradient(
+    110deg,
+    var(--c-accent) 0%,
+    var(--c-accent-bright) 45%,
+    var(--c-gold) 100%
+  );
+  --hero-glow: 0 0 26px color-mix(in oklab, var(--c-accent) 28%, transparent);
 
   color-scheme: light;
 }
