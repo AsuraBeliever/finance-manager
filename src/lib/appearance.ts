@@ -2,6 +2,11 @@
 // Applied via CSS custom properties on <html> (so it overrides the per-theme
 // defaults in index.css), persisted to localStorage for an instant, flash-free
 // apply and mirrored to the account so it follows the user across devices.
+//
+// Cross-device sync is last-write-wins by timestamp: every local change stamps
+// an `updatedAt` (stored locally and pushed to the account inside an envelope).
+// On login we fetch the account copy and adopt it when this device has none or
+// when the account's stamp is newer than what we last saved here.
 import {
   Coins,
   Gem,
@@ -103,6 +108,15 @@ export const FONTS: Record<FontKey, FontDef> = {
 };
 
 const KEY = "finanzas.appearance";
+const TS_KEY = "finanzas.appearance.updatedAt";
+
+// What we store on the account: the appearance plus the stamp of its last edit,
+// so other devices can tell whose copy is newer. Older clients wrote the bare
+// Appearance JSON with no stamp; we treat that as the oldest possible (ts 0).
+interface AppearanceEnvelope {
+  updatedAt: number;
+  value: Partial<Appearance>;
+}
 
 function read(): Appearance {
   try {
@@ -112,6 +126,29 @@ function read(): Appearance {
     /* ignore */
   }
   return { ...DEFAULT_APPEARANCE };
+}
+
+function readLocalTimestamp(): number {
+  const raw = localStorage.getItem(TS_KEY);
+  const n = raw ? Number(raw) : 0;
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Parse the account's stored value, tolerating the legacy stampless format. */
+function parseServer(raw: string): { value: Appearance; updatedAt: number } | null {
+  try {
+    const parsed = JSON.parse(raw) as AppearanceEnvelope | Partial<Appearance>;
+    if (parsed && typeof parsed === "object" && "value" in parsed) {
+      const env = parsed as AppearanceEnvelope;
+      return {
+        value: { ...DEFAULT_APPEARANCE, ...env.value },
+        updatedAt: typeof env.updatedAt === "number" ? env.updatedAt : 0,
+      };
+    }
+    return { value: { ...DEFAULT_APPEARANCE, ...(parsed as Partial<Appearance>) }, updatedAt: 0 };
+  } catch {
+    return null;
+  }
 }
 
 let current: Appearance = read();
@@ -172,14 +209,16 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 export function setAppearance(patch: Partial<Appearance>): void {
   current = { ...current, ...patch };
   applyAppearance(current);
+  const updatedAt = Date.now();
   try {
     localStorage.setItem(KEY, JSON.stringify(current));
+    localStorage.setItem(TS_KEY, String(updatedAt));
   } catch {
     /* ignore */
   }
   for (const fn of listeners) fn();
   if (saveTimer) clearTimeout(saveTimer);
-  const snapshot = JSON.stringify(current);
+  const snapshot = JSON.stringify({ updatedAt, value: current } satisfies AppearanceEnvelope);
   saveTimer = setTimeout(() => setSetting("appearance", snapshot).catch(() => {}), 600);
 }
 
@@ -187,15 +226,23 @@ export function resetAppearance(): void {
   setAppearance({ ...DEFAULT_APPEARANCE });
 }
 
-/** Seed from the account when this device has no saved appearance yet. */
+/**
+ * Reconcile this device with the account: adopt the account's appearance when
+ * this device has none, or when the account's copy is strictly newer than what
+ * we last saved here (so a change on any device propagates to the rest).
+ */
 export async function hydrateAppearanceFromServer(): Promise<void> {
   try {
-    if (localStorage.getItem(KEY)) return; // device already customized
     const raw = await getSetting("appearance");
-    if (!raw) return;
-    current = { ...DEFAULT_APPEARANCE, ...(JSON.parse(raw) as Partial<Appearance>) };
+    if (!raw) return; // nothing saved on the account yet
+    const server = parseServer(raw);
+    if (!server) return;
+    const hasLocal = localStorage.getItem(KEY) != null;
+    if (hasLocal && server.updatedAt <= readLocalTimestamp()) return; // local is newer
+    current = server.value;
     applyAppearance(current);
-    localStorage.setItem(KEY, raw);
+    localStorage.setItem(KEY, JSON.stringify(current));
+    localStorage.setItem(TS_KEY, String(server.updatedAt));
     for (const fn of listeners) fn();
   } catch {
     /* offline or logged out: keep local/default */
