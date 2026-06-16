@@ -61,12 +61,13 @@
   --mesh-1: rgba(168, 85, 247, 0.22);
   --mesh-2: rgba(236, 72, 153, 0.14);
   --mesh-3: rgba(34, 211, 238, 0.14);
-  /* Accent → secondary so both custom colors clearly show on the headline. */
+  /* Vibrant accent start, then a long blend so the secondary clearly owns the
+     right half of the figure (not just the tail). */
   --hero-gradient: linear-gradient(
     110deg,
     var(--c-accent-bright) 0%,
-    var(--c-accent) 30%,
-    var(--c-gold) 90%
+    var(--c-accent) 20%,
+    var(--c-gold) 100%
   );
   --hero-glow: 0 0 38px color-mix(in oklab, var(--c-accent) 45%, transparent);
 
@@ -99,8 +100,8 @@
   --hero-gradient: linear-gradient(
     110deg,
     var(--c-accent) 0%,
-    var(--c-accent-bright) 30%,
-    var(--c-gold) 90%
+    var(--c-accent-bright) 20%,
+    var(--c-gold) 100%
   );
   --hero-glow: 0 0 26px color-mix(in oklab, var(--c-accent) 28%, transparent);
 
