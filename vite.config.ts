@@ -41,8 +41,8 @@ export default defineConfig(async () => ({
       registerType: "prompt",
       includeAssets: ["apple-touch-icon.png", "favicon.ico", "favicon-32.png"],
       manifest: {
-        name: "Finanzas",
-        short_name: "Finanzas",
+        name: "Broke",
+        short_name: "Broke",
         description: "Finanzas personales",
         lang: "es-MX",
         display: "standalone",

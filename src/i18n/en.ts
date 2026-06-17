@@ -3,7 +3,7 @@ import type { Dict } from "./es";
 
 export const en: Dict = {
   app: {
-    name: "Finanzas",
+    name: "Broke",
   },
   nav: {
     dashboard: "Overview",

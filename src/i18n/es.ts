@@ -4,7 +4,7 @@ import { getLocale, type Locale } from "./store";
 
 export const esDict = {
   app: {
-    name: "Finanzas",
+    name: "Broke",
   },
   nav: {
     dashboard: "Resumen",

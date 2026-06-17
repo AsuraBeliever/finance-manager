@@ -51,10 +51,19 @@ export const DEFAULT_APPEARANCE: Appearance = {
   gold: null,
   surface: null,
   font: "default",
-  appName: "Finanzas",
+  appName: "", // empty = show the brand name (es.app.name); a value overrides it
   icon: "trending-up",
   logo: "",
 };
+
+// The app name used to default to "Finanzas" and was persisted verbatim into
+// every account/device. Treat that legacy default as "unset" so the current
+// brand name shows through; a name the user actually typed is untouched.
+const LEGACY_APP_NAME = "Finanzas";
+
+function normalize(a: Appearance): Appearance {
+  return a.appName === LEGACY_APP_NAME ? { ...a, appName: "" } : a;
+}
 
 // How strongly a chosen background tint is mixed over the theme base. Modest so
 // the theme's light/dark dominates and text stays readable.
@@ -121,7 +130,7 @@ interface AppearanceEnvelope {
 function read(): Appearance {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULT_APPEARANCE, ...(JSON.parse(raw) as Partial<Appearance>) };
+    if (raw) return normalize({ ...DEFAULT_APPEARANCE, ...(JSON.parse(raw) as Partial<Appearance>) });
   } catch {
     /* ignore */
   }
@@ -141,11 +150,14 @@ function parseServer(raw: string): { value: Appearance; updatedAt: number } | nu
     if (parsed && typeof parsed === "object" && "value" in parsed) {
       const env = parsed as AppearanceEnvelope;
       return {
-        value: { ...DEFAULT_APPEARANCE, ...env.value },
+        value: normalize({ ...DEFAULT_APPEARANCE, ...env.value }),
         updatedAt: typeof env.updatedAt === "number" ? env.updatedAt : 0,
       };
     }
-    return { value: { ...DEFAULT_APPEARANCE, ...(parsed as Partial<Appearance>) }, updatedAt: 0 };
+    return {
+      value: normalize({ ...DEFAULT_APPEARANCE, ...(parsed as Partial<Appearance>) }),
+      updatedAt: 0,
+    };
   } catch {
     return null;
   }

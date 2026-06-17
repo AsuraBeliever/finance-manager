@@ -146,7 +146,7 @@ export function AppearancePage() {
               </span>
             )}
             <span className="truncate font-display text-xl font-semibold tracking-tight text-fg">
-              {a.appName || "Finanzas"}
+              {a.appName || es.app.name}
             </span>
           </div>
 
@@ -154,6 +154,7 @@ export function AppearancePage() {
             <input
               className={inputClass}
               value={a.appName}
+              placeholder={es.app.name}
               maxLength={24}
               onChange={(e) => setAppearance({ appName: e.target.value })}
             />
