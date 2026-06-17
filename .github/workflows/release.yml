@@ -62,10 +62,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "Finanzas ${{ github.ref_name }}"
+          releaseName: "Broke ${{ github.ref_name }}"
           releaseBody: |
             ## English
-            Finanzas desktop app installers.
+            Broke desktop app installers.
 
             - **Windows:** download the `.msi` (or the `.exe` setup).
             - **Linux (any distro):** `.AppImage` — make it executable and run it.
@@ -74,7 +74,7 @@ jobs:
             The web app is always at https://finanzas.aseth.workers.dev
 
             ## Español
-            Instaladores de la app de escritorio de Finanzas.
+            Instaladores de la app de escritorio de Broke.
 
             - **Windows:** descarga el `.msi` (o el instalador `.exe`).
             - **Linux (cualquier distro):** `.AppImage` — dale permiso de ejecución y ábrelo.
