@@ -159,7 +159,7 @@ export default function App() {
               {({ isActive }) => (
                 <>
                   <span
-                    className={`absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-accent transition-opacity ${
+                    className={`absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-gold transition-opacity ${
                       isActive ? "opacity-100" : "opacity-0"
                     }`}
                   />
@@ -186,7 +186,7 @@ export default function App() {
               {({ isActive }) => (
                 <>
                   <span
-                    className={`absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-accent transition-opacity ${
+                    className={`absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-gold transition-opacity ${
                       isActive ? "opacity-100" : "opacity-0"
                     }`}
                   />
@@ -232,7 +232,7 @@ export default function App() {
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-accent" />
+                  <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-gold" />
                 )}
                 <Icon size={20} />
                 {label}
