@@ -14,6 +14,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { archiveWallet, deleteWallet, getWallet, listTransactions } from "../../lib/api";
+import type { Transaction } from "../../lib/types";
 import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
 import { TransactionFormModal } from "../transactions/TransactionFormModal";
@@ -27,6 +28,7 @@ export function WalletDetailPage() {
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [txFormOpen, setTxFormOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const wallet = useQuery({
@@ -143,14 +145,19 @@ export function WalletDetailPage() {
             transactions={transactions.data}
             currencyByWallet={currencyByWallet}
             showWallet={false}
+            onEdit={setEditingTx}
           />
         )
       )}
 
       <WalletFormModal open={editOpen} onClose={() => setEditOpen(false)} wallet={w} />
       <TransactionFormModal
-        open={txFormOpen}
-        onClose={() => setTxFormOpen(false)}
+        open={txFormOpen || editingTx !== null}
+        transaction={editingTx ?? undefined}
+        onClose={() => {
+          setTxFormOpen(false);
+          setEditingTx(null);
+        }}
         defaultWalletId={walletId}
       />
       <ConfirmDialog
