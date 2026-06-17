@@ -68,4 +68,13 @@ pub async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) 
     {
         console_error!("session cleanup failed: {e}");
     }
+    if let Err(e) = db::exec(
+        &db,
+        "DELETE FROM auth_attempts WHERE window_start < datetime('now', '-1 day')",
+        vec![],
+    )
+    .await
+    {
+        console_error!("auth_attempts cleanup failed: {e}");
+    }
 }
