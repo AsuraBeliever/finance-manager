@@ -34,6 +34,7 @@ import {
 import { CATEGORY_PALETTE, NEUTRAL_DOT } from "../../lib/palette";
 import type { TransactionCategory } from "../../lib/types";
 import { es } from "../../i18n/es";
+import { seedName } from "../../i18n/seed";
 
 type Kind = "income" | "expense";
 
@@ -149,7 +150,7 @@ function CategoryRow({
         className="h-2.5 w-2.5 shrink-0 rounded-full"
         style={{ backgroundColor: cat.color ?? NEUTRAL_DOT }}
       />
-      <span className="min-w-0 flex-1 truncate text-sm text-fg">{cat.name}</span>
+      <span className="min-w-0 flex-1 truncate text-sm text-fg">{seedName(cat.name, cat.isSystem)}</span>
       {cat.isSystem && (
         <span className="shrink-0 rounded-full bg-surface-overlay px-2 py-0.5 text-[10px] text-fg-subtle">
           {cat.isHidden ? es.categories.hiddenLabel : es.categories.defaultBadge}

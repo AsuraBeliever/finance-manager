@@ -16,6 +16,7 @@ import {
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
 import { es } from "../../i18n/es";
+import { seedName } from "../../i18n/seed";
 
 export function BudgetsPage() {
   const qc = useQueryClient();
@@ -63,7 +64,7 @@ export function BudgetsPage() {
                   {b.color && (
                     <span className="h-3 w-3 rounded-full" style={{ backgroundColor: b.color }} />
                   )}
-                  {b.categoryName ?? es.budgets.overall}
+                  {b.categoryName ? seedName(b.categoryName) : es.budgets.overall}
                 </span>
                 <button
                   onClick={() => setDeleteId(b.id)}
@@ -154,7 +155,7 @@ function BudgetFormModal({
             <option value="">{es.budgets.overall}</option>
             {expenseCats.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {seedName(c.name, c.isSystem)}
               </option>
             ))}
           </select>

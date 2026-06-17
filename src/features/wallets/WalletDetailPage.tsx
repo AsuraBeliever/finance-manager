@@ -17,6 +17,7 @@ import { archiveWallet, deleteWallet, getWallet, listTransactions } from "../../
 import type { Transaction } from "../../lib/types";
 import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
+import { seedName } from "../../i18n/seed";
 import { TransactionFormModal } from "../transactions/TransactionFormModal";
 import { TransactionList } from "../transactions/TransactionList";
 import { WalletFormModal } from "./WalletFormModal";
@@ -111,7 +112,7 @@ export function WalletDetailPage() {
             style={{ backgroundColor: w.color ?? "#a8a29e" }}
           />
           <span className="text-sm text-fg-muted">
-            {w.categoryName} · {w.currencyCode}
+            {seedName(w.categoryName)} · {w.currencyCode}
           </span>
         </div>
         <p className="text-3xl font-semibold tabular-nums">

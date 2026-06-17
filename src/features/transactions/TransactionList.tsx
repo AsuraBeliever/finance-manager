@@ -6,6 +6,7 @@ import { deleteTransaction } from "../../lib/api";
 import { formatCents } from "../../lib/money";
 import type { Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
+import { seedName } from "../../i18n/seed";
 
 const kindMeta: Record<
   Transaction["kind"],
@@ -60,7 +61,7 @@ export function TransactionList({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm">
                 {t.description ||
-                  t.categoryName ||
+                  (t.categoryName && seedName(t.categoryName)) ||
                   es.transactions[
                     t.kind === "income"
                       ? "income"
@@ -72,7 +73,7 @@ export function TransactionList({
               <p className="text-xs text-fg-subtle">
                 {t.occurredAt}
                 {showWallet && <> · {t.walletName}</>}
-                {t.categoryName && t.description && <> · {t.categoryName}</>}
+                {t.categoryName && t.description && <> · {seedName(t.categoryName)}</>}
               </p>
             </div>
             <span className={`text-sm font-medium tabular-nums ${meta.color}`}>

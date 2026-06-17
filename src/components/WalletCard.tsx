@@ -4,6 +4,7 @@ import { formatCents } from "../lib/money";
 import { effectiveSkin, isImageSkin, resolveSkin, skinArt } from "../lib/skins";
 import type { Wallet } from "../lib/types";
 import { es } from "../i18n/es";
+import { seedName } from "../i18n/seed";
 
 const ART_ICON = { banknote: Banknote, wallet: WalletIcon, coins: Coins, piggy: PiggyBank } as const;
 
@@ -91,7 +92,7 @@ export function WalletCard({ wallet }: { wallet: Wallet }) {
           <p className="font-display text-2xl font-semibold tabular-nums [text-shadow:0_1px_4px_rgba(0,0,0,0.3)]">
             {formatCents(wallet.balanceCents, wallet.currencyCode)}
           </p>
-          <p className="mt-0.5 text-xs opacity-80">{wallet.categoryName}</p>
+          <p className="mt-0.5 text-xs opacity-80">{seedName(wallet.categoryName)}</p>
         </div>
       </div>
     </Link>

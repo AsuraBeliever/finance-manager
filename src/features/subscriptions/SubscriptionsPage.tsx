@@ -27,6 +27,7 @@ import { todayIso } from "../../lib/date";
 import { CHART_COLORS } from "../../lib/palette";
 import type { Subscription } from "../../lib/types";
 import { es } from "../../i18n/es";
+import { seedName } from "../../i18n/seed";
 
 export function SubscriptionsPage() {
   const qc = useQueryClient();
@@ -345,7 +346,7 @@ function SubscriptionFormModal({
             <option value="">{es.subscriptions.none}</option>
             {expenseCats.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {seedName(c.name, c.isSystem)}
               </option>
             ))}
           </select>

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { es as dateLocaleEs } from "date-fns/locale";
+import { es as dateLocaleEs, enUS as dateLocaleEn } from "date-fns/locale";
 import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Tags } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
@@ -20,14 +20,16 @@ import {
 } from "../../lib/auth";
 import { deviceLabel, isMobileDevice } from "../../lib/device";
 import { es } from "../../i18n/es";
-import { setLocale, useLocale, type Locale } from "../../i18n/store";
+import { seedName } from "../../i18n/seed";
+import { getLocale, setLocale, useLocale, type Locale } from "../../i18n/store";
 
-/** SQLite UTC timestamp ("YYYY-MM-DD HH:MM:SS") → relative es-MX phrase. */
+/** SQLite UTC timestamp ("YYYY-MM-DD HH:MM:SS") → relative phrase in the active locale. */
 function relativeFromUtc(ts: string | null): string {
   if (!ts) return "";
   const date = new Date(ts.replace(" ", "T") + "Z");
   if (Number.isNaN(date.getTime())) return ts;
-  return formatDistanceToNow(date, { addSuffix: true, locale: dateLocaleEs });
+  const locale = getLocale() === "en" ? dateLocaleEn : dateLocaleEs;
+  return formatDistanceToNow(date, { addSuffix: true, locale });
 }
 
 function ChangePasswordForm() {
@@ -269,7 +271,7 @@ export function SettingsPage() {
                 key={c.id}
                 className="rounded-full bg-surface-overlay px-3 py-1 text-sm text-fg"
               >
-                {c.name}
+                {seedName(c.name, c.isSystem)}
               </li>
             ))}
           </ul>

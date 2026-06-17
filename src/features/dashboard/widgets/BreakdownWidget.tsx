@@ -5,6 +5,7 @@ import { getCategoryBreakdown } from "../../../lib/api";
 import { formatCents } from "../../../lib/money";
 import { CHART_COLORS } from "../../../lib/palette";
 import { es } from "../../../i18n/es";
+import { seedName } from "../../../i18n/seed";
 
 /** Donut + ranked category list for income or expense (current month). */
 export function BreakdownWidget({
@@ -68,7 +69,7 @@ export function BreakdownWidget({
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: colorFor(i, s.color) }}
                 />
-                <span className="truncate text-fg-muted">{s.name}</span>
+                <span className="truncate text-fg-muted">{seedName(s.name)}</span>
                 <span className="ml-auto tabular-nums text-fg">
                   {formatCents(s.mxnCents, "MXN")}
                 </span>

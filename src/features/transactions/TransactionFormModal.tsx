@@ -10,6 +10,7 @@ import { parseToCents } from "../../lib/money";
 import { todayIso } from "../../lib/date";
 import type { Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
+import { seedName } from "../../i18n/seed";
 
 type Tab = "income" | "expense" | "transfer";
 
@@ -242,7 +243,7 @@ export function TransactionFormModal({
               <option value="">{es.transactions.noCategory}</option>
               {visibleCategories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {seedName(c.name, c.isSystem)}
                 </option>
               ))}
             </select>

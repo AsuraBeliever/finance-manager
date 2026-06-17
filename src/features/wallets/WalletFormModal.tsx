@@ -16,6 +16,7 @@ import { CHART_COLORS } from "../../lib/palette";
 import { effectiveSkin, resolveSkin, skinAccent, SKINS, type SkinGroup } from "../../lib/skins";
 import type { Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
+import { seedName } from "../../i18n/seed";
 
 const COLORS = CHART_COLORS;
 
@@ -154,7 +155,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
             >
               {categories.data?.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {seedName(c.name, c.isSystem)}
                 </option>
               ))}
             </select>
@@ -167,7 +168,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
             >
               {currencies.data?.map((c) => (
                 <option key={c.code} value={c.code}>
-                  {c.code} — {c.name}
+                  {c.code} — {seedName(c.name)}
                 </option>
               ))}
             </select>

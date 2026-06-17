@@ -5,6 +5,7 @@ import { StatWidget } from "../../../components/StatWidget";
 import { listBudgets } from "../../../lib/api";
 import { formatCents } from "../../../lib/money";
 import { es } from "../../../i18n/es";
+import { seedName } from "../../../i18n/seed";
 
 export function BudgetWidget() {
   const q = useQuery({ queryKey: ["budgets"], queryFn: listBudgets });
@@ -52,7 +53,7 @@ export function BudgetWidget() {
                       style={{ backgroundColor: b.color }}
                     />
                   )}
-                  {b.categoryName}
+                  {seedName(b.categoryName)}
                 </span>
                 <span className="tabular-nums text-fg-subtle">
                   {formatCents(b.spentMxnCents, "MXN")} / {formatCents(b.limitCents, "MXN")}
