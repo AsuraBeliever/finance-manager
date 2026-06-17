@@ -57,9 +57,12 @@ pub fn banxico_series(kind: &str) -> AppResult<&'static str> {
         "cetes_182" => "SF43942,CF107,13",
         "cetes_364" => "SF43945,CF107,17",
         "objetivo" => "SF61745,CF101,2",
+        // Tipo de cambio FIX: the official MXN/USD reference Banxico publishes
+        // in the DOF and banks settle against. Used to value USD wallets.
+        "usd_fix" => "SF43718,CF86,2",
         other => {
             return Err(AppError::InvalidInput(format!(
-                "serie desconocida: {other} (válidas: cetes_28/91/182/364, objetivo)"
+                "serie desconocida: {other} (válidas: cetes_28/91/182/364, objetivo, usd_fix)"
             )))
         }
     })
@@ -97,11 +100,10 @@ pub fn parse_sie_internet_history(body: &serde_json::Value) -> Vec<(String, i64)
         .collect()
 }
 
-/// Parse SieInternet chart payload: {valores: [[iso_date, value]]} where
-/// SIE_SENTINEL marks missing values. The latest real value wins.
-pub fn parse_sie_internet_body(body: &serde_json::Value) -> AppResult<BanxicoRate> {
-    let last = body
-        .get("valores")
+/// Latest (date, value) of a SieInternet chart payload, skipping the missing
+/// sentinel. Shared by the interest-rate and exchange-rate parsers.
+fn sie_last_value(body: &serde_json::Value) -> AppResult<(String, f64)> {
+    body.get("valores")
         .and_then(|v| v.as_array())
         .into_iter()
         .flatten()
@@ -111,11 +113,25 @@ pub fn parse_sie_internet_body(body: &serde_json::Value) -> AppResult<BanxicoRat
             (value != SIE_SENTINEL && value > 0.0).then(|| (date.to_string(), value))
         })
         .next_back()
-        .ok_or_else(|| AppError::Internal("Banxico no regresó datos para la serie".into()))?;
+        .ok_or_else(|| AppError::Internal("Banxico no regresó datos para la serie".into()))
+}
+
+/// Parse SieInternet chart payload: {valores: [[iso_date, value]]} where
+/// SIE_SENTINEL marks missing values. The latest real value wins.
+pub fn parse_sie_internet_body(body: &serde_json::Value) -> AppResult<BanxicoRate> {
+    let (date, value) = sie_last_value(body)?;
     Ok(BanxicoRate {
-        rate_bps: (last.1 * 100.0).round() as i64,
-        date: last.0,
+        rate_bps: (value * 100.0).round() as i64,
+        date,
     })
+}
+
+/// Latest value of a SieInternet FX series (MXN per foreign unit, e.g. the
+/// USD/MXN FIX) as (date, rate_to_mxn_micros). Unlike the interest-rate parser
+/// this keeps full precision instead of rounding to whole basis points.
+pub fn parse_sie_internet_fx_micros(body: &serde_json::Value) -> AppResult<(String, i64)> {
+    let (date, value) = sie_last_value(body)?;
+    Ok((date, (value * 1_000_000.0).round() as i64))
 }
 
 // ---- BONDDIA official daily price (cetesdirecto) ----
@@ -267,6 +283,20 @@ mod tests {
         let rate = parse_sie_internet_body(&body).unwrap();
         assert_eq!(rate.rate_bps, 625);
         assert_eq!(rate.date, "2026-06-11");
+    }
+
+    #[test]
+    fn parses_usd_fix_to_micros_keeping_precision() {
+        // FIX is MXN per USD; 17.2023 -> 17_202_300 micros (no bps rounding).
+        let body: serde_json::Value = serde_json::from_str(
+            r#"{"serie":"SF43718","valores":
+                [["2026-06-12",17.2067],["2026-06-15",17.2008],
+                 ["2026-06-16",17.2023],["2026-06-17",-989898.0]]}"#,
+        )
+        .unwrap();
+        let (date, micros) = parse_sie_internet_fx_micros(&body).unwrap();
+        assert_eq!(micros, 17_202_300);
+        assert_eq!(date, "2026-06-16");
     }
 
     #[test]

@@ -124,7 +124,30 @@ pub async fn fetch_and_store_rates(db: &D1Database, force: bool) -> AppResult<us
         )
         .await?;
     }
+
+    // USD: override with Banxico's FIX, the official MXN/USD reference banks
+    // settle against (DOF). Inserted last so load_rates (MAX(id) per currency)
+    // prefers it; best-effort, the open.er-api USD row above stays as fallback.
+    if wanted.iter().any(|c| c == "USD") {
+        if let Err(e) = store_usd_fix(db).await {
+            worker::console_warn!("USD FIX update failed, keeping api rate: {e}");
+        }
+    }
     Ok(parsed.len())
+}
+
+/// Fetch the Banxico FIX (SF43718, MXN per USD) and store it as the USD rate.
+async fn store_usd_fix(db: &D1Database) -> AppResult<()> {
+    let body = get_json(&market::banxico_series_url("usd_fix")?).await?;
+    let (_date, micros) = market::parse_sie_internet_fx_micros(&body)?;
+    exec(
+        db,
+        "INSERT INTO exchange_rates (currency_code, rate_to_mxn_micros, source)
+         VALUES ('USD', ?1, 'banxico_fix')",
+        jsv![micros],
+    )
+    .await?;
+    Ok(())
 }
 
 // ---- market data cache (rate history + bonddia price + crypto prices) ----

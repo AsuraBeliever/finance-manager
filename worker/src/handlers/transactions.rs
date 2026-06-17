@@ -8,7 +8,9 @@ use serde::Deserialize;
 use wasm_bindgen::JsValue;
 use worker::D1Database;
 
-use crate::db::{all, batch, changes, exec, first, last_row_id, new_group_id, stmt, CountRow, ToJs};
+use crate::db::{
+    all, batch, changes, exec, first, last_row_id, new_group_id, stmt, CountRow, ToJs,
+};
 use crate::jsv;
 
 fn validate_amount(amount_cents: i64) -> AppResult<()> {

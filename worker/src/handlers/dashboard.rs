@@ -82,6 +82,28 @@ pub(crate) fn to_mxn(cents: i64, rate_micros: i64) -> i64 {
     ((cents as i128 * rate_micros as i128) / MICROS as i128) as i64
 }
 
+/// Convert an amount between two currencies using their rates-to-MXN (micros).
+/// `cents` is in `from`; the result is in `to`. The MICROS scale cancels, so we
+/// go through i128 directly: cents_to = cents_from * rate[from] / rate[to].
+/// Errors if either currency has no configured rate.
+pub(crate) fn convert(
+    cents: i64,
+    from: &str,
+    to: &str,
+    rates: &HashMap<String, i64>,
+) -> AppResult<i64> {
+    if from == to {
+        return Ok(cents);
+    }
+    let from_rate = *rates.get(from).ok_or_else(|| {
+        finanzas_core::error::AppError::InvalidInput(format!("no hay tipo de cambio para {from}"))
+    })?;
+    let to_rate = *rates.get(to).ok_or_else(|| {
+        finanzas_core::error::AppError::InvalidInput(format!("no hay tipo de cambio para {to}"))
+    })?;
+    Ok(((cents as i128 * from_rate as i128) / to_rate as i128) as i64)
+}
+
 #[derive(Deserialize)]
 struct BalanceRow {
     id: i64,

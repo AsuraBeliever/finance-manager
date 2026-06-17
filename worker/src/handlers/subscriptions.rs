@@ -6,7 +6,7 @@ use finanzas_core::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
-use super::dashboard::{load_rates, to_mxn};
+use super::dashboard::{convert, load_rates, to_mxn};
 use super::transactions::{add_expense, SimpleTxArgs};
 use crate::db::{all, changes, exec, first, last_row_id, today_mx};
 use crate::jsv;
@@ -245,12 +245,33 @@ pub async fn register_subscription_payment(
         .wallet_id
         .ok_or_else(|| AppError::InvalidInput("la suscripción no tiene cartera asignada".into()))?;
 
+    // Transactions are stored in the wallet's currency, so a USD subscription
+    // charged to an MXN wallet must be converted first.
+    #[derive(Deserialize)]
+    struct CurrencyRow {
+        currency_code: String,
+    }
+    let wallet: CurrencyRow = first(
+        db,
+        "SELECT currency_code FROM wallets WHERE id = ?1 AND user_id = ?2",
+        jsv![wallet_id, uid],
+    )
+    .await?
+    .ok_or(AppError::NotFound("cartera"))?;
+    let rates = load_rates(db).await?;
+    let amount_cents = convert(
+        sub.amount_cents,
+        &sub.currency_code,
+        &wallet.currency_code,
+        &rates,
+    )?;
+
     add_expense(
         db,
         uid,
         SimpleTxArgs {
             wallet_id,
-            amount_cents: sub.amount_cents,
+            amount_cents,
             category_id: sub.category_id,
             description: Some(sub.name.clone()),
             occurred_at: today_mx().format("%Y-%m-%d").to_string(),
