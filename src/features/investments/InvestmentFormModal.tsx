@@ -18,6 +18,7 @@ import {
 } from "../../lib/api";
 import { formatBps } from "../../lib/money";
 import { parseToCents } from "../../lib/money";
+import { todayIso } from "../../lib/date";
 import type { CalculatorId, InvestmentWithValue } from "../../lib/types";
 import { es } from "../../i18n/es";
 
@@ -40,10 +41,6 @@ function parseQuantityE8(text: string): number | null {
   return value > 0 ? value : null;
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /** Percent text ("12.5") -> basis points (1250), or null when invalid. */
 function parseBps(text: string): number | null {
   const v = parseFloat(text.replace(/,/g, ""));
@@ -64,7 +61,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
   const [calculator, setCalculator] = useState<CalculatorId>("nu_cajita");
   const [name, setName] = useState("");
   const [principalText, setPrincipalText] = useState("");
-  const [startDate, setStartDate] = useState(today());
+  const [startDate, setStartDate] = useState(todayIso());
   const [currencyCode, setCurrencyCode] = useState("MXN");
   const [rateText, setRateText] = useState("");
   const [plazo, setPlazo] = useState(91);
@@ -135,7 +132,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
     setCalculator(investment?.calculator ?? "nu_cajita");
     setName(investment?.name ?? "");
     setPrincipalText(investment ? (investment.principalCents / 100).toFixed(2) : "");
-    setStartDate(investment?.startDate ?? today());
+    setStartDate(investment?.startDate ?? todayIso());
     setCurrencyCode(investment?.currencyCode ?? "MXN");
     setRateText(
       params.annual_rate_bps !== undefined ? (params.annual_rate_bps / 100).toString() : "",

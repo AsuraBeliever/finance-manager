@@ -23,13 +23,10 @@ import {
   updateSubscription,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
+import { todayIso } from "../../lib/date";
 import { CHART_COLORS } from "../../lib/palette";
 import type { Subscription } from "../../lib/types";
 import { es } from "../../i18n/es";
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export function SubscriptionsPage() {
   const qc = useQueryClient();
@@ -198,7 +195,7 @@ function SubscriptionFormModal({
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("MXN");
   const [cadence, setCadence] = useState<"monthly" | "yearly">("monthly");
-  const [nextDate, setNextDate] = useState(today());
+  const [nextDate, setNextDate] = useState(todayIso());
   const [walletId, setWalletId] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [color, setColor] = useState<string>(CHART_COLORS[0]);
@@ -227,7 +224,7 @@ function SubscriptionFormModal({
     setAmount(sub ? (sub.amountCents / 100).toString() : "");
     setCurrency(sub?.currencyCode ?? "MXN");
     setCadence(sub?.cadence ?? "monthly");
-    setNextDate(sub?.nextChargeDate ?? today());
+    setNextDate(sub?.nextChargeDate ?? todayIso());
     setWalletId(sub?.walletId != null ? String(sub.walletId) : "");
     setCategoryId(sub?.categoryId != null ? String(sub.categoryId) : "");
     setColor(sub?.color ?? CHART_COLORS[0]);

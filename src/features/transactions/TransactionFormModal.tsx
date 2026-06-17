@@ -7,14 +7,11 @@ import { Modal } from "../../components/Modal";
 import { listTransactionCategories, listWallets, updateTransaction } from "../../lib/api";
 import { submitOrQueue } from "../../lib/outbox";
 import { parseToCents } from "../../lib/money";
+import { todayIso } from "../../lib/date";
 import type { Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
 
 type Tab = "income" | "expense" | "transfer";
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 interface TransactionFormModalProps {
   open: boolean;
@@ -52,7 +49,7 @@ export function TransactionFormModal({
   const [amountToText, setAmountToText] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [description, setDescription] = useState("");
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(todayIso());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,7 +71,7 @@ export function TransactionFormModal({
       setAmountText("");
       setCategoryId(null);
       setDescription("");
-      setDate(today());
+      setDate(todayIso());
     }
   }, [open, defaultWalletId, transaction]);
 

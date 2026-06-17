@@ -35,13 +35,10 @@ import {
   getInvestmentDetail,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
+import { todayIso } from "../../lib/date";
 import { POSITIVE, useChartTokens } from "../../lib/palette";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export function InvestmentDetailPage() {
   const { id } = useParams();
@@ -52,11 +49,11 @@ export function InvestmentDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [snapshotOpen, setSnapshotOpen] = useState(false);
   const [snapshotValue, setSnapshotValue] = useState("");
-  const [snapshotDate, setSnapshotDate] = useState(today());
+  const [snapshotDate, setSnapshotDate] = useState(todayIso());
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [movementKind, setMovementKind] = useState<"deposit" | "withdrawal" | null>(null);
   const [movementValue, setMovementValue] = useState("");
-  const [movementDate, setMovementDate] = useState(today());
+  const [movementDate, setMovementDate] = useState(todayIso());
   const [movementError, setMovementError] = useState<string | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [movementToDelete, setMovementToDelete] = useState<number | null>(null);
@@ -98,7 +95,7 @@ export function InvestmentDetailPage() {
       invalidate();
       setSnapshotOpen(false);
       setSnapshotValue("");
-      setSnapshotDate(today());
+      setSnapshotDate(todayIso());
     },
     onError: (e) => setSnapshotError(e instanceof Error ? e.message : String(e)),
   });
@@ -115,7 +112,7 @@ export function InvestmentDetailPage() {
       invalidate();
       setMovementKind(null);
       setMovementValue("");
-      setMovementDate(today());
+      setMovementDate(todayIso());
     },
     onError: (e) => setMovementError(e instanceof Error ? e.message : String(e)),
   });
@@ -134,7 +131,7 @@ export function InvestmentDetailPage() {
     date: p.date,
     value: p.valueCents / 100,
   }));
-  const todayStr = today();
+  const todayStr = todayIso();
 
   // crypto extras: quantity from params + USD equivalent via the USD fx rate
   let cryptoParams: { symbol: string; quantity_e8: number } | null = null;
