@@ -63,6 +63,9 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
   const [skin, setSkin] = useState<string | null>(null);
   const [customColor, setCustomColor] = useState(COLORS[0]);
   const [notes, setNotes] = useState("");
+  const [yieldEnabled, setYieldEnabled] = useState(false);
+  const [yieldRateText, setYieldRateText] = useState("");
+  const [yieldFrequency, setYieldFrequency] = useState("weekly");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -75,6 +78,9 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
     setSkin(wallet?.skin ?? null);
     setCustomColor(skinAccent(wallet?.skin) ?? wallet?.color ?? COLORS[0]);
     setNotes(wallet?.notes ?? "");
+    setYieldEnabled(wallet?.yieldRateBps != null);
+    setYieldRateText(wallet?.yieldRateBps != null ? String(wallet.yieldRateBps / 100) : "");
+    setYieldFrequency(wallet?.yieldFrequency ?? "weekly");
     setError(null);
   }, [open, wallet]);
 
@@ -108,6 +114,15 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
     }
     const finalCategory = categoryId ?? categories.data?.[0]?.id;
     if (finalCategory === undefined) return;
+    let yieldRateBps: number | null = null;
+    if (yieldEnabled) {
+      const pct = parseFloat(yieldRateText.replace(",", "."));
+      if (!isFinite(pct) || pct <= 0) {
+        setError(es.wallets.invalidAmount);
+        return;
+      }
+      yieldRateBps = Math.round(pct * 100);
+    }
     const catName = categories.data?.find((c) => c.id === finalCategory)?.name;
     mutation.mutate({
       name,
@@ -117,6 +132,8 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
       color: skinAccent(effectiveSkin(skin, catName)) ?? COLORS[0],
       skin,
       notes: notes.trim() === "" ? null : notes.trim(),
+      yieldRateBps,
+      yieldFrequency: yieldRateBps != null ? yieldFrequency : null,
     });
   }
 
@@ -277,6 +294,60 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
             onChange={(e) => setNotes(e.target.value)}
           />
         </Field>
+
+        {/* Yield: wallets that grow on their own (Klar, Nu…) accrue interest
+            automatically via the daily cron; see worker wallet_yield. */}
+        <div className="rounded-lg border border-border-muted p-3">
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={yieldEnabled}
+              onChange={(e) => setYieldEnabled(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-accent"
+            />
+            <span className="text-sm">
+              {es.wallets.yieldEnable}
+              <span className="mt-0.5 block text-xs text-fg-subtle">
+                {es.wallets.yieldHint}
+              </span>
+            </span>
+          </label>
+
+          {yieldEnabled && (
+            <div className="mt-3 space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label={es.wallets.yieldRate}>
+                  <div className="relative">
+                    <input
+                      className={inputClass}
+                      value={yieldRateText}
+                      onChange={(e) => setYieldRateText(e.target.value)}
+                      placeholder="3.0"
+                      inputMode="decimal"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-fg-subtle">
+                      %
+                    </span>
+                  </div>
+                </Field>
+                <Field label={es.wallets.yieldFrequency}>
+                  <select
+                    className={inputClass}
+                    value={yieldFrequency}
+                    onChange={(e) => setYieldFrequency(e.target.value)}
+                  >
+                    <option value="weekly">{es.wallets.yieldWeekly}</option>
+                    <option value="biweekly">{es.wallets.yieldBiweekly}</option>
+                    <option value="monthly">{es.wallets.yieldMonthly}</option>
+                  </select>
+                </Field>
+              </div>
+              {!wallet?.yieldRateBps && (
+                <p className="text-xs text-fg-subtle">{es.wallets.yieldStartsToday}</p>
+              )}
+            </div>
+          )}
+        </div>
 
         {error && <p className="text-sm text-danger">{error}</p>}
         {wallet && (

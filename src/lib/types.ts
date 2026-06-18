@@ -26,6 +26,12 @@ export interface Wallet {
   skin: string | null;
   notes: string | null;
   isArchived: boolean;
+  /** Annual yield rate in basis points, or null when the wallet earns nothing. */
+  yieldRateBps: number | null;
+  /** Payout cadence ('weekly' | 'biweekly' | 'monthly') when yield is on. */
+  yieldFrequency: string | null;
+  /** 'YYYY-MM-DD' the day yield was switched on (null when off). */
+  yieldAnchorDate: string | null;
   createdAt: string;
 }
 

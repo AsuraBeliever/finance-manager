@@ -101,6 +101,10 @@ CREATE TABLE wallets (
   color TEXT,
   notes TEXT,
   is_archived INTEGER NOT NULL DEFAULT 0,
+  yield_rate_bps INTEGER,        -- migración 0012; NULL = sin rendimiento
+  yield_frequency TEXT,          -- 'weekly' | 'biweekly' | 'monthly'
+  yield_anchor_date TEXT,        -- 'YYYY-MM-DD' día en que se activó
+  yield_last_paid_date TEXT,     -- 'YYYY-MM-DD' fin del último periodo abonado
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -259,3 +263,5 @@ CREATE TABLE subscriptions (     -- pagos recurrentes; "registrar pago" inserta 
 - **categorías (migración 0009)**: cada `transaction_categories` trae un `color` por defecto distinto (seeds asignados por nombre; resto por `id % paleta`; ver `CATEGORY_PALETTE` en `src/lib/palette.ts`). Orden de despliegue por usuario en `category_order(user_id, category_id, position)` (PK compuesta): el manager lo reordena arrastrando; los listados hacen LEFT JOIN y ordenan por `kind, (position IS NULL), position, is_system DESC, id`. Por-usuario, así que reordenar seeds compartidos no afecta a otros. RPC `reorder_transaction_categories`.
 
 - **wallets.sort_order** (migración 0007): orden de despliegue definido por el usuario (arrastrar para reordenar). Menor = primero; empates por `created_at, id`. Carteras nuevas van al final (`MAX(sort_order)+1`). `reorder_wallets` reescribe el `sort_order` de cada id según su índice (batch atómico, scoped por usuario).
+
+- **carteras con rendimiento** (migración 0012): una cartera normal (no inversión) cuyo saldo crece solo, como las cuentas Klar/Nu que pagan interés diario con abono periódico. Activarla fija `yield_rate_bps` (>0), `yield_frequency` y `yield_anchor_date`/`yield_last_paid_date` = hoy (sin retroactivo). El cron diario (`handlers::wallet_yield::accrue_yield`) recorre cada cartera activa y, por cada periodo vencido, inserta UNA transacción `income` (categoría semilla *Intereses*) y avanza `yield_last_paid_date`. Idempotente: `client_id = yield:<wallet>:<fin-periodo>` (índice único) + el cursor solo avanza. La fórmula (interés compuesto diario ACT/365, misma convención que la cajita Nu) es pura en `finanzas_core::wallet_yield` con tests. El saldo sigue siendo calculado (initial + Σ transacciones); los abonos son transacciones reales, editables/borrables.

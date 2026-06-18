@@ -34,6 +34,11 @@ fn wallet_from_row(r: &Row) -> rusqlite::Result<Wallet> {
         skin: None,
         notes: r.get("notes")?,
         is_archived: r.get::<_, i64>("is_archived")? != 0,
+        // Yield-bearing wallets are a cloud-only feature; the legacy local DB
+        // has no such columns. This desktop path is dead (shell loads the web).
+        yield_rate_bps: None,
+        yield_frequency: None,
+        yield_anchor_date: None,
         created_at: r.get("created_at")?,
     })
 }

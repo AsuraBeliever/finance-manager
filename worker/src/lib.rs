@@ -59,6 +59,9 @@ pub async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) 
     if let Err(e) = market::refresh_market_data(&db).await {
         console_error!("market data auto-update failed: {e}");
     }
+    if let Err(e) = handlers::wallet_yield::accrue_yield(&db).await {
+        console_error!("wallet yield accrual failed: {e}");
+    }
     if let Err(e) = db::exec(
         &db,
         "DELETE FROM sessions WHERE expires_at < datetime('now')",
