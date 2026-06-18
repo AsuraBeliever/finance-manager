@@ -88,6 +88,47 @@ pub async fn require_user(req: &Request, db: &D1Database) -> AppResult<i64> {
         .ok_or_else(|| AppError::Unauthorized("no autenticado".into()))
 }
 
+/// Per-IP fixed-window throttle for the unauthenticated auth endpoints. One
+/// atomic D1 upsert opens a fresh window or increments the current one and
+/// returns the post-increment count; over `limit` within `window_secs` →
+/// TooManyRequests (HTTP 429). Keyed on CF-Connecting-IP so one source can't
+/// brute-force passwords or exhaust the signup cap. Per-IP (not per-email) on
+/// purpose: an email key would let an attacker lock a victim out.
+async fn rate_limit(
+    req: &Request,
+    db: &D1Database,
+    scope: &str,
+    limit: i64,
+    window_secs: i64,
+) -> AppResult<()> {
+    let key = req
+        .headers()
+        .get("CF-Connecting-IP")
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| "unknown".to_string());
+    let cutoff = format!("-{window_secs} seconds");
+    let row: Option<CountRow> = first(
+        db,
+        "INSERT INTO auth_attempts (scope, client_key, count, window_start)
+         VALUES (?1, ?2, 1, datetime('now'))
+         ON CONFLICT(scope, client_key) DO UPDATE SET
+           count = CASE WHEN window_start < datetime('now', ?3)
+                        THEN 1 ELSE count + 1 END,
+           window_start = CASE WHEN window_start < datetime('now', ?3)
+                               THEN datetime('now') ELSE window_start END
+         RETURNING count AS n",
+        jsv![scope, key, cutoff],
+    )
+    .await?;
+    if row.map(|r| r.n).unwrap_or(1) > limit {
+        return Err(AppError::TooManyRequests(
+            "demasiados intentos; espera unos minutos e inténtalo de nuevo".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Mutating routes must come from our own origin (defense in depth on top of
 /// SameSite=Lax).
 pub fn check_origin(req: &Request) -> AppResult<()> {
@@ -182,6 +223,14 @@ pub async fn register(mut req: Request, ctx: RouteContext<()>) -> worker::Result
     if let Err(e) = check_origin(&req) {
         return error_response(&e);
     }
+    let db = match ctx.env.d1("DB") {
+        Ok(d) => d,
+        Err(e) => return error_response(&db_err(e)),
+    };
+    // At most 5 new accounts per IP per hour: blunts signup-cap exhaustion.
+    if let Err(e) = rate_limit(&req, &db, "register", 5, 3600).await {
+        return error_response(&e);
+    }
     let ua = user_agent(&req);
     let args: RegisterArgs = match req.json().await {
         Ok(a) => a,
@@ -269,6 +318,11 @@ pub async fn login(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Re
         Ok(d) => d,
         Err(e) => return error_response(&db_err(e)),
     };
+    // At most 10 attempts per IP per 15 min: slows online password guessing on
+    // top of the per-attempt PBKDF2 cost.
+    if let Err(e) = rate_limit(&req, &db, "login", 10, 900).await {
+        return error_response(&e);
+    }
     match do_login(&db, args, ua).await {
         Ok((user, token)) => {
             let resp = Response::from_json(&user)?;

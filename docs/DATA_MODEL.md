@@ -29,6 +29,14 @@ CREATE TABLE sessions (
   user_agent TEXT,                        -- 0003: lista de dispositivos
   last_seen_at TEXT                       -- 0003: actividad (granularidad ~1h)
 );
+
+CREATE TABLE auth_attempts (             -- 0010: throttle anti-fuerza-bruta de /api/auth
+  scope TEXT NOT NULL,                    -- 'login' | 'register'
+  client_key TEXT NOT NULL,              -- CF-Connecting-IP (o 'unknown')
+  count INTEGER NOT NULL,                 -- contador de ventana fija
+  window_start TEXT NOT NULL,            -- datetime('now') al abrir la ventana
+  PRIMARY KEY (scope, client_key)        -- upsert atómico; el cron diario poda filas viejas
+);
 ```
 
 Scoping: `wallets.user_id` y `investments.user_id` (NOT NULL);

@@ -17,6 +17,10 @@ pub enum AppError {
     #[error("{0}")]
     Unauthorized(String),
 
+    // Too many requests in a time window (auth throttle); maps to HTTP 429.
+    #[error("{0}")]
+    TooManyRequests(String),
+
     #[error("{0}")]
     Internal(String),
 }
