@@ -6,4 +6,5 @@ pub mod investments;
 pub mod settings;
 pub mod subscriptions;
 pub mod transactions;
+pub mod wallet_yield;
 pub mod wallets;

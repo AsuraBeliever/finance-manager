@@ -34,6 +34,12 @@ pub struct Wallet {
     pub skin: Option<String>,
     pub notes: Option<String>,
     pub is_archived: bool,
+    /// Yield: annual rate in basis points, or None when the wallet earns nothing.
+    pub yield_rate_bps: Option<i64>,
+    /// Payout cadence ('weekly' | 'biweekly' | 'monthly') when yield is on.
+    pub yield_frequency: Option<String>,
+    /// 'YYYY-MM-DD' the day yield was switched on (None when off).
+    pub yield_anchor_date: Option<String>,
     pub created_at: String,
 }
 

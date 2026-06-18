@@ -18,7 +18,8 @@ const WALLET_SELECT: &str = "
                           WHEN 'transfer_in' THEN t.amount_cents
                           ELSE -t.amount_cents END)
              FROM transactions t WHERE t.wallet_id = w.id), 0) AS balance_cents,
-           w.color, w.skin, w.notes, w.is_archived, w.created_at
+           w.color, w.skin, w.notes, w.is_archived,
+           w.yield_rate_bps, w.yield_frequency, w.yield_anchor_date, w.created_at
     FROM wallets w
     JOIN wallet_categories wc ON wc.id = w.category_id";
 
@@ -36,6 +37,9 @@ struct WalletRow {
     skin: Option<String>,
     notes: Option<String>,
     is_archived: i64,
+    yield_rate_bps: Option<i64>,
+    yield_frequency: Option<String>,
+    yield_anchor_date: Option<String>,
     created_at: String,
 }
 
@@ -53,8 +57,38 @@ impl From<WalletRow> for Wallet {
             skin: r.skin,
             notes: r.notes,
             is_archived: r.is_archived != 0,
+            yield_rate_bps: r.yield_rate_bps,
+            yield_frequency: r.yield_frequency,
+            yield_anchor_date: r.yield_anchor_date,
             created_at: r.created_at,
         }
+    }
+}
+
+/// Validates an optional yield config and returns the effective
+/// (rate_bps, frequency) when yield is on, or `None` when it's off.
+/// Yield is "on" only when a positive rate is paired with a known cadence.
+fn validate_yield(
+    rate_bps: Option<i64>,
+    frequency: Option<&str>,
+) -> AppResult<Option<(i64, String)>> {
+    match rate_bps {
+        Some(bps) if bps > 0 => {
+            let freq = frequency.unwrap_or("weekly");
+            if !finanzas_core::wallet_yield::is_valid_frequency(freq) {
+                return Err(AppError::InvalidInput(
+                    "frecuencia de rendimiento inválida".into(),
+                ));
+            }
+            // Guard against fat-fingered rates: 100% annual is already extreme.
+            if bps > 10_000 {
+                return Err(AppError::InvalidInput(
+                    "la tasa de rendimiento es demasiado alta".into(),
+                ));
+            }
+            Ok(Some((bps, freq.to_string())))
+        }
+        _ => Ok(None),
     }
 }
 
@@ -119,16 +153,30 @@ pub struct CreateWalletArgs {
     pub color: Option<String>,
     pub skin: Option<String>,
     pub notes: Option<String>,
+    pub yield_rate_bps: Option<i64>,
+    pub yield_frequency: Option<String>,
 }
 
 pub async fn create_wallet(db: &D1Database, uid: i64, a: CreateWalletArgs) -> AppResult<Wallet> {
     validate(&a.name)?;
+    // When yield is on, accrual starts today — no retroactive interest.
+    let (rate_bps, frequency, anchor) =
+        match validate_yield(a.yield_rate_bps, a.yield_frequency.as_deref())? {
+            Some((bps, freq)) => (
+                Some(bps),
+                Some(freq),
+                Some(crate::db::today_mx().to_string()),
+            ),
+            None => (None, None, None),
+        };
     let res = exec(
         db,
-        "INSERT INTO wallets (user_id, name, category_id, currency_code, initial_balance_cents, color, skin, notes, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
+        "INSERT INTO wallets (user_id, name, category_id, currency_code, initial_balance_cents, color, skin, notes,
+                              yield_rate_bps, yield_frequency, yield_anchor_date, yield_last_paid_date, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM wallets WHERE user_id = ?1), 0))",
-        jsv![uid, a.name.trim(), a.category_id, a.currency_code, a.initial_balance_cents, a.color, a.skin, a.notes],
+        jsv![uid, a.name.trim(), a.category_id, a.currency_code, a.initial_balance_cents, a.color, a.skin, a.notes,
+             rate_bps, frequency, anchor],
     )
     .await?;
     fetch_wallet(db, uid, last_row_id(&res)?).await
@@ -145,15 +193,26 @@ pub struct UpdateWalletArgs {
     pub color: Option<String>,
     pub skin: Option<String>,
     pub notes: Option<String>,
+    pub yield_rate_bps: Option<i64>,
+    pub yield_frequency: Option<String>,
 }
 
 pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> AppResult<Wallet> {
     validate(&a.name)?;
+    let yield_on = validate_yield(a.yield_rate_bps, a.yield_frequency.as_deref())?;
+    // Turning yield on for the first time stamps today as the anchor; an already
+    // running wallet keeps its anchor/last-paid (COALESCE) so its history is
+    // untouched. Turning it off clears everything but leaves posted interest.
     let res = exec(
         db,
         "UPDATE wallets
          SET name = ?3, category_id = ?4, currency_code = ?5,
-             initial_balance_cents = ?6, color = ?7, skin = ?8, notes = ?9
+             initial_balance_cents = ?6, color = ?7, skin = ?8, notes = ?9,
+             yield_rate_bps = ?10, yield_frequency = ?11,
+             yield_anchor_date = CASE WHEN ?10 IS NULL THEN NULL
+                                      ELSE COALESCE(yield_anchor_date, ?12) END,
+             yield_last_paid_date = CASE WHEN ?10 IS NULL THEN NULL
+                                         ELSE COALESCE(yield_last_paid_date, ?12) END
          WHERE id = ?1 AND user_id = ?2",
         jsv![
             a.id,
@@ -164,7 +223,10 @@ pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> Ap
             a.initial_balance_cents,
             a.color,
             a.skin,
-            a.notes
+            a.notes,
+            yield_on.as_ref().map(|(bps, _)| *bps),
+            yield_on.as_ref().map(|(_, freq)| freq.clone()),
+            crate::db::today_mx().to_string()
         ],
     )
     .await?;

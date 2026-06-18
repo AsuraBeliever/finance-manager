@@ -88,6 +88,10 @@ export interface WalletInput {
   color: string | null;
   skin: string | null;
   notes: string | null;
+  /** Annual yield rate in basis points; null/omitted turns yield off. */
+  yieldRateBps: number | null;
+  /** Payout cadence ('weekly' | 'biweekly' | 'monthly'); used when yield is on. */
+  yieldFrequency: string | null;
 }
 
 export const listWallets = (includeArchived = false) =>
