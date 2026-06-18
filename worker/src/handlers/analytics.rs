@@ -66,7 +66,7 @@ pub async fn get_category_breakdown(
     if a.kind != "income" && a.kind != "expense" {
         return Err(AppError::InvalidInput("tipo inválido".into()));
     }
-    let rates = load_rates(db).await?;
+    let rates = load_rates(db, uid).await?;
     let sql = format!(
         "SELECT t.category_id AS category_id, c.name AS name, c.color AS color, c.icon AS icon,
                 w.currency_code AS currency_code, SUM(t.amount_cents) AS sum_cents
@@ -154,7 +154,7 @@ struct DayRow {
 }
 
 pub async fn get_spending_trends(db: &D1Database, uid: i64) -> AppResult<SpendingTrends> {
-    let rates = load_rates(db).await?;
+    let rates = load_rates(db, uid).await?;
 
     // Current month vs previous month, split by kind, per currency.
     let month_rows: Vec<MonthRow> = all(

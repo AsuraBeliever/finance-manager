@@ -89,7 +89,7 @@ async fn rates_are_fresh(db: &D1Database) -> AppResult<bool> {
         "SELECT COUNT(*) AS n FROM currencies c
          WHERE c.code != 'MXN' AND NOT EXISTS (
            SELECT 1 FROM exchange_rates r
-           WHERE r.currency_code = c.code AND r.source = 'api'
+           WHERE r.currency_code = c.code AND r.source = 'api' AND r.user_id = 0
              AND r.as_of > datetime('now', ?1)
          )",
         jsv![format!("-{FRESH_HOURS} hours")],
@@ -118,15 +118,15 @@ pub async fn fetch_and_store_rates(db: &D1Database, force: bool) -> AppResult<us
     for (code, micros) in &parsed {
         exec(
             db,
-            "INSERT INTO exchange_rates (currency_code, rate_to_mxn_micros, source)
-             VALUES (?1, ?2, 'api')",
+            "INSERT INTO exchange_rates (currency_code, rate_to_mxn_micros, source, user_id)
+             VALUES (?1, ?2, 'api', 0)",
             jsv![code, micros],
         )
         .await?;
     }
 
     // USD: override with Banxico's FIX, the official MXN/USD reference banks
-    // settle against (DOF). Inserted last so load_rates (MAX(id) per currency)
+    // settle against (DOF). Inserted last so load_rates (latest id per currency)
     // prefers it; best-effort, the open.er-api USD row above stays as fallback.
     if wanted.iter().any(|c| c == "USD") {
         if let Err(e) = store_usd_fix(db).await {
@@ -142,8 +142,8 @@ async fn store_usd_fix(db: &D1Database) -> AppResult<()> {
     let (_date, micros) = market::parse_sie_internet_fx_micros(&body)?;
     exec(
         db,
-        "INSERT INTO exchange_rates (currency_code, rate_to_mxn_micros, source)
-         VALUES ('USD', ?1, 'banxico_fix')",
+        "INSERT INTO exchange_rates (currency_code, rate_to_mxn_micros, source, user_id)
+         VALUES ('USD', ?1, 'banxico_fix', 0)",
         jsv![micros],
     )
     .await?;

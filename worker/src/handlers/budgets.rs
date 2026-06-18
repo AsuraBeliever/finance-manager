@@ -49,7 +49,7 @@ fn progress_bps(spent: i64, limit: i64) -> i64 {
 }
 
 pub async fn list_budgets(db: &D1Database, uid: i64) -> AppResult<Vec<Budget>> {
-    let rates = load_rates(db).await?;
+    let rates = load_rates(db, uid).await?;
 
     // This month's expenses per category + currency → MXN map + grand total.
     let spent_rows: Vec<SpentRow> = all(

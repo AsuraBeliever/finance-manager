@@ -62,14 +62,21 @@ struct RateRow {
     rate_to_mxn_micros: i64,
 }
 
-/// Latest rate per currency in micros; MXN is always 1.0.
-pub async fn load_rates(db: &D1Database) -> AppResult<HashMap<String, i64>> {
+/// Latest rate per currency in micros; MXN is always 1.0. The user's own manual
+/// rate wins over the global auto-fetched one (user_id 0); else the global is
+/// used. `(user_id = ?1) DESC` sorts the user's rows ahead of the global ones,
+/// then the newest id within that group.
+pub async fn load_rates(db: &D1Database, uid: i64) -> AppResult<HashMap<String, i64>> {
     let mut rates = HashMap::from([("MXN".to_string(), MICROS)]);
     let rows: Vec<RateRow> = all(
         db,
-        "SELECT currency_code, rate_to_mxn_micros FROM exchange_rates
-         WHERE id IN (SELECT MAX(id) FROM exchange_rates GROUP BY currency_code)",
-        vec![],
+        "SELECT currency_code, rate_to_mxn_micros FROM (
+           SELECT currency_code, rate_to_mxn_micros,
+                  ROW_NUMBER() OVER (PARTITION BY currency_code
+                                     ORDER BY (user_id = ?1) DESC, id DESC) AS rn
+           FROM exchange_rates WHERE user_id IN (?1, 0)
+         ) WHERE rn = 1",
+        jsv![uid],
     )
     .await?;
     for r in rows {
@@ -122,7 +129,7 @@ struct FlowRow {
 }
 
 pub async fn get_dashboard_summary(db: &D1Database, uid: i64) -> AppResult<DashboardSummary> {
-    let rates = load_rates(db).await?;
+    let rates = load_rates(db, uid).await?;
 
     let rows: Vec<BalanceRow> = all(
         db,

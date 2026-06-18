@@ -83,7 +83,7 @@ pub struct SubscriptionList {
 }
 
 pub async fn list_subscriptions(db: &D1Database, uid: i64) -> AppResult<SubscriptionList> {
-    let rates = load_rates(db).await?;
+    let rates = load_rates(db, uid).await?;
     let rows: Vec<SubRow> = all(
         db,
         &format!("{SELECT} WHERE user_id = ?1 ORDER BY is_active DESC, next_charge_date"),
@@ -258,7 +258,7 @@ pub async fn register_subscription_payment(
     )
     .await?
     .ok_or(AppError::NotFound("cartera"))?;
-    let rates = load_rates(db).await?;
+    let rates = load_rates(db, uid).await?;
     let amount_cents = convert(
         sub.amount_cents,
         &sub.currency_code,

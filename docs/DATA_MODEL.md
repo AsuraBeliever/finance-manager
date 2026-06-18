@@ -43,8 +43,10 @@ Scoping: `wallets.user_id` y `investments.user_id` (NOT NULL);
 `transaction_categories.user_id` (NULL = seed del sistema, visible a todos);
 `transactions`, `investment_snapshots` e `investment_movements` se escopan por
 JOIN a su padre; `settings` tiene PK `(user_id, key)` y el usuario 0 guarda
-cachés globales (`bonddia_price`). Tablas globales sin user_id: `currencies`,
-`exchange_rates`, `wallet_categories`, `rate_history`, `crypto_prices`.
+cachés globales (`bonddia_price`). `exchange_rates` usa el mismo patrón que
+`settings` (user_id 0 = tasas globales del cron; >0 = override manual del
+usuario). Tablas globales sin user_id: `currencies`, `wallet_categories`,
+`rate_history`, `crypto_prices`.
 
 ## Convenciones
 
@@ -70,13 +72,17 @@ CREATE TABLE currencies (
   decimals INTEGER NOT NULL DEFAULT 2
 );
 
-CREATE TABLE exchange_rates (             -- la fila más reciente por moneda gana
+CREATE TABLE exchange_rates (             -- por moneda: la tasa propia del usuario gana, si no la global
   id INTEGER PRIMARY KEY,
   currency_code TEXT NOT NULL REFERENCES currencies(code),
   rate_to_mxn_micros INTEGER NOT NULL,    -- 1 unidad = rate/1e6 MXN
   as_of TEXT NOT NULL DEFAULT (datetime('now')),
-  source TEXT NOT NULL DEFAULT 'manual'   -- 'manual' | 'api' (futuro)
+  source TEXT NOT NULL DEFAULT 'manual',  -- 'manual' (override del usuario) | 'api' | 'banxico_fix'
+  user_id INTEGER NOT NULL DEFAULT 0      -- 0011: 0 = global (cron); >0 = override manual de ese usuario
 );
+-- Lectura (load_rates / get_exchange_rates): ROW_NUMBER() OVER (PARTITION BY
+-- currency_code ORDER BY (user_id = ?uid) DESC, id DESC) — la fila manual del
+-- usuario vence a la global 0; sin override, gana la global más reciente.
 
 CREATE TABLE wallet_categories (
   id INTEGER PRIMARY KEY,

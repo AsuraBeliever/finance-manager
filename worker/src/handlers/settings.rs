@@ -62,7 +62,9 @@ pub async fn list_wallet_categories(db: &D1Database) -> AppResult<Vec<WalletCate
 }
 
 /// Latest rate per currency (excluding MXN, which is always 1.0 by definition).
-pub async fn get_exchange_rates(db: &D1Database) -> AppResult<Vec<ExchangeRate>> {
+/// The caller's own manual rate wins over the global auto-fetched one (user_id
+/// 0); same precedence as `load_rates`.
+pub async fn get_exchange_rates(db: &D1Database, uid: i64) -> AppResult<Vec<ExchangeRate>> {
     #[derive(Deserialize)]
     struct Row {
         currency_code: String,
@@ -72,11 +74,14 @@ pub async fn get_exchange_rates(db: &D1Database) -> AppResult<Vec<ExchangeRate>>
     }
     let rows: Vec<Row> = all(
         db,
-        "SELECT currency_code, rate_to_mxn_micros, as_of, source
-         FROM exchange_rates
-         WHERE id IN (SELECT MAX(id) FROM exchange_rates GROUP BY currency_code)
+        "SELECT currency_code, rate_to_mxn_micros, as_of, source FROM (
+           SELECT currency_code, rate_to_mxn_micros, as_of, source,
+                  ROW_NUMBER() OVER (PARTITION BY currency_code
+                                     ORDER BY (user_id = ?1) DESC, id DESC) AS rn
+           FROM exchange_rates WHERE user_id IN (?1, 0)
+         ) WHERE rn = 1
          ORDER BY currency_code",
-        vec![],
+        jsv![uid],
     )
     .await?;
     Ok(rows
@@ -97,7 +102,7 @@ pub struct SetExchangeRateArgs {
     pub rate_to_mxn_micros: i64,
 }
 
-pub async fn set_exchange_rate(db: &D1Database, a: SetExchangeRateArgs) -> AppResult<()> {
+pub async fn set_exchange_rate(db: &D1Database, uid: i64, a: SetExchangeRateArgs) -> AppResult<()> {
     if a.rate_to_mxn_micros <= 0 {
         return Err(AppError::InvalidInput(
             "el tipo de cambio debe ser positivo".into(),
@@ -117,11 +122,14 @@ pub async fn set_exchange_rate(db: &D1Database, a: SetExchangeRateArgs) -> AppRe
     if row.map(|r| r.n).unwrap_or(0) == 0 {
         return Err(AppError::NotFound("moneda"));
     }
+    // Per-user manual override (user_id = caller). It wins over the global
+    // auto-fetched rate (user_id 0) only for this user; everyone else keeps
+    // theirs.
     exec(
         db,
-        "INSERT INTO exchange_rates (currency_code, rate_to_mxn_micros, source)
-         VALUES (?1, ?2, 'manual')",
-        jsv![a.currency_code, a.rate_to_mxn_micros],
+        "INSERT INTO exchange_rates (currency_code, rate_to_mxn_micros, source, user_id)
+         VALUES (?1, ?2, 'manual', ?3)",
+        jsv![a.currency_code, a.rate_to_mxn_micros, uid],
     )
     .await?;
     Ok(())

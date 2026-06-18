@@ -54,8 +54,8 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         // ---- settings ----
         "list_currencies" => out(settings::list_currencies(db).await?),
         "list_wallet_categories" => out(settings::list_wallet_categories(db).await?),
-        "get_exchange_rates" => out(settings::get_exchange_rates(db).await?),
-        "set_exchange_rate" => out(settings::set_exchange_rate(db, args(body)?).await?),
+        "get_exchange_rates" => out(settings::get_exchange_rates(db, uid).await?),
+        "set_exchange_rate" => out(settings::set_exchange_rate(db, uid, args(body)?).await?),
         "fetch_exchange_rates" => out(market::fetch_and_store_rates(db, true).await?),
         "add_currency" => out(settings::add_currency(db, args(body)?).await?),
         "fetch_banxico_rate" => {
