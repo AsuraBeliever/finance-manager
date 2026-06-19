@@ -33,6 +33,7 @@ import {
   deleteInvestmentMovement,
   getExchangeRates,
   getInvestmentDetail,
+  listWallets,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
 import { todayIso } from "../../lib/date";
@@ -54,6 +55,7 @@ export function InvestmentDetailPage() {
   const [movementKind, setMovementKind] = useState<"deposit" | "withdrawal" | null>(null);
   const [movementValue, setMovementValue] = useState("");
   const [movementDate, setMovementDate] = useState(todayIso());
+  const [movementWalletId, setMovementWalletId] = useState<number | null>(null);
   const [movementError, setMovementError] = useState<string | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [movementToDelete, setMovementToDelete] = useState<number | null>(null);
@@ -65,10 +67,14 @@ export function InvestmentDetailPage() {
   });
 
   const fxRates = useQuery({ queryKey: ["exchangeRates"], queryFn: getExchangeRates });
+  const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["investments"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    // Movements can move money in/out of a wallet, so refresh balances + ledger.
+    queryClient.invalidateQueries({ queryKey: ["wallets"] });
+    queryClient.invalidateQueries({ queryKey: ["transactions"] });
   };
 
   const close = useMutation({
@@ -106,7 +112,7 @@ export function InvestmentDetailPage() {
       if (cents === null || cents <= 0)
         return Promise.reject(new Error(es.investments.invalidAmount));
       if (!movementKind) return Promise.reject(new Error(es.investments.invalidAmount));
-      return addInvestmentMovement(invId, movementKind, cents, movementDate);
+      return addInvestmentMovement(invId, movementKind, cents, movementDate, movementWalletId);
     },
     onSuccess: () => {
       invalidate();
@@ -126,6 +132,15 @@ export function InvestmentDetailPage() {
   if (detail.isError) return <p className="text-sm text-danger">{String(detail.error)}</p>;
 
   const d = detail.data;
+  // Open the deposit/withdrawal modal with the investment's remembered wallet
+  // preselected (the user can still change or clear it).
+  const openMovement = (kind: "deposit" | "withdrawal") => {
+    setMovementWalletId(d.linkedWalletId);
+    setMovementValue("");
+    setMovementDate(todayIso());
+    setMovementError(null);
+    setMovementKind(kind);
+  };
   const gainPositive = d.gainCents >= 0;
   const chartData = d.projection.map((p) => ({
     date: p.date,
@@ -262,12 +277,12 @@ export function InvestmentDetailPage() {
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-medium">{es.investments.movements}</h3>
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setMovementKind("deposit")}>
+              <Button variant="ghost" onClick={() => openMovement("deposit")}>
                 <span className="flex items-center gap-2 text-accent">
                   <ArrowDownLeft size={15} /> {es.investments.deposit}
                 </span>
               </Button>
-              <Button variant="ghost" onClick={() => setMovementKind("withdrawal")}>
+              <Button variant="ghost" onClick={() => openMovement("withdrawal")}>
                 <span className="flex items-center gap-2 text-danger">
                   <ArrowUpRight size={15} /> {es.investments.withdrawal}
                 </span>
@@ -374,6 +389,29 @@ export function InvestmentDetailPage() {
           </Field>
           <Field label={es.investments.movementDate}>
             <DateInput value={movementDate} onChange={setMovementDate} min={d.startDate} />
+          </Field>
+          <Field label={es.investments.movementWallet}>
+            <select
+              className={inputClass}
+              value={movementWalletId ?? ""}
+              onChange={(e) =>
+                setMovementWalletId(e.target.value === "" ? null : Number(e.target.value))
+              }
+            >
+              <option value="">{es.investments.movementWalletNone}</option>
+              {wallets.data?.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} ({w.currencyCode})
+                </option>
+              ))}
+            </select>
+            {movementWalletId !== null && (
+              <span className="mt-1 block text-xs text-fg-subtle">
+                {movementKind === "withdrawal"
+                  ? es.investments.movementWalletWithdrawalHint
+                  : es.investments.movementWalletDepositHint}
+              </span>
+            )}
           </Field>
           {movementError && <p className="text-sm text-danger">{movementError}</p>}
           <div className="flex justify-end gap-2">

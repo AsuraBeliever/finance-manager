@@ -10,7 +10,7 @@ use finanzas_core::models::{Investment, InvestmentMovement, InvestmentSnapshot};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
-use crate::db::{all, changes, exec, first, last_row_id, today_mx, ValueRow};
+use crate::db::{all, batch, changes, exec, first, last_row_id, stmt, today_mx, ValueRow};
 use crate::jsv;
 
 #[derive(Debug, Serialize)]
@@ -645,6 +645,11 @@ pub struct AddMovementArgs {
     pub kind: String,
     pub amount_cents: i64,
     pub occurred_at: String,
+    /// Optional wallet the money moves from (deposit) or into (withdrawal). When
+    /// set, the matching income/expense posts on that wallet — converted to its
+    /// currency — atomically with the movement, and the wallet is remembered as
+    /// this investment's default. None = external move with no wallet side.
+    pub wallet_id: Option<i64>,
 }
 
 pub async fn add_investment_movement(
@@ -672,26 +677,126 @@ pub async fn add_investment_movement(
             "el movimiento no puede ser anterior a la fecha de inicio".into(),
         ));
     }
-    exec(
+
+    let Some(wallet_id) = a.wallet_id else {
+        // No wallet side: external contribution/withdrawal (e.g. the very first
+        // deposit before any wallet exists). Just record the movement.
+        exec(
+            db,
+            "INSERT INTO investment_movements (investment_id, kind, amount_cents, occurred_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            jsv![a.investment_id, a.kind, a.amount_cents, a.occurred_at],
+        )
+        .await?;
+        return Ok(());
+    };
+
+    // Wallet side: a deposit leaves the wallet (expense), a withdrawal returns to
+    // it (income), in the wallet's own currency. The transaction, the movement
+    // (linked to it) and the remembered default wallet all post in one batch so
+    // money never half-moves. last_insert_rowid() carries the just-inserted
+    // transaction id within the batch transaction.
+    #[derive(Deserialize)]
+    struct CurrencyRow {
+        currency_code: String,
+    }
+    let wallet: CurrencyRow = first(
         db,
-        "INSERT INTO investment_movements (investment_id, kind, amount_cents, occurred_at)
-         VALUES (?1, ?2, ?3, ?4)",
-        jsv![a.investment_id, a.kind, a.amount_cents, a.occurred_at],
+        "SELECT currency_code FROM wallets WHERE id = ?1 AND user_id = ?2",
+        jsv![wallet_id, uid],
+    )
+    .await?
+    .ok_or(AppError::NotFound("cartera"))?;
+
+    let rates = super::dashboard::load_rates(db, uid).await?;
+    let wallet_amount = super::dashboard::convert(
+        a.amount_cents,
+        &inv.currency_code,
+        &wallet.currency_code,
+        &rates,
+    )?;
+
+    let (tx_kind, description) = if a.kind == "deposit" {
+        ("expense", format!("Aporte a {}", inv.name))
+    } else {
+        ("income", format!("Retiro de {}", inv.name))
+    };
+
+    batch(
+        db,
+        vec![
+            stmt(
+                db,
+                "INSERT INTO transactions (wallet_id, kind, amount_cents, description, occurred_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                jsv![
+                    wallet_id,
+                    tx_kind,
+                    wallet_amount,
+                    description,
+                    a.occurred_at
+                ],
+            )?,
+            stmt(
+                db,
+                "INSERT INTO investment_movements
+                   (investment_id, kind, amount_cents, occurred_at, linked_transaction_id)
+                 VALUES (?1, ?2, ?3, ?4, last_insert_rowid())",
+                jsv![a.investment_id, a.kind, a.amount_cents, a.occurred_at],
+            )?,
+            stmt(
+                db,
+                "UPDATE investments SET linked_wallet_id = ?1 WHERE id = ?2 AND user_id = ?3",
+                jsv![wallet_id, a.investment_id, uid],
+            )?,
+        ],
     )
     .await?;
     Ok(())
 }
 
 pub async fn delete_investment_movement(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<()> {
-    let res = exec(
+    // Ownership check + grab the linked transaction (if any) in one lookup.
+    #[derive(Deserialize)]
+    struct MovementLinkRow {
+        linked_transaction_id: Option<i64>,
+    }
+    let row: Option<MovementLinkRow> = first(
         db,
-        "DELETE FROM investment_movements WHERE id = ?1 AND investment_id IN
-           (SELECT id FROM investments WHERE user_id = ?2)",
+        "SELECT m.linked_transaction_id FROM investment_movements m
+         JOIN investments i ON i.id = m.investment_id AND i.user_id = ?2
+         WHERE m.id = ?1",
         jsv![a.id, uid],
     )
     .await?;
-    if changes(&res) == 0 {
-        return Err(AppError::NotFound("movimiento"));
+    let row = row.ok_or(AppError::NotFound("movimiento"))?;
+
+    match row.linked_transaction_id {
+        // Drop the wallet transaction too so the money returns; both in one
+        // batch. (Deleting the tx would cascade-delete the movement anyway, but
+        // being explicit keeps the intent clear and order-independent.)
+        Some(tx_id) => {
+            batch(
+                db,
+                vec![
+                    stmt(
+                        db,
+                        "DELETE FROM investment_movements WHERE id = ?1",
+                        jsv![a.id],
+                    )?,
+                    stmt(db, "DELETE FROM transactions WHERE id = ?1", jsv![tx_id])?,
+                ],
+            )
+            .await?;
+        }
+        None => {
+            exec(
+                db,
+                "DELETE FROM investment_movements WHERE id = ?1",
+                jsv![a.id],
+            )
+            .await?;
+        }
     }
     Ok(())
 }

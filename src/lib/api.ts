@@ -293,12 +293,14 @@ export const addInvestmentMovement = (
   kind: "deposit" | "withdrawal",
   amountCents: number,
   occurredAt: string,
+  walletId: number | null = null,
 ) =>
   rpc<void>("add_investment_movement", {
     investmentId,
     kind,
     amountCents,
     occurredAt,
+    walletId,
   });
 
 export const deleteInvestmentMovement = (id: number) =>

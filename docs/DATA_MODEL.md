@@ -168,6 +168,7 @@ CREATE TABLE investment_movements (   -- aportaciones y retiros posteriores al i
   kind TEXT NOT NULL CHECK (kind IN ('deposit','withdrawal')),
   amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
   occurred_at TEXT NOT NULL,          -- 'YYYY-MM-DD', >= start_date de la inversión
+  linked_transaction_id INTEGER REFERENCES transactions(id) ON DELETE CASCADE,  -- NULL = movimiento externo
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_inv_mov ON investment_movements(investment_id, occurred_at);
@@ -179,6 +180,7 @@ CREATE INDEX idx_inv_mov ON investment_movements(investment_id, occurred_at);
 - **Valuación por posición**: cada monto genera rendimiento desde su propia fecha — `valor(t) = principal·f(start→t) + Σ aportaciones·f(fecha→t) − Σ retiros·f(fecha→t)`, donde `f` es el factor de crecimiento de la calculadora. Un retiro resta también el rendimiento que ese dinero habría generado desde la fecha del retiro.
 - **Aportado neto** = principal + aportaciones − retiros. **Rendimiento** = valor actual − aportado neto (captura rendimiento realizado y no realizado; puede ser positivo aunque el valor actual sea menor a lo retirado).
 - Las inversiones `manual` no usan movimientos (su valor viene de snapshots).
+- **Movimiento ligado a cartera**: al aportar/retirar el usuario puede elegir una cartera origen/destino. Si lo hace, el aporte genera un `expense` (sale dinero de la cartera) y el retiro un `income` (regresa a la cartera), convertido a la moneda de la cartera, y el movimiento guarda `linked_transaction_id` apuntando a esa transacción. Movimiento + transacción se escriben en un solo `db.batch()`; borrar el movimiento borra la transacción ligada y, por el `ON DELETE CASCADE`, borrar la transacción borra el movimiento — los saldos nunca se descuadran. La cartera elegida se recuerda en `investments.linked_wallet_id` como predeterminada. `linked_transaction_id` NULL = movimiento externo (sin cartera, p. ej. el aporte inicial antes de tener carteras).
 
 ## Seeds (worker/migrations/0002_seed.sql)
 
