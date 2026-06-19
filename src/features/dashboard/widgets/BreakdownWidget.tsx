@@ -61,7 +61,7 @@ export function BreakdownWidget({
         </div>
 
         <ul className="min-w-[10rem] flex-1 space-y-2">
-          {data.slices.slice(0, 5).map((s, i) => {
+          {data.slices.map((s, i) => {
             const pct = total > 0 ? Math.round((s.mxnCents / total) * 100) : 0;
             return (
               <li key={s.categoryId ?? "none"} className="flex items-center gap-2 text-sm">
