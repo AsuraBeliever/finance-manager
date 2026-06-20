@@ -186,6 +186,25 @@ body::before {
   .stagger > *:nth-child(n + 8) { animation-delay: 0.35s; }
 }
 
+/* Row actions (edit / delete / drag handle) live inside a `.group` row and, on
+   pointer devices, stay hidden until the row is hovered — keeps lists calm.
+   Touch screens have no hover, so a hover-gated reveal would leave them
+   permanently invisible (the iPhone "where's the button?" bug). Show them
+   always on devices that can't hover; only hide-until-hover where hover works.
+   Mark the button with `touch-action-reveal`; the row needs `group`/`group/cell`. */
+.touch-action-reveal {
+  opacity: 1;
+}
+@media (hover: hover) {
+  .touch-action-reveal {
+    opacity: 0;
+  }
+  .group:hover .touch-action-reveal,
+  .group\/cell:hover .touch-action-reveal {
+    opacity: 1;
+  }
+}
+
 /* Display type. */
 .font-display {
   font-optical-sizing: auto;

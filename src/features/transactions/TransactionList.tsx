@@ -84,7 +84,7 @@ export function TransactionList({
               <button
                 onClick={() => onEdit(t)}
                 aria-label={es.common.edit}
-                className="rounded-md p-1.5 text-fg-subtle opacity-0 transition-all hover:bg-surface-overlay hover:text-fg group-hover:opacity-100"
+                className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-surface-overlay hover:text-fg"
               >
                 <Pencil size={15} />
               </button>
@@ -92,7 +92,7 @@ export function TransactionList({
             <button
               onClick={() => setToDelete(t.id)}
               aria-label={es.common.delete}
-              className="rounded-md p-1.5 text-fg-subtle opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+              className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
             >
               <Trash2 size={15} />
             </button>

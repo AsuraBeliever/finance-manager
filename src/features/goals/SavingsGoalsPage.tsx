@@ -83,7 +83,7 @@ export function SavingsGoalsPage() {
                 <h3 className="min-w-0 flex-1 truncate font-display text-lg font-medium text-fg">
                   {g.name}
                 </h3>
-                <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="touch-action-reveal flex shrink-0 gap-1 transition-opacity">
                   <button
                     onClick={() => {
                       setFormGoal(g);

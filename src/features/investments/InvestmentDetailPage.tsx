@@ -323,7 +323,7 @@ export function InvestmentDetailPage() {
                   <button
                     onClick={() => setMovementToDelete(m.id)}
                     aria-label={es.common.delete}
-                    className="rounded-md p-1 text-fg-subtle opacity-0 transition-all hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                    className="touch-action-reveal rounded-md p-1 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
                   >
                     <Trash2 size={14} />
                   </button>

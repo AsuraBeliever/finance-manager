@@ -158,7 +158,7 @@ export function DashboardGrid({
               <button
                 type="button"
                 aria-label="Mover"
-                className="dash-drag absolute right-2.5 top-2.5 z-10 cursor-grab rounded-md p-1 text-fg-subtle opacity-0 transition-opacity hover:bg-surface-overlay hover:text-fg active:cursor-grabbing group-hover/cell:opacity-100"
+                className="dash-drag touch-action-reveal absolute right-2.5 top-2.5 z-10 cursor-grab rounded-md p-1 text-fg-subtle transition-opacity hover:bg-surface-overlay hover:text-fg active:cursor-grabbing"
               >
                 <GripVertical size={16} />
               </button>
