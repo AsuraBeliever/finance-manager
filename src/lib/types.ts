@@ -22,6 +22,8 @@ export interface Wallet {
   currencyCode: string;
   initialBalanceCents: number;
   balanceCents: number;
+  /** Total earmarked in active goal apartados; available = balance − reserved. */
+  reservedCents: number;
   color: string | null;
   skin: string | null;
   notes: string | null;
@@ -85,12 +87,6 @@ export interface CurrencySubtotal {
   hasRate: boolean;
 }
 
-export interface MonthlyFlow {
-  month: string;
-  incomeMxnCents: number;
-  expenseMxnCents: number;
-}
-
 export interface InvestmentSlice {
   id: number;
   name: string;
@@ -98,11 +94,14 @@ export interface InvestmentSlice {
 }
 
 export interface DashboardSummary {
-  totalMxnCents: number;
+  /** Cash (wallets) total at the start of the selected period. */
+  totalStartMxnCents: number;
+  /** Cash (wallets) total at the end of the period. */
+  totalEndMxnCents: number;
   wallets: WalletBalance[];
   byCurrency: CurrencySubtotal[];
-  monthly: MonthlyFlow[];
   missingRates: string[];
+  investmentsStartMxnCents: number;
   investmentsTotalMxnCents: number;
   investments: InvestmentSlice[];
 }
@@ -181,8 +180,20 @@ export interface CategoryBreakdown {
   slices: CategorySlice[];
 }
 
-export interface DailyFlow {
-  day: string;
+/** Dashboard flow window. Mirrors `finanzas_core::period::Period` (tagged by
+ *  `kind`, camelCase). `month` is 1-12; dates are ISO `YYYY-MM-DD`. */
+export type Period =
+  | { kind: "currentMonth" }
+  | { kind: "lastMonths"; months: number }
+  | { kind: "month"; year: number; month: number }
+  | { kind: "day"; date: string }
+  | { kind: "range"; from: string; to: string };
+
+export type BucketUnit = "day" | "month";
+
+export interface FlowBucket {
+  /** 'YYYY-MM-DD' when bucketUnit is 'day', 'YYYY-MM' when 'month'. */
+  key: string;
   incomeMxnCents: number;
   expenseMxnCents: number;
 }
@@ -194,7 +205,8 @@ export interface SpendingTrends {
   expensePrevMxnCents: number;
   incomeTrendBps: number;
   expenseTrendBps: number;
-  daily: DailyFlow[];
+  bucketUnit: BucketUnit;
+  buckets: FlowBucket[];
 }
 
 // ---- savings goals ----
@@ -208,6 +220,8 @@ export interface SavingsGoal {
   targetCents: number;
   savedCents: number;
   progressBps: number;
+  /** Wallet remembered as the default source for contributions, if any. */
+  linkedWalletId: number | null;
 }
 
 export interface GoalInput {
@@ -216,6 +230,8 @@ export interface GoalInput {
   color: string | null;
   currencyCode: string;
   targetCents: number;
+  /** Wallet to make this goal an apartado of (null = track only). */
+  walletId: number | null;
 }
 
 // ---- budgets ----
@@ -246,6 +262,8 @@ export interface Subscription {
   walletId: number | null;
   categoryId: number | null;
   isActive: boolean;
+  /** Whether a charge falls inside the selected dashboard period. */
+  chargedInPeriod: boolean;
 }
 
 export interface SubscriptionList {

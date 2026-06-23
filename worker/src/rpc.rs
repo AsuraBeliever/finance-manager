@@ -107,28 +107,32 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         }
 
         // ---- dashboard / analytics ----
-        "get_dashboard_summary" => out(dashboard::get_dashboard_summary(db, uid).await?),
+        "get_dashboard_summary" => {
+            out(dashboard::get_dashboard_summary(db, uid, args(body)?).await?)
+        }
         "get_category_breakdown" => {
             out(analytics::get_category_breakdown(db, uid, args(body)?).await?)
         }
-        "get_spending_trends" => out(analytics::get_spending_trends(db, uid).await?),
+        "get_spending_trends" => out(analytics::get_spending_trends(db, uid, args(body)?).await?),
 
         // ---- savings goals ----
-        "list_savings_goals" => out(goals::list_savings_goals(db, uid).await?),
+        "list_savings_goals" => out(goals::list_savings_goals(db, uid, args(body)?).await?),
         "create_savings_goal" => out(goals::create_savings_goal(db, uid, args(body)?).await?),
         "update_savings_goal" => out(goals::update_savings_goal(db, uid, args(body)?).await?),
         "contribute_savings_goal" => {
             out(goals::contribute_savings_goal(db, uid, args(body)?).await?)
         }
         "delete_savings_goal" => out(goals::delete_savings_goal(db, uid, args(body)?).await?),
+        "use_savings_goal" => out(goals::use_savings_goal(db, uid, args(body)?).await?),
+        "reorder_savings_goals" => out(goals::reorder_savings_goals(db, uid, args(body)?).await?),
 
         // ---- budgets ----
-        "list_budgets" => out(budgets::list_budgets(db, uid).await?),
+        "list_budgets" => out(budgets::list_budgets(db, uid, args(body)?).await?),
         "set_budget" => out(budgets::set_budget(db, uid, args(body)?).await?),
         "delete_budget" => out(budgets::delete_budget(db, uid, args(body)?).await?),
 
         // ---- subscriptions ----
-        "list_subscriptions" => out(subscriptions::list_subscriptions(db, uid).await?),
+        "list_subscriptions" => out(subscriptions::list_subscriptions(db, uid, args(body)?).await?),
         "create_subscription" => {
             out(subscriptions::create_subscription(db, uid, args(body)?).await?)
         }

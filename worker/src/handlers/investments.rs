@@ -266,6 +266,14 @@ pub async fn open_investments_mxn(
     let mut slices = Vec::new();
     for row in invs {
         let inv: Investment = row.into();
+        // Skip investments that hadn't started yet at the as-of date (historical
+        // views): they shouldn't inflate a past net worth.
+        if NaiveDate::parse_from_str(&inv.start_date, "%Y-%m-%d")
+            .map(|d| d > as_of)
+            .unwrap_or(false)
+        {
+            continue;
+        }
         let ctx = load_calc_context(db, &inv).await?;
         let value = find(&inv.calculator)?.value_at(&inv, &ctx, as_of)?;
         if let Some(rate) = rates.get(&inv.currency_code) {

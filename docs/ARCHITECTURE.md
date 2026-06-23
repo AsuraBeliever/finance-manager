@@ -73,7 +73,8 @@ puente Tauri original), respuesta JSON o `{"error": "..."}` (400/401/404/500).
 |---|---|
 | Carteras | `list_wallets`, `get_wallet`, `create_wallet`, `update_wallet`, `archive_wallet`, `delete_wallet`, `list_wallet_categories` |
 | Transacciones | `add_income`, `add_expense`, `add_transfer` (los tres aceptan `clientId` opcional para idempotencia del outbox offline), `list_transactions`, `delete_transaction`, `list_transaction_categories`, `create_transaction_category` |
-| Dashboard | `get_dashboard_summary` |
+| Dashboard | `get_dashboard_summary` (foto del momento: saldos, donas, inversiones) |
+| Analytics | `get_spending_trends`, `get_category_breakdown` — ambos aceptan `period` (`{kind}`: `currentMonth` \| `lastMonths{months}` \| `month{year,month}` \| `day{date}` \| `range{from,to}`); la ventana se resuelve en `finanzas-core::period` |
 | Inversiones | `list_investments`, `create_investment`, `update_investment`, `close_investment`, `delete_investment`, `get_investment_detail`, `add_snapshot`, `add_investment_movement`, `delete_investment_movement`, `list_calculators`, `get_investment_catalog` |
 | Ajustes / mercado | `list_currencies`, `add_currency`, `get_exchange_rates`, `set_exchange_rate`, `fetch_exchange_rates`, `fetch_banxico_rate`, `refresh_market_data_cmd`, `get_setting`, `set_setting` |
 
@@ -156,7 +157,7 @@ npm run dev                          # (opcional) Vite con HMR; /api se proxea a
 | Ruta | Pantalla |
 |---|---|
 | (sin sesión) | Login / registro con código de invitación |
-| `/` | Resumen: patrimonio total MXN, desglose por moneda, dona por cartera, barras 6 meses, card de inversiones |
+| `/` | Resumen: patrimonio total MXN, desglose por moneda, dona por cartera, gráfica de flujo con selector de periodo (mes actual / últimos X meses / un mes / un día / rango), card de inversiones |
 | `/carteras`, `/carteras/:id` | Lista + detalle con historial de transacciones |
 | `/transacciones` | Lista con filtros; modal con tabs ingreso/gasto/transferencia |
 | `/inversiones`, `/inversiones/:id` | Lista + detalle con gráfica de proyección y vencimiento |

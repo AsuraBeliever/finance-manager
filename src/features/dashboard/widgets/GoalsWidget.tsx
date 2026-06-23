@@ -6,12 +6,23 @@ import { StatWidget } from "../../../components/StatWidget";
 import { listSavingsGoals } from "../../../lib/api";
 import { formatCents } from "../../../lib/money";
 import { CHART_COLORS } from "../../../lib/palette";
+import type { Period } from "../../../lib/types";
 import { es } from "../../../i18n/es";
 
-export function GoalsWidget() {
-  const q = useQuery({ queryKey: ["savingsGoals"], queryFn: listSavingsGoals });
+export function GoalsWidget({ period }: { period: Period }) {
+  const q = useQuery({ queryKey: ["savingsGoals", period], queryFn: () => listSavingsGoals(period) });
   const goals = q.data;
-  if (!goals || goals.length === 0) return null;
+  if (!goals) return null;
+  // Keep the cell at a fixed size when no goal existed yet in this period.
+  if (goals.length === 0) {
+    return (
+      <StatWidget title={es.goals.title}>
+        <div className="flex h-full items-center justify-center">
+          <p className="text-sm text-fg-subtle">{es.dashboard.noPeriodData}</p>
+        </div>
+      </StatWidget>
+    );
+  }
 
   const [featured, ...rest] = goals;
 

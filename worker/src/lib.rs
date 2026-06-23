@@ -62,6 +62,9 @@ pub async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) 
     if let Err(e) = handlers::wallet_yield::accrue_yield(&db).await {
         console_error!("wallet yield accrual failed: {e}");
     }
+    if let Err(e) = handlers::goals::snapshot_all_goals(&db).await {
+        console_error!("goal snapshot failed: {e}");
+    }
     if let Err(e) = db::exec(
         &db,
         "DELETE FROM sessions WHERE expires_at < datetime('now')",

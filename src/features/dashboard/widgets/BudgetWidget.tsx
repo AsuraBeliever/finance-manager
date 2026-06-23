@@ -4,11 +4,12 @@ import { ProgressBar } from "../../../components/ProgressBar";
 import { StatWidget } from "../../../components/StatWidget";
 import { listBudgets } from "../../../lib/api";
 import { formatCents } from "../../../lib/money";
+import type { Period } from "../../../lib/types";
 import { es } from "../../../i18n/es";
 import { seedName } from "../../../i18n/seed";
 
-export function BudgetWidget() {
-  const q = useQuery({ queryKey: ["budgets"], queryFn: listBudgets });
+export function BudgetWidget({ period }: { period: Period }) {
+  const q = useQuery({ queryKey: ["budgets", period], queryFn: () => listBudgets(period) });
   const budgets = q.data;
   if (!budgets || budgets.length === 0) return null;
 

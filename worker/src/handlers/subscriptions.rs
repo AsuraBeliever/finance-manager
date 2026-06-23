@@ -2,7 +2,10 @@
 //! expense (reusing transactions::add_expense) into the linked wallet and
 //! advances the next charge date by the cadence.
 
+use chrono::NaiveDate;
 use finanzas_core::error::{AppError, AppResult};
+use finanzas_core::period::{resolve_period, Period};
+use finanzas_core::subscription::count_charges;
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
@@ -10,6 +13,13 @@ use super::dashboard::{convert, load_rates, to_mxn};
 use super::transactions::{add_expense, SimpleTxArgs};
 use crate::db::{all, changes, exec, first, last_row_id, today_mx};
 use crate::jsv;
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SubArgs {
+    #[serde(default)]
+    pub period: Period,
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +35,8 @@ pub struct Subscription {
     pub wallet_id: Option<i64>,
     pub category_id: Option<i64>,
     pub is_active: bool,
+    /// Whether a charge for this subscription falls inside the selected period.
+    pub charged_in_period: bool,
 }
 
 #[derive(Deserialize)]
@@ -40,12 +52,17 @@ struct SubRow {
     wallet_id: Option<i64>,
     category_id: Option<i64>,
     is_active: i64,
+    #[serde(default)]
+    started_at: Option<String>,
+    #[serde(default)]
+    ended_at: Option<String>,
 }
 
 impl From<SubRow> for Subscription {
     fn from(r: SubRow) -> Self {
         Subscription {
             is_active: r.is_active != 0,
+            charged_in_period: false,
             id: r.id,
             name: r.name,
             icon: r.icon,
@@ -82,27 +99,56 @@ pub struct SubscriptionList {
     pub monthly_total_mxn_cents: i64,
 }
 
-pub async fn list_subscriptions(db: &D1Database, uid: i64) -> AppResult<SubscriptionList> {
+pub async fn list_subscriptions(
+    db: &D1Database,
+    uid: i64,
+    a: SubArgs,
+) -> AppResult<SubscriptionList> {
     let rates = load_rates(db, uid).await?;
+    let resolved = resolve_period(&a.period, today_mx());
+    let (start, end) = (resolved.start, resolved.end);
+
+    // Every subscription stays in the list (stable layout + the manager view);
+    // `charged_in_period` marks the ones that were actually charged during the
+    // period — a charge occurrence (by cadence) that also falls inside the
+    // active window. The total sums those charges (amount × occurrences).
     let rows: Vec<SubRow> = all(
         db,
-        &format!("{SELECT} WHERE user_id = ?1 ORDER BY is_active DESC, next_charge_date"),
+        "SELECT id, name, icon, color, amount_cents, currency_code, cadence,
+                next_charge_date, wallet_id, category_id, is_active, started_at, ended_at
+         FROM subscriptions
+         WHERE user_id = ?1
+         ORDER BY next_charge_date",
         jsv![uid],
     )
     .await?;
-    let subscriptions: Vec<Subscription> = rows.into_iter().map(Into::into).collect();
-    let monthly_total_mxn_cents = subscriptions
-        .iter()
-        .filter(|s| s.is_active)
-        .map(|s| {
-            let monthly = if s.cadence == "yearly" {
-                s.amount_cents / 12
-            } else {
-                s.amount_cents
-            };
-            to_mxn(monthly, rates.get(&s.currency_code).copied().unwrap_or(0))
-        })
-        .sum();
+
+    let parse = |s: &Option<String>| {
+        s.as_deref()
+            .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+    };
+    let mut subscriptions = Vec::with_capacity(rows.len());
+    let mut monthly_total_mxn_cents = 0i64;
+    for r in rows {
+        // Charge window = period ∩ active span.
+        let lo = parse(&r.started_at).map_or(start, |d| d.max(start));
+        let hi = parse(&r.ended_at).map_or(end, |d| d.min(end));
+        let cadence_months = if r.cadence == "yearly" { 12 } else { 1 };
+        let count = NaiveDate::parse_from_str(&r.next_charge_date, "%Y-%m-%d")
+            .map(|next| count_charges(next, cadence_months, lo, hi))
+            .unwrap_or(0);
+        if count > 0 {
+            monthly_total_mxn_cents += to_mxn(
+                r.amount_cents * count,
+                rates.get(&r.currency_code).copied().unwrap_or(0),
+            );
+        }
+        let mut sub: Subscription = r.into();
+        sub.charged_in_period = count > 0;
+        subscriptions.push(sub);
+    }
+    // Charged-in-period first, then by next charge date (already roughly sorted).
+    subscriptions.sort_by_key(|s| !s.charged_in_period);
     Ok(SubscriptionList {
         subscriptions,
         monthly_total_mxn_cents,
@@ -147,8 +193,8 @@ pub async fn create_subscription(
     let res = exec(
         db,
         "INSERT INTO subscriptions
-           (user_id, name, icon, color, amount_cents, currency_code, cadence, next_charge_date, wallet_id, category_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+           (user_id, name, icon, color, amount_cents, currency_code, cadence, next_charge_date, wallet_id, category_id, started_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, date('now'))",
         jsv![
             uid, a.name.trim(), a.icon, a.color, a.amount_cents, a.currency_code,
             a.cadence, a.next_charge_date, a.wallet_id, a.category_id
@@ -202,12 +248,16 @@ pub async fn set_subscription_active(
     uid: i64,
     a: SetActiveArgs,
 ) -> AppResult<Subscription> {
-    let res = exec(
-        db,
-        "UPDATE subscriptions SET is_active = ?3 WHERE id = ?1 AND user_id = ?2",
-        jsv![a.id, uid, a.active],
-    )
-    .await?;
+    // Maintain the active window: reactivating opens a new span, cancelling
+    // closes the current one (so past periods still count it as active).
+    let sql = if a.active {
+        "UPDATE subscriptions SET is_active = 1, started_at = date('now'), ended_at = NULL
+         WHERE id = ?1 AND user_id = ?2"
+    } else {
+        "UPDATE subscriptions SET is_active = 0, ended_at = date('now')
+         WHERE id = ?1 AND user_id = ?2"
+    };
+    let res = exec(db, sql, jsv![a.id, uid]).await?;
     if changes(&res) == 0 {
         return Err(AppError::NotFound("suscripción"));
     }

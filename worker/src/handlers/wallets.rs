@@ -18,6 +18,9 @@ const WALLET_SELECT: &str = "
                           WHEN 'transfer_in' THEN t.amount_cents
                           ELSE -t.amount_cents END)
              FROM transactions t WHERE t.wallet_id = w.id), 0) AS balance_cents,
+           COALESCE((SELECT SUM(g.saved_cents) FROM savings_goals g
+                     WHERE g.linked_wallet_id = w.id AND g.archived_at IS NULL), 0)
+             AS reserved_cents,
            w.color, w.skin, w.notes, w.is_archived,
            w.yield_rate_bps, w.yield_frequency, w.yield_anchor_date, w.created_at
     FROM wallets w
@@ -33,6 +36,7 @@ struct WalletRow {
     currency_code: String,
     initial_balance_cents: i64,
     balance_cents: i64,
+    reserved_cents: i64,
     color: Option<String>,
     skin: Option<String>,
     notes: Option<String>,
@@ -53,6 +57,7 @@ impl From<WalletRow> for Wallet {
             currency_code: r.currency_code,
             initial_balance_cents: r.initial_balance_cents,
             balance_cents: r.balance_cents,
+            reserved_cents: r.reserved_cents,
             color: r.color,
             skin: r.skin,
             notes: r.notes,

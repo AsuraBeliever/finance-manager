@@ -20,7 +20,7 @@ import { seedName } from "../../i18n/seed";
 
 export function BudgetsPage() {
   const qc = useQueryClient();
-  const budgets = useQuery({ queryKey: ["budgets"], queryFn: listBudgets });
+  const budgets = useQuery({ queryKey: ["budgets"], queryFn: () => listBudgets() });
   const [formOpen, setFormOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 

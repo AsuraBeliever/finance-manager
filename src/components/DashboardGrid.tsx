@@ -58,6 +58,27 @@ function parse(raw: string | null | undefined): ResponsiveLayouts | null {
   }
 }
 
+/** Reconcile a saved layout with the current item set: drop positions for items
+ *  that no longer exist and append any new item (e.g. a renamed widget) at the
+ *  bottom with its default size. Without this, a child the saved layout doesn't
+ *  cover gets RGL's 1×1 fallback and effectively disappears — which is exactly
+ *  what happens to existing users when a widget key changes. */
+function reconcile(layouts: ResponsiveLayouts, base: LayoutItem[]): ResponsiveLayouts {
+  const known = new Set(base.map((b) => b.i));
+  const out: ResponsiveLayouts = {};
+  for (const [bp, items] of Object.entries(layouts)) {
+    if (!items) continue;
+    const present = new Set(items.map((it) => it.i));
+    const kept = items.filter((it) => known.has(it.i));
+    const maxY = kept.reduce((m, it) => Math.max(m, it.y + it.h), 0);
+    const missing = base
+      .filter((b) => !present.has(b.i))
+      .map((b, i) => ({ ...b, x: 0, y: maxY + i }));
+    out[bp] = [...kept, ...missing];
+  }
+  return out;
+}
+
 /** A draggable, resizable dashboard grid (react-grid-layout v2, React 19 safe).
  *  Each cell drags from its grip handle (so controls/links inside keep working)
  *  and resizes from the corner. The arrangement is saved per user on the server,
@@ -104,7 +125,8 @@ export function DashboardGrid({
   // first paint used a stale cached value (or the default).
   useEffect(() => {
     if (touched.current || !saved.isSuccess) return;
-    const next = parse(saved.data) ?? { lg: baseRef.current };
+    const parsed = parse(saved.data);
+    const next = parsed ? reconcile(parsed, baseRef.current) : { lg: baseRef.current };
     layoutsRef.current = next;
     setLayouts(next);
   }, [saved.isSuccess, saved.data]);

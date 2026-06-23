@@ -257,8 +257,55 @@ CREATE TABLE subscriptions (     -- pagos recurrentes; "registrar pago" inserta 
 );
 ```
 
-- **budgets.spent** nunca se almacena: se calcula al leer (gasto del mes en MXN, general o por categoría).
+- **budgets.spent** nunca se almacena: se calcula al leer (gasto del periodo en MXN, general o por categoría).
 - **subscriptions** total mensual = suma de activas normalizadas a mes (anual/12) en MXN.
+
+### Economía histórica (migraciones 0014–0016)
+
+El resumen se historiza por el selector de periodo: patrimonio/saldos y valor de
+inversiones se reconstruyen desde las transacciones/snapshots existentes; metas,
+suscripciones y límites de presupuesto necesitan historial nuevo (prospectivo).
+
+```sql
+CREATE TABLE budget_limit_history (   -- 0014: límite mensual vigente desde una fecha
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+  category_id INTEGER REFERENCES transaction_categories(id),
+  limit_cents INTEGER NOT NULL CHECK (limit_cents > 0),
+  effective_from TEXT NOT NULL,                 -- 'YYYY-MM-DD' (inicio de mes)
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);                                              -- seed: límite actual desde '1970-01-01'
+
+CREATE TABLE goal_snapshots (         -- 0015: saved_cents de cada meta a lo largo del tiempo
+  id INTEGER PRIMARY KEY,
+  goal_id INTEGER NOT NULL REFERENCES savings_goals(id) ON DELETE CASCADE,
+  saved_cents INTEGER NOT NULL, as_of TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'auto'
+);                                              -- al contribuir/crear + cron diario; seed en created_at
+
+-- 0016: ventana activa de suscripciones (columnas nuevas)
+ALTER TABLE subscriptions ADD COLUMN started_at TEXT;  -- 'YYYY-MM-DD'
+ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
+```
+
+- **Límite del periodo** = prorrateo diario del límite mensual vigente cada mes
+  (`finanzas_core::budget::prorated_limit`): un mes completo = límite mensual,
+  varios meses = suma, un día = ~1/30, honrando cambios del límite.
+- **Meta a una fecha** = último `goal_snapshots.as_of <= fin del periodo` (0 si no hay).
+- **Metas = apartados** (0017 `linked_wallet_id`, 0019 `archived_at`): una meta
+  ligada a una cartera es un **apartado** — reserva parte del saldo de esa cartera
+  (como Apartados de BBVA / cajitas de Nu). `contribute_savings_goal` solo cambia
+  el earmark (`saved_cents`), **sin transacción**: el dinero se queda en la cartera
+  y en el patrimonio. Un depósito no puede exceder lo **disponible** =
+  `balance − Σ saved de metas activas de la cartera` (`wallets.reserved_cents`).
+  `use_savings_goal` "usa" la meta: postea un **gasto real** por `saved_cents` en
+  su cartera y la **archiva** (`archived_at`), liberando el apartado — único
+  momento en que el dinero sale. Metas sin cartera = solo seguimiento (abstracto,
+  fuera del patrimonio). Las archivadas no reservan y se ocultan de periodos
+  posteriores a su archivo (`archived_at >= fin del periodo` para mostrarlas).
+- **Orden de metas** (0018, `savings_goals.sort_order`): orden de despliegue por
+  arrastre (`reorder_savings_goals`, igual que `reorder_wallets`). La primera
+  (menor `sort_order`) es la "principal" — gauge/círculo en el resumen; el resto, barras.
+- **Suscripción activa a una fecha** D = `started_at <= D AND (ended_at IS NULL OR ended_at > D)`.
+  Cancelar (set inactive) cierra la ventana y conserva historia; borrar la pierde.
 
 - **wallets.skin** (migración 0006): estilo de tarjeta — id de catálogo, `grad:<from>,<to>,<angle>` o `img:<data-url>`; NULL = derivado del color.
 

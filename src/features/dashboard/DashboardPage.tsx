@@ -1,18 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Eye, EyeOff, LayoutDashboard, RotateCcw } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LayoutDashboard, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Button } from "../../components/Button";
 import { DashboardGrid, type GridItemSpec } from "../../components/DashboardGrid";
 import { EmptyState } from "../../components/EmptyState";
@@ -20,7 +9,6 @@ import { PageHeader } from "../../components/PageHeader";
 import { StatWidget } from "../../components/StatWidget";
 import { TrendBadge } from "../../components/TrendBadge";
 import {
-  getCategoryBreakdown,
   getDashboardSummary,
   getSpendingTrends,
   listBudgets,
@@ -29,54 +17,33 @@ import {
 } from "../../lib/api";
 import { formatCents } from "../../lib/money";
 import { MASK, useHideBalance } from "../../lib/hideBalance";
-import { CHART_COLORS, NEGATIVE, POSITIVE, useChartTokens } from "../../lib/palette";
+import { CHART_COLORS, useChartTokens } from "../../lib/palette";
 import { es } from "../../i18n/es";
+import { FlowChart } from "./FlowChart";
+import { PeriodPicker } from "./PeriodPicker";
+import { usePeriod } from "./usePeriod";
 import { BreakdownWidget } from "./widgets/BreakdownWidget";
 import { BudgetWidget } from "./widgets/BudgetWidget";
+import { FlowRangeWidget } from "./widgets/FlowRangeWidget";
 import { GoalsWidget } from "./widgets/GoalsWidget";
 import { SubscriptionsWidget } from "./widgets/SubscriptionsWidget";
-
-function monthLabel(month: string): string {
-  const [y, m] = month.split("-");
-  const names = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-  return `${names[Number(m) - 1]} ${y.slice(2)}`;
-}
-
-const longDateFmt = new Intl.DateTimeFormat("es-MX", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
-
-// The daily flow chart spans the current month, so its axis only carries the
-// day-of-month ('DD'); expand it to a full localized date for the tooltip.
-function dayLabel(day: string): string {
-  const n = Number(day);
-  if (!Number.isFinite(n)) return day;
-  const now = new Date();
-  const date = new Date(now.getFullYear(), now.getMonth(), n);
-  const full = longDateFmt.format(date);
-  return full.charAt(0).toUpperCase() + full.slice(1);
-}
 
 export function DashboardPage() {
   const chart = useChartTokens();
   const [hidden, toggleHidden] = useHideBalance();
-  const summary = useQuery({ queryKey: ["dashboard"], queryFn: getDashboardSummary });
-  const trends = useQuery({ queryKey: ["spendingTrends"], queryFn: getSpendingTrends });
+  const [period, setPeriod] = usePeriod();
+  const summary = useQuery({
+    queryKey: ["dashboard", period],
+    queryFn: () => getDashboardSummary(period),
+  });
+  const trends = useQuery({
+    queryKey: ["spendingTrends", period],
+    queryFn: () => getSpendingTrends(period),
+  });
   // Same keys the widgets use (deduped) — only to decide which cells exist.
-  const budgets = useQuery({ queryKey: ["budgets"], queryFn: listBudgets });
-  const goals = useQuery({ queryKey: ["savingsGoals"], queryFn: listSavingsGoals });
-  const subs = useQuery({ queryKey: ["subscriptions"], queryFn: listSubscriptions });
-  const expBreak = useQuery({
-    queryKey: ["breakdown", "expense"],
-    queryFn: () => getCategoryBreakdown("expense", "month"),
-  });
-  const incBreak = useQuery({
-    queryKey: ["breakdown", "income"],
-    queryFn: () => getCategoryBreakdown("income", "month"),
-  });
+  const budgets = useQuery({ queryKey: ["budgets"], queryFn: () => listBudgets() });
+  const goals = useQuery({ queryKey: ["savingsGoals"], queryFn: () => listSavingsGoals() });
+  const subs = useQuery({ queryKey: ["subscriptions"], queryFn: () => listSubscriptions() });
   const [resetSignal, setResetSignal] = useState(0);
 
   if (summary.isPending)
@@ -87,6 +54,9 @@ export function DashboardPage() {
   const s = summary.data;
   const hasData = s.wallets.length > 0 || s.investmentsTotalMxnCents > 0;
   const money = (cents: number, code = "MXN") => (hidden ? MASK : formatCents(cents, code));
+  // Net worth (cash + investments) at the start and end of the selected period.
+  const netStart = s.totalStartMxnCents + s.investmentsStartMxnCents;
+  const netEnd = s.totalEndMxnCents + s.investmentsTotalMxnCents;
 
   const walletDonut = s.wallets
     .filter((w) => w.balanceMxnCents > 0)
@@ -104,19 +74,7 @@ export function DashboardPage() {
       color: CHART_COLORS[i % CHART_COLORS.length],
     }));
 
-  const monthlyData = s.monthly.map((m) => ({
-    month: monthLabel(m.month),
-    [es.dashboard.incomes]: m.incomeMxnCents / 100,
-    [es.dashboard.expenses]: m.expenseMxnCents / 100,
-  }));
-
   const t = trends.data;
-  const dailyData =
-    t?.daily.map((d) => ({
-      day: d.day,
-      [es.dashboard.incomes]: d.incomeMxnCents / 100,
-      [es.dashboard.expenses]: d.expenseMxnCents / 100,
-    })) ?? [];
 
   if (!hasData) {
     return (
@@ -147,14 +105,30 @@ export function DashboardPage() {
           {hidden ? <EyeOff size={15} /> : <Eye size={15} />}
         </button>
       </div>
-      <p className="text-gold-gradient mt-2 font-display text-4xl font-semibold tracking-tight tabular-nums md:text-5xl">
-        {money(s.totalMxnCents + s.investmentsTotalMxnCents)}
-      </p>
+      <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-3">
+        <div>
+          <p className="text-[0.7rem] uppercase tracking-wide text-fg-subtle">
+            {es.dashboard.periodStart}
+          </p>
+          <p className="font-display text-2xl font-semibold tabular-nums text-fg-muted">
+            {money(netStart)}
+          </p>
+        </div>
+        <ArrowRight size={22} className="mb-1.5 shrink-0 text-fg-subtle" />
+        <div>
+          <p className="text-[0.7rem] uppercase tracking-wide text-fg-subtle">
+            {es.dashboard.periodEnd}
+          </p>
+          <p className="text-gold-gradient font-display text-4xl font-semibold tracking-tight tabular-nums md:text-5xl">
+            {money(netEnd)}
+          </p>
+        </div>
+      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-muted">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-accent" />
-          {es.nav.wallets} <span className="tabular-nums text-fg">{money(s.totalMxnCents)}</span>
+          {es.nav.wallets} <span className="tabular-nums text-fg">{money(s.totalEndMxnCents)}</span>
         </span>
         {s.investmentsTotalMxnCents > 0 && (
           <>
@@ -173,14 +147,23 @@ export function DashboardPage() {
           <div className="flex items-center gap-2 text-sm">
             <span className="text-fg-muted">{es.dashboard.incomes}</span>
             <span className="tabular-nums text-fg">{money(t.incomeMxnCents)}</span>
+            {t.incomePrevMxnCents > 0 && (
+              <span className="text-xs tabular-nums text-fg-subtle">
+                {es.dashboard.previously} {money(t.incomePrevMxnCents)}
+              </span>
+            )}
             <TrendBadge bps={t.incomeTrendBps} />
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-fg-muted">{es.dashboard.expenses}</span>
             <span className="tabular-nums text-fg">{money(t.expenseMxnCents)}</span>
+            {t.expensePrevMxnCents > 0 && (
+              <span className="text-xs tabular-nums text-fg-subtle">
+                {es.dashboard.previously} {money(t.expensePrevMxnCents)}
+              </span>
+            )}
             <TrendBadge bps={t.expenseTrendBps} goodWhenUp={false} />
           </div>
-          <span className="self-center text-xs text-fg-subtle">{es.dashboard.vsLastMonth}</span>
         </div>
       )}
 
@@ -207,57 +190,42 @@ export function DashboardPage() {
     { key: "networth", w: 12, h: 4, minW: 4, minH: 3, node: heroNode },
   ];
 
-  if (dailyData.length > 0) {
-    items.push({
-      key: "dailyFlow",
-      w: 8,
-      h: 5,
-      minH: 3,
-      node: (
-        <StatWidget title={es.dashboard.dailyFlow}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dailyData}>
-              <XAxis dataKey="day" stroke={chart.axis} fontSize={11} />
-              <YAxis stroke={chart.axis} fontSize={11} width={40} />
-              <Tooltip
-                labelFormatter={(label) => dayLabel(String(label))}
-                formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
-                contentStyle={chart.tooltip}
-                cursor={{ fill: "color-mix(in oklab, var(--color-border-muted) 40%, transparent)" }}
-              />
-              <Legend />
-              <Bar dataKey={es.dashboard.incomes} fill={POSITIVE} radius={[3, 3, 0, 0]} />
-              <Bar dataKey={es.dashboard.expenses} fill={NEGATIVE} radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </StatWidget>
-      ),
-    });
-  }
+  // Always present so changing the period never adds/removes the widget (which
+  // would reflow the grid). Empty periods render a same-size placeholder.
+  items.push({
+    key: "flow",
+    w: 12,
+    h: 5,
+    minH: 3,
+    node: (
+      <StatWidget title={es.dashboard.flow}>
+        {t && <FlowChart trends={t} />}
+      </StatWidget>
+    ),
+  });
   if ((budgets.data?.length ?? 0) > 0) {
-    items.push({ key: "budget", w: 4, h: 5, node: <BudgetWidget /> });
+    items.push({ key: "budget", w: 4, h: 5, node: <BudgetWidget period={period} /> });
   }
-  if ((expBreak.data?.slices.length ?? 0) > 0) {
-    items.push({
-      key: "breakdownExpense",
-      w: 4,
-      h: 5,
-      node: <BreakdownWidget kind="expense" title={es.dashboard.expenseByCategory} />,
-    });
-  }
-  if ((incBreak.data?.slices.length ?? 0) > 0) {
-    items.push({
-      key: "breakdownIncome",
-      w: 4,
-      h: 5,
-      node: <BreakdownWidget kind="income" title={es.dashboard.incomeByCategory} />,
-    });
-  }
+  // Always present (period-dependent content, fixed size) — see the flow note.
+  items.push({
+    key: "breakdownExpense",
+    w: 4,
+    h: 5,
+    node: (
+      <BreakdownWidget kind="expense" title={es.dashboard.expenseByCategory} period={period} />
+    ),
+  });
+  items.push({
+    key: "breakdownIncome",
+    w: 4,
+    h: 5,
+    node: <BreakdownWidget kind="income" title={es.dashboard.incomeByCategory} period={period} />,
+  });
   if ((goals.data?.length ?? 0) > 0) {
-    items.push({ key: "goals", w: 4, h: 5, node: <GoalsWidget /> });
+    items.push({ key: "goals", w: 4, h: 5, node: <GoalsWidget period={period} /> });
   }
   if ((subs.data?.subscriptions.length ?? 0) > 0) {
-    items.push({ key: "subscriptions", w: 4, h: 5, node: <SubscriptionsWidget /> });
+    items.push({ key: "subscriptions", w: 4, h: 5, node: <SubscriptionsWidget period={period} /> });
   }
   if (walletDonut.length > 0) {
     items.push({
@@ -284,6 +252,8 @@ export function DashboardPage() {
               <Tooltip
                 formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
                 contentStyle={chart.tooltip}
+                labelStyle={{ color: chart.tooltip.color }}
+                itemStyle={{ color: chart.tooltip.color }}
               />
               <Legend />
             </PieChart>
@@ -317,6 +287,8 @@ export function DashboardPage() {
               <Tooltip
                 formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
                 contentStyle={chart.tooltip}
+                labelStyle={{ color: chart.tooltip.color }}
+                itemStyle={{ color: chart.tooltip.color }}
               />
               <Legend />
             </PieChart>
@@ -325,43 +297,23 @@ export function DashboardPage() {
       ),
     });
   }
-  if (monthlyData.length > 0) {
-    items.push({
-      key: "monthlyFlow",
-      w: 12,
-      h: 5,
-      minH: 3,
-      node: (
-        <StatWidget title={es.dashboard.monthlyFlow}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyData}>
-              <XAxis dataKey="month" stroke={chart.axis} fontSize={12} />
-              <YAxis stroke={chart.axis} fontSize={12} />
-              <Tooltip
-                formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
-                contentStyle={chart.tooltip}
-                cursor={{ fill: "color-mix(in oklab, var(--color-border-muted) 40%, transparent)" }}
-              />
-              <Legend />
-              <Bar dataKey={es.dashboard.incomes} fill={POSITIVE} radius={[4, 4, 0, 0]} />
-              <Bar dataKey={es.dashboard.expenses} fill={NEGATIVE} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </StatWidget>
-      ),
-    });
-  }
+
+  // Income-vs-expense totals (two bars) for the same global period, at the bottom.
+  items.push({ key: "flowRange", w: 12, h: 5, minH: 3, node: <FlowRangeWidget period={period} /> });
 
   return (
     <>
       <PageHeader
         title={es.dashboard.title}
         actions={
-          <Button variant="ghost" onClick={() => setResetSignal((n) => n + 1)}>
-            <span className="flex items-center gap-2">
-              <RotateCcw size={15} /> {es.dashboard.resetLayout}
-            </span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <PeriodPicker value={period} onChange={setPeriod} />
+            <Button variant="ghost" onClick={() => setResetSignal((n) => n + 1)}>
+              <span className="flex items-center gap-2">
+                <RotateCcw size={15} /> {es.dashboard.resetLayout}
+              </span>
+            </Button>
+          </div>
         }
       />
       <DashboardGrid items={items} resetSignal={resetSignal} />

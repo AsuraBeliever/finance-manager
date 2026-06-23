@@ -9,6 +9,7 @@ import type {
   GoalInput,
   InvestmentDetail,
   InvestmentWithValue,
+  Period,
   SavingsGoal,
   SpendingTrends,
   SubInput,
@@ -191,19 +192,20 @@ export const restoreTransactionCategory = (id: number) =>
 export const reorderTransactionCategories = (ids: number[]) =>
   rpc<void>("reorder_transaction_categories", { ids });
 
-export const getDashboardSummary = () =>
-  rpc<DashboardSummary>("get_dashboard_summary");
+export const getDashboardSummary = (period: Period = { kind: "currentMonth" }) =>
+  rpc<DashboardSummary>("get_dashboard_summary", { period });
 
 export const getCategoryBreakdown = (
   kind: "income" | "expense",
-  period: "month" | "week" | "all" = "month",
+  period: Period = { kind: "currentMonth" },
 ) => rpc<CategoryBreakdown>("get_category_breakdown", { kind, period });
 
-export const getSpendingTrends = () =>
-  rpc<SpendingTrends>("get_spending_trends");
+export const getSpendingTrends = (period: Period = { kind: "currentMonth" }) =>
+  rpc<SpendingTrends>("get_spending_trends", { period });
 
 // ---- savings goals ----
-export const listSavingsGoals = () => rpc<SavingsGoal[]>("list_savings_goals");
+export const listSavingsGoals = (period: Period = { kind: "currentMonth" }) =>
+  rpc<SavingsGoal[]>("list_savings_goals", { period });
 
 export const createSavingsGoal = (input: GoalInput) =>
   rpc<SavingsGoal>("create_savings_goal", { ...input });
@@ -214,11 +216,17 @@ export const updateSavingsGoal = (id: number, input: GoalInput) =>
 export const contributeSavingsGoal = (id: number, amountCents: number) =>
   rpc<SavingsGoal>("contribute_savings_goal", { id, amountCents });
 
+export const useSavingsGoal = (id: number) => rpc<void>("use_savings_goal", { id });
+
 export const deleteSavingsGoal = (id: number) =>
   rpc<void>("delete_savings_goal", { id });
 
+export const reorderSavingsGoals = (ids: number[]) =>
+  rpc<void>("reorder_savings_goals", { ids });
+
 // ---- budgets ----
-export const listBudgets = () => rpc<Budget[]>("list_budgets");
+export const listBudgets = (period: Period = { kind: "currentMonth" }) =>
+  rpc<Budget[]>("list_budgets", { period });
 
 export const setBudget = (categoryId: number | null, limitCents: number) =>
   rpc<void>("set_budget", { categoryId, limitCents });
@@ -226,8 +234,8 @@ export const setBudget = (categoryId: number | null, limitCents: number) =>
 export const deleteBudget = (id: number) => rpc<void>("delete_budget", { id });
 
 // ---- subscriptions ----
-export const listSubscriptions = () =>
-  rpc<SubscriptionList>("list_subscriptions");
+export const listSubscriptions = (period: Period = { kind: "currentMonth" }) =>
+  rpc<SubscriptionList>("list_subscriptions", { period });
 
 export const createSubscription = (input: SubInput) =>
   rpc<Subscription>("create_subscription", { ...input });

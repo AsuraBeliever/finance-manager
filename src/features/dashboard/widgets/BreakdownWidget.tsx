@@ -4,24 +4,37 @@ import { StatWidget } from "../../../components/StatWidget";
 import { getCategoryBreakdown } from "../../../lib/api";
 import { formatCents } from "../../../lib/money";
 import { CHART_COLORS } from "../../../lib/palette";
+import type { Period } from "../../../lib/types";
 import { es } from "../../../i18n/es";
 import { seedName } from "../../../i18n/seed";
 
-/** Donut + ranked category list for income or expense (current month). */
+/** Donut + ranked category list for income or expense over the given period. */
 export function BreakdownWidget({
   kind,
   title,
+  period,
 }: {
   kind: "income" | "expense";
   title: string;
+  period: Period;
 }) {
   const q = useQuery({
-    queryKey: ["breakdown", kind],
-    queryFn: () => getCategoryBreakdown(kind, "month"),
+    queryKey: ["breakdown", kind, period],
+    queryFn: () => getCategoryBreakdown(kind, period),
   });
 
   const data = q.data;
-  if (!data || data.slices.length === 0) return null;
+  // Always render at a fixed size so the dashboard grid never reflows when the
+  // period changes; show a centered note when the period has no data.
+  if (!data || data.slices.length === 0) {
+    return (
+      <StatWidget title={title}>
+        <div className="flex h-full items-center justify-center">
+          <p className="text-sm text-fg-subtle">{es.dashboard.noPeriodData}</p>
+        </div>
+      </StatWidget>
+    );
+  }
 
   const total = data.totalMxnCents;
   const colorFor = (i: number, c: string | null) => c ?? CHART_COLORS[i % CHART_COLORS.length];

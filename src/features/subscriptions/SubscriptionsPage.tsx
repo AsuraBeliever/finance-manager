@@ -31,7 +31,7 @@ import { seedName } from "../../i18n/seed";
 
 export function SubscriptionsPage() {
   const qc = useQueryClient();
-  const subs = useQuery({ queryKey: ["subscriptions"], queryFn: listSubscriptions });
+  const subs = useQuery({ queryKey: ["subscriptions"], queryFn: () => listSubscriptions() });
   const [formSub, setFormSub] = useState<Subscription | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);

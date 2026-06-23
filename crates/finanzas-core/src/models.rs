@@ -29,6 +29,10 @@ pub struct Wallet {
     pub initial_balance_cents: i64,
     /// Computed: initial balance + signed sum of transactions.
     pub balance_cents: i64,
+    /// Computed: total earmarked in active goal "apartados" on this wallet. The
+    /// available balance is `balance_cents - reserved_cents`.
+    #[serde(default)]
+    pub reserved_cents: i64,
     pub color: Option<String>,
     /// Card skin: a catalog id ("oro"), a custom gradient, or an imported image.
     pub skin: Option<String>,

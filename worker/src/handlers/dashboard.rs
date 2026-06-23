@@ -1,6 +1,7 @@
 //! Port of src-tauri/src/commands/dashboard.rs, scoped by user_id.
 
 use finanzas_core::error::AppResult;
+use finanzas_core::period::{resolve_period, Period};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use worker::D1Database;
@@ -34,26 +35,29 @@ pub struct CurrencySubtotal {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MonthlyFlow {
-    pub month: String, // 'YYYY-MM'
-    pub income_mxn_cents: i64,
-    pub expense_mxn_cents: i64,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DashboardSummary {
-    pub total_mxn_cents: i64,
+    /// Cash (wallets) total in MXN at the START of the selected period.
+    pub total_start_mxn_cents: i64,
+    /// Cash (wallets) total in MXN at the END of the period (headline cash).
+    pub total_end_mxn_cents: i64,
+    /// Per-wallet balances at the end of the period.
     pub wallets: Vec<WalletBalance>,
     pub by_currency: Vec<CurrencySubtotal>,
-    pub monthly: Vec<MonthlyFlow>,
     /// Currencies with non-MXN wallets but no exchange rate configured;
     /// their balances are excluded from the MXN total.
     pub missing_rates: Vec<String>,
-    /// Current value of open investments, converted to MXN.
+    /// Open-investment value in MXN at the start and end of the period.
+    pub investments_start_mxn_cents: i64,
     pub investments_total_mxn_cents: i64,
-    /// Per-investment values for the dashboard donut.
+    /// Per-investment values (end of period) for the dashboard donut.
     pub investments: Vec<InvestmentSlice>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SummaryArgs {
+    #[serde(default)]
+    pub period: Period,
 }
 
 #[derive(Deserialize)]
@@ -120,18 +124,10 @@ struct BalanceRow {
     balance_cents: i64,
 }
 
-#[derive(Deserialize)]
-struct FlowRow {
-    month: String,
-    kind: String,
-    currency_code: String,
-    sum_cents: i64,
-}
-
-pub async fn get_dashboard_summary(db: &D1Database, uid: i64) -> AppResult<DashboardSummary> {
-    let rates = load_rates(db, uid).await?;
-
-    let rows: Vec<BalanceRow> = all(
+/// Per-wallet balance as of `cutoff` (exclusive): initial + Σ transactions
+/// strictly before that date. `cutoff` is a 'YYYY-MM-DD' bound parameter.
+async fn wallet_balances_at(db: &D1Database, uid: i64, cutoff: &str) -> AppResult<Vec<BalanceRow>> {
+    all(
         db,
         "SELECT w.id, w.name, w.color, w.currency_code,
                 w.initial_balance_cents + COALESCE((
@@ -139,13 +135,45 @@ pub async fn get_dashboard_summary(db: &D1Database, uid: i64) -> AppResult<Dashb
                                WHEN 'income' THEN t.amount_cents
                                WHEN 'transfer_in' THEN t.amount_cents
                                ELSE -t.amount_cents END)
-                  FROM transactions t WHERE t.wallet_id = w.id), 0) AS balance_cents
+                  FROM transactions t
+                  WHERE t.wallet_id = w.id AND t.occurred_at < ?2), 0) AS balance_cents
          FROM wallets w
          WHERE w.is_archived = 0 AND w.user_id = ?1
          ORDER BY balance_cents DESC",
-        jsv![uid],
+        jsv![uid, cutoff],
     )
-    .await?;
+    .await
+}
+
+fn sum_mxn(rows: &[BalanceRow], rates: &HashMap<String, i64>) -> i64 {
+    rows.iter()
+        .map(|r| {
+            rates
+                .get(&r.currency_code)
+                .map(|rate| to_mxn(r.balance_cents, *rate))
+                .unwrap_or(0)
+        })
+        .sum()
+}
+
+pub async fn get_dashboard_summary(
+    db: &D1Database,
+    uid: i64,
+    a: SummaryArgs,
+) -> AppResult<DashboardSummary> {
+    let rates = load_rates(db, uid).await?;
+    let resolved = resolve_period(&a.period, today_mx());
+    let start = resolved.start.to_string();
+    let end = resolved.end.to_string();
+    // Value investments at the opening (day before the period) and the close
+    // (last day of the period), never projecting past today. Using the day before
+    // the exclusive bounds also drops investments that only start on the boundary.
+    let today = today_mx();
+    let inv_start = resolved.start.pred_opt().unwrap_or(resolved.start).min(today);
+    let inv_end = resolved.end.pred_opt().unwrap_or(resolved.end).min(today);
+
+    // End-of-period balances drive the wallet list, donut and by-currency totals.
+    let rows = wallet_balances_at(db, uid, &end).await?;
     let mut wallets: Vec<WalletBalance> = Vec::with_capacity(rows.len());
     for r in rows {
         let balance_mxn_cents = rates
@@ -178,57 +206,31 @@ pub async fn get_dashboard_summary(db: &D1Database, uid: i64) -> AppResult<Dashb
     let mut by_currency: Vec<CurrencySubtotal> = by_currency_map.into_values().collect();
     by_currency.sort_by(|a, b| a.currency_code.cmp(&b.currency_code));
 
-    let total_mxn_cents = by_currency.iter().map(|c| c.balance_mxn_cents).sum();
+    let total_end_mxn_cents = by_currency.iter().map(|c| c.balance_mxn_cents).sum();
     let missing_rates: Vec<String> = by_currency
         .iter()
         .filter(|c| !c.has_rate)
         .map(|c| c.currency_code.clone())
         .collect();
 
-    // Income/expense per month, last 6 months (transfers excluded), in MXN.
-    let rows: Vec<FlowRow> = all(
-        db,
-        "SELECT strftime('%Y-%m', t.occurred_at) AS month, t.kind, w.currency_code,
-                SUM(t.amount_cents) AS sum_cents
-         FROM transactions t JOIN wallets w ON w.id = t.wallet_id
-         WHERE t.kind IN ('income', 'expense')
-           AND w.user_id = ?1
-           AND t.occurred_at >= date('now', 'start of month', '-5 months')
-         GROUP BY month, t.kind, w.currency_code",
-        jsv![uid],
-    )
-    .await?;
-    let mut monthly_map: HashMap<String, MonthlyFlow> = HashMap::new();
-    for r in rows {
-        let mxn = rates
-            .get(&r.currency_code)
-            .map(|rate| to_mxn(r.sum_cents, *rate))
-            .unwrap_or(0);
-        let entry = monthly_map
-            .entry(r.month.clone())
-            .or_insert_with(|| MonthlyFlow {
-                month: r.month,
-                income_mxn_cents: 0,
-                expense_mxn_cents: 0,
-            });
-        if r.kind == "income" {
-            entry.income_mxn_cents += mxn;
-        } else {
-            entry.expense_mxn_cents += mxn;
-        }
-    }
-    let mut monthly: Vec<MonthlyFlow> = monthly_map.into_values().collect();
-    monthly.sort_by(|a, b| a.month.cmp(&b.month));
+    // Cash at the start of the period (a single MXN figure for the hero).
+    let total_start_mxn_cents = sum_mxn(&wallet_balances_at(db, uid, &start).await?, &rates);
 
-    let investments = open_investments_mxn(db, uid, &rates, today_mx()).await?;
+    let investments = open_investments_mxn(db, uid, &rates, inv_end).await?;
     let investments_total_mxn_cents = investments.iter().map(|s| s.value_mxn_cents).sum();
+    let investments_start_mxn_cents = open_investments_mxn(db, uid, &rates, inv_start)
+        .await?
+        .iter()
+        .map(|s| s.value_mxn_cents)
+        .sum();
 
     Ok(DashboardSummary {
-        total_mxn_cents,
+        total_start_mxn_cents,
+        total_end_mxn_cents,
         wallets,
         by_currency,
-        monthly,
         missing_rates,
+        investments_start_mxn_cents,
         investments_total_mxn_cents,
         investments,
     })

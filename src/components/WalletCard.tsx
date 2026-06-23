@@ -92,7 +92,15 @@ export function WalletCard({ wallet }: { wallet: Wallet }) {
           <p className="font-display text-2xl font-semibold tabular-nums [text-shadow:0_1px_4px_rgba(0,0,0,0.3)]">
             {formatCents(wallet.balanceCents, wallet.currencyCode)}
           </p>
-          <p className="mt-0.5 text-xs opacity-80">{seedName(wallet.categoryName)}</p>
+          {wallet.reservedCents > 0 ? (
+            <p className="mt-0.5 text-xs tabular-nums opacity-80">
+              {es.wallets.available}{" "}
+              {formatCents(wallet.balanceCents - wallet.reservedCents, wallet.currencyCode)} ·{" "}
+              {es.wallets.reserved} {formatCents(wallet.reservedCents, wallet.currencyCode)}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-xs opacity-80">{seedName(wallet.categoryName)}</p>
+          )}
         </div>
       </div>
     </Link>

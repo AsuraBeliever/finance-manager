@@ -28,6 +28,8 @@ fn wallet_from_row(r: &Row) -> rusqlite::Result<Wallet> {
         currency_code: r.get("currency_code")?,
         initial_balance_cents: r.get("initial_balance_cents")?,
         balance_cents: r.get("balance_cents")?,
+        // Goal "apartados" are a cloud-only feature; this desktop path is dead.
+        reserved_cents: 0,
         color: r.get("color")?,
         // Card skins are a cloud-only feature; the legacy local DB has no such
         // column. This desktop path is dead (the shell loads the web app).
