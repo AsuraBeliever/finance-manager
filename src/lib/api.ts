@@ -11,6 +11,8 @@ import type {
   InvestmentWithValue,
   SimulateInput,
   SimResult,
+  SolveInput,
+  SolveResult,
   Period,
   SavingsGoal,
   SpendingTrends,
@@ -300,6 +302,9 @@ export const getInvestmentDetail = (id: number) =>
 
 export const simulateInvestment = (input: SimulateInput) =>
   rpc<SimResult>("simulate_investment", { ...input });
+
+export const solveContribution = (input: SolveInput) =>
+  rpc<SolveResult>("solve_contribution", { ...input });
 
 export const addInvestmentMovement = (
   investmentId: number,

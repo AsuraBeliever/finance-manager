@@ -3,7 +3,9 @@
 
 use chrono::{Duration, NaiveDate};
 use finanzas_core::error::{AppError, AppResult};
-use finanzas_core::investments::simulate::{simulate, Cadence, SimulationInput};
+use finanzas_core::investments::simulate::{
+    simulate, solve_monthly_contribution, Cadence, SimulationInput,
+};
 use finanzas_core::investments::{
     find, net_invested, parse_bonddia_price, registry, CalcContext, Movement, Snapshot,
 };
@@ -888,5 +890,34 @@ pub fn simulate_investment(a: SimulateArgs) -> AppResult<SimResult> {
         final_value_cents: r.final_value_cents,
         total_contributed_cents: r.total_contributed_cents,
         total_interest_cents: r.total_interest_cents,
+    })
+}
+
+// ---- goal solver ("¿cuánto debo aportar al mes para llegar a $X?") ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SolveArgs {
+    #[serde(default)]
+    pub initial_cents: i64,
+    pub target_cents: i64,
+    pub annual_rate_bps: i64,
+    pub months: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SolveResult {
+    pub monthly_contribution_cents: i64,
+}
+
+pub fn solve_contribution(a: SolveArgs) -> AppResult<SolveResult> {
+    Ok(SolveResult {
+        monthly_contribution_cents: solve_monthly_contribution(
+            a.initial_cents,
+            a.target_cents,
+            a.annual_rate_bps,
+            a.months,
+        )?,
     })
 }

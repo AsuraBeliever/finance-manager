@@ -190,6 +190,17 @@ export interface SimResult {
   totalInterestCents: number;
 }
 
+export interface SolveInput {
+  initialCents: number;
+  targetCents: number;
+  annualRateBps: number;
+  months: number;
+}
+
+export interface SolveResult {
+  monthlyContributionCents: number;
+}
+
 // ---- analytics ----
 
 export interface CategorySlice {
