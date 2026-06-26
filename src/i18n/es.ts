@@ -13,6 +13,7 @@ export const esDict = {
     investments: "Inversiones",
     settings: "Ajustes",
     planning: "Planeación",
+    more: "Más",
     goals: "Metas",
     budgets: "Presupuestos",
     subscriptions: "Suscripciones",

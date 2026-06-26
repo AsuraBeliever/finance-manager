@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CloudOff,
@@ -12,6 +12,8 @@ import {
   PiggyBank,
   Target,
   CreditCard,
+  MoreHorizontal,
+  ChevronRight,
 } from "lucide-react";
 import { es } from "./i18n/es";
 import { UNAUTHORIZED_EVENT } from "./lib/api";
@@ -26,6 +28,8 @@ import { hydrateAppearanceFromServer, useAppearance, ICONS } from "./lib/appeara
 export default function App() {
   const queryClient = useQueryClient();
   const online = useOnline();
+  const location = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
   const appearance = useAppearance();
   const BrandIcon = ICONS[appearance.icon] ?? ICONS["trending-up"];
 
@@ -74,6 +78,12 @@ export default function App() {
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
   }, [queryClient]);
+
+  // Close the mobile "more" sheet whenever the route changes (e.g. after
+  // tapping one of its items).
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [location.pathname]);
 
   // Drain the offline outbox on startup and whenever the connection returns.
   useEffect(() => {
@@ -240,7 +250,61 @@ export default function App() {
             )}
           </NavLink>
         ))}
+        {/* The planning pages don't fit the 5-slot bar, so they live behind a
+            "Más" sheet (mirrors the desktop sidebar's Planeación group). */}
+        {(() => {
+          const planningActive = planningItems.some(
+            (p) => location.pathname === p.to,
+          );
+          return (
+            <button
+              onClick={() => setMoreOpen(true)}
+              className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] transition-colors ${
+                planningActive || moreOpen ? "text-accent" : "text-fg-subtle"
+              }`}
+            >
+              {planningActive && (
+                <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-gold" />
+              )}
+              <MoreHorizontal size={20} />
+              {es.nav.more}
+            </button>
+          );
+        })()}
       </nav>
+
+      {/* Mobile "Más" sheet: the planning destinations. */}
+      {moreOpen && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm md:hidden"
+          onMouseDown={(e) => e.target === e.currentTarget && setMoreOpen(false)}
+        >
+          <div
+            className="rounded-t-2xl border-t border-border-muted bg-surface-raised pb-[env(safe-area-inset-bottom)] shadow-card"
+          >
+            <p className="eyebrow px-5 pt-4 pb-2">{es.nav.planning}</p>
+            <nav className="flex flex-col px-2 pb-3">
+              {planningItems.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors ${
+                      isActive
+                        ? "bg-surface-overlay text-accent"
+                        : "text-fg hover:bg-surface-overlay"
+                    }`
+                  }
+                >
+                  <Icon size={20} />
+                  <span className="flex-1">{label}</span>
+                  <ChevronRight size={16} className="text-fg-subtle" />
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

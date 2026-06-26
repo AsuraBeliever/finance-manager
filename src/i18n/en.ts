@@ -12,6 +12,7 @@ export const en: Dict = {
     investments: "Investments",
     settings: "Settings",
     planning: "Planning",
+    more: "More",
     goals: "Goals",
     budgets: "Budgets",
     subscriptions: "Subscriptions",
