@@ -420,6 +420,11 @@ export const esDict = {
     invalidAmount: "Monto inválido",
     invalidRate: "Tasa inválida",
     total: "Inversiones",
+    portfolioValue: "Valor total",
+    portfolioInvested: "Aportado",
+    portfolioGain: "Rendimiento",
+    annualizedReturn: "Retorno anual (TIR)",
+    distribution: "Distribución",
   },
   simulator: {
     title: "Simulador",

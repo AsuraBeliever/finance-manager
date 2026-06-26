@@ -415,6 +415,11 @@ export const en: Dict = {
     invalidAmount: "Invalid amount",
     invalidRate: "Invalid rate",
     total: "Investments",
+    portfolioValue: "Total value",
+    portfolioInvested: "Contributed",
+    portfolioGain: "Gain",
+    annualizedReturn: "Annual return (XIRR)",
+    distribution: "Distribution",
   },
   simulator: {
     title: "Simulator",

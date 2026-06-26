@@ -201,6 +201,21 @@ export interface SolveResult {
   monthlyContributionCents: number;
 }
 
+export interface PortfolioSlice {
+  id: number;
+  name: string;
+  currentValueCents: number;
+  gainCents: number;
+}
+
+export interface Portfolio {
+  totalValueCents: number;
+  totalInvestedCents: number;
+  totalGainCents: number;
+  annualizedReturnBps: number | null;
+  slices: PortfolioSlice[];
+}
+
 // ---- analytics ----
 
 export interface CategorySlice {

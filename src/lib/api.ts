@@ -9,6 +9,7 @@ import type {
   GoalInput,
   InvestmentDetail,
   InvestmentWithValue,
+  Portfolio,
   SimulateInput,
   SimResult,
   SolveInput,
@@ -305,6 +306,8 @@ export const simulateInvestment = (input: SimulateInput) =>
 
 export const solveContribution = (input: SolveInput) =>
   rpc<SolveResult>("solve_contribution", { ...input });
+
+export const getPortfolio = () => rpc<Portfolio>("get_portfolio");
 
 export const addInvestmentMovement = (
   investmentId: number,

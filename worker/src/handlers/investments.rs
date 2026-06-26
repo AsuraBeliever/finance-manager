@@ -6,9 +6,12 @@ use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::investments::simulate::{
     simulate, solve_monthly_contribution, Cadence, SimulationInput,
 };
+use finanzas_core::investments::xirr::{xirr, CashFlow};
 use finanzas_core::investments::{
     find, net_invested, parse_bonddia_price, registry, CalcContext, Movement, Snapshot,
 };
+
+use super::dashboard::{convert, load_rates};
 use finanzas_core::models::{Investment, InvestmentMovement, InvestmentSnapshot};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
@@ -919,5 +922,87 @@ pub fn solve_contribution(a: SolveArgs) -> AppResult<SolveResult> {
             a.annual_rate_bps,
             a.months,
         )?,
+    })
+}
+
+// ---- portfolio (aggregate across open investments, in MXN) ----
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortfolioSlice {
+    pub id: i64,
+    pub name: String,
+    /// Current value in MXN (converted from the investment's currency).
+    pub current_value_cents: i64,
+    pub gain_cents: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Portfolio {
+    pub total_value_cents: i64,
+    pub total_invested_cents: i64,
+    pub total_gain_cents: i64,
+    /// Money-weighted annualized return (XIRR) in basis points; None when it is
+    /// undefined (e.g. a position opened today with no realized flows).
+    pub annualized_return_bps: Option<i64>,
+    pub slices: Vec<PortfolioSlice>,
+}
+
+pub async fn get_portfolio(db: &D1Database, uid: i64) -> AppResult<Portfolio> {
+    let rates = load_rates(db, uid).await?;
+    let as_of = today_mx();
+    let sql = format!("{INVESTMENT_SELECT} WHERE user_id = ?1 AND is_closed = 0 ORDER BY created_at, id");
+    let rows: Vec<InvestmentRow> = all(db, &sql, jsv![uid]).await?;
+
+    let mut slices = Vec::with_capacity(rows.len());
+    let mut total_value = 0i64;
+    let mut total_invested = 0i64;
+    let mut flows: Vec<CashFlow> = Vec::new();
+    for row in rows {
+        let inv: Investment = row.into();
+        let calc = find(&inv.calculator)?;
+        let ctx = load_calc_context(db, &inv).await?;
+        let ccy = inv.currency_code.as_str();
+        let to_mxn = |cents: i64| convert(cents, ccy, "MXN", &rates);
+
+        let value_mxn = to_mxn(calc.value_at(&inv, &ctx, as_of)?)?;
+        let net_mxn = to_mxn(net_invested(&inv, &ctx, as_of))?;
+
+        // Cash flows for XIRR: principal + deposits are outflows, withdrawals
+        // are inflows (the current value is added once at the end).
+        flows.push(CashFlow {
+            date: parse_date(&inv.start_date, "inicio")?,
+            amount_cents: -to_mxn(inv.principal_cents)?,
+        });
+        for m in &ctx.movements {
+            let amt = to_mxn(m.amount_cents)?;
+            flows.push(CashFlow {
+                date: m.occurred_at,
+                amount_cents: if m.kind == "withdrawal" { amt } else { -amt },
+            });
+        }
+
+        total_value += value_mxn;
+        total_invested += net_mxn;
+        slices.push(PortfolioSlice {
+            id: inv.id,
+            name: inv.name,
+            current_value_cents: value_mxn,
+            gain_cents: value_mxn - net_mxn,
+        });
+    }
+    // The whole portfolio valued today is the closing inflow.
+    flows.push(CashFlow {
+        date: as_of,
+        amount_cents: total_value,
+    });
+
+    Ok(Portfolio {
+        total_value_cents: total_value,
+        total_invested_cents: total_invested,
+        total_gain_cents: total_value - total_invested,
+        annualized_return_bps: xirr(&flows).map(|r| (r * 10_000.0).round() as i64),
+        slices,
     })
 }

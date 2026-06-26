@@ -5,6 +5,7 @@ pub mod fixed_rate;
 pub mod manual;
 pub mod nu_cajita;
 pub mod simulate;
+pub mod xirr;
 
 use chrono::NaiveDate;
 use serde_json::Value;

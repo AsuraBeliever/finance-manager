@@ -9,6 +9,7 @@ import { listInvestments } from "../../lib/api";
 import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
+import { PortfolioSummary } from "./PortfolioSummary";
 
 /** "0.05 BTC" from a crypto investment's params. */
 function cryptoSub(paramsJson: string): string {
@@ -71,6 +72,8 @@ export function InvestmentsPage() {
           description={es.investments.emptyDescription}
         />
       )}
+
+      {items.length > 0 && <PortfolioSummary />}
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
         {items.map((inv) => {
