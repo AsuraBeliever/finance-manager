@@ -583,25 +583,44 @@ pub async fn get_investment_detail(
     let as_of = today_mx();
 
     let start = parse_date(&inv.start_date, "inicio")?;
+    // Liquidity funds (no maturity) project 5 years out so the compound growth
+    // is actually visible.
     let end = calc
         .maturity_date(&inv)
-        .unwrap_or(as_of.max(start) + Duration::days(365));
+        .unwrap_or(as_of.max(start) + Duration::days(365 * 5));
 
-    // Weekly points from start to maturity (or +1 year), endpoint included.
-    // One context load serves every projection point.
+    // Weekly points from start to the horizon, endpoint included. The PAST half
+    // (date ≤ today) is the real modeled value, with its steps at each
+    // contribution; the FUTURE half grows from today's value at the
+    // instrument's current effective rate — so a date-anchored position (e.g.
+    // BONDDIA tracked by títulos, whose value_at ignores the date) projects
+    // forward instead of drawing a flat line. One context load serves all.
     let ctx = load_calc_context(db, &inv).await?;
+    let current = calc.value_at(&inv, &ctx, as_of)?;
+    let rate_bps = calc.effective_annual_rate_bps(&inv, &ctx)?;
+    let project = |d: NaiveDate| -> AppResult<i64> {
+        if d <= as_of {
+            calc.value_at(&inv, &ctx, d)
+        } else if let Some(r) = rate_bps {
+            let days = (d - as_of).num_days() as i32;
+            let factor = (1.0 + r as f64 / 10_000.0 / 365.0).powi(days);
+            Ok((current as f64 * factor).round() as i64)
+        } else {
+            Ok(current)
+        }
+    };
     let mut projection = Vec::new();
     let mut d = start;
     while d < end {
         projection.push(ProjectionPoint {
             date: d.format("%Y-%m-%d").to_string(),
-            value_cents: calc.value_at(&inv, &ctx, d)?,
+            value_cents: project(d)?,
         });
         d += Duration::days(7);
     }
     projection.push(ProjectionPoint {
         date: end.format("%Y-%m-%d").to_string(),
-        value_cents: calc.value_at(&inv, &ctx, end)?,
+        value_cents: project(end)?,
     });
 
     let snapshots: Vec<SnapshotRow> = all(

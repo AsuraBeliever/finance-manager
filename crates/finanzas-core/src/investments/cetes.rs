@@ -75,6 +75,19 @@ impl InvestmentCalculator for Cetes {
         let plazo_days = param_i64(&params, "plazo_days").ok()?;
         Some(parse_start_date(inv).ok()? + Duration::days(plazo_days))
     }
+
+    fn effective_annual_rate_bps(
+        &self,
+        inv: &Investment,
+        _ctx: &CalcContext,
+    ) -> AppResult<Option<i64>> {
+        // Net-of-ISR approximation for forward projection (the exact day-count
+        // convention differs slightly; this keeps the headline rate intuitive).
+        let params = parse_params(inv)?;
+        let rate_bps = param_i64(&params, "annual_rate_bps")?;
+        let isr_bps = param_i64_or(&params, "isr_rate_bps", 0);
+        Ok(Some((rate_bps - isr_bps).max(0)))
+    }
 }
 
 #[cfg(test)]

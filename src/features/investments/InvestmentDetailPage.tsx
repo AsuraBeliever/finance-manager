@@ -142,11 +142,15 @@ export function InvestmentDetailPage() {
     setMovementKind(kind);
   };
   const gainPositive = d.gainCents >= 0;
+  const todayStr = todayIso();
+  // Split into a solid "real so far" line and a dashed "projected" line. The
+  // boundary point (today) belongs to both so the two segments meet.
   const chartData = d.projection.map((p) => ({
     date: p.date,
     value: p.valueCents / 100,
+    actual: p.date <= todayStr ? p.valueCents / 100 : null,
+    projected: p.date >= todayStr ? p.valueCents / 100 : null,
   }));
-  const todayStr = todayIso();
 
   // crypto extras: quantity from params + USD equivalent via the USD fx rate
   let cryptoParams: { symbol: string; quantity_e8: number } | null = null;
@@ -254,7 +258,9 @@ export function InvestmentDetailPage() {
               tickFormatter={(v) => (Number(v) / 1000).toFixed(1) + "k"}
             />
             <Tooltip
-              formatter={(v) => formatCents(Math.round(Number(v) * 100), d.currencyCode)}
+              formatter={(v) =>
+                v == null ? [] : formatCents(Math.round(Number(v) * 100), d.currencyCode)
+              }
               contentStyle={chart.tooltip}
             />
             {chartData.some((p) => p.date >= todayStr) && (
@@ -262,10 +268,24 @@ export function InvestmentDetailPage() {
             )}
             <Line
               type="monotone"
-              dataKey="value"
+              dataKey="actual"
+              name={es.investments.currentValue}
               stroke={POSITIVE}
               strokeWidth={2}
               dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="projected"
+              name={es.investments.projection}
+              stroke={POSITIVE}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>
