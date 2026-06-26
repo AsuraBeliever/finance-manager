@@ -50,6 +50,10 @@ pub struct SimpleTxArgs {
     pub occurred_at: String,
     /// Offline-outbox idempotency: a replay with the same id never inserts twice.
     pub client_id: Option<String>,
+    /// Set when this expense is a subscription charge, so the dashboard can
+    /// attribute real charges to a subscription. NULL for ordinary entries.
+    #[serde(default)]
+    pub subscription_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -80,9 +84,9 @@ async fn insert_simple(
     }
     let res = exec(
         db,
-        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at, client_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        jsv![a.wallet_id, kind, a.amount_cents, a.category_id, a.description, a.occurred_at, a.client_id],
+        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at, client_id, subscription_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        jsv![a.wallet_id, kind, a.amount_cents, a.category_id, a.description, a.occurred_at, a.client_id, a.subscription_id],
     )
     .await?;
     last_row_id(&res)

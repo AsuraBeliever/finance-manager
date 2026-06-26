@@ -2,10 +2,8 @@
 //! expense (reusing transactions::add_expense) into the linked wallet and
 //! advances the next charge date by the cadence.
 
-use chrono::NaiveDate;
 use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::period::{resolve_period, Period};
-use finanzas_core::subscription::count_charges;
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
@@ -52,10 +50,6 @@ struct SubRow {
     wallet_id: Option<i64>,
     category_id: Option<i64>,
     is_active: i64,
-    #[serde(default)]
-    started_at: Option<String>,
-    #[serde(default)]
-    ended_at: Option<String>,
 }
 
 impl From<SubRow> for Subscription {
@@ -106,47 +100,61 @@ pub async fn list_subscriptions(
 ) -> AppResult<SubscriptionList> {
     let rates = load_rates(db, uid).await?;
     let resolved = resolve_period(&a.period, today_mx());
-    let (start, end) = (resolved.start, resolved.end);
+    let start = resolved.start.format("%Y-%m-%d").to_string();
+    let end = resolved.end.format("%Y-%m-%d").to_string();
 
     // Every subscription stays in the list (stable layout + the manager view);
-    // `charged_in_period` marks the ones that were actually charged during the
-    // period — a charge occurrence (by cadence) that also falls inside the
-    // active window. The total sums those charges (amount × occurrences).
+    // `charged_in_period` reflects REAL charges: an expense booked through
+    // "register payment" (linked via transactions.subscription_id) whose date
+    // falls in the period. We never project from the billing calendar, so a
+    // subscription only counts once it was actually paid. The total sums those
+    // real charges, each converted from its wallet's currency to MXN.
     let rows: Vec<SubRow> = all(
         db,
-        "SELECT id, name, icon, color, amount_cents, currency_code, cadence,
-                next_charge_date, wallet_id, category_id, is_active, started_at, ended_at
-         FROM subscriptions
-         WHERE user_id = ?1
-         ORDER BY next_charge_date",
+        &format!("{SELECT} WHERE user_id = ?1 ORDER BY next_charge_date"),
         jsv![uid],
     )
     .await?;
 
-    let parse = |s: &Option<String>| {
-        s.as_deref()
-            .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
-    };
-    let mut subscriptions = Vec::with_capacity(rows.len());
-    let mut monthly_total_mxn_cents = 0i64;
-    for r in rows {
-        // Charge window = period ∩ active span.
-        let lo = parse(&r.started_at).map_or(start, |d| d.max(start));
-        let hi = parse(&r.ended_at).map_or(end, |d| d.min(end));
-        let cadence_months = if r.cadence == "yearly" { 12 } else { 1 };
-        let count = NaiveDate::parse_from_str(&r.next_charge_date, "%Y-%m-%d")
-            .map(|next| count_charges(next, cadence_months, lo, hi))
-            .unwrap_or(0);
-        if count > 0 {
-            monthly_total_mxn_cents += to_mxn(
-                r.amount_cents * count,
-                rates.get(&r.currency_code).copied().unwrap_or(0),
-            );
-        }
-        let mut sub: Subscription = r.into();
-        sub.charged_in_period = count > 0;
-        subscriptions.push(sub);
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ChargeRow {
+        subscription_id: i64,
+        currency_code: String,
+        total_cents: i64,
     }
+    let charges: Vec<ChargeRow> = all(
+        db,
+        "SELECT t.subscription_id AS subscription_id,
+                w.currency_code AS currency_code,
+                SUM(t.amount_cents) AS total_cents
+         FROM transactions t
+         JOIN wallets w ON w.id = t.wallet_id
+         WHERE w.user_id = ?1
+           AND t.subscription_id IS NOT NULL
+           AND t.kind = 'expense'
+           AND t.occurred_at >= ?2 AND t.occurred_at < ?3
+         GROUP BY t.subscription_id, w.currency_code",
+        jsv![uid, start, end],
+    )
+    .await?;
+
+    let mut charged_mxn: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
+    let mut monthly_total_mxn_cents = 0i64;
+    for c in charges {
+        let mxn = to_mxn(c.total_cents, rates.get(&c.currency_code).copied().unwrap_or(0));
+        *charged_mxn.entry(c.subscription_id).or_insert(0) += mxn;
+        monthly_total_mxn_cents += mxn;
+    }
+
+    let mut subscriptions: Vec<Subscription> = rows
+        .into_iter()
+        .map(|r| {
+            let mut sub: Subscription = r.into();
+            sub.charged_in_period = charged_mxn.contains_key(&sub.id);
+            sub
+        })
+        .collect();
     // Charged-in-period first, then by next charge date (already roughly sorted).
     subscriptions.sort_by_key(|s| !s.charged_in_period);
     Ok(SubscriptionList {
@@ -326,6 +334,7 @@ pub async fn register_subscription_payment(
             description: Some(sub.name.clone()),
             occurred_at: today_mx().format("%Y-%m-%d").to_string(),
             client_id: None,
+            subscription_id: Some(sub.id),
         },
     )
     .await?;
