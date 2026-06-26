@@ -116,8 +116,9 @@ pub async fn list_subscriptions(
     )
     .await?;
 
+    // D1 returns the SQL column names verbatim (snake_case), so this row — like
+    // every other DB-row struct here — must NOT use rename_all = "camelCase".
     #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
     struct ChargeRow {
         subscription_id: i64,
         currency_code: String,
