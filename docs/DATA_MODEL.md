@@ -128,11 +128,13 @@ CREATE TABLE transactions (
   description TEXT,
   occurred_at TEXT NOT NULL,              -- 'YYYY-MM-DD'
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  client_id TEXT                          -- 0003: idempotencia del outbox offline
+  client_id TEXT,                         -- 0003: idempotencia del outbox offline
+  subscription_id INTEGER REFERENCES subscriptions(id)  -- 0020: gasto que pagó una suscripción (NULL = transacción normal)
 );
 CREATE INDEX idx_tx_wallet ON transactions(wallet_id, occurred_at);
 CREATE INDEX idx_tx_transfer ON transactions(transfer_group_id);
 CREATE UNIQUE INDEX idx_tx_client ON transactions(client_id) WHERE client_id IS NOT NULL;
+CREATE INDEX idx_tx_subscription ON transactions(subscription_id, occurred_at);  -- 0020: cargos reales por suscripción/periodo
 
 CREATE TABLE investments (
   id INTEGER PRIMARY KEY,
@@ -306,6 +308,14 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
   (menor `sort_order`) es la "principal" — gauge/círculo en el resumen; el resto, barras.
 - **Suscripción activa a una fecha** D = `started_at <= D AND (ended_at IS NULL OR ended_at > D)`.
   Cancelar (set inactive) cierra la ventana y conserva historia; borrar la pierde.
+- **Cobrado en el periodo = cargos reales** (0020, `transactions.subscription_id`):
+  `register_subscription_payment` etiqueta el gasto que inserta con su
+  `subscription_id`. El resumen (`charged_in_period` y el total) cuenta esos
+  gastos reales dentro del periodo (`SUM(amount_cents)` → MXN por moneda de la
+  cartera), **nunca** proyecta desde el calendario de cobro: una suscripción
+  aparece solo cuando de verdad se registró su pago. (Antes se proyectaba con
+  `count_charges`, que mostraba cobros futuros del mes como ya hechos y omitía
+  pagos cuya ocurrencia proyectada caía antes del alta.)
 
 - **wallets.skin** (migración 0006): estilo de tarjeta — id de catálogo, `grad:<from>,<to>,<angle>` o `img:<data-url>`; NULL = derivado del color.
 
