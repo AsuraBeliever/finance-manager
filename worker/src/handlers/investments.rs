@@ -3,6 +3,7 @@
 
 use chrono::{Duration, NaiveDate};
 use finanzas_core::error::{AppError, AppResult};
+use finanzas_core::investments::simulate::{simulate, Cadence, SimulationInput};
 use finanzas_core::investments::{
     find, net_invested, parse_bonddia_price, registry, CalcContext, Movement, Snapshot,
 };
@@ -807,4 +808,66 @@ pub async fn delete_investment_movement(db: &D1Database, uid: i64, a: IdArgs) ->
         }
     }
     Ok(())
+}
+
+// ---- forward simulator ("¿cuánto crecería?") ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimulateArgs {
+    pub initial_cents: i64,
+    #[serde(default)]
+    pub contribution_cents: i64,
+    /// "monthly" | "biweekly" | "weekly" | "none"
+    pub cadence: String,
+    pub annual_rate_bps: i64,
+    pub months: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimPoint {
+    pub month: i64,
+    pub contributed_cents: i64,
+    pub value_cents: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimResult {
+    pub points: Vec<SimPoint>,
+    pub final_value_cents: i64,
+    pub total_contributed_cents: i64,
+    pub total_interest_cents: i64,
+}
+
+/// Pure forward projection — no DB. Powers the Simulator UI.
+pub fn simulate_investment(a: SimulateArgs) -> AppResult<SimResult> {
+    let cadence = match a.cadence.as_str() {
+        "monthly" => Cadence::Monthly,
+        "biweekly" => Cadence::Biweekly,
+        "weekly" => Cadence::Weekly,
+        _ => Cadence::None,
+    };
+    let r = simulate(&SimulationInput {
+        initial_cents: a.initial_cents,
+        contribution_cents: a.contribution_cents,
+        cadence,
+        annual_rate_bps: a.annual_rate_bps,
+        months: a.months,
+    })?;
+    Ok(SimResult {
+        points: r
+            .points
+            .into_iter()
+            .map(|p| SimPoint {
+                month: p.month,
+                contributed_cents: p.contributed_cents,
+                value_cents: p.value_cents,
+            })
+            .collect(),
+        final_value_cents: r.final_value_cents,
+        total_contributed_cents: r.total_contributed_cents,
+        total_interest_cents: r.total_interest_cents,
+    })
 }

@@ -165,6 +165,31 @@ export type InvestmentDetail = InvestmentWithValue & {
   movements: InvestmentMovement[];
 };
 
+// ---- forward simulator ----
+
+export type SimCadence = "monthly" | "biweekly" | "weekly" | "none";
+
+export interface SimulateInput {
+  initialCents: number;
+  contributionCents: number;
+  cadence: SimCadence;
+  annualRateBps: number;
+  months: number;
+}
+
+export interface SimPoint {
+  month: number;
+  contributedCents: number;
+  valueCents: number;
+}
+
+export interface SimResult {
+  points: SimPoint[];
+  finalValueCents: number;
+  totalContributedCents: number;
+  totalInterestCents: number;
+}
+
 // ---- analytics ----
 
 export interface CategorySlice {

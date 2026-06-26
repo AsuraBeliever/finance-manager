@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Plus, TrendingDown, TrendingUp } from "lucide-react";
+import { Calculator, Plus, TrendingDown, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
@@ -45,6 +45,12 @@ export function InvestmentsPage() {
               />
               {es.investments.showClosed}
             </label>
+            <Link
+              to="/inversiones/simulador"
+              className="inline-flex items-center gap-2 rounded-lg border border-border-muted px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:border-accent hover:text-accent"
+            >
+              <Calculator size={16} /> {es.simulator.open}
+            </Link>
             <Button onClick={() => setFormOpen(true)}>
               <span className="flex items-center gap-2">
                 <Plus size={16} /> {es.investments.newInvestment}

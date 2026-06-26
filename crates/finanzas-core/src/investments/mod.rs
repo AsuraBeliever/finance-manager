@@ -4,6 +4,7 @@ pub mod crypto;
 pub mod fixed_rate;
 pub mod manual;
 pub mod nu_cajita;
+pub mod simulate;
 
 use chrono::NaiveDate;
 use serde_json::Value;

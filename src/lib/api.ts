@@ -9,6 +9,8 @@ import type {
   GoalInput,
   InvestmentDetail,
   InvestmentWithValue,
+  SimulateInput,
+  SimResult,
   Period,
   SavingsGoal,
   SpendingTrends,
@@ -295,6 +297,9 @@ export const addSnapshot = (investmentId: number, valueCents: number, asOf: stri
 
 export const getInvestmentDetail = (id: number) =>
   rpc<InvestmentDetail>("get_investment_detail", { id });
+
+export const simulateInvestment = (input: SimulateInput) =>
+  rpc<SimResult>("simulate_investment", { ...input });
 
 export const addInvestmentMovement = (
   investmentId: number,
