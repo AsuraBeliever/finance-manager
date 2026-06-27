@@ -6,7 +6,10 @@ import {
   LockOpen,
   Pencil,
   Plus,
+  SlidersHorizontal,
   Trash2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -45,6 +48,9 @@ import { InvestmentFormModal } from "./InvestmentFormModal";
 
 const SIM_GOLD = "#c9a14a";
 const SIM_CADENCES: SimCadence[] = ["monthly", "biweekly", "weekly", "none"];
+// Zoom steps for the projection time range (years).
+const ZOOM_YEARS = [1, 2, 3, 5, 10, 15, 20, 30, 40];
+const ZOOM_DEFAULT = 3; // 5 years
 
 export function InvestmentDetailPage() {
   const { id } = useParams();
@@ -133,24 +139,27 @@ export function InvestmentDetailPage() {
     onSuccess: invalidate,
   });
 
-  // Inline "what-if": the user adds an imagined recurring contribution and the
-  // projection chart updates against this investment's real value and rate.
+  // Projection controls. By default it shows the plain projection (the money
+  // untouched). A toggle opens the "what-if" (recurring contributions), and the
+  // zoom stretches/shrinks the time range. The same RPC serves both — with
+  // contribution 0 it's just the plain forward projection over the zoom range.
+  const [simEnabled, setSimEnabled] = useState(false);
   const [simContribution, setSimContribution] = useState("");
   const [simCadence, setSimCadence] = useState<SimCadence>("monthly");
-  const [simYears, setSimYears] = useState("5");
-  const simContributionCents = parseToCents(simContribution) ?? 0;
-  const simMonths = Math.round((Number(simYears) || 0) * 12);
-  const simActive = simContributionCents > 0 && simMonths > 0;
+  const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
+  const zoomYears = ZOOM_YEARS[zoomIdx];
+  const simContributionCents = simEnabled ? (parseToCents(simContribution) ?? 0) : 0;
+  const simActive = simContributionCents > 0;
   const projectionQuery = useQuery({
-    queryKey: ["projectInvestment", invId, simContributionCents, simCadence, simMonths],
+    queryKey: ["projectInvestment", invId, simContributionCents, simCadence, zoomYears],
     queryFn: () =>
       projectInvestment({
         id: invId,
         contributionCents: simContributionCents,
         cadence: simCadence,
-        months: simMonths,
+        months: zoomYears * 12,
       }),
-    enabled: Number.isFinite(invId) && simActive,
+    enabled: Number.isFinite(invId),
     placeholderData: (p) => p,
   });
 
@@ -169,11 +178,12 @@ export function InvestmentDetailPage() {
   };
   const gainPositive = d.gainCents >= 0;
   const todayStr = todayIso();
-  // When the what-if is active, the chart's future is the simulated line (gold);
-  // otherwise it's the plain projection (green dashed). The solid "actual" past
-  // line is the same either way.
-  const simData = simActive ? projectionQuery.data : undefined;
-  const activeProjection = simData?.projection ?? d.projection;
+  // The chart always comes from the projection RPC (zoom + optional contribs);
+  // the detail's own projection is just the first-paint fallback. With the
+  // what-if on, the future line is gold ("con aportes"); otherwise it's the
+  // plain green dashed projection. The solid "actual" past line is the same.
+  const projData = projectionQuery.data;
+  const activeProjection = projData?.projection ?? d.projection;
   const chartData = activeProjection.map((p) => ({
     date: p.date,
     actual: p.date <= todayStr ? p.valueCents / 100 : null,
@@ -275,68 +285,99 @@ export function InvestmentDetailPage() {
 
       {d.calculator !== "crypto" && (
       <section className="mb-4 rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card">
-        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-display text-lg font-medium tracking-tight text-fg">
-            {es.investments.projection}
-          </h3>
-          {simData?.annualRateBps != null && (
-            <span className="text-xs text-fg-subtle">
-              {es.investments.projectionAtRate.replace(
-                "{rate}",
-                (simData.annualRateBps / 100).toFixed(2),
-              )}
-            </span>
-          )}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <h3 className="font-display text-lg font-medium tracking-tight text-fg">
+              {es.investments.projection}
+            </h3>
+            {projData?.annualRateBps != null && (
+              <span className="text-xs text-fg-subtle">
+                {es.investments.projectionAtRate.replace(
+                  "{rate}",
+                  (projData.annualRateBps / 100).toFixed(2),
+                )}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Zoom: stretch/shrink the projection time range. */}
+            <div className="flex items-center gap-1 rounded-lg border border-border-muted p-0.5">
+              <button
+                onClick={() => setZoomIdx((i) => Math.max(0, i - 1))}
+                disabled={zoomIdx === 0}
+                aria-label="zoom in"
+                className="rounded-md p-1 text-fg-muted transition-colors hover:bg-surface-overlay hover:text-fg disabled:opacity-30"
+              >
+                <ZoomIn size={15} />
+              </button>
+              <span className="min-w-12 text-center text-xs tabular-nums text-fg-muted">
+                {zoomYears} {es.investments.projectionYearsShort}
+              </span>
+              <button
+                onClick={() => setZoomIdx((i) => Math.min(ZOOM_YEARS.length - 1, i + 1))}
+                disabled={zoomIdx === ZOOM_YEARS.length - 1}
+                aria-label="zoom out"
+                className="rounded-md p-1 text-fg-muted transition-colors hover:bg-surface-overlay hover:text-fg disabled:opacity-30"
+              >
+                <ZoomOut size={15} />
+              </button>
+            </div>
+            {/* Toggle the what-if (recurring contributions). */}
+            <button
+              onClick={() => setSimEnabled((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                simEnabled
+                  ? "border-accent/40 bg-accent/15 text-accent"
+                  : "border-border-muted text-fg-muted hover:text-fg"
+              }`}
+            >
+              <SlidersHorizontal size={15} /> {es.investments.projectionSimToggle}
+            </button>
+          </div>
         </div>
 
         {/* What-if controls: simulate adding money straight on this chart. */}
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Field label={es.investments.projectionContribution}>
-            <input
-              className={inputClass}
-              inputMode="decimal"
-              placeholder="0"
-              value={simContribution}
-              onChange={(e) => setSimContribution(e.target.value)}
-            />
-          </Field>
-          <Field label={es.simulator.cadence}>
-            <select
-              className={inputClass}
-              value={simCadence}
-              onChange={(e) => setSimCadence(e.target.value as SimCadence)}
-            >
-              {SIM_CADENCES.map((c) => (
-                <option key={c} value={c}>
-                  {es.simulator.cadenceOptions[c]}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={es.investments.projectionYears}>
-            <input
-              className={inputClass}
-              inputMode="decimal"
-              value={simYears}
-              onChange={(e) => setSimYears(e.target.value)}
-            />
-          </Field>
-        </div>
+        {simEnabled && (
+          <div className="mb-4 grid grid-cols-2 gap-3">
+            <Field label={es.investments.projectionContribution}>
+              <input
+                className={inputClass}
+                inputMode="decimal"
+                placeholder="0"
+                value={simContribution}
+                onChange={(e) => setSimContribution(e.target.value)}
+              />
+            </Field>
+            <Field label={es.simulator.cadence}>
+              <select
+                className={inputClass}
+                value={simCadence}
+                onChange={(e) => setSimCadence(e.target.value as SimCadence)}
+              >
+                {SIM_CADENCES.map((c) => (
+                  <option key={c} value={c}>
+                    {es.simulator.cadenceOptions[c]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        )}
 
-        {simActive && simData && (
+        {simActive && projData && (
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MiniStat
               label={es.investments.projectionFinal}
-              value={formatCents(simData.finalValueCents, d.currencyCode)}
+              value={formatCents(projData.finalValueCents, d.currencyCode)}
               accent
             />
             <MiniStat
               label={es.investments.projectionContributed}
-              value={formatCents(simData.contributedCents, d.currencyCode)}
+              value={formatCents(projData.contributedCents, d.currencyCode)}
             />
             <MiniStat
               label={es.investments.projectionInterest}
-              value={formatCents(simData.interestCents, d.currencyCode)}
+              value={formatCents(projData.interestCents, d.currencyCode)}
               gold
             />
           </div>

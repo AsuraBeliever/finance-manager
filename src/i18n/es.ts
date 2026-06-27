@@ -331,6 +331,8 @@ export const esDict = {
     valueAtMaturity: "Valor al vencimiento",
     projection: "Proyección",
     projectionSimTitle: "Simula tus aportaciones",
+    projectionSimToggle: "Simular aportes",
+    projectionYearsShort: "años",
     projectionContribution: "Aporte",
     projectionYears: "Plazo (años)",
     projectionFinal: "Valor proyectado",

@@ -327,6 +327,8 @@ export const en: Dict = {
     valueAtMaturity: "Value at maturity",
     projection: "Projection",
     projectionSimTitle: "Simulate your contributions",
+    projectionSimToggle: "Simulate contributions",
+    projectionYearsShort: "yr",
     projectionContribution: "Contribution",
     projectionYears: "Term (years)",
     projectionFinal: "Projected value",
