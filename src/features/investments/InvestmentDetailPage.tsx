@@ -48,9 +48,11 @@ import { InvestmentFormModal } from "./InvestmentFormModal";
 
 const SIM_GOLD = "#c9a14a";
 const SIM_CADENCES: SimCadence[] = ["monthly", "biweekly", "weekly", "none"];
-// Zoom steps for the projection time range (years).
-const ZOOM_YEARS = [1, 2, 3, 5, 10, 15, 20, 30, 40];
-const ZOOM_DEFAULT = 3; // 5 years
+// Projection time range (years): +/- steppers or a free manual value, capped at
+// 50 (the backend clamps months to 600).
+const MIN_YEARS = 1;
+const MAX_YEARS = 50;
+const clampYears = (n: number) => Math.min(MAX_YEARS, Math.max(MIN_YEARS, n));
 
 export function InvestmentDetailPage() {
   const { id } = useParams();
@@ -146,18 +148,20 @@ export function InvestmentDetailPage() {
   const [simEnabled, setSimEnabled] = useState(false);
   const [simContribution, setSimContribution] = useState("");
   const [simCadence, setSimCadence] = useState<SimCadence>("monthly");
-  const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
-  const zoomYears = ZOOM_YEARS[zoomIdx];
+  const [zoomYears, setZoomYears] = useState("5");
+  const parsedYears = Math.round(Number(zoomYears));
+  const zoomYearsNum = parsedYears > 0 ? clampYears(parsedYears) : MIN_YEARS;
+  const stepZoom = (delta: number) => setZoomYears(String(clampYears(zoomYearsNum + delta)));
   const simContributionCents = simEnabled ? (parseToCents(simContribution) ?? 0) : 0;
   const simActive = simContributionCents > 0;
   const projectionQuery = useQuery({
-    queryKey: ["projectInvestment", invId, simContributionCents, simCadence, zoomYears],
+    queryKey: ["projectInvestment", invId, simContributionCents, simCadence, zoomYearsNum],
     queryFn: () =>
       projectInvestment({
         id: invId,
         contributionCents: simContributionCents,
         cadence: simCadence,
-        months: zoomYears * 12,
+        months: zoomYearsNum * 12,
       }),
     enabled: Number.isFinite(invId),
     placeholderData: (p) => p,
@@ -300,22 +304,31 @@ export function InvestmentDetailPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Zoom: stretch/shrink the projection time range. */}
-            <div className="flex items-center gap-1 rounded-lg border border-border-muted p-0.5">
+            {/* Zoom: stretch/shrink the projection time range (steppers or a
+                manual value). */}
+            <div className="flex items-center gap-0.5 rounded-lg border border-border-muted p-0.5">
               <button
-                onClick={() => setZoomIdx((i) => Math.max(0, i - 1))}
-                disabled={zoomIdx === 0}
+                onClick={() => stepZoom(-1)}
+                disabled={zoomYearsNum <= MIN_YEARS}
                 aria-label="zoom in"
                 className="rounded-md p-1 text-fg-muted transition-colors hover:bg-surface-overlay hover:text-fg disabled:opacity-30"
               >
                 <ZoomIn size={15} />
               </button>
-              <span className="min-w-12 text-center text-xs tabular-nums text-fg-muted">
-                {zoomYears} {es.investments.projectionYearsShort}
+              <input
+                value={zoomYears}
+                onChange={(e) => setZoomYears(e.target.value)}
+                onBlur={() => setZoomYears(String(zoomYearsNum))}
+                inputMode="numeric"
+                aria-label="años"
+                className="w-8 bg-transparent text-center text-xs tabular-nums text-fg outline-none"
+              />
+              <span className="pr-1 text-xs text-fg-subtle">
+                {es.investments.projectionYearsShort}
               </span>
               <button
-                onClick={() => setZoomIdx((i) => Math.min(ZOOM_YEARS.length - 1, i + 1))}
-                disabled={zoomIdx === ZOOM_YEARS.length - 1}
+                onClick={() => stepZoom(1)}
+                disabled={zoomYearsNum >= MAX_YEARS}
                 aria-label="zoom out"
                 className="rounded-md p-1 text-fg-muted transition-colors hover:bg-surface-overlay hover:text-fg disabled:opacity-30"
               >

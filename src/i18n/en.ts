@@ -519,6 +519,13 @@ export const en: Dict = {
     updating: "Updating…",
     updatingHint: "Applying the new version, don't close the app.",
   },
+  whatsNew: {
+    title: "What's new",
+    empty: "Nothing new right now.",
+    settingsHint: "See the changes in each version of the app.",
+    view: "What's new",
+    notifyOnUpdate: "Notify me on update",
+  },
   offline: {
     banner: "Offline — showing the last synced data",
     savedPending: "Offline: the entry was saved and will sync when you reconnect.",

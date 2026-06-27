@@ -525,6 +525,13 @@ export const esDict = {
     updating: "Actualizando…",
     updatingHint: "Aplicando la nueva versión, no cierres la app.",
   },
+  whatsNew: {
+    title: "Qué hay de nuevo",
+    empty: "No hay novedades por ahora.",
+    settingsHint: "Mira los cambios de cada versión de la app.",
+    view: "Ver novedades",
+    notifyOnUpdate: "Avisarme al actualizar",
+  },
   offline: {
     banner: "Sin conexión — mostrando los últimos datos sincronizados",
     savedPending: "Sin conexión: el movimiento se guardó y se sincronizará al reconectar.",

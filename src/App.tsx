@@ -22,6 +22,7 @@ import { useOnline } from "./lib/online";
 import { flush } from "./lib/outbox";
 import { LoginPage } from "./features/auth/LoginPage";
 import { UpdateBanner } from "./features/update/UpdateBanner";
+import { WhatsNewAuto } from "./features/update/WhatsNew";
 import { hydrateThemeFromServer } from "./lib/theme";
 import { hydrateAppearanceFromServer, useAppearance, ICONS } from "./lib/appearance";
 
@@ -127,6 +128,7 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <UpdateBanner />
+      <WhatsNewAuto />
       {!online && (
         <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-500/15 px-4 py-1.5 text-xs text-amber-300">
           <CloudOff size={14} />
