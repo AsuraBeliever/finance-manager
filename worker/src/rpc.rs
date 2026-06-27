@@ -167,6 +167,10 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "delete_investment_movement" => {
             out(investments::delete_investment_movement(db, uid, args(body)?).await?)
         }
+        "simulate_investment" => out(investments::simulate_investment(args(body)?)?),
+        "solve_contribution" => out(investments::solve_contribution(args(body)?)?),
+        "get_portfolio" => out(investments::get_portfolio(db, uid).await?),
+        "project_investment" => out(investments::project_investment(db, uid, args(body)?).await?),
 
         _ => Err(AppError::NotFound("comando")),
     }

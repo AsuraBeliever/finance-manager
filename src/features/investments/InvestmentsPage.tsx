@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Plus, TrendingDown, TrendingUp } from "lucide-react";
+import { Calculator, Plus, TrendingDown, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
@@ -9,6 +9,7 @@ import { listInvestments } from "../../lib/api";
 import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
+import { PortfolioSummary } from "./PortfolioSummary";
 
 /** "0.05 BTC" from a crypto investment's params. */
 function cryptoSub(paramsJson: string): string {
@@ -45,6 +46,12 @@ export function InvestmentsPage() {
               />
               {es.investments.showClosed}
             </label>
+            <Link
+              to="/inversiones/simulador"
+              className="inline-flex items-center gap-2 rounded-lg border border-border-muted px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:border-accent hover:text-accent"
+            >
+              <Calculator size={16} /> {es.simulator.open}
+            </Link>
             <Button onClick={() => setFormOpen(true)}>
               <span className="flex items-center gap-2">
                 <Plus size={16} /> {es.investments.newInvestment}
@@ -65,6 +72,8 @@ export function InvestmentsPage() {
           description={es.investments.emptyDescription}
         />
       )}
+
+      {items.length > 0 && <PortfolioSummary />}
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
         {items.map((inv) => {

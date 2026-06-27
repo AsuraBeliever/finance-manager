@@ -4,6 +4,8 @@ pub mod crypto;
 pub mod fixed_rate;
 pub mod manual;
 pub mod nu_cajita;
+pub mod simulate;
+pub mod xirr;
 
 use chrono::NaiveDate;
 use serde_json::Value;
@@ -22,6 +24,19 @@ pub trait InvestmentCalculator: Send + Sync {
     /// storage layer (see `CalcContext`).
     fn value_at(&self, inv: &Investment, ctx: &CalcContext, as_of: NaiveDate) -> AppResult<i64>;
     fn maturity_date(&self, inv: &Investment) -> Option<NaiveDate>;
+
+    /// Current effective annual rate in bps, used to project the value FORWARD
+    /// from today. `None` means the instrument has no forward-growth model
+    /// (crypto, manual): the projection then stays flat at the current value.
+    /// For constant-rate calculators this equals the param rate; for bonddia it
+    /// is the latest target rate minus the tracking spread.
+    fn effective_annual_rate_bps(
+        &self,
+        _inv: &Investment,
+        _ctx: &CalcContext,
+    ) -> AppResult<Option<i64>> {
+        Ok(None)
+    }
 }
 
 /// Stored data backing one investment's valuation, preloaded by the storage

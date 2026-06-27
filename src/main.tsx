@@ -11,6 +11,7 @@ import { WalletDetailPage } from "./features/wallets/WalletDetailPage";
 import { TransactionsPage } from "./features/transactions/TransactionsPage";
 import { InvestmentsPage } from "./features/investments/InvestmentsPage";
 import { InvestmentDetailPage } from "./features/investments/InvestmentDetailPage";
+import { SimulatorPage } from "./features/investments/SimulatorPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { SavingsGoalsPage } from "./features/goals/SavingsGoalsPage";
 import { BudgetsPage } from "./features/budgets/BudgetsPage";
@@ -55,6 +56,7 @@ const router = createHashRouter([
       { path: "carteras/:id", element: <WalletDetailPage /> },
       { path: "transacciones", element: <TransactionsPage /> },
       { path: "inversiones", element: <InvestmentsPage /> },
+      { path: "inversiones/simulador", element: <SimulatorPage /> },
       { path: "inversiones/:id", element: <InvestmentDetailPage /> },
       { path: "metas", element: <SavingsGoalsPage /> },
       { path: "presupuestos", element: <BudgetsPage /> },

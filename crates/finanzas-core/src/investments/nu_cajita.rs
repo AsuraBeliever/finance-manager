@@ -30,6 +30,14 @@ impl InvestmentCalculator for NuCajita {
     fn maturity_date(&self, _inv: &Investment) -> Option<NaiveDate> {
         None // open-ended savings
     }
+
+    fn effective_annual_rate_bps(
+        &self,
+        inv: &Investment,
+        _ctx: &CalcContext,
+    ) -> AppResult<Option<i64>> {
+        Ok(Some(param_i64(&parse_params(inv)?, "annual_rate_bps")?))
+    }
 }
 
 #[cfg(test)]

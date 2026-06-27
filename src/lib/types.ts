@@ -165,6 +165,65 @@ export type InvestmentDetail = InvestmentWithValue & {
   movements: InvestmentMovement[];
 };
 
+export interface InvestmentProjection {
+  projection: ProjectionPoint[];
+  annualRateBps: number | null;
+  finalValueCents: number;
+  contributedCents: number;
+  interestCents: number;
+}
+
+// ---- forward simulator ----
+
+export type SimCadence = "monthly" | "biweekly" | "weekly" | "none";
+
+export interface SimulateInput {
+  initialCents: number;
+  contributionCents: number;
+  cadence: SimCadence;
+  annualRateBps: number;
+  months: number;
+}
+
+export interface SimPoint {
+  month: number;
+  contributedCents: number;
+  valueCents: number;
+}
+
+export interface SimResult {
+  points: SimPoint[];
+  finalValueCents: number;
+  totalContributedCents: number;
+  totalInterestCents: number;
+}
+
+export interface SolveInput {
+  initialCents: number;
+  targetCents: number;
+  annualRateBps: number;
+  months: number;
+}
+
+export interface SolveResult {
+  monthlyContributionCents: number;
+}
+
+export interface PortfolioSlice {
+  id: number;
+  name: string;
+  currentValueCents: number;
+  gainCents: number;
+}
+
+export interface Portfolio {
+  totalValueCents: number;
+  totalInvestedCents: number;
+  totalGainCents: number;
+  annualizedReturnBps: number | null;
+  slices: PortfolioSlice[];
+}
+
 // ---- analytics ----
 
 export interface CategorySlice {

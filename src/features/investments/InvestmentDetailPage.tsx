@@ -6,7 +6,10 @@ import {
   LockOpen,
   Pencil,
   Plus,
+  SlidersHorizontal,
   Trash2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -34,12 +37,22 @@ import {
   getExchangeRates,
   getInvestmentDetail,
   listWallets,
+  projectInvestment,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
 import { todayIso } from "../../lib/date";
 import { POSITIVE, useChartTokens } from "../../lib/palette";
+import type { SimCadence } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
+
+const SIM_GOLD = "#c9a14a";
+const SIM_CADENCES: SimCadence[] = ["monthly", "biweekly", "weekly", "none"];
+// Projection time range (years): +/- steppers or a free manual value, capped at
+// 50 (the backend clamps months to 600).
+const MIN_YEARS = 1;
+const MAX_YEARS = 50;
+const clampYears = (n: number) => Math.min(MAX_YEARS, Math.max(MIN_YEARS, n));
 
 export function InvestmentDetailPage() {
   const { id } = useParams();
@@ -128,6 +141,32 @@ export function InvestmentDetailPage() {
     onSuccess: invalidate,
   });
 
+  // Projection controls. By default it shows the plain projection (the money
+  // untouched). A toggle opens the "what-if" (recurring contributions), and the
+  // zoom stretches/shrinks the time range. The same RPC serves both — with
+  // contribution 0 it's just the plain forward projection over the zoom range.
+  const [simEnabled, setSimEnabled] = useState(false);
+  const [simContribution, setSimContribution] = useState("");
+  const [simCadence, setSimCadence] = useState<SimCadence>("monthly");
+  const [zoomYears, setZoomYears] = useState("5");
+  const parsedYears = Math.round(Number(zoomYears));
+  const zoomYearsNum = parsedYears > 0 ? clampYears(parsedYears) : MIN_YEARS;
+  const stepZoom = (delta: number) => setZoomYears(String(clampYears(zoomYearsNum + delta)));
+  const simContributionCents = simEnabled ? (parseToCents(simContribution) ?? 0) : 0;
+  const simActive = simContributionCents > 0;
+  const projectionQuery = useQuery({
+    queryKey: ["projectInvestment", invId, simContributionCents, simCadence, zoomYearsNum],
+    queryFn: () =>
+      projectInvestment({
+        id: invId,
+        contributionCents: simContributionCents,
+        cadence: simCadence,
+        months: zoomYearsNum * 12,
+      }),
+    enabled: Number.isFinite(invId),
+    placeholderData: (p) => p,
+  });
+
   if (detail.isPending) return <p className="text-sm text-fg-subtle">{es.common.loading}</p>;
   if (detail.isError) return <p className="text-sm text-danger">{String(detail.error)}</p>;
 
@@ -142,11 +181,19 @@ export function InvestmentDetailPage() {
     setMovementKind(kind);
   };
   const gainPositive = d.gainCents >= 0;
-  const chartData = d.projection.map((p) => ({
-    date: p.date,
-    value: p.valueCents / 100,
-  }));
   const todayStr = todayIso();
+  // The chart always comes from the projection RPC (zoom + optional contribs);
+  // the detail's own projection is just the first-paint fallback. With the
+  // what-if on, the future line is gold ("con aportes"); otherwise it's the
+  // plain green dashed projection. The solid "actual" past line is the same.
+  const projData = projectionQuery.data;
+  const activeProjection = projData?.projection ?? d.projection;
+  const chartData = activeProjection.map((p) => ({
+    date: p.date,
+    actual: p.date <= todayStr ? p.valueCents / 100 : null,
+    projected: !simActive && p.date >= todayStr ? p.valueCents / 100 : null,
+    withContrib: simActive && p.date >= todayStr ? p.valueCents / 100 : null,
+  }));
 
   // crypto extras: quantity from params + USD equivalent via the USD fx rate
   let cryptoParams: { symbol: string; quantity_e8: number } | null = null;
@@ -242,7 +289,113 @@ export function InvestmentDetailPage() {
 
       {d.calculator !== "crypto" && (
       <section className="mb-4 rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card">
-        <h3 className="mb-4 font-display text-lg font-medium tracking-tight text-fg">{es.investments.projection}</h3>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <h3 className="font-display text-lg font-medium tracking-tight text-fg">
+              {es.investments.projection}
+            </h3>
+            {projData?.annualRateBps != null && (
+              <span className="text-xs text-fg-subtle">
+                {es.investments.projectionAtRate.replace(
+                  "{rate}",
+                  (projData.annualRateBps / 100).toFixed(2),
+                )}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Zoom: stretch/shrink the projection time range (steppers or a
+                manual value). */}
+            <div className="flex items-center gap-0.5 rounded-lg border border-border-muted p-0.5">
+              <button
+                onClick={() => stepZoom(-1)}
+                disabled={zoomYearsNum <= MIN_YEARS}
+                aria-label="zoom in"
+                className="rounded-md p-1 text-fg-muted transition-colors hover:bg-surface-overlay hover:text-fg disabled:opacity-30"
+              >
+                <ZoomIn size={15} />
+              </button>
+              <input
+                value={zoomYears}
+                onChange={(e) => setZoomYears(e.target.value)}
+                onBlur={() => setZoomYears(String(zoomYearsNum))}
+                inputMode="numeric"
+                aria-label="años"
+                className="w-8 bg-transparent text-center text-xs tabular-nums text-fg outline-none"
+              />
+              <span className="pr-1 text-xs text-fg-subtle">
+                {es.investments.projectionYearsShort}
+              </span>
+              <button
+                onClick={() => stepZoom(1)}
+                disabled={zoomYearsNum >= MAX_YEARS}
+                aria-label="zoom out"
+                className="rounded-md p-1 text-fg-muted transition-colors hover:bg-surface-overlay hover:text-fg disabled:opacity-30"
+              >
+                <ZoomOut size={15} />
+              </button>
+            </div>
+            {/* Toggle the what-if (recurring contributions). */}
+            <button
+              onClick={() => setSimEnabled((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                simEnabled
+                  ? "border-accent/40 bg-accent/15 text-accent"
+                  : "border-border-muted text-fg-muted hover:text-fg"
+              }`}
+            >
+              <SlidersHorizontal size={15} /> {es.investments.projectionSimToggle}
+            </button>
+          </div>
+        </div>
+
+        {/* What-if controls: simulate adding money straight on this chart. */}
+        {simEnabled && (
+          <div className="mb-4 grid grid-cols-2 gap-3">
+            <Field label={es.investments.projectionContribution}>
+              <input
+                className={inputClass}
+                inputMode="decimal"
+                placeholder="0"
+                value={simContribution}
+                onChange={(e) => setSimContribution(e.target.value)}
+              />
+            </Field>
+            <Field label={es.simulator.cadence}>
+              <select
+                className={inputClass}
+                value={simCadence}
+                onChange={(e) => setSimCadence(e.target.value as SimCadence)}
+              >
+                {SIM_CADENCES.map((c) => (
+                  <option key={c} value={c}>
+                    {es.simulator.cadenceOptions[c]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        )}
+
+        {simActive && projData && (
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <MiniStat
+              label={es.investments.projectionFinal}
+              value={formatCents(projData.finalValueCents, d.currencyCode)}
+              accent
+            />
+            <MiniStat
+              label={es.investments.projectionContributed}
+              value={formatCents(projData.contributedCents, d.currencyCode)}
+            />
+            <MiniStat
+              label={es.investments.projectionInterest}
+              value={formatCents(projData.interestCents, d.currencyCode)}
+              gold
+            />
+          </div>
+        )}
+
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={chartData}>
             <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" />
@@ -254,7 +407,9 @@ export function InvestmentDetailPage() {
               tickFormatter={(v) => (Number(v) / 1000).toFixed(1) + "k"}
             />
             <Tooltip
-              formatter={(v) => formatCents(Math.round(Number(v) * 100), d.currencyCode)}
+              formatter={(v) =>
+                v == null ? [] : formatCents(Math.round(Number(v) * 100), d.currencyCode)
+              }
               contentStyle={chart.tooltip}
             />
             {chartData.some((p) => p.date >= todayStr) && (
@@ -262,10 +417,35 @@ export function InvestmentDetailPage() {
             )}
             <Line
               type="monotone"
-              dataKey="value"
+              dataKey="actual"
+              name={es.investments.currentValue}
               stroke={POSITIVE}
               strokeWidth={2}
               dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="projected"
+              name={es.investments.projection}
+              stroke={POSITIVE}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="withContrib"
+              name={es.investments.projectionWithContrib}
+              stroke={SIM_GOLD}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -481,5 +661,30 @@ export function InvestmentDetailPage() {
         onClose={() => setMovementToDelete(null)}
       />
     </>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  accent,
+  gold,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  gold?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-border-muted bg-surface p-3">
+      <p className="text-xs text-fg-subtle">{label}</p>
+      <p
+        className={`mt-0.5 font-display text-lg font-semibold tabular-nums ${
+          accent ? "text-accent" : gold ? "text-gold" : "text-fg"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
   );
 }

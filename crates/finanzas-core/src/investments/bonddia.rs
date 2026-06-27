@@ -105,6 +105,25 @@ impl InvestmentCalculator for Bonddia {
     fn maturity_date(&self, _inv: &Investment) -> Option<NaiveDate> {
         None // daily liquidity fund
     }
+
+    fn effective_annual_rate_bps(
+        &self,
+        inv: &Investment,
+        ctx: &CalcContext,
+    ) -> AppResult<Option<i64>> {
+        let params = parse_params(inv)?;
+        let spread_bps = params
+            .get("spread_bps")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        // Latest target rate minus the tracking spread; fall back to the flat
+        // param rate when the history cache is empty.
+        let rate = match ctx.rate_history.last() {
+            Some((_, bps)) => (*bps as f64 - spread_bps).max(0.0).round() as i64,
+            None => param_i64_or(&params, "annual_rate_bps", 0),
+        };
+        Ok(Some(rate))
+    }
 }
 
 #[cfg(test)]

@@ -2,13 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es as dateLocaleEs, enUS as dateLocaleEn } from "date-fns/locale";
-import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Tags } from "lucide-react";
+import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Sparkles, Tags } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { InstallButton } from "../../components/InstallButton";
 import { Field, inputClass } from "../../components/Field";
 import { PageHeader } from "../../components/PageHeader";
 import { ThemeToggle } from "../../components/ThemeToggle";
+import { WhatsNewModal } from "../update/WhatsNew";
+import { changelogEnabled, setChangelogEnabled, visibleEntries } from "../../lib/changelog";
 import { listWalletCategories } from "../../lib/api";
 import {
   changePassword,
@@ -183,6 +185,8 @@ export function SettingsPage() {
   });
   const session = useQuery({ queryKey: ["me"], queryFn: me, staleTime: Infinity });
   const locale = useLocale();
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [changelogOn, setChangelogOn] = useState(changelogEnabled());
 
   const doLogout = async () => {
     await logout().catch(() => {});
@@ -306,6 +310,36 @@ export function SettingsPage() {
         </section>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="mb-1 flex items-center gap-2 font-medium">
+            <Sparkles size={16} className="text-fg-subtle" />
+            {es.whatsNew.title}
+          </h3>
+          <p className="mb-3 text-xs text-fg-subtle">{es.whatsNew.settingsHint}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setWhatsNewOpen(true)}
+              className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
+            >
+              {es.whatsNew.view}
+              <ChevronRight size={15} />
+            </button>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
+              <input
+                type="checkbox"
+                checked={changelogOn}
+                onChange={(e) => {
+                  setChangelogOn(e.target.checked);
+                  setChangelogEnabled(e.target.checked);
+                }}
+                className="accent-accent"
+              />
+              {es.whatsNew.notifyOnUpdate}
+            </label>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-3 flex items-center gap-2 font-medium">
             <Info size={16} className="text-fg-subtle" />
             {es.settings.about}
@@ -316,6 +350,12 @@ export function SettingsPage() {
           </div>
         </section>
       </div>
+
+      <WhatsNewModal
+        open={whatsNewOpen}
+        onClose={() => setWhatsNewOpen(false)}
+        entries={visibleEntries(__APP_VERSION__)}
+      />
     </div>
   );
 }

@@ -1,11 +1,17 @@
 //! Port of src-tauri/src/commands/investments.rs, scoped by user_id.
 //! Money math stays in finanzas-core; this side only loads CalcContext from D1.
 
-use chrono::{Duration, NaiveDate};
+use chrono::{Duration, Months, NaiveDate};
 use finanzas_core::error::{AppError, AppResult};
+use finanzas_core::investments::simulate::{
+    simulate, solve_monthly_contribution, Cadence, SimulationInput,
+};
+use finanzas_core::investments::xirr::{xirr, CashFlow};
 use finanzas_core::investments::{
     find, net_invested, parse_bonddia_price, registry, CalcContext, Movement, Snapshot,
 };
+
+use super::dashboard::{convert, load_rates};
 use finanzas_core::models::{Investment, InvestmentMovement, InvestmentSnapshot};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
@@ -582,25 +588,44 @@ pub async fn get_investment_detail(
     let as_of = today_mx();
 
     let start = parse_date(&inv.start_date, "inicio")?;
+    // Liquidity funds (no maturity) project 5 years out so the compound growth
+    // is actually visible.
     let end = calc
         .maturity_date(&inv)
-        .unwrap_or(as_of.max(start) + Duration::days(365));
+        .unwrap_or(as_of.max(start) + Duration::days(365 * 5));
 
-    // Weekly points from start to maturity (or +1 year), endpoint included.
-    // One context load serves every projection point.
+    // Weekly points from start to the horizon, endpoint included. The PAST half
+    // (date ≤ today) is the real modeled value, with its steps at each
+    // contribution; the FUTURE half grows from today's value at the
+    // instrument's current effective rate — so a date-anchored position (e.g.
+    // BONDDIA tracked by títulos, whose value_at ignores the date) projects
+    // forward instead of drawing a flat line. One context load serves all.
     let ctx = load_calc_context(db, &inv).await?;
+    let current = calc.value_at(&inv, &ctx, as_of)?;
+    let rate_bps = calc.effective_annual_rate_bps(&inv, &ctx)?;
+    let project = |d: NaiveDate| -> AppResult<i64> {
+        if d <= as_of {
+            calc.value_at(&inv, &ctx, d)
+        } else if let Some(r) = rate_bps {
+            let days = (d - as_of).num_days() as i32;
+            let factor = (1.0 + r as f64 / 10_000.0 / 365.0).powi(days);
+            Ok((current as f64 * factor).round() as i64)
+        } else {
+            Ok(current)
+        }
+    };
     let mut projection = Vec::new();
     let mut d = start;
     while d < end {
         projection.push(ProjectionPoint {
             date: d.format("%Y-%m-%d").to_string(),
-            value_cents: calc.value_at(&inv, &ctx, d)?,
+            value_cents: project(d)?,
         });
         d += Duration::days(7);
     }
     projection.push(ProjectionPoint {
         date: end.format("%Y-%m-%d").to_string(),
-        value_cents: calc.value_at(&inv, &ctx, end)?,
+        value_cents: project(end)?,
     });
 
     let snapshots: Vec<SnapshotRow> = all(
@@ -807,4 +832,294 @@ pub async fn delete_investment_movement(db: &D1Database, uid: i64, a: IdArgs) ->
         }
     }
     Ok(())
+}
+
+// ---- forward simulator ("¿cuánto crecería?") ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimulateArgs {
+    pub initial_cents: i64,
+    #[serde(default)]
+    pub contribution_cents: i64,
+    /// "monthly" | "biweekly" | "weekly" | "none"
+    pub cadence: String,
+    pub annual_rate_bps: i64,
+    pub months: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimPoint {
+    pub month: i64,
+    pub contributed_cents: i64,
+    pub value_cents: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimResult {
+    pub points: Vec<SimPoint>,
+    pub final_value_cents: i64,
+    pub total_contributed_cents: i64,
+    pub total_interest_cents: i64,
+}
+
+/// Pure forward projection — no DB. Powers the Simulator UI.
+pub fn simulate_investment(a: SimulateArgs) -> AppResult<SimResult> {
+    let cadence = match a.cadence.as_str() {
+        "monthly" => Cadence::Monthly,
+        "biweekly" => Cadence::Biweekly,
+        "weekly" => Cadence::Weekly,
+        _ => Cadence::None,
+    };
+    let r = simulate(&SimulationInput {
+        initial_cents: a.initial_cents,
+        contribution_cents: a.contribution_cents,
+        cadence,
+        annual_rate_bps: a.annual_rate_bps,
+        months: a.months,
+    })?;
+    Ok(SimResult {
+        points: r
+            .points
+            .into_iter()
+            .map(|p| SimPoint {
+                month: p.month,
+                contributed_cents: p.contributed_cents,
+                value_cents: p.value_cents,
+            })
+            .collect(),
+        final_value_cents: r.final_value_cents,
+        total_contributed_cents: r.total_contributed_cents,
+        total_interest_cents: r.total_interest_cents,
+    })
+}
+
+// ---- goal solver ("¿cuánto debo aportar al mes para llegar a $X?") ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SolveArgs {
+    #[serde(default)]
+    pub initial_cents: i64,
+    pub target_cents: i64,
+    pub annual_rate_bps: i64,
+    pub months: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SolveResult {
+    pub monthly_contribution_cents: i64,
+}
+
+pub fn solve_contribution(a: SolveArgs) -> AppResult<SolveResult> {
+    Ok(SolveResult {
+        monthly_contribution_cents: solve_monthly_contribution(
+            a.initial_cents,
+            a.target_cents,
+            a.annual_rate_bps,
+            a.months,
+        )?,
+    })
+}
+
+// ---- interactive "what-if" projection on one investment's chart ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectArgs {
+    pub id: i64,
+    /// Recurring amount the user imagines adding (0 = just let it ride).
+    #[serde(default)]
+    pub contribution_cents: i64,
+    /// "monthly" | "biweekly" | "weekly" | "none"
+    pub cadence: String,
+    /// How many months into the future to project.
+    pub months: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvestmentProjection {
+    /// Weekly points from the start date to the horizon. The past is the real
+    /// modeled value; the future grows from today's value at the instrument's
+    /// rate, plus the imagined contributions.
+    pub projection: Vec<ProjectionPoint>,
+    /// Annual rate (bps) used for the forward growth, for display.
+    pub annual_rate_bps: Option<i64>,
+    pub final_value_cents: i64,
+    /// New money the user would add over the horizon (excludes today's value).
+    pub contributed_cents: i64,
+    /// final − today's value − new contributions: the future growth.
+    pub interest_cents: i64,
+}
+
+pub async fn project_investment(
+    db: &D1Database,
+    uid: i64,
+    a: ProjectArgs,
+) -> AppResult<InvestmentProjection> {
+    let months = a.months.clamp(1, 600);
+    let inv = fetch_investment(db, uid, a.id).await?;
+    let calc = find(&inv.calculator)?;
+    let ctx = load_calc_context(db, &inv).await?;
+    let today = today_mx();
+    let start = parse_date(&inv.start_date, "inicio")?;
+    let end = today + Months::new(months as u32);
+
+    let current = calc.value_at(&inv, &ctx, today)?;
+    let rate_bps = calc.effective_annual_rate_bps(&inv, &ctx)?;
+    let daily = |from: NaiveDate, to: NaiveDate| -> f64 {
+        match rate_bps {
+            Some(r) => {
+                let days = (to - from).num_days().max(0) as i32;
+                (1.0 + r as f64 / 10_000.0 / 365.0).powi(days)
+            }
+            None => 1.0,
+        }
+    };
+
+    // Dates of each imagined contribution, from one cadence step after today.
+    let mut contribs: Vec<NaiveDate> = Vec::new();
+    if a.contribution_cents > 0 && a.cadence != "none" {
+        let step_days = match a.cadence.as_str() {
+            "weekly" => Some(7),
+            "biweekly" => Some(14),
+            _ => None, // monthly handled by calendar months
+        };
+        let mut d = match step_days {
+            Some(n) => today + Duration::days(n),
+            None => today + Months::new(1),
+        };
+        let mut k = 2u32;
+        while d <= end {
+            contribs.push(d);
+            d = match step_days {
+                Some(n) => today + Duration::days(n * k as i64),
+                None => today + Months::new(k),
+            };
+            k += 1;
+        }
+    }
+
+    let value_at = |d: NaiveDate| -> AppResult<i64> {
+        if d <= today {
+            return calc.value_at(&inv, &ctx, d);
+        }
+        let mut v = current as f64 * daily(today, d);
+        for cd in &contribs {
+            if *cd <= d {
+                v += a.contribution_cents as f64 * daily(*cd, d);
+            }
+        }
+        Ok(v.round() as i64)
+    };
+
+    let mut projection = Vec::new();
+    let mut d = start;
+    while d < end {
+        projection.push(ProjectionPoint {
+            date: d.format("%Y-%m-%d").to_string(),
+            value_cents: value_at(d)?,
+        });
+        d += Duration::days(7);
+    }
+    projection.push(ProjectionPoint {
+        date: end.format("%Y-%m-%d").to_string(),
+        value_cents: value_at(end)?,
+    });
+
+    let final_value_cents = value_at(end)?;
+    let contributed_cents = a.contribution_cents * contribs.len() as i64;
+    Ok(InvestmentProjection {
+        projection,
+        annual_rate_bps: rate_bps,
+        final_value_cents,
+        contributed_cents,
+        interest_cents: final_value_cents - current - contributed_cents,
+    })
+}
+
+// ---- portfolio (aggregate across open investments, in MXN) ----
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortfolioSlice {
+    pub id: i64,
+    pub name: String,
+    /// Current value in MXN (converted from the investment's currency).
+    pub current_value_cents: i64,
+    pub gain_cents: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Portfolio {
+    pub total_value_cents: i64,
+    pub total_invested_cents: i64,
+    pub total_gain_cents: i64,
+    /// Money-weighted annualized return (XIRR) in basis points; None when it is
+    /// undefined (e.g. a position opened today with no realized flows).
+    pub annualized_return_bps: Option<i64>,
+    pub slices: Vec<PortfolioSlice>,
+}
+
+pub async fn get_portfolio(db: &D1Database, uid: i64) -> AppResult<Portfolio> {
+    let rates = load_rates(db, uid).await?;
+    let as_of = today_mx();
+    let sql = format!("{INVESTMENT_SELECT} WHERE user_id = ?1 AND is_closed = 0 ORDER BY created_at, id");
+    let rows: Vec<InvestmentRow> = all(db, &sql, jsv![uid]).await?;
+
+    let mut slices = Vec::with_capacity(rows.len());
+    let mut total_value = 0i64;
+    let mut total_invested = 0i64;
+    let mut flows: Vec<CashFlow> = Vec::new();
+    for row in rows {
+        let inv: Investment = row.into();
+        let calc = find(&inv.calculator)?;
+        let ctx = load_calc_context(db, &inv).await?;
+        let ccy = inv.currency_code.as_str();
+        let to_mxn = |cents: i64| convert(cents, ccy, "MXN", &rates);
+
+        let value_mxn = to_mxn(calc.value_at(&inv, &ctx, as_of)?)?;
+        let net_mxn = to_mxn(net_invested(&inv, &ctx, as_of))?;
+
+        // Cash flows for XIRR: principal + deposits are outflows, withdrawals
+        // are inflows (the current value is added once at the end).
+        flows.push(CashFlow {
+            date: parse_date(&inv.start_date, "inicio")?,
+            amount_cents: -to_mxn(inv.principal_cents)?,
+        });
+        for m in &ctx.movements {
+            let amt = to_mxn(m.amount_cents)?;
+            flows.push(CashFlow {
+                date: m.occurred_at,
+                amount_cents: if m.kind == "withdrawal" { amt } else { -amt },
+            });
+        }
+
+        total_value += value_mxn;
+        total_invested += net_mxn;
+        slices.push(PortfolioSlice {
+            id: inv.id,
+            name: inv.name,
+            current_value_cents: value_mxn,
+            gain_cents: value_mxn - net_mxn,
+        });
+    }
+    // The whole portfolio valued today is the closing inflow.
+    flows.push(CashFlow {
+        date: as_of,
+        amount_cents: total_value,
+    });
+
+    Ok(Portfolio {
+        total_value_cents: total_value,
+        total_invested_cents: total_invested,
+        total_gain_cents: total_value - total_invested,
+        annualized_return_bps: xirr(&flows).map(|r| (r * 10_000.0).round() as i64),
+        slices,
+    })
 }
