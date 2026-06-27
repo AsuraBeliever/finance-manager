@@ -8,8 +8,10 @@ import type {
   ExchangeRate,
   GoalInput,
   InvestmentDetail,
+  InvestmentProjection,
   InvestmentWithValue,
   Portfolio,
+  SimCadence,
   SimulateInput,
   SimResult,
   SolveInput,
@@ -308,6 +310,13 @@ export const solveContribution = (input: SolveInput) =>
   rpc<SolveResult>("solve_contribution", { ...input });
 
 export const getPortfolio = () => rpc<Portfolio>("get_portfolio");
+
+export const projectInvestment = (input: {
+  id: number;
+  contributionCents: number;
+  cadence: SimCadence;
+  months: number;
+}) => rpc<InvestmentProjection>("project_investment", { ...input });
 
 export const addInvestmentMovement = (
   investmentId: number,

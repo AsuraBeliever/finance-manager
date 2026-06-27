@@ -34,12 +34,17 @@ import {
   getExchangeRates,
   getInvestmentDetail,
   listWallets,
+  projectInvestment,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
 import { todayIso } from "../../lib/date";
 import { POSITIVE, useChartTokens } from "../../lib/palette";
+import type { SimCadence } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
+
+const SIM_GOLD = "#c9a14a";
+const SIM_CADENCES: SimCadence[] = ["monthly", "biweekly", "weekly", "none"];
 
 export function InvestmentDetailPage() {
   const { id } = useParams();
@@ -128,6 +133,27 @@ export function InvestmentDetailPage() {
     onSuccess: invalidate,
   });
 
+  // Inline "what-if": the user adds an imagined recurring contribution and the
+  // projection chart updates against this investment's real value and rate.
+  const [simContribution, setSimContribution] = useState("");
+  const [simCadence, setSimCadence] = useState<SimCadence>("monthly");
+  const [simYears, setSimYears] = useState("5");
+  const simContributionCents = parseToCents(simContribution) ?? 0;
+  const simMonths = Math.round((Number(simYears) || 0) * 12);
+  const simActive = simContributionCents > 0 && simMonths > 0;
+  const projectionQuery = useQuery({
+    queryKey: ["projectInvestment", invId, simContributionCents, simCadence, simMonths],
+    queryFn: () =>
+      projectInvestment({
+        id: invId,
+        contributionCents: simContributionCents,
+        cadence: simCadence,
+        months: simMonths,
+      }),
+    enabled: Number.isFinite(invId) && simActive,
+    placeholderData: (p) => p,
+  });
+
   if (detail.isPending) return <p className="text-sm text-fg-subtle">{es.common.loading}</p>;
   if (detail.isError) return <p className="text-sm text-danger">{String(detail.error)}</p>;
 
@@ -143,13 +169,16 @@ export function InvestmentDetailPage() {
   };
   const gainPositive = d.gainCents >= 0;
   const todayStr = todayIso();
-  // Split into a solid "real so far" line and a dashed "projected" line. The
-  // boundary point (today) belongs to both so the two segments meet.
-  const chartData = d.projection.map((p) => ({
+  // When the what-if is active, the chart's future is the simulated line (gold);
+  // otherwise it's the plain projection (green dashed). The solid "actual" past
+  // line is the same either way.
+  const simData = simActive ? projectionQuery.data : undefined;
+  const activeProjection = simData?.projection ?? d.projection;
+  const chartData = activeProjection.map((p) => ({
     date: p.date,
-    value: p.valueCents / 100,
     actual: p.date <= todayStr ? p.valueCents / 100 : null,
-    projected: p.date >= todayStr ? p.valueCents / 100 : null,
+    projected: !simActive && p.date >= todayStr ? p.valueCents / 100 : null,
+    withContrib: simActive && p.date >= todayStr ? p.valueCents / 100 : null,
   }));
 
   // crypto extras: quantity from params + USD equivalent via the USD fx rate
@@ -246,7 +275,73 @@ export function InvestmentDetailPage() {
 
       {d.calculator !== "crypto" && (
       <section className="mb-4 rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card">
-        <h3 className="mb-4 font-display text-lg font-medium tracking-tight text-fg">{es.investments.projection}</h3>
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-display text-lg font-medium tracking-tight text-fg">
+            {es.investments.projection}
+          </h3>
+          {simData?.annualRateBps != null && (
+            <span className="text-xs text-fg-subtle">
+              {es.investments.projectionAtRate.replace(
+                "{rate}",
+                (simData.annualRateBps / 100).toFixed(2),
+              )}
+            </span>
+          )}
+        </div>
+
+        {/* What-if controls: simulate adding money straight on this chart. */}
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label={es.investments.projectionContribution}>
+            <input
+              className={inputClass}
+              inputMode="decimal"
+              placeholder="0"
+              value={simContribution}
+              onChange={(e) => setSimContribution(e.target.value)}
+            />
+          </Field>
+          <Field label={es.simulator.cadence}>
+            <select
+              className={inputClass}
+              value={simCadence}
+              onChange={(e) => setSimCadence(e.target.value as SimCadence)}
+            >
+              {SIM_CADENCES.map((c) => (
+                <option key={c} value={c}>
+                  {es.simulator.cadenceOptions[c]}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={es.investments.projectionYears}>
+            <input
+              className={inputClass}
+              inputMode="decimal"
+              value={simYears}
+              onChange={(e) => setSimYears(e.target.value)}
+            />
+          </Field>
+        </div>
+
+        {simActive && simData && (
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <MiniStat
+              label={es.investments.projectionFinal}
+              value={formatCents(simData.finalValueCents, d.currencyCode)}
+              accent
+            />
+            <MiniStat
+              label={es.investments.projectionContributed}
+              value={formatCents(simData.contributedCents, d.currencyCode)}
+            />
+            <MiniStat
+              label={es.investments.projectionInterest}
+              value={formatCents(simData.interestCents, d.currencyCode)}
+              gold
+            />
+          </div>
+        )}
+
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={chartData}>
             <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" />
@@ -281,6 +376,17 @@ export function InvestmentDetailPage() {
               dataKey="projected"
               name={es.investments.projection}
               stroke={POSITIVE}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="withContrib"
+              name={es.investments.projectionWithContrib}
+              stroke={SIM_GOLD}
               strokeWidth={2}
               strokeDasharray="5 4"
               dot={false}
@@ -501,5 +607,30 @@ export function InvestmentDetailPage() {
         onClose={() => setMovementToDelete(null)}
       />
     </>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  accent,
+  gold,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  gold?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-border-muted bg-surface p-3">
+      <p className="text-xs text-fg-subtle">{label}</p>
+      <p
+        className={`mt-0.5 font-display text-lg font-semibold tabular-nums ${
+          accent ? "text-accent" : gold ? "text-gold" : "text-fg"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
   );
 }

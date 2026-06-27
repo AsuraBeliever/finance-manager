@@ -1,7 +1,7 @@
 //! Port of src-tauri/src/commands/investments.rs, scoped by user_id.
 //! Money math stays in finanzas-core; this side only loads CalcContext from D1.
 
-use chrono::{Duration, NaiveDate};
+use chrono::{Duration, Months, NaiveDate};
 use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::investments::simulate::{
     simulate, solve_monthly_contribution, Cadence, SimulationInput,
@@ -922,6 +922,123 @@ pub fn solve_contribution(a: SolveArgs) -> AppResult<SolveResult> {
             a.annual_rate_bps,
             a.months,
         )?,
+    })
+}
+
+// ---- interactive "what-if" projection on one investment's chart ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectArgs {
+    pub id: i64,
+    /// Recurring amount the user imagines adding (0 = just let it ride).
+    #[serde(default)]
+    pub contribution_cents: i64,
+    /// "monthly" | "biweekly" | "weekly" | "none"
+    pub cadence: String,
+    /// How many months into the future to project.
+    pub months: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvestmentProjection {
+    /// Weekly points from the start date to the horizon. The past is the real
+    /// modeled value; the future grows from today's value at the instrument's
+    /// rate, plus the imagined contributions.
+    pub projection: Vec<ProjectionPoint>,
+    /// Annual rate (bps) used for the forward growth, for display.
+    pub annual_rate_bps: Option<i64>,
+    pub final_value_cents: i64,
+    /// New money the user would add over the horizon (excludes today's value).
+    pub contributed_cents: i64,
+    /// final − today's value − new contributions: the future growth.
+    pub interest_cents: i64,
+}
+
+pub async fn project_investment(
+    db: &D1Database,
+    uid: i64,
+    a: ProjectArgs,
+) -> AppResult<InvestmentProjection> {
+    let months = a.months.clamp(1, 600);
+    let inv = fetch_investment(db, uid, a.id).await?;
+    let calc = find(&inv.calculator)?;
+    let ctx = load_calc_context(db, &inv).await?;
+    let today = today_mx();
+    let start = parse_date(&inv.start_date, "inicio")?;
+    let end = today + Months::new(months as u32);
+
+    let current = calc.value_at(&inv, &ctx, today)?;
+    let rate_bps = calc.effective_annual_rate_bps(&inv, &ctx)?;
+    let daily = |from: NaiveDate, to: NaiveDate| -> f64 {
+        match rate_bps {
+            Some(r) => {
+                let days = (to - from).num_days().max(0) as i32;
+                (1.0 + r as f64 / 10_000.0 / 365.0).powi(days)
+            }
+            None => 1.0,
+        }
+    };
+
+    // Dates of each imagined contribution, from one cadence step after today.
+    let mut contribs: Vec<NaiveDate> = Vec::new();
+    if a.contribution_cents > 0 && a.cadence != "none" {
+        let step_days = match a.cadence.as_str() {
+            "weekly" => Some(7),
+            "biweekly" => Some(14),
+            _ => None, // monthly handled by calendar months
+        };
+        let mut d = match step_days {
+            Some(n) => today + Duration::days(n),
+            None => today + Months::new(1),
+        };
+        let mut k = 2u32;
+        while d <= end {
+            contribs.push(d);
+            d = match step_days {
+                Some(n) => today + Duration::days(n * k as i64),
+                None => today + Months::new(k),
+            };
+            k += 1;
+        }
+    }
+
+    let value_at = |d: NaiveDate| -> AppResult<i64> {
+        if d <= today {
+            return calc.value_at(&inv, &ctx, d);
+        }
+        let mut v = current as f64 * daily(today, d);
+        for cd in &contribs {
+            if *cd <= d {
+                v += a.contribution_cents as f64 * daily(*cd, d);
+            }
+        }
+        Ok(v.round() as i64)
+    };
+
+    let mut projection = Vec::new();
+    let mut d = start;
+    while d < end {
+        projection.push(ProjectionPoint {
+            date: d.format("%Y-%m-%d").to_string(),
+            value_cents: value_at(d)?,
+        });
+        d += Duration::days(7);
+    }
+    projection.push(ProjectionPoint {
+        date: end.format("%Y-%m-%d").to_string(),
+        value_cents: value_at(end)?,
+    });
+
+    let final_value_cents = value_at(end)?;
+    let contributed_cents = a.contribution_cents * contribs.len() as i64;
+    Ok(InvestmentProjection {
+        projection,
+        annual_rate_bps: rate_bps,
+        final_value_cents,
+        contributed_cents,
+        interest_cents: final_value_cents - current - contributed_cents,
     })
 }
 
