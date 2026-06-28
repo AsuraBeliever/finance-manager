@@ -476,6 +476,7 @@ export const esDict = {
   },
   settings: {
     title: "Ajustes",
+    back: "Volver a ajustes",
     language: "Idioma",
     currencies: "Monedas",
     currenciesHint:
@@ -511,6 +512,8 @@ export const esDict = {
     passwordChanged: "Contraseña actualizada. Tus otras sesiones se cerraron.",
     passwordChangeNote:
       "Al cambiarla se cerrará la sesión en tus demás dispositivos.",
+    passwordSettingsHint:
+      "Actualiza la contraseña con la que inicias sesión.",
     devices: "Dispositivos con sesión",
     thisDevice: "Este dispositivo",
     lastSeen: "Última actividad",

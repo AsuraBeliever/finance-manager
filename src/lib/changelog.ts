@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.19.1",
+    date: "2026-06-28",
+    es: [
+      "Cambiar contraseña ahora tiene su propia página dedicada, más clara y enfocada.",
+      "Botón para volver a Ajustes en las páginas de Apariencia, Categorías y Cambiar contraseña.",
+    ],
+    en: [
+      "Change password now has its own dedicated page, cleaner and more focused.",
+      "Back-to-Settings button on the Appearance, Categories and Change password pages.",
+    ],
+  },
+  {
     version: "2.19.0",
     date: "2026-06-27",
     es: [

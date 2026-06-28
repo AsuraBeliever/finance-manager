@@ -63,6 +63,8 @@ export function AppearancePage() {
     <div className="mx-auto w-full max-w-2xl">
       <PageHeader
         title={es.appearance.title}
+        backTo="/ajustes"
+        backLabel={es.settings.back}
         actions={
           <Button variant="ghost" onClick={() => resetAppearance()}>
             <span className="flex items-center gap-2">

@@ -1,19 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es as dateLocaleEs, enUS as dateLocaleEn } from "date-fns/locale";
 import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Sparkles, Tags } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { InstallButton } from "../../components/InstallButton";
-import { Field, inputClass } from "../../components/Field";
 import { PageHeader } from "../../components/PageHeader";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { WhatsNewModal } from "../update/WhatsNew";
 import { changelogEnabled, setChangelogEnabled, visibleEntries } from "../../lib/changelog";
 import { listWalletCategories } from "../../lib/api";
 import {
-  changePassword,
   listSessions,
   logout,
   me,
@@ -32,83 +30,6 @@ function relativeFromUtc(ts: string | null): string {
   if (Number.isNaN(date.getTime())) return ts;
   const locale = getLocale() === "en" ? dateLocaleEn : dateLocaleEs;
   return formatDistanceToNow(date, { addSuffix: true, locale });
-}
-
-function ChangePasswordForm() {
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      if (next !== confirm) throw new Error(es.account.passwordMismatch);
-      await changePassword(current, next);
-    },
-    onSuccess: () => {
-      setDone(true);
-      setError(null);
-      setCurrent("");
-      setNext("");
-      setConfirm("");
-    },
-    onError: (e) => {
-      setDone(false);
-      setError(e instanceof Error ? e.message : String(e));
-    },
-  });
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    setDone(false);
-    mutation.mutate();
-  };
-
-  return (
-    <form onSubmit={submit} className="grid max-w-sm gap-3">
-      <Field label={es.account.currentPassword}>
-        <input
-          type="password"
-          className={inputClass}
-          value={current}
-          onChange={(e) => setCurrent(e.target.value)}
-          autoComplete="current-password"
-          required
-        />
-      </Field>
-      <Field label={es.account.newPassword}>
-        <input
-          type="password"
-          className={inputClass}
-          value={next}
-          onChange={(e) => setNext(e.target.value)}
-          autoComplete="new-password"
-          minLength={8}
-          required
-        />
-      </Field>
-      <Field label={es.account.confirmPassword}>
-        <input
-          type="password"
-          className={inputClass}
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          autoComplete="new-password"
-          minLength={8}
-          required
-        />
-      </Field>
-      <p className="text-xs text-fg-subtle">{es.account.passwordChangeNote}</p>
-      {error && <p className="text-sm text-danger">{error}</p>}
-      {done && <p className="text-sm text-accent">{es.account.passwordChanged}</p>}
-      <div>
-        <Button type="submit" disabled={mutation.isPending}>
-          {es.account.changePassword}
-        </Button>
-      </div>
-    </form>
-  );
 }
 
 function DevicesList() {
@@ -289,13 +210,17 @@ export function SettingsPage() {
           <DevicesList />
         </section>
 
-        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
-          <h3 className="mb-3 flex items-center gap-2 font-medium">
-            <KeyRound size={16} className="text-fg-subtle" />
-            {es.account.changePassword}
-          </h3>
-          <ChangePasswordForm />
-        </section>
+        <Link
+          to="/ajustes/contrasena"
+          className="flex items-center gap-3 rounded-xl border border-border-muted bg-surface-raised p-5 transition-colors hover:bg-surface-overlay"
+        >
+          <KeyRound size={16} className="shrink-0 text-fg-subtle" />
+          <div className="min-w-0 flex-1">
+            <h3 className="font-medium">{es.account.changePassword}</h3>
+            <p className="text-xs text-fg-subtle">{es.account.passwordSettingsHint}</p>
+          </div>
+          <ChevronRight size={16} className="shrink-0 text-fg-subtle" />
+        </Link>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-3 font-medium">{es.settings.session}</h3>

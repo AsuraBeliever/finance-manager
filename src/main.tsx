@@ -13,6 +13,7 @@ import { InvestmentsPage } from "./features/investments/InvestmentsPage";
 import { InvestmentDetailPage } from "./features/investments/InvestmentDetailPage";
 import { SimulatorPage } from "./features/investments/SimulatorPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { ChangePasswordPage } from "./features/settings/ChangePasswordPage";
 import { SavingsGoalsPage } from "./features/goals/SavingsGoalsPage";
 import { BudgetsPage } from "./features/budgets/BudgetsPage";
 import { SubscriptionsPage } from "./features/subscriptions/SubscriptionsPage";
@@ -64,6 +65,7 @@ const router = createHashRouter([
       { path: "categorias", element: <CategoriesPage /> },
       { path: "apariencia", element: <AppearancePage /> },
       { path: "ajustes", element: <SettingsPage /> },
+      { path: "ajustes/contrasena", element: <ChangePasswordPage /> },
     ],
   },
 ]);

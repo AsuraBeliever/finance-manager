@@ -471,6 +471,7 @@ export const en: Dict = {
   },
   settings: {
     title: "Settings",
+    back: "Back to settings",
     language: "Language",
     currencies: "Currencies",
     currenciesHint:
@@ -505,6 +506,7 @@ export const en: Dict = {
     passwordMismatch: "Passwords don't match",
     passwordChanged: "Password updated. Your other sessions were signed out.",
     passwordChangeNote: "Changing it signs you out on your other devices.",
+    passwordSettingsHint: "Update the password you sign in with.",
     devices: "Signed-in devices",
     thisDevice: "This device",
     lastSeen: "Last active",

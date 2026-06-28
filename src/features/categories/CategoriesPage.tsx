@@ -304,7 +304,7 @@ export function CategoriesPage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <PageHeader title={es.categories.title} />
+      <PageHeader title={es.categories.title} backTo="/ajustes" backLabel={es.settings.back} />
       <p className="mb-5 -mt-3 text-sm text-fg-subtle">{es.categories.settingsHint}</p>
 
       {cats.isPending && <p className="text-sm text-fg-subtle">{es.common.loading}</p>}
