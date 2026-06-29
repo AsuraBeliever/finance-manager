@@ -12,13 +12,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "2.19.2",
+    version: "2.19.3",
     date: "2026-06-28",
     es: [
-      "El tamaño de los contenedores del tablero ahora se conserva siempre al recargar, incluidos Metas de ahorro, Presupuesto y Suscripciones.",
+      "Corregido: al cambiar el tamaño de cualquier contenedor del tablero (Metas de ahorro, etc.), el nuevo tamaño ahora se guarda y se mantiene al recargar.",
     ],
     en: [
-      "Dashboard card sizes now always persist after reload, including Savings goals, Budget and Subscriptions.",
+      "Fixed: resizing any dashboard card (Savings goals, etc.) now saves the new size and keeps it after reload.",
     ],
   },
   {
