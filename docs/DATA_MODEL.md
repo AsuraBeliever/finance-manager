@@ -306,6 +306,14 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
 - **Orden de metas** (0018, `savings_goals.sort_order`): orden de despliegue por
   arrastre (`reorder_savings_goals`, igual que `reorder_wallets`). La primera
   (menor `sort_order`) es la "principal" — gauge/círculo en el resumen; el resto, barras.
+- **Fecha límite de meta** (0021, `target_date` + `contribution_cadence`): ambas
+  NULL = meta sin plazo (igual que antes). Con plazo, `finanzas_core::goals`
+  calcula en cada lectura (nunca se almacena) el `ContributionPlan`: cuánto
+  apartar por periodo (`per_period_cents` = restante ÷ periodos al plazo según la
+  cadencia diaria/semanal/mensual/anual, redondeado hacia arriba) y si va
+  **atrasada** (`behind_cents` = lo ahorrado vs. el ritmo lineal desde `created_at`
+  hasta `target_date`). Vencida = plazo pasado con dinero pendiente. La cadencia
+  se fija junto con la fecha (default mensual); quitar la fecha limpia ambas.
 - **Suscripción activa a una fecha** D = `started_at <= D AND (ended_at IS NULL OR ended_at > D)`.
   Cancelar (set inactive) cierra la ventana y conserva historia; borrar la pierde.
 - **Cobrado en el periodo = cargos reales** (0020, `transactions.subscription_id`):

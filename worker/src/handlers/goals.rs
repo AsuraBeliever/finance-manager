@@ -5,7 +5,9 @@
 //! expense and archives it. Track-only goals (no wallet) are abstract progress.
 //! Progress in basis points, capped at 100%. All scoped by user_id.
 
+use chrono::NaiveDate;
 use finanzas_core::error::{AppError, AppResult};
+use finanzas_core::goals::{plan_contribution, Cadence, ContributionPlan};
 use finanzas_core::period::{resolve_period, Period};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
@@ -53,6 +55,14 @@ pub struct SavingsGoal {
     /// Wallet this goal is an apartado of (its money is reserved there). None =
     /// a plain tracking goal with no real money behind it.
     pub linked_wallet_id: Option<i64>,
+    /// Optional deadline 'YYYY-MM-DD' to reach the target by.
+    pub target_date: Option<String>,
+    /// How often the user plans to contribute (daily|weekly|monthly|yearly).
+    pub cadence: Option<String>,
+    /// Contribution plan, present only when both a deadline and cadence are set.
+    pub plan: Option<ContributionPlan>,
+    /// True when the goal has fallen below its steady pace (drives the badge).
+    pub is_behind: bool,
 }
 
 #[derive(Deserialize)]
@@ -66,6 +76,12 @@ struct GoalRow {
     saved_cents: i64,
     #[serde(default)]
     linked_wallet_id: Option<i64>,
+    #[serde(default)]
+    target_date: Option<String>,
+    #[serde(default)]
+    contribution_cadence: Option<String>,
+    /// Day the goal started ('YYYY-MM-DD'), the pace anchor for the plan.
+    created_at: String,
 }
 
 fn progress_bps(saved: i64, target: i64) -> i64 {
@@ -76,24 +92,54 @@ fn progress_bps(saved: i64, target: i64) -> i64 {
     }
 }
 
-impl From<GoalRow> for SavingsGoal {
-    fn from(r: GoalRow) -> Self {
-        SavingsGoal {
-            progress_bps: progress_bps(r.saved_cents, r.target_cents),
-            id: r.id,
-            name: r.name,
-            icon: r.icon,
-            color: r.color,
-            currency_code: r.currency_code,
-            target_cents: r.target_cents,
-            saved_cents: r.saved_cents,
-            linked_wallet_id: r.linked_wallet_id,
+/// Build the API goal from a DB row, computing the contribution plan against
+/// `today` when the goal has both a deadline and a cadence. A goal missing
+/// either (or with an unparseable date/cadence) simply carries no plan.
+fn build(r: GoalRow, today: NaiveDate) -> SavingsGoal {
+    let (plan, is_behind) = match (
+        r.target_date.as_deref().and_then(parse_date),
+        r.contribution_cadence.as_deref().and_then(Cadence::parse),
+        parse_date(&r.created_at),
+    ) {
+        (Some(deadline), Some(cadence), Some(start)) => {
+            let p = plan_contribution(
+                start,
+                deadline,
+                today,
+                cadence,
+                r.target_cents,
+                r.saved_cents,
+            );
+            let behind = p.behind_cents > 0;
+            (Some(p), behind)
         }
+        _ => (None, false),
+    };
+    SavingsGoal {
+        progress_bps: progress_bps(r.saved_cents, r.target_cents),
+        id: r.id,
+        name: r.name,
+        icon: r.icon,
+        color: r.color,
+        currency_code: r.currency_code,
+        target_cents: r.target_cents,
+        saved_cents: r.saved_cents,
+        linked_wallet_id: r.linked_wallet_id,
+        target_date: r.target_date,
+        cadence: r.contribution_cadence,
+        plan,
+        is_behind,
     }
 }
 
+/// Parse a 'YYYY-MM-DD' (the leading date of a datetime is fine too).
+fn parse_date(s: &str) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(s.get(..10).unwrap_or(s), "%Y-%m-%d").ok()
+}
+
 const SELECT: &str = "SELECT id, name, icon, color, currency_code, target_cents, saved_cents,
-        linked_wallet_id FROM savings_goals";
+        linked_wallet_id, target_date, contribution_cadence, date(created_at) AS created_at
+        FROM savings_goals";
 
 async fn fetch_goal(db: &D1Database, uid: i64, id: i64) -> AppResult<SavingsGoal> {
     let row: GoalRow = first(
@@ -103,7 +149,7 @@ async fn fetch_goal(db: &D1Database, uid: i64, id: i64) -> AppResult<SavingsGoal
     )
     .await?
     .ok_or(AppError::NotFound("meta"))?;
-    Ok(row.into())
+    Ok(build(row, today_mx()))
 }
 
 pub async fn list_savings_goals(
@@ -119,7 +165,8 @@ pub async fn list_savings_goals(
     let rows: Vec<GoalRow> = all(
         db,
         "SELECT g.id, g.name, g.icon, g.color, g.currency_code, g.target_cents,
-                g.linked_wallet_id,
+                g.linked_wallet_id, g.target_date, g.contribution_cadence,
+                date(g.created_at) AS created_at,
                 COALESCE((SELECT s.saved_cents FROM goal_snapshots s
                           WHERE s.goal_id = g.id AND s.as_of <= ?2
                           ORDER BY s.as_of DESC, s.id DESC LIMIT 1), 0) AS saved_cents
@@ -130,7 +177,8 @@ pub async fn list_savings_goals(
         jsv![uid, end],
     )
     .await?;
-    Ok(rows.into_iter().map(Into::into).collect())
+    let today = today_mx();
+    Ok(rows.into_iter().map(|r| build(r, today)).collect())
 }
 
 #[derive(Deserialize)]
@@ -145,6 +193,38 @@ pub struct GoalInput {
     /// goal's currency follows the wallet's.
     #[serde(default)]
     pub wallet_id: Option<i64>,
+    /// Optional deadline 'YYYY-MM-DD' to reach the target by.
+    #[serde(default)]
+    pub target_date: Option<String>,
+    /// How often the user plans to contribute (daily|weekly|monthly|yearly).
+    /// Required (and defaulted to monthly) whenever a deadline is set.
+    #[serde(default)]
+    pub cadence: Option<String>,
+}
+
+/// Normalize the deadline + cadence pair: drop a blank date, and when a date is
+/// present pin a valid cadence (defaulting to monthly); when no date is set,
+/// clear the cadence so the two always travel together.
+fn resolve_deadline(input: &GoalInput) -> AppResult<(Option<String>, Option<String>)> {
+    let date = input
+        .target_date
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    match date {
+        Some(d) => {
+            if parse_date(d).is_none() {
+                return Err(AppError::InvalidInput("fecha límite inválida".into()));
+            }
+            let cadence = input
+                .cadence
+                .as_deref()
+                .filter(|c| Cadence::parse(c).is_some())
+                .unwrap_or("monthly");
+            Ok((Some(d.to_string()), Some(cadence.to_string())))
+        }
+        None => Ok((None, None)),
+    }
 }
 
 fn validate(input: &GoalInput) -> AppResult<()> {
@@ -186,11 +266,13 @@ pub async fn create_savings_goal(
 ) -> AppResult<SavingsGoal> {
     validate(&a)?;
     let (linked_wallet_id, currency) = resolve_link(db, uid, &a).await?;
+    let (target_date, cadence) = resolve_deadline(&a)?;
     let res = exec(
         db,
         "INSERT INTO savings_goals
-           (user_id, name, icon, color, currency_code, target_cents, linked_wallet_id, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7,
+           (user_id, name, icon, color, currency_code, target_cents, linked_wallet_id,
+            target_date, contribution_cadence, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM savings_goals WHERE user_id = ?1), 0))",
         jsv![
             uid,
@@ -199,7 +281,9 @@ pub async fn create_savings_goal(
             a.color,
             currency,
             a.target_cents,
-            linked_wallet_id
+            linked_wallet_id,
+            target_date,
+            cadence
         ],
     )
     .await?;
@@ -223,11 +307,12 @@ pub async fn update_savings_goal(
 ) -> AppResult<SavingsGoal> {
     validate(&a.input)?;
     let (linked_wallet_id, currency) = resolve_link(db, uid, &a.input).await?;
+    let (target_date, cadence) = resolve_deadline(&a.input)?;
     let res = exec(
         db,
         "UPDATE savings_goals
          SET name = ?3, icon = ?4, color = ?5, currency_code = ?6, target_cents = ?7,
-             linked_wallet_id = ?8
+             linked_wallet_id = ?8, target_date = ?9, contribution_cadence = ?10
          WHERE id = ?1 AND user_id = ?2",
         jsv![
             a.id,
@@ -237,7 +322,9 @@ pub async fn update_savings_goal(
             a.input.color,
             currency,
             a.input.target_cents,
-            linked_wallet_id
+            linked_wallet_id,
+            target_date,
+            cadence
         ],
     )
     .await?;

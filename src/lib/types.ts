@@ -270,6 +270,23 @@ export interface SpendingTrends {
 
 // ---- savings goals ----
 
+/** How often the user plans to contribute toward a goal with a deadline. */
+export type GoalCadence = "daily" | "weekly" | "monthly" | "yearly";
+
+/** Contribution plan for a goal with a deadline (computed in Rust). */
+export interface ContributionPlan {
+  /** Cadence periods left until the deadline (0 when met or overdue). */
+  periodsLeft: number;
+  /** Suggested amount to set aside each period to arrive on time. */
+  perPeriodCents: number;
+  /** Whole days to the deadline; negative once it has passed. */
+  daysLeft: number;
+  /** True once the deadline passed with money still owed. */
+  overdue: boolean;
+  /** How far below the steady pace the saved amount is (0 = on/ahead). */
+  behindCents: number;
+}
+
 export interface SavingsGoal {
   id: number;
   name: string;
@@ -281,6 +298,14 @@ export interface SavingsGoal {
   progressBps: number;
   /** Wallet remembered as the default source for contributions, if any. */
   linkedWalletId: number | null;
+  /** Deadline 'YYYY-MM-DD' to reach the target by, if set. */
+  targetDate: string | null;
+  /** Contribution cadence, set alongside the deadline. */
+  cadence: GoalCadence | null;
+  /** Plan, present only when both a deadline and cadence are set. */
+  plan: ContributionPlan | null;
+  /** True when the goal has fallen below its steady pace. */
+  isBehind: boolean;
 }
 
 export interface GoalInput {
@@ -291,6 +316,10 @@ export interface GoalInput {
   targetCents: number;
   /** Wallet to make this goal an apartado of (null = track only). */
   walletId: number | null;
+  /** Optional deadline 'YYYY-MM-DD'. */
+  targetDate: string | null;
+  /** Contribution cadence (defaults to monthly when a deadline is set). */
+  cadence: GoalCadence | null;
 }
 
 // ---- budgets ----
