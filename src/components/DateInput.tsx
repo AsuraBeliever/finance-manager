@@ -37,9 +37,24 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
   const [mode, setMode] = useState<"days" | "months">("days");
   const selected = value ? parseISO(value) : new Date();
   const [view, setView] = useState(startOfMonth(selected));
+  // Editable year in the month picker: a local text buffer so partial typing
+  // ("20…") doesn't snap, committing to `view` only once it's a full valid year.
+  const [yearText, setYearText] = useState(String(view.getFullYear()));
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  // Keep the year field in sync when the year changes via the arrows or by
+  // jumping months/years elsewhere.
+  useEffect(() => {
+    setYearText(String(view.getFullYear()));
+  }, [view]);
+
+  /** Step the viewed year by ±1, clamped to the supported range. */
+  function stepYear(delta: number) {
+    const y = Math.min(new Date().getFullYear() + 100, Math.max(YEAR_FROM, view.getFullYear() + delta));
+    setView(new Date(y, view.getMonth(), 1));
+  }
 
   // The calendar renders in a portal at <body> with fixed positioning so it
   // overlaps any modal/overflow instead of being clipped inside it. Anchor it to
@@ -132,32 +147,32 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
               <div className="mb-3 flex items-center justify-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setView((v) => addMonths(v, -12))}
+                  onClick={() => stepYear(-1)}
+                  aria-label={es.common.prevYear}
                   className="rounded-md p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg"
                 >
                   <ChevronLeft size={16} />
                 </button>
-                <select
-                  className="rounded-lg border border-border-muted bg-surface py-1 pl-2 text-sm font-medium text-fg outline-none"
-                  value={view.getFullYear()}
-                  onChange={(e) =>
-                    setView(new Date(Number(e.target.value), view.getMonth(), 1))
-                  }
-                >
-                  {Array.from(
-                    { length: new Date().getFullYear() + 2 - YEAR_FROM },
-                    (_, i) => YEAR_FROM + i,
-                  )
-                    .reverse()
-                    .map((y) => (
-                      <option key={y} value={y}>
-                        {y}
-                      </option>
-                    ))}
-                </select>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={yearText}
+                  onChange={(e) => {
+                    const t = e.target.value.replace(/\D/g, "").slice(0, 4);
+                    setYearText(t);
+                    if (t.length === 4) {
+                      const y = Number(t);
+                      if (y >= YEAR_FROM) setView(new Date(y, view.getMonth(), 1));
+                    }
+                  }}
+                  onBlur={() => setYearText(String(view.getFullYear()))}
+                  className="w-16 rounded-lg border border-border-muted bg-surface py-1 text-center text-sm font-medium tabular-nums text-fg outline-none focus:border-accent"
+                />
                 <button
                   type="button"
-                  onClick={() => setView((v) => addMonths(v, 12))}
+                  onClick={() => stepYear(1)}
+                  aria-label={es.common.nextYear}
                   className="rounded-md p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg"
                 >
                   <ChevronRight size={16} />

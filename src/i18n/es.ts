@@ -174,6 +174,8 @@ export const esDict = {
     today: "Hoy",
     pickDate: "Elige una fecha",
     pickMonthYear: "Elegir mes y año",
+    prevYear: "Año anterior",
+    nextYear: "Año siguiente",
   },
   dashboard: {
     title: "Resumen",

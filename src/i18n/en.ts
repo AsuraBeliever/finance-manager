@@ -170,6 +170,8 @@ export const en: Dict = {
     today: "Today",
     pickDate: "Pick a date",
     pickMonthYear: "Pick month and year",
+    prevYear: "Previous year",
+    nextYear: "Next year",
   },
   dashboard: {
     title: "Overview",
