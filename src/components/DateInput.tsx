@@ -9,7 +9,8 @@ import {
 } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { inputClass } from "./Field";
 import { es } from "../i18n/es";
 
@@ -28,24 +29,57 @@ interface DateInputProps {
 /** Themed calendar picker. The native <input type="date"> popup in WebKitGTK
  *  grabs input focus and freezes the window until it loses focus, so dates
  *  are picked with our own popover instead. */
+/** Popover width in px (matches the w-72 calendar). */
+const POPOVER_W = 288;
+
 export function DateInput({ value, onChange, min }: DateInputProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"days" | "months">("days");
   const selected = value ? parseISO(value) : new Date();
   const [view, setView] = useState(startOfMonth(selected));
-  const rootRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  // The calendar renders in a portal at <body> with fixed positioning so it
+  // overlaps any modal/overflow instead of being clipped inside it. Anchor it to
+  // the trigger, flipping above when there isn't room below, and keep it on
+  // screen horizontally.
+  function reposition() {
+    const b = btnRef.current;
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    const left = Math.max(8, Math.min(r.right - POPOVER_W, window.innerWidth - POPOVER_W - 8));
+    const popH = popRef.current?.offsetHeight ?? 340;
+    const below = r.bottom + 8;
+    const top = below + popH > window.innerHeight - 8 && r.top - popH - 8 > 8 ? r.top - popH - 8 : below;
+    setPos({ top, left });
+  }
+
+  useLayoutEffect(() => {
+    if (open) reposition();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, view]);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onMove = () => reposition();
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onMove);
+    // capture phase so scrolling inside the modal also repositions the popover
+    window.addEventListener("scroll", onMove, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onMove, true);
     };
   }, [open]);
 
@@ -67,8 +101,9 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <button
+        ref={btnRef}
         type="button"
         className={`${inputClass} flex items-center justify-between gap-2 text-left`}
         onClick={() => {
@@ -85,8 +120,13 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
         <Calendar size={15} className="shrink-0 text-fg-subtle" />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-muted bg-surface-overlay p-3 shadow-2xl">
+      {open &&
+        createPortal(
+          <div
+            ref={popRef}
+            style={{ position: "fixed", top: pos.top, left: pos.left }}
+            className="z-[60] w-72 rounded-xl border border-border-muted bg-surface-overlay p-3 shadow-2xl"
+          >
           {mode === "months" ? (
             <>
               <div className="mb-3 flex items-center justify-center gap-2">
@@ -237,8 +277,9 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
           </button>
           </>
           )}
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
