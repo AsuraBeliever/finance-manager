@@ -449,6 +449,7 @@ pub async fn list_transaction_categories(
          FROM transaction_categories tc
          LEFT JOIN category_order co ON co.user_id = ?1 AND co.category_id = tc.id
          WHERE (tc.user_id IS NULL OR tc.user_id = ?1)
+           AND tc.is_reserved = 0
            AND NOT EXISTS (
              SELECT 1 FROM hidden_categories h
              WHERE h.user_id = ?1 AND h.category_id = tc.id)
@@ -472,7 +473,8 @@ pub async fn list_manage_categories(
                         WHERE h.user_id = ?1 AND h.category_id = tc.id) AS is_hidden
          FROM transaction_categories tc
          LEFT JOIN category_order co ON co.user_id = ?1 AND co.category_id = tc.id
-         WHERE tc.user_id IS NULL OR tc.user_id = ?1
+         WHERE (tc.user_id IS NULL OR tc.user_id = ?1)
+           AND tc.is_reserved = 0
          ORDER BY tc.kind, (co.position IS NULL), co.position, tc.is_system DESC, tc.id",
         jsv![uid],
     )

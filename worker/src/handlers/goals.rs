@@ -444,11 +444,15 @@ pub async fn use_savings_goal(db: &D1Database, uid: i64, a: IdArgs) -> AppResult
             batch(
                 db,
                 vec![
+                    // File the expense under the reserved "Metas" category (its
+                    // name is localized in the UI) — no hardcoded prefix.
                     stmt(
                         db,
-                        "INSERT INTO transactions (wallet_id, kind, amount_cents, description, occurred_at)
-                         VALUES (?1, 'expense', ?2, ?3, ?4)",
-                        jsv![wallet_id, goal.saved_cents, format!("Meta: {}", goal.name), today],
+                        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at)
+                         VALUES (?1, 'expense', ?2,
+                                 (SELECT id FROM transaction_categories WHERE is_reserved = 1 LIMIT 1),
+                                 ?3, ?4)",
+                        jsv![wallet_id, goal.saved_cents, goal.name, today],
                     )?,
                     stmt(
                         db,

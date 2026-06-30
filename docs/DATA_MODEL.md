@@ -306,6 +306,13 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
 - **Orden de metas** (0018, `savings_goals.sort_order`): orden de despliegue por
   arrastre (`reorder_savings_goals`, igual que `reorder_wallets`). La primera
   (menor `sort_order`) es la "principal" — gauge/círculo en el resumen; el resto, barras.
+- **Categoría reservada "Metas"** (0023, `transaction_categories.is_reserved`):
+  al **usar** (gastar) una meta se postea un gasto real categorizado en esta
+  categoría semilla, en vez del antiguo prefijo `"Meta:"` en la descripción (que
+  rompía el bilingüe). `is_reserved = 1` la excluye de los selectores de
+  categoría (`list_transaction_categories`) y de la pantalla de administración
+  (`list_manage_categories`), así nunca se elige a mano — solo viene de metas. Su
+  nombre se traduce en `src/i18n/seed.ts` (Metas → Goals).
 - **Rastro de apartados** (0022, tabla `goal_contributions`): cada aporte/retiro
   a una meta apartada se registra como evento (`amount_cents` con signo, +
   apartar / − liberar). Es **solo informativo**: el dinero nunca sale de la
