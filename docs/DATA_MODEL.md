@@ -306,6 +306,15 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
 - **Orden de metas** (0018, `savings_goals.sort_order`): orden de despliegue por
   arrastre (`reorder_savings_goals`, igual que `reorder_wallets`). La primera
   (menor `sort_order`) es la "principal" — gauge/círculo en el resumen; el resto, barras.
+- **Rastro de apartados** (0022, tabla `goal_contributions`): cada aporte/retiro
+  a una meta apartada se registra como evento (`amount_cents` con signo, +
+  apartar / − liberar). Es **solo informativo**: el dinero nunca sale de la
+  cartera (sigue en saldo y patrimonio), así que vive en su propia tabla y
+  `list_transactions` lo mezcla con `UNION ALL` en el historial como filas de
+  solo lectura (`kind` sintético `reserve`/`release`, id negativo, sin categoría)
+  — se omiten al filtrar por tipo o categoría. NUNCA toca el cálculo de saldo ni
+  de flujo (esos leen `transactions`). El earmark vigente sigue en
+  `savings_goals.saved_cents`; esto es la bitácora.
 - **Fecha límite de meta** (0021, `target_date` + `contribution_cadence`): ambas
   NULL = meta sin plazo (igual que antes). Con plazo, `finanzas_core::goals`
   calcula en cada lectura (nunca se almacena) el `ContributionPlan`: cuánto

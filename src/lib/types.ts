@@ -39,6 +39,11 @@ export interface Wallet {
 
 export type TransactionKind = "income" | "expense" | "transfer_in" | "transfer_out";
 
+/** A transaction row's kind as shown in the history. Beyond the real kinds, the
+ *  list also surfaces read-only apartado moves to/from goals ("reserve" /
+ *  "release") for tracking — these never affect balances. */
+export type TxRowKind = TransactionKind | "reserve" | "release";
+
 export interface TransactionCategory {
   id: number;
   name: string;
@@ -54,7 +59,7 @@ export interface Transaction {
   id: number;
   walletId: number;
   walletName: string;
-  kind: TransactionKind;
+  kind: TxRowKind;
   amountCents: number;
   categoryId: number | null;
   categoryName: string | null;

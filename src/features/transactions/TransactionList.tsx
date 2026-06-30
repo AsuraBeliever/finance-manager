@@ -1,5 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Pencil, Trash2 } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowLeftRight,
+  ArrowUpRight,
+  PiggyBank,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { deleteTransaction } from "../../lib/api";
@@ -16,7 +23,13 @@ const kindMeta: Record<
   expense: { icon: ArrowUpRight, sign: "−", color: "text-danger" },
   transfer_in: { icon: ArrowLeftRight, sign: "+", color: "text-sky-400" },
   transfer_out: { icon: ArrowLeftRight, sign: "−", color: "text-sky-400" },
+  // Apartado moves (info only): neutral colour, no +/−, since no money leaves
+  // the wallet — they're earmarks shown for tracking.
+  reserve: { icon: PiggyBank, sign: "→", color: "text-fg-muted" },
+  release: { icon: PiggyBank, sign: "←", color: "text-fg-muted" },
 };
+
+const apartadoKinds = new Set<Transaction["kind"]>(["reserve", "release"]);
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -60,15 +73,17 @@ export function TransactionList({
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm">
-                {t.description ||
-                  (t.categoryName && seedName(t.categoryName)) ||
-                  es.transactions[
-                    t.kind === "income"
-                      ? "income"
-                      : t.kind === "expense"
-                        ? "expense"
-                        : "transfer"
-                  ]}
+                {apartadoKinds.has(t.kind)
+                  ? `${es.transactions[t.kind === "reserve" ? "reserved" : "released"]} · ${t.description ?? ""}`
+                  : t.description ||
+                    (t.categoryName && seedName(t.categoryName)) ||
+                    es.transactions[
+                      t.kind === "income"
+                        ? "income"
+                        : t.kind === "expense"
+                          ? "expense"
+                          : "transfer"
+                    ]}
               </p>
               <p className="text-xs text-fg-subtle">
                 {t.occurredAt}
@@ -89,13 +104,15 @@ export function TransactionList({
                 <Pencil size={15} />
               </button>
             )}
-            <button
-              onClick={() => setToDelete(t.id)}
-              aria-label={es.common.delete}
-              className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
-            >
-              <Trash2 size={15} />
-            </button>
+            {!apartadoKinds.has(t.kind) && (
+              <button
+                onClick={() => setToDelete(t.id)}
+                aria-label={es.common.delete}
+                className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
           </li>
         );
       })}

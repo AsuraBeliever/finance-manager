@@ -417,6 +417,16 @@ pub async fn contribute_savings_goal(
     )
     .await?;
 
+    // Trail of the move so the transactions history can show it (informational
+    // only — no real money left the wallet). See migration 0022.
+    exec(
+        db,
+        "INSERT INTO goal_contributions (goal_id, amount_cents, occurred_at)
+         VALUES (?1, ?2, ?3)",
+        jsv![a.id, amount, today_mx().to_string()],
+    )
+    .await?;
+
     let goal = fetch_goal(db, uid, a.id).await?;
     snapshot_goal(db, goal.id, goal.saved_cents).await?;
     Ok(goal)

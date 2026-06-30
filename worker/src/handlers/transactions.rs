@@ -368,7 +368,40 @@ pub async fn list_transactions(
         sql.push_str(" AND t.occurred_at <= ?");
         params.push(to.to_js());
     }
-    sql.push_str(" ORDER BY t.occurred_at DESC, t.id DESC LIMIT ? OFFSET ?");
+
+    // Apartado moves to/from goals are shown as read-only informational rows so
+    // the history tracks where money went (they live in goal_contributions and
+    // never touch balances — see migration 0022). They carry no real kind or
+    // category, so skip them whenever the user is filtering by either.
+    if f.kind.is_none() && f.category_id.is_none() {
+        sql.push_str(
+            " UNION ALL
+             SELECT -gc.id, g.linked_wallet_id, w2.name,
+                    CASE WHEN gc.amount_cents >= 0 THEN 'reserve' ELSE 'release' END,
+                    ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, gc.created_at
+             FROM goal_contributions gc
+             JOIN savings_goals g ON g.id = gc.goal_id
+             JOIN wallets w2 ON w2.id = g.linked_wallet_id
+             WHERE g.user_id = ? AND g.linked_wallet_id IS NOT NULL",
+        );
+        params.push(uid.to_js());
+        if let Some(wid) = f.wallet_id {
+            sql.push_str(" AND g.linked_wallet_id = ?");
+            params.push(wid.to_js());
+        }
+        if let Some(from) = &f.from {
+            sql.push_str(" AND gc.occurred_at >= ?");
+            params.push(from.to_js());
+        }
+        if let Some(to) = &f.to {
+            sql.push_str(" AND gc.occurred_at <= ?");
+            params.push(to.to_js());
+        }
+    }
+
+    // Order by column position (occurred_at = 10, id = 1): names are ambiguous
+    // across a compound UNION in SQLite, positions are not.
+    sql.push_str(" ORDER BY 10 DESC, 1 DESC LIMIT ? OFFSET ?");
     params.push(f.limit.unwrap_or(100).to_js());
     params.push(f.offset.unwrap_or(0).to_js());
 

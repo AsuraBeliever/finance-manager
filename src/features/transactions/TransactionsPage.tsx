@@ -5,7 +5,13 @@ import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { inputClass } from "../../components/Field";
-import { listTransactions, listWallets, type TxFilter } from "../../lib/api";
+import {
+  listTransactionCategories,
+  listTransactions,
+  listWallets,
+  type TxFilter,
+} from "../../lib/api";
+import { seedName } from "../../i18n/seed";
 import type { Transaction, TransactionKind } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { TransactionFormModal } from "./TransactionFormModal";
@@ -17,12 +23,18 @@ export function TransactionsPage() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [walletId, setWalletId] = useState<number | "">("");
   const [kind, setKind] = useState<TransactionKind | "">("");
+  const [categoryId, setCategoryId] = useState<number | "">("");
 
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
+  const categories = useQuery({
+    queryKey: ["transactionCategories"],
+    queryFn: listTransactionCategories,
+  });
 
   const filter: TxFilter = {
     ...(walletId !== "" && { walletId }),
     ...(kind !== "" && { kind }),
+    ...(categoryId !== "" && { categoryId }),
   };
   const transactions = useQuery({
     queryKey: ["transactions", filter],
@@ -77,6 +89,20 @@ export function TransactionsPage() {
             <option value="expense">{es.transactions.expense}</option>
             <option value="transfer_in">{es.transactions.transfer} (+)</option>
             <option value="transfer_out">{es.transactions.transfer} (−)</option>
+          </select>
+        </div>
+        <div className="w-full sm:w-56">
+          <select
+            className={inputClass}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
+          >
+            <option value="">{es.transactions.allCategories}</option>
+            {categories.data?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {seedName(c.name, c.isSystem)}
+              </option>
+            ))}
           </select>
         </div>
       </div>
