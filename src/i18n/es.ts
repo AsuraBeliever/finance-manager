@@ -81,6 +81,9 @@ export const esDict = {
     // Deadline + cadence.
     deadline: "Fecha límite",
     deadlineOptional: "Fecha límite (opcional)",
+    enableDeadline: "Ponerle fecha límite",
+    deadlineHint: "Calcula cuánto apartar por periodo para llegar a tiempo.",
+    deadlineDateLabel: "¿Para cuándo?",
     noDeadline: "Sin fecha límite",
     removeDeadline: "Quitar fecha",
     cadenceLabel: "¿Cada cuándo aportas?",

@@ -43,6 +43,19 @@ import { CHART_COLORS } from "../../lib/palette";
 import type { GoalCadence, SavingsGoal } from "../../lib/types";
 import { es } from "../../i18n/es";
 
+/** Today's date as ISO 'YYYY-MM-DD' (the earliest selectable deadline). */
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** A sensible default deadline (~3 months out) prefilled when the user turns
+ *  on a deadline, so they can just tweak it instead of starting from scratch. */
+function defaultDeadlineISO(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 3);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Short, locale-aware date like "30 nov 2026" for the plan line. */
 function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
@@ -391,6 +404,7 @@ function GoalFormModal({
   const [currency, setCurrency] = useState("MXN");
   const [walletId, setWalletId] = useState<number | null>(null);
   const [color, setColor] = useState<string>(CHART_COLORS[0]);
+  const [deadlineEnabled, setDeadlineEnabled] = useState(false);
   const [deadline, setDeadline] = useState<string>("");
   const [cadence, setCadence] = useState<GoalCadence>("monthly");
   const [error, setError] = useState<string | null>(null);
@@ -405,6 +419,7 @@ function GoalFormModal({
     setCurrency(goal?.currencyCode ?? "MXN");
     setWalletId(goal?.linkedWalletId ?? null);
     setColor(goal?.color ?? CHART_COLORS[0]);
+    setDeadlineEnabled(goal?.targetDate != null);
     setDeadline(goal?.targetDate ?? "");
     setCadence(goal?.cadence ?? "monthly");
     setError(null);
@@ -426,8 +441,8 @@ function GoalFormModal({
         currencyCode: effectiveCurrency,
         targetCents: cents,
         walletId,
-        targetDate: deadline || null,
-        cadence: deadline ? cadence : null,
+        targetDate: deadlineEnabled && deadline ? deadline : null,
+        cadence: deadlineEnabled && deadline ? cadence : null,
       };
       return goal ? updateSavingsGoal(goal.id, input) : createSavingsGoal(input);
     },
@@ -488,48 +503,48 @@ function GoalFormModal({
             {walletId !== null ? es.goals.apartadoHint : es.goals.apartadoNoneHint}
           </span>
         </Field>
-        <Field label={es.goals.deadlineOptional}>
-          {deadline ? (
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <DateInput
-                  value={deadline}
-                  onChange={setDeadline}
-                  min={new Date().toISOString().slice(0, 10)}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => setDeadline("")}
-                className="shrink-0 text-xs font-medium text-fg-subtle transition-colors hover:text-danger"
-              >
-                {es.goals.removeDeadline}
-              </button>
+        {/* Deadline is opt-in via a clear switch; flipping it on reveals the
+            date + cadence right away (prefilled), so it's configured in place. */}
+        <div className="rounded-lg border border-border-muted p-3">
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={deadlineEnabled}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setDeadlineEnabled(on);
+                if (on && !deadline) setDeadline(defaultDeadlineISO());
+              }}
+              className="mt-0.5 h-4 w-4 accent-accent"
+            />
+            <span className="text-sm">
+              {es.goals.enableDeadline}
+              <span className="mt-0.5 block text-xs text-fg-subtle">
+                {es.goals.deadlineHint}
+              </span>
+            </span>
+          </label>
+
+          {deadlineEnabled && (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label={es.goals.deadlineDateLabel}>
+                <DateInput value={deadline} onChange={setDeadline} min={todayISO()} />
+              </Field>
+              <Field label={es.goals.cadenceLabel}>
+                <select
+                  className={inputClass}
+                  value={cadence}
+                  onChange={(e) => setCadence(e.target.value as GoalCadence)}
+                >
+                  <option value="daily">{es.goals.cadenceDaily}</option>
+                  <option value="weekly">{es.goals.cadenceWeekly}</option>
+                  <option value="monthly">{es.goals.cadenceMonthly}</option>
+                  <option value="yearly">{es.goals.cadenceYearly}</option>
+                </select>
+              </Field>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setDeadline(new Date().toISOString().slice(0, 10))}
-              className={`${inputClass} text-left text-fg-subtle`}
-            >
-              {es.goals.noDeadline}
-            </button>
           )}
-        </Field>
-        {deadline && (
-          <Field label={es.goals.cadenceLabel}>
-            <select
-              className={inputClass}
-              value={cadence}
-              onChange={(e) => setCadence(e.target.value as GoalCadence)}
-            >
-              <option value="daily">{es.goals.cadenceDaily}</option>
-              <option value="weekly">{es.goals.cadenceWeekly}</option>
-              <option value="monthly">{es.goals.cadenceMonthly}</option>
-              <option value="yearly">{es.goals.cadenceYearly}</option>
-            </select>
-          </Field>
-        )}
+        </div>
         <Field label={es.common.color ?? "Color"}>
           <ColorPicker value={color} onChange={setColor} />
         </Field>
