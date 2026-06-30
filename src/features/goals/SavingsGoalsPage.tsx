@@ -24,6 +24,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { DateInput } from "../../components/DateInput";
 import { EmptyState } from "../../components/EmptyState";
 import { Field, inputClass } from "../../components/Field";
+import { MoneyInput } from "../../components/MoneyInput";
 import { ProgressBar } from "../../components/ProgressBar";
 import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
@@ -461,12 +462,7 @@ function GoalFormModal({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={es.goals.target}>
-            <input
-              className={inputClass}
-              inputMode="decimal"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-            />
+            <MoneyInput value={target} onChange={setTarget} />
           </Field>
           <Field label={es.investments.currency}>
             {walletId !== null ? (
@@ -655,13 +651,7 @@ function ContributeModal({
         )}
 
         <Field label={es.goals.amount}>
-          <input
-            className={inputClass}
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            autoFocus
-          />
+          <MoneyInput value={amount} onChange={setAmount} autoFocus />
         </Field>
         {suggested > 0 && (
           <button

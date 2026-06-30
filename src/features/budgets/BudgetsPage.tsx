@@ -5,6 +5,7 @@ import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { Field, inputClass } from "../../components/Field";
+import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
 import { ProgressBar } from "../../components/ProgressBar";
@@ -161,12 +162,7 @@ function BudgetFormModal({
           </select>
         </Field>
         <Field label={es.budgets.limit}>
-          <input
-            className={inputClass}
-            inputMode="decimal"
-            value={limit}
-            onChange={(e) => setLimit(e.target.value)}
-          />
+          <MoneyInput value={limit} onChange={setLimit} />
         </Field>
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">

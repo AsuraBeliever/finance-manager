@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Palette, Upload } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
+import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import {
   createWallet,
@@ -193,13 +194,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
         </div>
 
         <Field label={es.wallets.initialBalance}>
-          <input
-            className={inputClass}
-            value={balanceText}
-            onChange={(e) => setBalanceText(e.target.value)}
-            placeholder="0.00"
-            inputMode="decimal"
-          />
+          <MoneyInput value={balanceText} onChange={setBalanceText} />
         </Field>
 
         {/* Card skin picker */}

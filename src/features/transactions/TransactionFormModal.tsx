@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../../components/Button";
 import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
+import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import { listTransactionCategories, listWallets, updateTransaction } from "../../lib/api";
 import { submitOrQueue } from "../../lib/outbox";
@@ -200,15 +201,7 @@ export function TransactionFormModal({
 
         <div className="grid grid-cols-2 gap-3">
           <Field label={es.transactions.amount}>
-            <input
-              className={inputClass}
-              value={amountText}
-              onChange={(e) => setAmountText(e.target.value)}
-              placeholder="0.00"
-              inputMode="decimal"
-              required
-              autoFocus
-            />
+            <MoneyInput value={amountText} onChange={setAmountText} required autoFocus />
           </Field>
           <Field label={es.transactions.date}>
             <DateInput value={date} onChange={setDate} />
@@ -217,14 +210,7 @@ export function TransactionFormModal({
 
         {crossCurrency && (
           <Field label={`${es.transactions.amountReceived} (${toWallet?.currencyCode})`}>
-            <input
-              className={inputClass}
-              value={amountToText}
-              onChange={(e) => setAmountToText(e.target.value)}
-              placeholder="0.00"
-              inputMode="decimal"
-              required
-            />
+            <MoneyInput value={amountToText} onChange={setAmountToText} required />
             <span className="mt-1 block text-xs text-fg-subtle">
               {es.transactions.transferHint}
             </span>
