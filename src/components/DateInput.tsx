@@ -183,12 +183,12 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
                         setView(new Date(view.getFullYear(), i, 1));
                         setMode("days");
                       }}
-                      className={`rounded-lg py-2 text-sm capitalize transition-colors ${
+                      className={`rounded-lg border border-transparent py-2 text-sm capitalize transition-colors ${
                         disabled
                           ? "cursor-not-allowed text-fg-subtle"
                           : isCurrent
-                            ? "bg-accent-dim/15 font-semibold text-accent hover:bg-surface-raised"
-                            : "text-fg hover:bg-surface-raised"
+                            ? "bg-accent-dim/15 font-semibold text-accent hover:border-accent hover:bg-surface-raised"
+                            : "text-fg hover:border-accent hover:bg-surface-raised"
                       }`}
                     >
                       {m}
@@ -245,14 +245,14 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
                   type="button"
                   disabled={disabled}
                   onClick={() => pick(day)}
-                  className={`rounded-lg py-1.5 text-sm tabular-nums transition-colors ${
+                  className={`rounded-lg border border-transparent py-1.5 text-sm tabular-nums transition-colors ${
                     isSelected
                       ? "bg-accent-dim font-semibold text-surface"
                       : disabled
                         ? "cursor-not-allowed text-fg-subtle"
                         : isToday
-                          ? "font-semibold text-accent hover:bg-surface-raised"
-                          : "text-fg hover:bg-surface-raised"
+                          ? "font-semibold text-accent hover:border-accent hover:bg-surface-raised"
+                          : "text-fg hover:border-accent hover:bg-surface-raised"
                   }`}
                 >
                   {day}
