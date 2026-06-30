@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftRight, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
@@ -18,12 +18,37 @@ import { TransactionFormModal } from "./TransactionFormModal";
 import { TransactionList } from "./TransactionList";
 import { OutboxPanel } from "./OutboxPanel";
 
+type FilterKind = TransactionKind | "transfer" | "";
+
+// The active filter survives tab switches and reloads.
+const FILTER_KEY = "finanzas.txFilter";
+
+interface PersistedFilter {
+  walletId: number | "";
+  kind: FilterKind;
+  categoryId: number | "";
+}
+
+function loadFilter(): PersistedFilter {
+  try {
+    const raw = localStorage.getItem(FILTER_KEY);
+    if (raw) return JSON.parse(raw) as PersistedFilter;
+  } catch {
+    // ignore corrupt/unavailable storage
+  }
+  return { walletId: "", kind: "", categoryId: "" };
+}
+
 export function TransactionsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
-  const [walletId, setWalletId] = useState<number | "">("");
-  const [kind, setKind] = useState<TransactionKind | "transfer" | "">("");
-  const [categoryId, setCategoryId] = useState<number | "">("");
+  const [walletId, setWalletId] = useState<number | "">(() => loadFilter().walletId);
+  const [kind, setKind] = useState<FilterKind>(() => loadFilter().kind);
+  const [categoryId, setCategoryId] = useState<number | "">(() => loadFilter().categoryId);
+
+  useEffect(() => {
+    localStorage.setItem(FILTER_KEY, JSON.stringify({ walletId, kind, categoryId }));
+  }, [walletId, kind, categoryId]);
 
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
   const categories = useQuery({
