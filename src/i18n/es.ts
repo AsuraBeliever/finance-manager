@@ -323,6 +323,7 @@ export const esDict = {
     date: "Fecha",
     allWallets: "Todas las carteras",
     allKinds: "Todos los tipos",
+    typeAll: "Todos",
     allCategories: "Todas las categorías",
     reserved: "Apartado",
     released: "Liberado",

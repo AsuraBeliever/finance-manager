@@ -61,7 +61,7 @@ export function TransactionsPage() {
 
       <OutboxPanel />
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="w-full sm:w-56">
           <select
             className={inputClass}
@@ -78,32 +78,52 @@ export function TransactionsPage() {
             ))}
           </select>
         </div>
-        <div className="w-full sm:w-48">
-          <select
-            className={inputClass}
-            value={kind}
-            onChange={(e) => setKind(e.target.value as TransactionKind | "transfer" | "")}
-          >
-            <option value="">{es.transactions.allKinds}</option>
-            <option value="income">{es.transactions.income}</option>
-            <option value="expense">{es.transactions.expense}</option>
-            <option value="transfer">{es.transactions.transfer}</option>
-          </select>
+        {/* Type as segmented buttons; picking a kind also resets the category. */}
+        <div className="flex gap-1 rounded-xl bg-surface-overlay p-1">
+          {(
+            [
+              ["", es.transactions.typeAll],
+              ["income", es.transactions.income],
+              ["expense", es.transactions.expense],
+              ["transfer", es.transactions.transfer],
+            ] as const
+          ).map(([val, label]) => (
+            <button
+              key={val || "all"}
+              type="button"
+              onClick={() => {
+                setKind(val);
+                setCategoryId("");
+              }}
+              className={`flex-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none ${
+                kind === val
+                  ? "bg-surface-raised text-fg shadow-sm"
+                  : "text-fg-subtle hover:text-fg"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-        <div className="w-full sm:w-56">
-          <select
-            className={inputClass}
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
-          >
-            <option value="">{es.transactions.allCategories}</option>
-            {categories.data?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {seedName(c.name, c.isSystem)}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Category only applies to income/expense, scoped to the chosen kind. */}
+        {(kind === "income" || kind === "expense") && (
+          <div className="w-full sm:w-56">
+            <select
+              className={inputClass}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
+            >
+              <option value="">{es.transactions.allCategories}</option>
+              {categories.data
+                ?.filter((c) => c.kind === kind)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {seedName(c.name, c.isSystem)}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {transactions.isError && (

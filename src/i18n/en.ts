@@ -317,6 +317,7 @@ export const en: Dict = {
     date: "Date",
     allWallets: "All wallets",
     allKinds: "All types",
+    typeAll: "All",
     allCategories: "All categories",
     reserved: "Reserved",
     released: "Released",
