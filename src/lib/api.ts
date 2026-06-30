@@ -141,7 +141,8 @@ export interface TransferInput {
 
 export interface TxFilter {
   walletId?: number;
-  kind?: TransactionKind;
+  /** A real kind, or "transfer" to match both transfer directions. */
+  kind?: TransactionKind | "transfer";
   categoryId?: number;
   from?: string;
   to?: string;
@@ -170,6 +171,11 @@ export const deleteTransaction = (id: number) =>
 
 export const listTransactionCategories = () =>
   rpc<TransactionCategory[]>("list_transaction_categories");
+
+/** Categories for the transactions filter — includes the reserved "Metas" so
+ *  you can filter by it (the entry form uses the plain list, which hides it). */
+export const listFilterCategories = () =>
+  rpc<TransactionCategory[]>("list_transaction_categories", { includeReserved: true });
 
 /** Full set for the category manager: own + all seeds, each with `isHidden`. */
 export const listManageCategories = () =>

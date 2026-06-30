@@ -6,7 +6,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { inputClass } from "../../components/Field";
 import {
-  listTransactionCategories,
+  listFilterCategories,
   listTransactions,
   listWallets,
   type TxFilter,
@@ -22,13 +22,13 @@ export function TransactionsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [walletId, setWalletId] = useState<number | "">("");
-  const [kind, setKind] = useState<TransactionKind | "">("");
+  const [kind, setKind] = useState<TransactionKind | "transfer" | "">("");
   const [categoryId, setCategoryId] = useState<number | "">("");
 
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
   const categories = useQuery({
-    queryKey: ["transactionCategories"],
-    queryFn: listTransactionCategories,
+    queryKey: ["filterCategories"],
+    queryFn: listFilterCategories,
   });
 
   const filter: TxFilter = {
@@ -82,13 +82,12 @@ export function TransactionsPage() {
           <select
             className={inputClass}
             value={kind}
-            onChange={(e) => setKind(e.target.value as TransactionKind | "")}
+            onChange={(e) => setKind(e.target.value as TransactionKind | "transfer" | "")}
           >
             <option value="">{es.transactions.allKinds}</option>
             <option value="income">{es.transactions.income}</option>
             <option value="expense">{es.transactions.expense}</option>
-            <option value="transfer_in">{es.transactions.transfer} (+)</option>
-            <option value="transfer_out">{es.transactions.transfer} (−)</option>
+            <option value="transfer">{es.transactions.transfer}</option>
           </select>
         </div>
         <div className="w-full sm:w-56">

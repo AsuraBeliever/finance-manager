@@ -353,8 +353,13 @@ pub async fn list_transactions(
         params.push(wid.to_js());
     }
     if let Some(kind) = &f.kind {
-        sql.push_str(" AND t.kind = ?");
-        params.push(kind.to_js());
+        if kind == "transfer" {
+            // A single "transfer" filter covers both directions.
+            sql.push_str(" AND t.kind IN ('transfer_in', 'transfer_out')");
+        } else {
+            sql.push_str(" AND t.kind = ?");
+            params.push(kind.to_js());
+        }
     }
     if let Some(cid) = f.category_id {
         sql.push_str(" AND t.category_id = ?");
@@ -439,21 +444,37 @@ impl From<CategoryRow> for TransactionCategory {
 
 /// Categories offered in the pickers: the user's own plus the seeds they
 /// haven't hidden. `is_hidden` is always false here.
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryListArgs {
+    /// Include the reserved "Metas" category — true for the transactions filter
+    /// (so you can filter by it), false for the entry form (can't pick it).
+    #[serde(default)]
+    pub include_reserved: bool,
+}
+
 pub async fn list_transaction_categories(
     db: &D1Database,
     uid: i64,
+    a: CategoryListArgs,
 ) -> AppResult<Vec<TransactionCategory>> {
+    let reserved = if a.include_reserved {
+        ""
+    } else {
+        " AND tc.is_reserved = 0"
+    };
     let rows: Vec<CategoryRow> = all(
         db,
-        "SELECT tc.id, tc.name, tc.kind, tc.icon, tc.color, tc.is_system, 0 AS is_hidden
-         FROM transaction_categories tc
-         LEFT JOIN category_order co ON co.user_id = ?1 AND co.category_id = tc.id
-         WHERE (tc.user_id IS NULL OR tc.user_id = ?1)
-           AND tc.is_reserved = 0
-           AND NOT EXISTS (
-             SELECT 1 FROM hidden_categories h
-             WHERE h.user_id = ?1 AND h.category_id = tc.id)
-         ORDER BY tc.kind, (co.position IS NULL), co.position, tc.is_system DESC, tc.id",
+        &format!(
+            "SELECT tc.id, tc.name, tc.kind, tc.icon, tc.color, tc.is_system, 0 AS is_hidden
+             FROM transaction_categories tc
+             LEFT JOIN category_order co ON co.user_id = ?1 AND co.category_id = tc.id
+             WHERE (tc.user_id IS NULL OR tc.user_id = ?1){reserved}
+               AND NOT EXISTS (
+                 SELECT 1 FROM hidden_categories h
+                 WHERE h.user_id = ?1 AND h.category_id = tc.id)
+             ORDER BY tc.kind, (co.position IS NULL), co.position, tc.is_system DESC, tc.id"
+        ),
         jsv![uid],
     )
     .await?;
