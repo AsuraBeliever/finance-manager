@@ -100,6 +100,8 @@ export interface WalletInput {
   yieldRateBps: number | null;
   /** Payout cadence ('weekly' | 'biweekly' | 'monthly'); used when yield is on. */
   yieldFrequency: string | null;
+  /** Parent wallet to nest under as an apartado, or null for standalone. */
+  parentWalletId: number | null;
 }
 
 export const listWallets = (includeArchived = false) =>
@@ -241,6 +243,7 @@ export const convertGoalToWallet = (
     categoryId?: number;
     skin?: string | null;
     notes?: string | null;
+    parentWalletId?: number | null;
   },
 ) => rpc<void>("convert_goal_to_wallet", { id, ...style });
 

@@ -35,6 +35,8 @@ fn wallet_from_row(r: &Row) -> rusqlite::Result<Wallet> {
         // column. This desktop path is dead (the shell loads the web app).
         skin: None,
         notes: r.get("notes")?,
+        // Wallet apartados are a cloud-only feature; this desktop path is dead.
+        parent_wallet_id: None,
         is_archived: r.get::<_, i64>("is_archived")? != 0,
         // Yield-bearing wallets are a cloud-only feature; the legacy local DB
         // has no such columns. This desktop path is dead (shell loads the web).

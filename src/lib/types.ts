@@ -27,6 +27,8 @@ export interface Wallet {
   color: string | null;
   skin: string | null;
   notes: string | null;
+  /** Parent wallet this is an apartado (pocket) of, or null when standalone. */
+  parentWalletId: number | null;
   isArchived: boolean;
   /** Annual yield rate in basis points, or null when the wallet earns nothing. */
   yieldRateBps: number | null;

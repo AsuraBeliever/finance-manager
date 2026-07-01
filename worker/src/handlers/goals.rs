@@ -530,6 +530,9 @@ pub struct ConvertArgs {
     pub skin: Option<String>,
     #[serde(default)]
     pub notes: Option<String>,
+    /// Parent wallet to nest under; defaults to the wallet the goal was saved in.
+    #[serde(default)]
+    pub parent_wallet_id: Option<i64>,
 }
 
 /// Graduate a fund goal into its own wallet: create a wallet (styled by the
@@ -565,13 +568,15 @@ pub async fn convert_goal_to_wallet(db: &D1Database, uid: i64, a: ConvertArgs) -
     let category_id = a.category_id.unwrap_or(src.category_id);
     let color = a.color.or_else(|| goal.color.clone()).or(src.color);
     let notes = a.notes.filter(|s| !s.trim().is_empty());
+    // The graduated fund nests under the wallet it was saved in by default.
+    let parent = a.parent_wallet_id.or(Some(src_id));
 
     let res = exec(
         db,
-        "INSERT INTO wallets (user_id, name, category_id, currency_code, color, skin, notes, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7,
+        "INSERT INTO wallets (user_id, name, category_id, currency_code, color, skin, notes, parent_wallet_id, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM wallets WHERE user_id = ?1), 0))",
-        jsv![uid, name, category_id, src.currency_code, color, a.skin, notes],
+        jsv![uid, name, category_id, src.currency_code, color, a.skin, notes, parent],
     )
     .await?;
     let new_id = last_row_id(&res)?;

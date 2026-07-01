@@ -10,6 +10,7 @@ import {
   createWallet,
   listCurrencies,
   listWalletCategories,
+  listWallets,
   updateWallet,
   type WalletInput,
 } from "../../lib/api";
@@ -53,6 +54,8 @@ export interface WalletConvert {
   currencyCode: string;
   savedCents: number;
   sourceCategoryId: number | null;
+  /** Wallet the goal was saved in — the graduated fund nests under it. */
+  sourceWalletId: number | null;
 }
 
 interface WalletFormModalProps {
@@ -71,11 +74,13 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
     queryFn: listWalletCategories,
   });
   const currencies = useQuery({ queryKey: ["currencies"], queryFn: listCurrencies });
+  const walletsQ = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
 
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [currencyCode, setCurrencyCode] = useState("MXN");
   const [balanceText, setBalanceText] = useState("");
+  const [parentWalletId, setParentWalletId] = useState<number | null>(null);
   const [skin, setSkin] = useState<string | null>(null);
   const [customColor, setCustomColor] = useState(COLORS[0]);
   const [notes, setNotes] = useState("");
@@ -92,6 +97,7 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
       setCategoryId(convert.sourceCategoryId);
       setCurrencyCode(convert.currencyCode);
       setBalanceText(""); // balance arrives via the transfer, not editable here
+      setParentWalletId(convert.sourceWalletId); // nest under the source wallet
       setSkin(null);
       setCustomColor(convert.color ?? COLORS[0]);
       setNotes("");
@@ -103,6 +109,7 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
     setCategoryId(wallet?.categoryId ?? null);
     setCurrencyCode(wallet?.currencyCode ?? "MXN");
     setBalanceText(wallet ? (wallet.initialBalanceCents / 100).toFixed(2) : "");
+    setParentWalletId(wallet?.parentWalletId ?? null);
     setSkin(wallet?.skin ?? null);
     setCustomColor(skinAccent(wallet?.skin) ?? wallet?.color ?? COLORS[0]);
     setNotes(wallet?.notes ?? "");
@@ -130,8 +137,14 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
   });
 
   const convertMut = useMutation({
-    mutationFn: (s: { name: string; color: string; categoryId: number; skin: string | null; notes: string | null }) =>
-      convertGoalToWallet(convert!.goalId, s),
+    mutationFn: (s: {
+      name: string;
+      color: string;
+      categoryId: number;
+      skin: string | null;
+      notes: string | null;
+      parentWalletId: number | null;
+    }) => convertGoalToWallet(convert!.goalId, s),
     onSuccess: invalidateAfterConvert,
     onError: (e) => setError(String(e)),
   });
@@ -160,6 +173,7 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
         categoryId: finalCategory,
         skin,
         notes: notes.trim() === "" ? null : notes.trim(),
+        parentWalletId,
       });
       return;
     }
@@ -187,10 +201,17 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
       color: skinAccent(effectiveSkin(skin, catName)) ?? COLORS[0],
       skin,
       notes: notes.trim() === "" ? null : notes.trim(),
+      parentWalletId,
       yieldRateBps,
       yieldFrequency: yieldRateBps != null ? yieldFrequency : null,
     });
   }
+
+  // Only top-level, non-archived wallets can be a parent (apartados stay one
+  // level deep), and never the wallet being edited itself.
+  const eligibleParents = (walletsQ.data ?? []).filter(
+    (w) => w.id !== wallet?.id && w.parentWalletId == null && !w.isArchived,
+  );
 
   const imgSelected = !!skin && skin.startsWith("img:");
   const gradSelected = !!skin && skin.startsWith("grad:");
@@ -260,6 +281,24 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
             <MoneyInput value={balanceText} onChange={setBalanceText} />
           </Field>
         )}
+
+        <Field label={es.wallets.parentWallet}>
+          <select
+            className={inputClass}
+            value={parentWalletId ?? ""}
+            onChange={(e) => setParentWalletId(e.target.value === "" ? null : Number(e.target.value))}
+          >
+            <option value="">{es.wallets.parentNone}</option>
+            {eligibleParents.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-fg-subtle">
+            {parentWalletId != null ? es.wallets.parentHint : es.wallets.parentNoneHint}
+          </span>
+        </Field>
 
         {/* Card skin picker */}
         <Field label={es.wallets.skin}>

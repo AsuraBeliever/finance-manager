@@ -306,6 +306,13 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
 - **Orden de metas** (0018, `savings_goals.sort_order`): orden de despliegue por
   arrastre (`reorder_savings_goals`, igual que `reorder_wallets`). La primera
   (menor `sort_order`) es la "principal" — gauge/círculo en el resumen; el resto, barras.
+- **Apartados de cartera** (0026, `wallets.parent_wallet_id`): una cartera puede
+  ser apartado (bolsillo) de otra. Es **organizativo** — cada cartera mantiene su
+  propio saldo; el UI anida los apartados bajo su padre (p. ej. BBVA $10k + su
+  apartado "Viaje" $40k). NULL = independiente. Al graduar un fondo a cartera
+  (`convert_goal_to_wallet`) el nuevo wallet queda como apartado de la cartera en
+  que estaba la meta. Solo un nivel de profundidad (los apartados no pueden ser
+  padres en el UI).
 - **Tipo de meta** (0025, `savings_goals.goal_kind` = `purchase` | `fund`): toda
   meta va ligada a una cartera (se quitó el "solo seguimiento" del UI). `purchase`
   = juntar para comprar; completar (`use_savings_goal`) postea el gasto real y

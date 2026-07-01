@@ -405,6 +405,7 @@ export function SavingsGoalsPage() {
             savedCents: convertGoal.savedCents,
             sourceCategoryId:
               wallets.data?.find((w) => w.id === convertGoal.linkedWalletId)?.categoryId ?? null,
+            sourceWalletId: convertGoal.linkedWalletId,
           }}
           onClose={() => setConvertGoal(null)}
         />
