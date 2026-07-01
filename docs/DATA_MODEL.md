@@ -306,6 +306,14 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
 - **Orden de metas** (0018, `savings_goals.sort_order`): orden de despliegue por
   arrastre (`reorder_savings_goals`, igual que `reorder_wallets`). La primera
   (menor `sort_order`) es la "principal" — gauge/círculo en el resumen; el resto, barras.
+- **Tipo de meta** (0025, `savings_goals.goal_kind` = `purchase` | `fund`): toda
+  meta va ligada a una cartera (se quitó el "solo seguimiento" del UI). `purchase`
+  = juntar para comprar; completar (`use_savings_goal`) postea el gasto real y
+  archiva. `fund` = juntar un fondo; el dinero se queda apartado y puedes
+  **graduar** la meta a su propia cartera con `convert_goal_to_wallet`: crea una
+  cartera con el nombre de la meta y mueve el apartado ahí con una transferencia
+  (patrimonio intacto), luego archiva la meta. (Gastar un fondo poco a poco =
+  etapa 2.) Metas existentes → `purchase` por defecto.
 - **Categoría reservada "Metas"** (0023, `transaction_categories.is_reserved`):
   al **usar** (gastar) una meta se postea un gasto real categorizado en esta
   categoría semilla, en vez del antiguo prefijo `"Meta:"` en la descripción (que

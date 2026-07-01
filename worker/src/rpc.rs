@@ -124,6 +124,9 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         }
         "delete_savings_goal" => out(goals::delete_savings_goal(db, uid, args(body)?).await?),
         "use_savings_goal" => out(goals::use_savings_goal(db, uid, args(body)?).await?),
+        "convert_goal_to_wallet" => {
+            out(goals::convert_goal_to_wallet(db, uid, args(body)?).await?)
+        }
         "reorder_savings_goals" => out(goals::reorder_savings_goals(db, uid, args(body)?).await?),
 
         // ---- budgets ----

@@ -231,6 +231,10 @@ export const contributeSavingsGoal = (id: number, amountCents: number) =>
 
 export const useSavingsGoal = (id: number) => rpc<void>("use_savings_goal", { id });
 
+/** Graduate a fund goal into its own wallet (moves the reserved money there). */
+export const convertGoalToWallet = (id: number) =>
+  rpc<void>("convert_goal_to_wallet", { id });
+
 export const deleteSavingsGoal = (id: number) =>
   rpc<void>("delete_savings_goal", { id });
 

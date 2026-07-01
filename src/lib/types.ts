@@ -278,6 +278,10 @@ export interface SpendingTrends {
 /** How often the user plans to contribute toward a goal with a deadline. */
 export type GoalCadence = "daily" | "weekly" | "monthly" | "yearly";
 
+/** What a goal is for: buying something (completing spends it) or a savings
+ *  fund (you draw it down over time, or graduate it into its own wallet). */
+export type GoalKind = "purchase" | "fund";
+
 /** Contribution plan for a goal with a deadline (computed in Rust). */
 export interface ContributionPlan {
   /** Cadence periods left until the deadline (0 when met or overdue). */
@@ -311,6 +315,8 @@ export interface SavingsGoal {
   plan: ContributionPlan | null;
   /** True when the goal has fallen below its steady pace. */
   isBehind: boolean;
+  /** Purchase (completing spends it) or fund (savings you draw down). */
+  goalKind: GoalKind;
 }
 
 export interface GoalInput {
@@ -319,12 +325,14 @@ export interface GoalInput {
   color: string | null;
   currencyCode: string;
   targetCents: number;
-  /** Wallet to make this goal an apartado of (null = track only). */
+  /** Wallet the goal reserves from (required). */
   walletId: number | null;
   /** Optional deadline 'YYYY-MM-DD'. */
   targetDate: string | null;
   /** Contribution cadence (defaults to monthly when a deadline is set). */
   cadence: GoalCadence | null;
+  /** Purchase or fund. */
+  goalKind: GoalKind;
 }
 
 // ---- budgets ----

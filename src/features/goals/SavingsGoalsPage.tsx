@@ -17,7 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useState, type ReactNode } from "react";
-import { Check, GripVertical, Pencil, PiggyBank, Plus, Trash2 } from "lucide-react";
+import { Check, GripVertical, Pencil, PiggyBank, Plus, Trash2, Wallet } from "lucide-react";
 import { Button } from "../../components/Button";
 import { ColorPicker } from "../../components/ColorPicker";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
@@ -30,9 +30,9 @@ import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
 import {
   contributeSavingsGoal,
+  convertGoalToWallet,
   createSavingsGoal,
   deleteSavingsGoal,
-  listCurrencies,
   listSavingsGoals,
   listWallets,
   reorderSavingsGoals,
@@ -41,7 +41,7 @@ import {
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
 import { CHART_COLORS } from "../../lib/palette";
-import type { GoalCadence, SavingsGoal } from "../../lib/types";
+import type { GoalCadence, GoalKind, SavingsGoal } from "../../lib/types";
 import { es } from "../../i18n/es";
 
 /** Today's date as ISO 'YYYY-MM-DD' (the earliest selectable deadline). */
@@ -90,6 +90,7 @@ function SortableGoalCard({
   onDelete,
   onContribute,
   onUse,
+  onConvert,
 }: {
   goal: SavingsGoal;
   walletName: string | null;
@@ -97,6 +98,7 @@ function SortableGoalCard({
   onDelete: () => void;
   onContribute: () => void;
   onUse: () => void;
+  onConvert: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: g.id,
@@ -181,13 +183,20 @@ function SortableGoalCard({
           <Button variant="ghost" onClick={onContribute}>
             {es.goals.contribute}
           </Button>
-          {g.savedCents > 0 && (
-            <Button variant="ghost" onClick={onUse}>
-              <span className="flex items-center gap-1.5">
-                <Check size={14} /> {es.goals.use}
-              </span>
-            </Button>
-          )}
+          {g.savedCents > 0 &&
+            (g.goalKind === "fund" ? (
+              <Button variant="ghost" onClick={onConvert}>
+                <span className="flex items-center gap-1.5">
+                  <Wallet size={14} /> {es.goals.convertToWallet}
+                </span>
+              </Button>
+            ) : (
+              <Button variant="ghost" onClick={onUse}>
+                <span className="flex items-center gap-1.5">
+                  <Check size={14} /> {es.goals.buy}
+                </span>
+              </Button>
+            ))}
         </div>
       </div>
 
@@ -256,6 +265,7 @@ export function SavingsGoalsPage() {
   const [contribFor, setContribFor] = useState<SavingsGoal | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [useGoal, setUseGoal] = useState<SavingsGoal | null>(null);
+  const [convertGoal, setConvertGoal] = useState<SavingsGoal | null>(null);
 
   const invalidate = () => {
     // Apartado moves/uses touch wallet balances + the ledger, so refresh both.
@@ -268,6 +278,11 @@ export function SavingsGoalsPage() {
     mutationFn: (id: number) => useSavingsGoal(id),
     onSuccess: invalidate,
     onSettled: () => setUseGoal(null),
+  });
+  const convertMut = useMutation({
+    mutationFn: (id: number) => convertGoalToWallet(id),
+    onSuccess: invalidate,
+    onSettled: () => setConvertGoal(null),
   });
   const walletName = (id: number | null) =>
     id == null ? null : (wallets.data?.find((w) => w.id === id)?.name ?? null);
@@ -339,6 +354,7 @@ export function SavingsGoalsPage() {
                 onDelete={() => setDeleteId(g.id)}
                 onContribute={() => setContribFor(g)}
                 onUse={() => setUseGoal(g)}
+                onConvert={() => setConvertGoal(g)}
               />
             ))}
           </div>
@@ -369,7 +385,7 @@ export function SavingsGoalsPage() {
       />
       <ConfirmDialog
         open={useGoal !== null}
-        title={es.goals.use}
+        title={es.goals.buy}
         message={
           useGoal?.linkedWalletId
             ? es.goals.useConfirmApartado
@@ -377,11 +393,28 @@ export function SavingsGoalsPage() {
                 .replace("{wallet}", walletName(useGoal.linkedWalletId) ?? "")
             : es.goals.useConfirmTrack
         }
-        confirmLabel={es.goals.use}
+        confirmLabel={es.goals.buy}
         onConfirm={() => {
           if (useGoal) useMut.mutate(useGoal.id);
         }}
         onClose={() => setUseGoal(null)}
+      />
+      <ConfirmDialog
+        open={convertGoal !== null}
+        title={es.goals.convertToWallet}
+        message={
+          convertGoal
+            ? es.goals.convertConfirm
+                .replace("{name}", convertGoal.name)
+                .replace("{amount}", formatCents(convertGoal.savedCents, convertGoal.currencyCode))
+                .replace("{wallet}", walletName(convertGoal.linkedWalletId) ?? "")
+            : ""
+        }
+        confirmLabel={es.goals.convertToWallet}
+        onConfirm={() => {
+          if (convertGoal) convertMut.mutate(convertGoal.id);
+        }}
+        onClose={() => setConvertGoal(null)}
       />
     </>
   );
@@ -398,19 +431,20 @@ function GoalFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const currencies = useQuery({ queryKey: ["currencies"], queryFn: listCurrencies });
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
   const [currency, setCurrency] = useState("MXN");
   const [walletId, setWalletId] = useState<number | null>(null);
+  const [goalKind, setGoalKind] = useState<GoalKind>("purchase");
   const [color, setColor] = useState<string>(CHART_COLORS[0]);
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
   const [deadline, setDeadline] = useState<string>("");
   const [cadence, setCadence] = useState<GoalCadence>("monthly");
   const [error, setError] = useState<string | null>(null);
 
-  // Reset fields whenever the modal opens for a new/edited goal.
+  // Reset fields whenever the modal opens for a new/edited goal. New goals
+  // default to the first wallet (every goal is now backed by real money).
   const [lastKey, setLastKey] = useState<string>("");
   const key = `${open}-${goal?.id ?? "new"}`;
   if (open && key !== lastKey) {
@@ -418,7 +452,8 @@ function GoalFormModal({
     setName(goal?.name ?? "");
     setTarget(goal ? (goal.targetCents / 100).toString() : "");
     setCurrency(goal?.currencyCode ?? "MXN");
-    setWalletId(goal?.linkedWalletId ?? null);
+    setWalletId(goal?.linkedWalletId ?? wallets.data?.[0]?.id ?? null);
+    setGoalKind(goal?.goalKind ?? "purchase");
     setColor(goal?.color ?? CHART_COLORS[0]);
     setDeadlineEnabled(goal?.targetDate != null);
     setDeadline(goal?.targetDate ?? "");
@@ -435,6 +470,7 @@ function GoalFormModal({
       const cents = parseToCents(target);
       if (!name.trim() || cents === null || cents <= 0)
         return Promise.reject(new Error(es.investments.invalidAmount));
+      if (walletId == null) return Promise.reject(new Error(es.goals.apartadoWallet));
       const input = {
         name: name.trim(),
         icon: null,
@@ -444,6 +480,7 @@ function GoalFormModal({
         walletId,
         targetDate: deadlineEnabled && deadline ? deadline : null,
         cadence: deadlineEnabled && deadline ? cadence : null,
+        goalKind,
       };
       return goal ? updateSavingsGoal(goal.id, input) : createSavingsGoal(input);
     },
@@ -460,26 +497,38 @@ function GoalFormModal({
         <Field label={es.goals.name}>
           <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
+        <Field label={es.goals.kindLabel}>
+          <div className="flex gap-1 rounded-xl bg-surface-overlay p-1">
+            {(
+              [
+                ["purchase", es.goals.kindPurchase],
+                ["fund", es.goals.kindFund],
+              ] as const
+            ).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setGoalKind(val)}
+                className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  goalKind === val
+                    ? "bg-surface-raised text-fg shadow-sm"
+                    : "text-fg-subtle hover:text-fg"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="mt-1 block text-xs text-fg-subtle">
+            {goalKind === "fund" ? es.goals.kindFundHint : es.goals.kindPurchaseHint}
+          </span>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={es.goals.target}>
             <MoneyInput value={target} onChange={setTarget} />
           </Field>
           <Field label={es.investments.currency}>
-            {walletId !== null ? (
-              <input className={inputClass} value={effectiveCurrency} disabled readOnly />
-            ) : (
-              <select
-                className={inputClass}
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-              >
-                {(currencies.data ?? []).map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.code}
-                  </option>
-                ))}
-              </select>
-            )}
+            <input className={inputClass} value={effectiveCurrency} disabled readOnly />
           </Field>
         </div>
         <Field label={es.goals.apartadoWallet}>
@@ -488,16 +537,13 @@ function GoalFormModal({
             value={walletId ?? ""}
             onChange={(e) => setWalletId(e.target.value === "" ? null : Number(e.target.value))}
           >
-            <option value="">{es.goals.apartadoNone}</option>
             {wallets.data?.map((w) => (
               <option key={w.id} value={w.id}>
                 {w.name} ({w.currencyCode})
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-fg-subtle">
-            {walletId !== null ? es.goals.apartadoHint : es.goals.apartadoNoneHint}
-          </span>
+          <span className="mt-1 block text-xs text-fg-subtle">{es.goals.apartadoHint}</span>
         </Field>
         {/* Deadline is opt-in via a clear switch; flipping it on reveals the
             date + cadence right away (prefilled), so it's configured in place. */}

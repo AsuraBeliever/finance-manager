@@ -12,7 +12,7 @@ use finanzas_core::period::{resolve_period, Period};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
-use crate::db::{all, batch, changes, exec, first, last_row_id, stmt, today_mx};
+use crate::db::{all, batch, changes, exec, first, last_row_id, new_group_id, stmt, today_mx};
 use crate::jsv;
 
 #[derive(Deserialize, Default)]
@@ -59,6 +59,9 @@ pub struct SavingsGoal {
     pub target_date: Option<String>,
     /// How often the user plans to contribute (daily|weekly|monthly|yearly).
     pub cadence: Option<String>,
+    /// 'purchase' (completing it spends the money) or 'fund' (savings you draw
+    /// down over time, or graduate into its own wallet).
+    pub goal_kind: String,
     /// Contribution plan, present only when both a deadline and cadence are set.
     pub plan: Option<ContributionPlan>,
     /// True when the goal has fallen below its steady pace (drives the badge).
@@ -80,6 +83,8 @@ struct GoalRow {
     target_date: Option<String>,
     #[serde(default)]
     contribution_cadence: Option<String>,
+    #[serde(default)]
+    goal_kind: String,
     /// Day the goal started ('YYYY-MM-DD'), the pace anchor for the plan.
     created_at: String,
 }
@@ -127,6 +132,7 @@ fn build(r: GoalRow, today: NaiveDate) -> SavingsGoal {
         linked_wallet_id: r.linked_wallet_id,
         target_date: r.target_date,
         cadence: r.contribution_cadence,
+        goal_kind: if r.goal_kind == "fund" { "fund" } else { "purchase" }.into(),
         plan,
         is_behind,
     }
@@ -138,7 +144,7 @@ fn parse_date(s: &str) -> Option<NaiveDate> {
 }
 
 const SELECT: &str = "SELECT id, name, icon, color, currency_code, target_cents, saved_cents,
-        linked_wallet_id, target_date, contribution_cadence, date(created_at) AS created_at
+        linked_wallet_id, target_date, contribution_cadence, goal_kind, date(created_at) AS created_at
         FROM savings_goals";
 
 async fn fetch_goal(db: &D1Database, uid: i64, id: i64) -> AppResult<SavingsGoal> {
@@ -165,7 +171,7 @@ pub async fn list_savings_goals(
     let rows: Vec<GoalRow> = all(
         db,
         "SELECT g.id, g.name, g.icon, g.color, g.currency_code, g.target_cents,
-                g.linked_wallet_id, g.target_date, g.contribution_cadence,
+                g.linked_wallet_id, g.target_date, g.contribution_cadence, g.goal_kind,
                 date(g.created_at) AS created_at,
                 COALESCE((SELECT s.saved_cents FROM goal_snapshots s
                           WHERE s.goal_id = g.id AND s.as_of <= ?2
@@ -189,8 +195,8 @@ pub struct GoalInput {
     pub color: Option<String>,
     pub currency_code: String,
     pub target_cents: i64,
-    /// Wallet to make this goal an apartado of (None = track only). When set, the
-    /// goal's currency follows the wallet's.
+    /// Wallet the goal apartado reserves from (required — the goal's currency
+    /// follows the wallet's).
     #[serde(default)]
     pub wallet_id: Option<i64>,
     /// Optional deadline 'YYYY-MM-DD' to reach the target by.
@@ -200,6 +206,18 @@ pub struct GoalInput {
     /// Required (and defaulted to monthly) whenever a deadline is set.
     #[serde(default)]
     pub cadence: Option<String>,
+    /// 'purchase' or 'fund' (defaults to purchase).
+    #[serde(default)]
+    pub goal_kind: Option<String>,
+}
+
+/// Normalize the goal kind to a known value.
+fn goal_kind(input: &GoalInput) -> &'static str {
+    if input.goal_kind.as_deref() == Some("fund") {
+        "fund"
+    } else {
+        "purchase"
+    }
 }
 
 /// Normalize the deadline + cadence pair: drop a blank date, and when a date is
@@ -233,6 +251,9 @@ fn validate(input: &GoalInput) -> AppResult<()> {
     }
     if input.target_cents <= 0 {
         return Err(AppError::InvalidInput("la meta debe ser positiva".into()));
+    }
+    if input.wallet_id.is_none() {
+        return Err(AppError::InvalidInput("elige una cartera para la meta".into()));
     }
     Ok(())
 }
@@ -271,8 +292,8 @@ pub async fn create_savings_goal(
         db,
         "INSERT INTO savings_goals
            (user_id, name, icon, color, currency_code, target_cents, linked_wallet_id,
-            target_date, contribution_cadence, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9,
+            target_date, contribution_cadence, goal_kind, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM savings_goals WHERE user_id = ?1), 0))",
         jsv![
             uid,
@@ -283,7 +304,8 @@ pub async fn create_savings_goal(
             a.target_cents,
             linked_wallet_id,
             target_date,
-            cadence
+            cadence,
+            goal_kind(&a)
         ],
     )
     .await?;
@@ -312,7 +334,7 @@ pub async fn update_savings_goal(
         db,
         "UPDATE savings_goals
          SET name = ?3, icon = ?4, color = ?5, currency_code = ?6, target_cents = ?7,
-             linked_wallet_id = ?8, target_date = ?9, contribution_cadence = ?10
+             linked_wallet_id = ?8, target_date = ?9, contribution_cadence = ?10, goal_kind = ?11
          WHERE id = ?1 AND user_id = ?2",
         jsv![
             a.id,
@@ -324,7 +346,8 @@ pub async fn update_savings_goal(
             a.input.target_cents,
             linked_wallet_id,
             target_date,
-            cadence
+            cadence,
+            goal_kind(&a.input)
         ],
     )
     .await?;
@@ -482,6 +505,82 @@ pub async fn use_savings_goal(db: &D1Database, uid: i64, a: IdArgs) -> AppResult
 #[serde(rename_all = "camelCase")]
 pub struct IdArgs {
     pub id: i64,
+}
+
+#[derive(Deserialize)]
+struct WalletMetaRow {
+    category_id: i64,
+    currency_code: String,
+    color: Option<String>,
+}
+
+/// Graduate a fund goal into its own wallet: create a wallet named after the
+/// goal and move the reserved money into it (a transfer, so net worth doesn't
+/// change), then archive the goal to release the apartado. Only for a goal that
+/// has a wallet and money saved.
+pub async fn convert_goal_to_wallet(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<()> {
+    let goal = fetch_goal(db, uid, a.id).await?;
+    let src_id = goal
+        .linked_wallet_id
+        .ok_or_else(|| AppError::InvalidInput("la meta no tiene cartera".into()))?;
+    if goal.saved_cents <= 0 {
+        return Err(AppError::InvalidInput(
+            "la meta no tiene dinero apartado".into(),
+        ));
+    }
+    let src: WalletMetaRow = first(
+        db,
+        "SELECT category_id, currency_code, color FROM wallets WHERE id = ?1 AND user_id = ?2",
+        jsv![src_id, uid],
+    )
+    .await?
+    .ok_or(AppError::NotFound("cartera"))?;
+
+    // New wallet named after the goal (no hardcoded prefix — the name is the
+    // user's own text, and stays whatever the UI language).
+    let res = exec(
+        db,
+        "INSERT INTO wallets (user_id, name, category_id, currency_code, color, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5,
+                 COALESCE((SELECT MAX(sort_order) + 1 FROM wallets WHERE user_id = ?1), 0))",
+        jsv![
+            uid,
+            goal.name.trim(),
+            src.category_id,
+            src.currency_code,
+            goal.color.clone().or(src.color)
+        ],
+    )
+    .await?;
+    let new_id = last_row_id(&res)?;
+
+    // Move the money and archive the goal — one atomic batch.
+    let group = new_group_id();
+    let today = today_mx().to_string();
+    let insert = "INSERT INTO transactions (wallet_id, kind, amount_cents, transfer_group_id, description, occurred_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
+    batch(
+        db,
+        vec![
+            stmt(
+                db,
+                insert,
+                jsv![src_id, "transfer_out", goal.saved_cents, group, goal.name, today],
+            )?,
+            stmt(
+                db,
+                insert,
+                jsv![new_id, "transfer_in", goal.saved_cents, group, goal.name, today],
+            )?,
+            stmt(
+                db,
+                "UPDATE savings_goals SET archived_at = ?3 WHERE id = ?1 AND user_id = ?2",
+                jsv![a.id, uid, today],
+            )?,
+        ],
+    )
+    .await?;
+    Ok(())
 }
 
 /// Daily cron: record today's saved amount for every goal so the progress curve
