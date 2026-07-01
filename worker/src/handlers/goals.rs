@@ -177,7 +177,7 @@ pub async fn list_savings_goals(
                           WHERE s.goal_id = g.id AND s.as_of <= ?2
                           ORDER BY s.as_of DESC, s.id DESC LIMIT 1), 0) AS saved_cents
          FROM savings_goals g
-         WHERE g.user_id = ?1 AND date(g.created_at) < ?2
+         WHERE g.user_id = ?1 AND date(g.created_at) <= ?2
            AND (g.archived_at IS NULL OR g.archived_at >= ?2)
          ORDER BY g.sort_order, g.created_at, g.id",
         jsv![uid, end],

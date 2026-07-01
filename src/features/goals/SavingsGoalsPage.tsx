@@ -461,8 +461,10 @@ function GoalFormModal({
     setError(null);
   }
 
-  // An apartado goal follows its wallet's currency.
-  const linkedWallet = wallets.data?.find((w) => w.id === walletId) ?? null;
+  // Fall back to the first wallet if none is chosen yet (e.g. the wallets query
+  // hadn't resolved when the modal opened), so a new goal always has one.
+  const effectiveWalletId = walletId ?? wallets.data?.[0]?.id ?? null;
+  const linkedWallet = wallets.data?.find((w) => w.id === effectiveWalletId) ?? null;
   const effectiveCurrency = linkedWallet?.currencyCode ?? currency;
 
   const save = useMutation({
@@ -470,14 +472,15 @@ function GoalFormModal({
       const cents = parseToCents(target);
       if (!name.trim() || cents === null || cents <= 0)
         return Promise.reject(new Error(es.investments.invalidAmount));
-      if (walletId == null) return Promise.reject(new Error(es.goals.apartadoWallet));
+      if (effectiveWalletId == null)
+        return Promise.reject(new Error(es.goals.apartadoWallet));
       const input = {
         name: name.trim(),
         icon: null,
         color,
         currencyCode: effectiveCurrency,
         targetCents: cents,
-        walletId,
+        walletId: effectiveWalletId,
         targetDate: deadlineEnabled && deadline ? deadline : null,
         cadence: deadlineEnabled && deadline ? cadence : null,
         goalKind,
@@ -534,7 +537,7 @@ function GoalFormModal({
         <Field label={es.goals.apartadoWallet}>
           <select
             className={inputClass}
-            value={walletId ?? ""}
+            value={effectiveWalletId ?? ""}
             onChange={(e) => setWalletId(e.target.value === "" ? null : Number(e.target.value))}
           >
             {wallets.data?.map((w) => (
