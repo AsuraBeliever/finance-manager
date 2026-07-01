@@ -239,35 +239,65 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={es.wallets.category}>
-            <select
-              className={inputClass}
-              value={categoryId ?? categories.data?.[0]?.id ?? ""}
-              onChange={(e) => setCategoryId(Number(e.target.value))}
-            >
-              {categories.data?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {seedName(c.name, c.isSystem)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={es.wallets.currency}>
-            <select
-              className={inputClass}
-              value={currencyCode}
-              onChange={(e) => setCurrencyCode(e.target.value)}
-              disabled={!!convert}
-            >
-              {currencies.data?.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.code} — {seedName(c.name)}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
+        <Field label={es.wallets.parentWallet}>
+          <select
+            className={inputClass}
+            value={parentWalletId ?? ""}
+            onChange={(e) => {
+              const pid = e.target.value === "" ? null : Number(e.target.value);
+              setParentWalletId(pid);
+              // An apartado inherits its parent's category + currency.
+              const par = walletsQ.data?.find((w) => w.id === pid);
+              if (par) {
+                setCategoryId(par.categoryId);
+                setCurrencyCode(par.currencyCode);
+              }
+            }}
+          >
+            <option value="">{es.wallets.parentNone}</option>
+            {eligibleParents.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-fg-subtle">
+            {parentWalletId != null ? es.wallets.parentHint : es.wallets.parentNoneHint}
+          </span>
+        </Field>
+
+        {/* An apartado inherits its parent's category and currency, so those
+            aren't shown — only a standalone wallet picks them. */}
+        {parentWalletId == null && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={es.wallets.category}>
+              <select
+                className={inputClass}
+                value={categoryId ?? categories.data?.[0]?.id ?? ""}
+                onChange={(e) => setCategoryId(Number(e.target.value))}
+              >
+                {categories.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {seedName(c.name, c.isSystem)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={es.wallets.currency}>
+              <select
+                className={inputClass}
+                value={currencyCode}
+                onChange={(e) => setCurrencyCode(e.target.value)}
+              >
+                {currencies.data?.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} — {seedName(c.name)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        )}
 
         {convert ? (
           <p className="rounded-lg bg-surface-overlay px-3 py-2 text-xs text-fg-muted">
@@ -281,24 +311,6 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
             <MoneyInput value={balanceText} onChange={setBalanceText} />
           </Field>
         )}
-
-        <Field label={es.wallets.parentWallet}>
-          <select
-            className={inputClass}
-            value={parentWalletId ?? ""}
-            onChange={(e) => setParentWalletId(e.target.value === "" ? null : Number(e.target.value))}
-          >
-            <option value="">{es.wallets.parentNone}</option>
-            {eligibleParents.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-          <span className="mt-1 block text-xs text-fg-subtle">
-            {parentWalletId != null ? es.wallets.parentHint : es.wallets.parentNoneHint}
-          </span>
-        </Field>
 
         {/* Card skin picker */}
         <Field label={es.wallets.skin}>
