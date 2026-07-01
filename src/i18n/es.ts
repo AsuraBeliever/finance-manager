@@ -119,6 +119,7 @@ export const esDict = {
     kindFundHint: "El dinero sigue siendo tuyo; lo usas después o lo pasas a su propia cartera.",
     buy: "Comprar",
     convertToWallet: "Pasar a cartera",
+    convertMoves: "Se moverán {amount} a esta cartera (desde tu apartado); la meta se cierra.",
     convertConfirm:
       "Se creará la cartera «{name}» con {amount} (el dinero se mueve ahí desde {wallet}) y se cierra la meta. ¿Continuar?",
     use: "Usar",

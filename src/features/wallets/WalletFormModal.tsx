@@ -6,6 +6,7 @@ import { Field, inputClass } from "../../components/Field";
 import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import {
+  convertGoalToWallet,
   createWallet,
   listCurrencies,
   listWalletCategories,
@@ -42,14 +43,28 @@ async function compressImage(file: File): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.72);
 }
 
+/** Graduating a fund goal into a wallet: the form is prefilled with the goal's
+ *  style and, on save, runs the conversion instead of a plain create. Balance
+ *  comes from the transfer (the field is hidden). */
+export interface WalletConvert {
+  goalId: number;
+  name: string;
+  color: string | null;
+  currencyCode: string;
+  savedCents: number;
+  sourceCategoryId: number | null;
+}
+
 interface WalletFormModalProps {
   open: boolean;
   onClose: () => void;
   /** When set, the form edits this wallet instead of creating one. */
   wallet?: Wallet;
+  /** When set, the form graduates a fund goal into a new wallet. */
+  convert?: WalletConvert;
 }
 
-export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps) {
+export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormModalProps) {
   const queryClient = useQueryClient();
   const categories = useQuery({
     queryKey: ["walletCategories"],
@@ -72,6 +87,18 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
 
   useEffect(() => {
     if (!open) return;
+    if (convert) {
+      setName(convert.name);
+      setCategoryId(convert.sourceCategoryId);
+      setCurrencyCode(convert.currencyCode);
+      setBalanceText(""); // balance arrives via the transfer, not editable here
+      setSkin(null);
+      setCustomColor(convert.color ?? COLORS[0]);
+      setNotes("");
+      setYieldEnabled(false);
+      setError(null);
+      return;
+    }
     setName(wallet?.name ?? "");
     setCategoryId(wallet?.categoryId ?? null);
     setCurrencyCode(wallet?.currencyCode ?? "MXN");
@@ -83,7 +110,14 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
     setYieldRateText(wallet?.yieldRateBps != null ? String(wallet.yieldRateBps / 100) : "");
     setYieldFrequency(wallet?.yieldFrequency ?? "weekly");
     setError(null);
-  }, [open, wallet]);
+  }, [open, wallet, convert]);
+
+  const invalidateAfterConvert = () => {
+    for (const key of ["wallets", "savingsGoals", "transactions", "dashboard"]) {
+      queryClient.invalidateQueries({ queryKey: [key] });
+    }
+    onClose();
+  };
 
   const mutation = useMutation({
     mutationFn: (input: WalletInput) =>
@@ -92,6 +126,13 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
       onClose();
     },
+    onError: (e) => setError(String(e)),
+  });
+
+  const convertMut = useMutation({
+    mutationFn: (s: { name: string; color: string; categoryId: number; skin: string | null; notes: string | null }) =>
+      convertGoalToWallet(convert!.goalId, s),
+    onSuccess: invalidateAfterConvert,
     onError: (e) => setError(String(e)),
   });
 
@@ -108,13 +149,26 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    const finalCategory = categoryId ?? categories.data?.[0]?.id;
+    if (finalCategory === undefined) return;
+    const catNameFor = categories.data?.find((c) => c.id === finalCategory)?.name;
+
+    if (convert) {
+      convertMut.mutate({
+        name,
+        color: skinAccent(effectiveSkin(skin, catNameFor)) ?? COLORS[0],
+        categoryId: finalCategory,
+        skin,
+        notes: notes.trim() === "" ? null : notes.trim(),
+      });
+      return;
+    }
+
     const cents = balanceText.trim() === "" ? 0 : parseToCents(balanceText);
     if (cents === null) {
       setError(es.wallets.invalidAmount);
       return;
     }
-    const finalCategory = categoryId ?? categories.data?.[0]?.id;
-    if (finalCategory === undefined) return;
     let yieldRateBps: number | null = null;
     if (yieldEnabled) {
       const pct = parseFloat(yieldRateText.replace(",", "."));
@@ -148,7 +202,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
 
   return (
     <Modal
-      title={wallet ? es.wallets.editWallet : es.wallets.newWallet}
+      title={convert ? es.goals.convertToWallet : wallet ? es.wallets.editWallet : es.wallets.newWallet}
       open={open}
       onClose={onClose}
     >
@@ -183,6 +237,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
               className={inputClass}
               value={currencyCode}
               onChange={(e) => setCurrencyCode(e.target.value)}
+              disabled={!!convert}
             >
               {currencies.data?.map((c) => (
                 <option key={c.code} value={c.code}>
@@ -193,9 +248,18 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
           </Field>
         </div>
 
-        <Field label={es.wallets.initialBalance}>
-          <MoneyInput value={balanceText} onChange={setBalanceText} />
-        </Field>
+        {convert ? (
+          <p className="rounded-lg bg-surface-overlay px-3 py-2 text-xs text-fg-muted">
+            {es.goals.convertMoves.replace(
+              "{amount}",
+              formatCents(convert.savedCents, convert.currencyCode),
+            )}
+          </p>
+        ) : (
+          <Field label={es.wallets.initialBalance}>
+            <MoneyInput value={balanceText} onChange={setBalanceText} />
+          </Field>
+        )}
 
         {/* Card skin picker */}
         <Field label={es.wallets.skin}>
@@ -291,7 +355,9 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
         </Field>
 
         {/* Yield: wallets that grow on their own (Klar, Nu…) accrue interest
-            automatically via the daily cron; see worker wallet_yield. */}
+            automatically via the daily cron; see worker wallet_yield. Not shown
+            when graduating a fund goal (set it later by editing the wallet). */}
+        {!convert && (
         <div className="rounded-lg border border-border-muted p-3">
           <label className="flex cursor-pointer items-start gap-2.5">
             <input
@@ -343,6 +409,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
             </div>
           )}
         </div>
+        )}
 
         {error && <p className="text-sm text-danger">{error}</p>}
         {wallet && (
@@ -355,8 +422,8 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
           <Button type="button" variant="ghost" onClick={onClose}>
             {es.common.cancel}
           </Button>
-          <Button type="submit" disabled={mutation.isPending}>
-            {es.common.save}
+          <Button type="submit" disabled={convert ? convertMut.isPending : mutation.isPending}>
+            {convert ? es.goals.convertToWallet : es.common.save}
           </Button>
         </div>
       </form>

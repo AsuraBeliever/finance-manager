@@ -30,7 +30,6 @@ import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
 import {
   contributeSavingsGoal,
-  convertGoalToWallet,
   createSavingsGoal,
   deleteSavingsGoal,
   listSavingsGoals,
@@ -39,6 +38,7 @@ import {
   updateSavingsGoal,
   useSavingsGoal,
 } from "../../lib/api";
+import { WalletFormModal } from "../wallets/WalletFormModal";
 import { formatCents, parseToCents } from "../../lib/money";
 import { CHART_COLORS } from "../../lib/palette";
 import type { GoalCadence, GoalKind, SavingsGoal } from "../../lib/types";
@@ -279,11 +279,6 @@ export function SavingsGoalsPage() {
     onSuccess: invalidate,
     onSettled: () => setUseGoal(null),
   });
-  const convertMut = useMutation({
-    mutationFn: (id: number) => convertGoalToWallet(id),
-    onSuccess: invalidate,
-    onSettled: () => setConvertGoal(null),
-  });
   const walletName = (id: number | null) =>
     id == null ? null : (wallets.data?.find((w) => w.id === id)?.name ?? null);
 
@@ -399,23 +394,21 @@ export function SavingsGoalsPage() {
         }}
         onClose={() => setUseGoal(null)}
       />
-      <ConfirmDialog
-        open={convertGoal !== null}
-        title={es.goals.convertToWallet}
-        message={
-          convertGoal
-            ? es.goals.convertConfirm
-                .replace("{name}", convertGoal.name)
-                .replace("{amount}", formatCents(convertGoal.savedCents, convertGoal.currencyCode))
-                .replace("{wallet}", walletName(convertGoal.linkedWalletId) ?? "")
-            : ""
-        }
-        confirmLabel={es.goals.convertToWallet}
-        onConfirm={() => {
-          if (convertGoal) convertMut.mutate(convertGoal.id);
-        }}
-        onClose={() => setConvertGoal(null)}
-      />
+      {convertGoal && (
+        <WalletFormModal
+          open
+          convert={{
+            goalId: convertGoal.id,
+            name: convertGoal.name,
+            color: convertGoal.color,
+            currencyCode: convertGoal.currencyCode,
+            savedCents: convertGoal.savedCents,
+            sourceCategoryId:
+              wallets.data?.find((w) => w.id === convertGoal.linkedWalletId)?.categoryId ?? null,
+          }}
+          onClose={() => setConvertGoal(null)}
+        />
+      )}
     </>
   );
 }

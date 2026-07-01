@@ -231,9 +231,18 @@ export const contributeSavingsGoal = (id: number, amountCents: number) =>
 
 export const useSavingsGoal = (id: number) => rpc<void>("use_savings_goal", { id });
 
-/** Graduate a fund goal into its own wallet (moves the reserved money there). */
-export const convertGoalToWallet = (id: number) =>
-  rpc<void>("convert_goal_to_wallet", { id });
+/** Graduate a fund goal into its own wallet (moves the reserved money there).
+ *  Optional style overrides the defaults (goal name/color, source category). */
+export const convertGoalToWallet = (
+  id: number,
+  style?: {
+    name?: string;
+    color?: string | null;
+    categoryId?: number;
+    skin?: string | null;
+    notes?: string | null;
+  },
+) => rpc<void>("convert_goal_to_wallet", { id, ...style });
 
 export const deleteSavingsGoal = (id: number) =>
   rpc<void>("delete_savings_goal", { id });

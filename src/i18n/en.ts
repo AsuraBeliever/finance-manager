@@ -114,6 +114,7 @@ export const en: Dict = {
     kindFundHint: "The money stays yours; spend it later or move it to its own wallet.",
     buy: "Buy",
     convertToWallet: "Move to wallet",
+    convertMoves: "{amount} will move into this wallet (from your reserve); the goal closes.",
     convertConfirm:
       "A wallet “{name}” will be created with {amount} (the money moves there from {wallet}) and the goal closes. Continue?",
     use: "Use",

@@ -514,11 +514,30 @@ struct WalletMetaRow {
     color: Option<String>,
 }
 
-/// Graduate a fund goal into its own wallet: create a wallet named after the
-/// goal and move the reserved money into it (a transfer, so net worth doesn't
-/// change), then archive the goal to release the apartado. Only for a goal that
-/// has a wallet and money saved.
-pub async fn convert_goal_to_wallet(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<()> {
+/// Optional style for the wallet the fund graduates into. Any field omitted
+/// falls back to a sensible default (goal name/color, source category).
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ConvertArgs {
+    pub id: i64,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub category_id: Option<i64>,
+    #[serde(default)]
+    pub skin: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+}
+
+/// Graduate a fund goal into its own wallet: create a wallet (styled by the
+/// user, or defaulting to the goal's name/color and the source category) and
+/// move the reserved money into it (a transfer, so net worth doesn't change),
+/// then archive the goal to release the apartado. Only for a goal that has a
+/// wallet and money saved.
+pub async fn convert_goal_to_wallet(db: &D1Database, uid: i64, a: ConvertArgs) -> AppResult<()> {
     let goal = fetch_goal(db, uid, a.id).await?;
     let src_id = goal
         .linked_wallet_id
@@ -536,20 +555,23 @@ pub async fn convert_goal_to_wallet(db: &D1Database, uid: i64, a: IdArgs) -> App
     .await?
     .ok_or(AppError::NotFound("cartera"))?;
 
-    // New wallet named after the goal (no hardcoded prefix — the name is the
-    // user's own text, and stays whatever the UI language).
+    let name = a
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| goal.name.trim())
+        .to_string();
+    let category_id = a.category_id.unwrap_or(src.category_id);
+    let color = a.color.or_else(|| goal.color.clone()).or(src.color);
+    let notes = a.notes.filter(|s| !s.trim().is_empty());
+
     let res = exec(
         db,
-        "INSERT INTO wallets (user_id, name, category_id, currency_code, color, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5,
+        "INSERT INTO wallets (user_id, name, category_id, currency_code, color, skin, notes, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM wallets WHERE user_id = ?1), 0))",
-        jsv![
-            uid,
-            goal.name.trim(),
-            src.category_id,
-            src.currency_code,
-            goal.color.clone().or(src.color)
-        ],
+        jsv![uid, name, category_id, src.currency_code, color, a.skin, notes],
     )
     .await?;
     let new_id = last_row_id(&res)?;
