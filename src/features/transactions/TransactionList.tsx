@@ -95,24 +95,28 @@ export function TransactionList({
               {meta.sign}
               {formatCents(t.amountCents, currency)}
             </span>
-            {onEdit && (t.kind === "income" || t.kind === "expense") && (
-              <button
-                onClick={() => onEdit(t)}
-                aria-label={es.common.edit}
-                className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-surface-overlay hover:text-fg"
-              >
-                <Pencil size={15} />
-              </button>
-            )}
-            {!apartadoKinds.has(t.kind) && (
-              <button
-                onClick={() => setToDelete(t.id)}
-                aria-label={es.common.delete}
-                className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
-              >
-                <Trash2 size={15} />
-              </button>
-            )}
+            {/* Fixed-width action slot so amounts line up whether a row has 0, 1
+                or 2 buttons (apartados/transfers have fewer). */}
+            <div className="flex w-16 shrink-0 items-center justify-end gap-1">
+              {onEdit && (t.kind === "income" || t.kind === "expense") && (
+                <button
+                  onClick={() => onEdit(t)}
+                  aria-label={es.common.edit}
+                  className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-surface-overlay hover:text-fg"
+                >
+                  <Pencil size={15} />
+                </button>
+              )}
+              {!apartadoKinds.has(t.kind) && (
+                <button
+                  onClick={() => setToDelete(t.id)}
+                  aria-label={es.common.delete}
+                  className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </div>
           </li>
         );
       })}
