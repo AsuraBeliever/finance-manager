@@ -16,7 +16,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, PiggyBank, Plus, Wallet as WalletIcon } from "lucide-react";
+import { ChevronDown, GripVertical, PiggyBank, Plus, Wallet as WalletIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
@@ -52,6 +52,7 @@ function ApartadoRow({ wallet }: { wallet: Wallet }) {
 /** A wallet card wrapped for drag-to-reorder. Dragging is initiated only from
  *  the grip handle so the rest of the card stays clickable (opens the detail). */
 function SortableWalletCard({ wallet, apartados }: { wallet: Wallet; apartados: Wallet[] }) {
+  const [open, setOpen] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: wallet.id,
   });
@@ -76,13 +77,33 @@ function SortableWalletCard({ wallet, apartados }: { wallet: Wallet; apartados: 
         </button>
       </div>
       {apartados.length > 0 && (
-        <div className="mt-2 space-y-1.5 border-l-2 border-border-muted pl-3">
-          <p className="text-[0.65rem] font-medium uppercase tracking-[0.12em] text-fg-subtle">
-            {es.wallets.apartadosLabel}
-          </p>
-          {apartados.map((a) => (
-            <ApartadoRow key={a.id} wallet={a} />
-          ))}
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="flex w-full items-center gap-1.5 rounded-lg px-1 py-1 text-[0.65rem] font-medium uppercase tracking-[0.12em] text-fg-subtle transition-colors hover:text-fg"
+          >
+            <ChevronDown
+              size={14}
+              className={`transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+            />
+            {es.wallets.apartadosLabel} · {apartados.length}
+          </button>
+          {/* grid-rows trick animates height without measuring the content */}
+          <div
+            className={`grid transition-all duration-300 ease-out ${
+              open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="space-y-1.5 border-l-2 border-border-muted pl-3 pt-1">
+                {apartados.map((a) => (
+                  <ApartadoRow key={a.id} wallet={a} />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
