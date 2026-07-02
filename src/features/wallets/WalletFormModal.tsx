@@ -20,6 +20,7 @@ import { effectiveSkin, resolveSkin, skinAccent, SKINS, type SkinGroup } from ".
 import type { Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
+import { getLocale } from "../../i18n/store";
 
 const COLORS = CHART_COLORS;
 
@@ -96,6 +97,12 @@ export function WalletFormModal({
   const [yieldEnabled, setYieldEnabled] = useState(false);
   const [yieldRateText, setYieldRateText] = useState("");
   const [yieldFrequency, setYieldFrequency] = useState("weekly");
+  const [creditEnabled, setCreditEnabled] = useState(false);
+  const [cutDayText, setCutDayText] = useState("");
+  const [dueDaysText, setDueDaysText] = useState("");
+  const [creditLimitText, setCreditLimitText] = useState("");
+  const [annivMonth, setAnnivMonth] = useState(""); // "" = untracked, else "1".."12"
+  const [annivDayText, setAnnivDayText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -111,6 +118,7 @@ export function WalletFormModal({
       setCustomColor(convert.color ?? COLORS[0]);
       setNotes("");
       setYieldEnabled(false);
+      setCreditEnabled(false);
       setError(null);
       return;
     }
@@ -125,6 +133,7 @@ export function WalletFormModal({
       setCustomColor(COLORS[0]);
       setNotes("");
       setYieldEnabled(false);
+      setCreditEnabled(false);
       setError(null);
       return;
     }
@@ -139,6 +148,15 @@ export function WalletFormModal({
     setYieldEnabled(wallet?.yieldRateBps != null);
     setYieldRateText(wallet?.yieldRateBps != null ? String(wallet.yieldRateBps / 100) : "");
     setYieldFrequency(wallet?.yieldFrequency ?? "weekly");
+    setCreditEnabled(wallet?.creditCutDay != null);
+    setCutDayText(wallet?.creditCutDay != null ? String(wallet.creditCutDay) : "");
+    setDueDaysText(wallet?.creditDueDays != null ? String(wallet.creditDueDays) : "");
+    setCreditLimitText(
+      wallet?.creditLimitCents != null ? (wallet.creditLimitCents / 100).toFixed(2) : "",
+    );
+    const [am, ad] = (wallet?.creditAnniversary ?? "").split("-");
+    setAnnivMonth(am ? String(Number(am)) : "");
+    setAnnivDayText(ad ? String(Number(ad)) : "");
     setError(null);
   }, [open, wallet, convert, defaultParent]);
 
@@ -215,6 +233,36 @@ export function WalletFormModal({
       }
       yieldRateBps = Math.round(pct * 100);
     }
+    let creditCutDay: number | null = null;
+    let creditDueDays: number | null = null;
+    let creditLimitCents: number | null = null;
+    let creditAnniversary: string | null = null;
+    if (creditEnabled) {
+      creditCutDay = parseInt(cutDayText, 10);
+      if (!isFinite(creditCutDay) || creditCutDay < 1 || creditCutDay > 31) {
+        setError(es.credit.invalidCutDay);
+        return;
+      }
+      if (dueDaysText.trim() !== "") {
+        creditDueDays = parseInt(dueDaysText, 10);
+        if (!isFinite(creditDueDays) || creditDueDays < 1 || creditDueDays > 60) {
+          setError(es.credit.invalidDueDays);
+          return;
+        }
+      }
+      if (creditLimitText.trim() !== "") {
+        creditLimitCents = parseToCents(creditLimitText);
+        if (creditLimitCents === null || creditLimitCents <= 0) {
+          setError(es.wallets.invalidAmount);
+          return;
+        }
+      }
+      const annivDay = parseInt(annivDayText, 10);
+      if (annivMonth !== "" && isFinite(annivDay) && annivDay >= 1 && annivDay <= 31) {
+        creditAnniversary = `${String(annivMonth).padStart(2, "0")}-${String(annivDay).padStart(2, "0")}`;
+      }
+    }
+
     const catName = categories.data?.find((c) => c.id === finalCategory)?.name;
     mutation.mutate({
       name,
@@ -227,6 +275,10 @@ export function WalletFormModal({
       parentWalletId,
       yieldRateBps,
       yieldFrequency: yieldRateBps != null ? yieldFrequency : null,
+      creditCutDay,
+      creditDueDays,
+      creditLimitCents,
+      creditAnniversary,
     });
   }
 
@@ -234,6 +286,11 @@ export function WalletFormModal({
   // level deep), and never the wallet being edited itself.
   const eligibleParents = (walletsQ.data ?? []).filter(
     (w) => w.id !== wallet?.id && w.parentWalletId == null && !w.isArchived,
+  );
+
+  const monthLocale = getLocale() === "en" ? "en-US" : "es-MX";
+  const monthNames = Array.from({ length: 12 }, (_, i) =>
+    new Date(2000, i, 1).toLocaleDateString(monthLocale, { month: "long" }),
   );
 
   const imgSelected = !!skin && skin.startsWith("img:");
@@ -297,7 +354,14 @@ export function WalletFormModal({
               <select
                 className={inputClass}
                 value={categoryId ?? categories.data?.[0]?.id ?? ""}
-                onChange={(e) => setCategoryId(Number(e.target.value))}
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  setCategoryId(id);
+                  // Picking the credit-card category on a new wallet suggests
+                  // credit mode; it stays a manual toggle otherwise.
+                  const cat = categories.data?.find((c) => c.id === id);
+                  if (!wallet && cat?.name === "Tarjeta de crédito") setCreditEnabled(true);
+                }}
               >
                 {categories.data?.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -480,6 +544,89 @@ export function WalletFormModal({
               {!wallet?.yieldRateBps && (
                 <p className="text-xs text-fg-subtle">{es.wallets.yieldStartsToday}</p>
               )}
+            </div>
+          )}
+        </div>
+        )}
+
+        {/* Credit card: cut day is the switch; everything else is optional.
+            Spending drives the balance negative (= debt) and the detail page
+            gains the statement panel. Not shown when graduating a goal. */}
+        {!convert && (
+        <div className="rounded-lg border border-border-muted p-3">
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={creditEnabled}
+              onChange={(e) => setCreditEnabled(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-accent"
+            />
+            <span className="text-sm">
+              {es.credit.enable}
+              <span className="mt-0.5 block text-xs text-fg-subtle">
+                {es.credit.enableHint}
+              </span>
+            </span>
+          </label>
+
+          {creditEnabled && (
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label={es.credit.cutDay}>
+                  <input
+                    className={inputClass}
+                    value={cutDayText}
+                    onChange={(e) => setCutDayText(e.target.value)}
+                    placeholder="15"
+                    inputMode="numeric"
+                  />
+                  <span className="mt-1 block text-xs text-fg-subtle">
+                    {es.credit.cutDayHint}
+                  </span>
+                </Field>
+                <Field label={es.credit.dueDays}>
+                  <input
+                    className={inputClass}
+                    value={dueDaysText}
+                    onChange={(e) => setDueDaysText(e.target.value)}
+                    placeholder="20"
+                    inputMode="numeric"
+                  />
+                  <span className="mt-1 block text-xs text-fg-subtle">
+                    {es.credit.dueDaysHint}
+                  </span>
+                </Field>
+              </div>
+              <Field label={es.credit.limit}>
+                <MoneyInput value={creditLimitText} onChange={setCreditLimitText} />
+                <span className="mt-1 block text-xs text-fg-subtle">
+                  {es.credit.limitHint}
+                </span>
+              </Field>
+              <Field label={es.credit.anniversary}>
+                <div className="grid grid-cols-2 gap-3">
+                  <select
+                    className={inputClass}
+                    value={annivMonth}
+                    onChange={(e) => setAnnivMonth(e.target.value)}
+                  >
+                    <option value="">{es.credit.anniversaryNone}</option>
+                    {monthNames.map((m, i) => (
+                      <option key={m} value={i + 1}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className={inputClass}
+                    value={annivDayText}
+                    onChange={(e) => setAnnivDayText(e.target.value)}
+                    placeholder={es.credit.anniversaryDay}
+                    inputMode="numeric"
+                    disabled={annivMonth === ""}
+                  />
+                </div>
+              </Field>
             </div>
           )}
         </div>

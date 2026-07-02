@@ -36,7 +36,61 @@ export interface Wallet {
   yieldFrequency: string | null;
   /** 'YYYY-MM-DD' the day yield was switched on (null when off). */
   yieldAnchorDate: string | null;
+  /** Day of month (1-31) the statement closes; set = this is a credit card. */
+  creditCutDay: number | null;
+  /** Days after the cut to pay without interest (null = default 20). */
+  creditDueDays: number | null;
+  /** Credit line in cents, or null when untracked. */
+  creditLimitCents: number | null;
+  /** 'MM-DD' the bank charges the annual fee, or null when untracked. */
+  creditAnniversary: string | null;
   createdAt: string;
+}
+
+/** One purchase in meses sin intereses, with its billing progress. */
+export interface MsiPlan {
+  id: number;
+  description: string;
+  totalCents: number;
+  months: number;
+  /** The regular installment (the first also carries the cent remainder). */
+  monthlyCents: number;
+  billedMonths: number;
+  pendingCents: number;
+  /** Null once the plan is fully billed. */
+  nextChargeDate: string | null;
+  nextChargeCents: number | null;
+  purchasedAt: string;
+}
+
+/** The last closed statement of a credit card and how it stands today. */
+export interface CreditStatement {
+  cutDate: string;
+  /** Saldo al corte — pay this in full by dueDate and no interest accrues. */
+  balanceCents: number;
+  /** Payments posted after the cut. */
+  paidCents: number;
+  /** balance − paid, floored at zero. */
+  remainingCents: number;
+  dueDate: string;
+  /** Negative = past due. */
+  daysToDue: number;
+}
+
+export interface CreditCardSummary {
+  debtCents: number;
+  creditLimitCents: number | null;
+  /** limit − debt − unbilled MSI; null when the limit isn't tracked. */
+  availableCreditCents: number | null;
+  /** (debt + unbilled MSI) ÷ limit in basis points; null without a limit. */
+  utilizationBps: number | null;
+  nextCutDate: string;
+  daysToCut: number;
+  statement: CreditStatement;
+  nextAnniversary: string | null;
+  /** MSI amounts not yet billed — committed but not in the debt yet. */
+  pendingMsiCents: number;
+  msiPlans: MsiPlan[];
 }
 
 export type TransactionKind = "income" | "expense" | "transfer_in" | "transfer_out";
