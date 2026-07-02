@@ -1,19 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Archive,
-  ArchiveRestore,
-  ArrowLeftRight,
-  Pencil,
-  PiggyBank,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeftRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
+import { WalletCard } from "../../components/WalletCard";
 import {
   archiveWallet,
   deleteWallet,
@@ -158,26 +151,11 @@ export function WalletDetailPage() {
             </Button>
           </div>
           {apartados.length > 0 && (
-            <ul className="space-y-1.5">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] items-start gap-4">
               {apartados.map((a) => (
-                <li key={a.id}>
-                  <Link
-                    to={`/carteras/${a.id}`}
-                    className="flex items-center gap-2.5 rounded-xl border border-border-muted bg-surface-raised px-3.5 py-2.5 transition-colors hover:border-accent/40"
-                  >
-                    <span
-                      className="h-6 w-1 shrink-0 rounded-full"
-                      style={{ background: a.color ?? "var(--color-accent)" }}
-                    />
-                    <PiggyBank size={15} className="shrink-0 text-fg-subtle" />
-                    <span className="min-w-0 flex-1 truncate text-sm text-fg">{a.name}</span>
-                    <span className="shrink-0 text-sm font-medium tabular-nums text-fg">
-                      {formatCents(a.balanceCents, a.currencyCode)}
-                    </span>
-                  </Link>
-                </li>
+                <WalletCard key={a.id} wallet={a} />
               ))}
-            </ul>
+            </div>
           )}
         </div>
       )}
