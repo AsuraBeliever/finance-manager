@@ -157,9 +157,7 @@ export function WalletDetailPage() {
               </span>
             </Button>
           </div>
-          {apartados.length === 0 ? (
-            <p className="text-sm text-fg-subtle">{es.wallets.noApartados}</p>
-          ) : (
+          {apartados.length > 0 && (
             <ul className="space-y-1.5">
               {apartados.map((a) => (
                 <li key={a.id}>
