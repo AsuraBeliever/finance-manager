@@ -70,10 +70,14 @@ pub struct SimulationResult {
 /// Run the forward simulation, returning a monthly series plus headline totals.
 pub fn simulate(input: &SimulationInput) -> AppResult<SimulationResult> {
     if input.months < 0 {
-        return Err(AppError::InvalidInput("el plazo no puede ser negativo".into()));
+        return Err(AppError::InvalidInput(
+            "el plazo no puede ser negativo".into(),
+        ));
     }
     if input.annual_rate_bps < 0 {
-        return Err(AppError::InvalidInput("la tasa no puede ser negativa".into()));
+        return Err(AppError::InvalidInput(
+            "la tasa no puede ser negativa".into(),
+        ));
     }
     let i = input.annual_rate_bps as f64 / 10_000.0 / 12.0;
     let monthly_contrib = input.contribution_cents as f64 * input.cadence.monthly_multiple();

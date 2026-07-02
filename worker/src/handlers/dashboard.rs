@@ -169,7 +169,11 @@ pub async fn get_dashboard_summary(
     // (last day of the period), never projecting past today. Using the day before
     // the exclusive bounds also drops investments that only start on the boundary.
     let today = today_mx();
-    let inv_start = resolved.start.pred_opt().unwrap_or(resolved.start).min(today);
+    let inv_start = resolved
+        .start
+        .pred_opt()
+        .unwrap_or(resolved.start)
+        .min(today);
     let inv_end = resolved.end.pred_opt().unwrap_or(resolved.end).min(today);
 
     // End-of-period balances drive the wallet list, donut and by-currency totals.

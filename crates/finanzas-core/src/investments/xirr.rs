@@ -16,10 +16,7 @@ pub struct CashFlow {
 }
 
 fn npv(flows: &[(f64, f64)], rate: f64) -> f64 {
-    flows
-        .iter()
-        .map(|&(t, cf)| cf / (1.0 + rate).powf(t))
-        .sum()
+    flows.iter().map(|&(t, cf)| cf / (1.0 + rate).powf(t)).sum()
 }
 
 /// Annualized return as a fraction (0.10 = 10%), or `None` when it is
@@ -100,8 +97,14 @@ mod tests {
     fn simple_one_year_10_percent() {
         // Put in 1,000 today, worth 1,100 a year later → 10%.
         let r = xirr(&[
-            CashFlow { date: d(2025, 1, 1), amount_cents: -100_000 },
-            CashFlow { date: d(2026, 1, 1), amount_cents: 110_000 },
+            CashFlow {
+                date: d(2025, 1, 1),
+                amount_cents: -100_000,
+            },
+            CashFlow {
+                date: d(2026, 1, 1),
+                amount_cents: 110_000,
+            },
         ])
         .unwrap();
         assert!((r - 0.10).abs() < 1e-4, "rate {r}");
@@ -110,8 +113,14 @@ mod tests {
     #[test]
     fn doubling_in_one_year_is_100_percent() {
         let r = xirr(&[
-            CashFlow { date: d(2025, 1, 1), amount_cents: -100_000 },
-            CashFlow { date: d(2026, 1, 1), amount_cents: 200_000 },
+            CashFlow {
+                date: d(2025, 1, 1),
+                amount_cents: -100_000,
+            },
+            CashFlow {
+                date: d(2026, 1, 1),
+                amount_cents: 200_000,
+            },
         ])
         .unwrap();
         assert!((r - 1.0).abs() < 1e-4, "rate {r}");
@@ -123,9 +132,18 @@ mod tests {
         // Money-weighted return is positive and below the 20% a same-day double
         // would imply.
         let r = xirr(&[
-            CashFlow { date: d(2025, 1, 1), amount_cents: -100_000 },
-            CashFlow { date: d(2025, 7, 1), amount_cents: -100_000 },
-            CashFlow { date: d(2026, 1, 1), amount_cents: 220_000 },
+            CashFlow {
+                date: d(2025, 1, 1),
+                amount_cents: -100_000,
+            },
+            CashFlow {
+                date: d(2025, 7, 1),
+                amount_cents: -100_000,
+            },
+            CashFlow {
+                date: d(2026, 1, 1),
+                amount_cents: 220_000,
+            },
         ])
         .unwrap();
         assert!(r > 0.10 && r < 0.35, "rate {r}");
@@ -134,8 +152,14 @@ mod tests {
     #[test]
     fn no_sign_change_is_none() {
         assert!(xirr(&[
-            CashFlow { date: d(2025, 1, 1), amount_cents: -100_000 },
-            CashFlow { date: d(2026, 1, 1), amount_cents: -50_000 },
+            CashFlow {
+                date: d(2025, 1, 1),
+                amount_cents: -100_000
+            },
+            CashFlow {
+                date: d(2026, 1, 1),
+                amount_cents: -50_000
+            },
         ])
         .is_none());
     }

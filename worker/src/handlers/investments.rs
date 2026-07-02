@@ -1069,7 +1069,8 @@ pub struct Portfolio {
 pub async fn get_portfolio(db: &D1Database, uid: i64) -> AppResult<Portfolio> {
     let rates = load_rates(db, uid).await?;
     let as_of = today_mx();
-    let sql = format!("{INVESTMENT_SELECT} WHERE user_id = ?1 AND is_closed = 0 ORDER BY created_at, id");
+    let sql =
+        format!("{INVESTMENT_SELECT} WHERE user_id = ?1 AND is_closed = 0 ORDER BY created_at, id");
     let rows: Vec<InvestmentRow> = all(db, &sql, jsv![uid]).await?;
 
     let mut slices = Vec::with_capacity(rows.len());
