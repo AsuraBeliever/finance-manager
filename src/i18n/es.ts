@@ -339,6 +339,26 @@ export const esDict = {
     msiDeleteMessage:
       "También se eliminarán sus mensualidades ya cargadas en el historial. Esta acción no se puede deshacer.",
     msiInvalidMonths: "Los meses deben estar entre 2 y 60",
+    // Credit-card wallet form: initial balance becomes existing debt
+    initialDebt: "Deuda actual",
+    initialDebtHint:
+      "Lo que ya debes hoy en esta tarjeta (si la estrenas en ceros, déjalo vacío).",
+    // Live MSI schedule preview + save confirmation
+    msiPreviewLine: "≈ {monthly} al mes · primer cargo: {amount} el {date}",
+    msiPreviewBackdated:
+      "{n} mensualidades ya vencidas ({amount}) se cargarán de inmediato.",
+    msiSavedTitle: "Compra a meses registrada",
+    msiSavedBody:
+      "El primer cargo de {amount} se hará en tu corte del {first}; el último, el {last}. Cada mensualidad aparecerá sola en tu historial.",
+    msiSavedBackdated:
+      "Se cargaron de una vez {n} mensualidades ya vencidas por {amount}.",
+    // Paying the card via a transfer
+    payContext: "De tu último corte te faltan {amount} (págalo antes del {date}).",
+    payContextPaid: "Corte liquidado — este abono adelanta tu siguiente pago.",
+    paySavedTitle: "Pago registrado",
+    paySavedRemaining: "Te faltan {amount} para liquidar el corte antes del {date}.",
+    paySavedDone: "Corte liquidado: no se generarán intereses. 🎉",
+    understood: "Entendido",
   },
   install: {
     title: "Instalar app",

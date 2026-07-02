@@ -5,6 +5,7 @@ import type {
   CategoryBreakdown,
   CreditCardSummary,
   Currency,
+  MsiSchedulePreview,
   DashboardSummary,
   ExchangeRate,
   GoalInput,
@@ -147,8 +148,13 @@ export interface MsiPlanInput {
   categoryId: number | null;
 }
 
+/** Live schedule for the form ("≈ $X/mo · first charge on…"); no writes. */
+export const previewMsiPlan = (input: Omit<MsiPlanInput, "description" | "categoryId">) =>
+  rpc<MsiSchedulePreview>("preview_msi_plan", { ...input, description: "" });
+
+/** Returns the same schedule the preview shows, for the save confirmation. */
 export const createMsiPlan = (input: MsiPlanInput) =>
-  rpc<void>("create_msi_plan", { ...input });
+  rpc<MsiSchedulePreview>("create_msi_plan", { ...input });
 
 export const deleteMsiPlan = (id: number) => rpc<void>("delete_msi_plan", { id });
 

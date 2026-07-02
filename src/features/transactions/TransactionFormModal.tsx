@@ -7,16 +7,22 @@ import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import {
   createMsiPlan,
+  getCreditCardSummary,
   listTransactionCategories,
   listWallets,
   updateTransaction,
 } from "../../lib/api";
 import { submitOrQueue } from "../../lib/outbox";
-import { parseToCents } from "../../lib/money";
-import { todayIso } from "../../lib/date";
-import type { Transaction } from "../../lib/types";
+import { formatCents, parseToCents } from "../../lib/money";
+import { formatDayMonth, todayIso } from "../../lib/date";
+import type {
+  CreditCardSummary,
+  MsiSchedulePreview,
+  Transaction,
+} from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
+import { MsiPreviewLine, MsiSavedInfo, useMsiPreview } from "../wallets/msiSchedule";
 
 type Tab = "income" | "expense" | "transfer";
 
@@ -59,6 +65,13 @@ export function TransactionFormModal({
   const [date, setDate] = useState(todayIso());
   const [msiEnabled, setMsiEnabled] = useState(false);
   const [msiMonthsText, setMsiMonthsText] = useState("12");
+  // Saving an MSI plan or a card payment ends on a confirmation screen (the
+  // consequences happen later, at the cut), instead of closing silently.
+  const [saved, setSaved] = useState<
+    | { kind: "msi"; schedule: MsiSchedulePreview; currency: string }
+    | { kind: "payment"; summary: CreditCardSummary; currency: string }
+    | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,6 +81,7 @@ export function TransactionFormModal({
     setAmountToText("");
     setMsiEnabled(false);
     setMsiMonthsText("12");
+    setSaved(null);
     if (transaction) {
       // Edit mode: prefill from the existing income/expense.
       setTab(transaction.kind === "expense" ? "expense" : "income");
@@ -103,6 +117,26 @@ export function TransactionFormModal({
   // anywhere). Edits never convert to/from MSI.
   const isCreditWallet = !isEdit && tab === "expense" && fromWallet?.creditCutDay != null;
   const msiActive = isCreditWallet && msiEnabled;
+  const msiPreview = useMsiPreview(
+    fromWallet?.id,
+    amountText,
+    msiMonthsText,
+    date,
+    msiActive && !saved,
+  );
+
+  // Transferring INTO a configured credit card is paying it: show how the
+  // statement stands so the user knows how much clears it interest-free.
+  const effectiveToId =
+    toWalletId ?? walletList.find((w) => w.id !== (walletId ?? walletList[0]?.id))?.id;
+  const effectiveToWallet = walletList.find((w) => w.id === effectiveToId);
+  const payingCard =
+    !isEdit && tab === "transfer" && effectiveToWallet?.creditCutDay != null;
+  const cardSummary = useQuery({
+    queryKey: ["creditCard", effectiveToId],
+    queryFn: () => getCreditCardSummary(effectiveToId!),
+    enabled: payingCard,
+  });
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -155,15 +189,76 @@ export function TransactionFormModal({
         occurredAt: date,
       });
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["creditCard"] });
+      if (msiActive && data) {
+        setSaved({
+          kind: "msi",
+          schedule: data as MsiSchedulePreview,
+          currency: fromWallet?.currencyCode ?? "MXN",
+        });
+        return;
+      }
+      if (payingCard && effectiveToId !== undefined) {
+        // Re-read the statement AFTER the payment so the confirmation says
+        // where the card actually stands ("liquidado" / "te faltan $X").
+        try {
+          const summary = await getCreditCardSummary(effectiveToId);
+          setSaved({
+            kind: "payment",
+            summary,
+            currency: effectiveToWallet?.currencyCode ?? "MXN",
+          });
+          return;
+        } catch {
+          // Offline or transient failure: fall back to closing quietly.
+        }
+      }
       onClose();
     },
     onError: (e) => setError(e instanceof Error ? e.message : String(e)),
   });
+
+  if (saved) {
+    const closeAll = () => {
+      setSaved(null);
+      onClose();
+    };
+    const paymentLine =
+      saved.kind === "payment"
+        ? saved.summary.statement.remainingCents > 0
+          ? es.credit.paySavedRemaining
+              .replace(
+                "{amount}",
+                formatCents(saved.summary.statement.remainingCents, saved.currency),
+              )
+              .replace("{date}", formatDayMonth(saved.summary.statement.dueDate))
+          : es.credit.paySavedDone
+        : null;
+    return (
+      <Modal
+        title={saved.kind === "msi" ? es.credit.msiSavedTitle : es.credit.paySavedTitle}
+        open={open}
+        onClose={closeAll}
+      >
+        <div className="grid gap-4">
+          {saved.kind === "msi" ? (
+            <MsiSavedInfo preview={saved.schedule} currency={saved.currency} />
+          ) : (
+            <p className="rounded-lg bg-surface-overlay px-3 py-2.5 text-sm text-fg-muted">
+              {paymentLine}
+            </p>
+          )}
+          <div className="flex justify-end">
+            <Button onClick={closeAll}>{es.credit.understood}</Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -230,6 +325,24 @@ export function TransactionFormModal({
                   </option>
                 ))}
             </select>
+            {payingCard && cardSummary.data && (
+              <span className="mt-1 block text-xs text-fg-subtle">
+                {cardSummary.data.statement.remainingCents > 0
+                  ? es.credit.payContext
+                      .replace(
+                        "{amount}",
+                        formatCents(
+                          cardSummary.data.statement.remainingCents,
+                          effectiveToWallet?.currencyCode ?? "MXN",
+                        ),
+                      )
+                      .replace(
+                        "{date}",
+                        formatDayMonth(cardSummary.data.statement.dueDate),
+                      )
+                  : es.credit.payContextPaid}
+              </span>
+            )}
           </Field>
         )}
 
@@ -271,15 +384,21 @@ export function TransactionFormModal({
               </span>
             </label>
             {msiEnabled && (
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <Field label={es.credit.msiMonths}>
-                  <input
-                    className={inputClass}
-                    value={msiMonthsText}
-                    onChange={(e) => setMsiMonthsText(e.target.value)}
-                    inputMode="numeric"
-                  />
-                </Field>
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label={es.credit.msiMonths}>
+                    <input
+                      className={inputClass}
+                      value={msiMonthsText}
+                      onChange={(e) => setMsiMonthsText(e.target.value)}
+                      inputMode="numeric"
+                    />
+                  </Field>
+                </div>
+                <MsiPreviewLine
+                  preview={msiPreview}
+                  currency={fromWallet?.currencyCode ?? "MXN"}
+                />
               </div>
             )}
           </div>

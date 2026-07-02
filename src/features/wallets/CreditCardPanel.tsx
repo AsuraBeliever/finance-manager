@@ -15,19 +15,14 @@ import {
   listTransactionCategories,
   type MsiPlanInput,
 } from "../../lib/api";
-import { todayIso } from "../../lib/date";
+import { formatDayMonth, todayIso } from "../../lib/date";
 import { formatCents, parseToCents } from "../../lib/money";
-import type { MsiPlan, Wallet } from "../../lib/types";
+import type { MsiPlan, MsiSchedulePreview, Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
+import { MsiPreviewLine, MsiSavedInfo, useMsiPreview } from "./msiSchedule";
 
-/** Short locale-aware date like "5 jul" (year only when it differs). */
-function formatDay(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
-  if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
-  return d.toLocaleDateString(undefined, opts);
-}
+const formatDay = formatDayMonth;
 
 /** "hoy" / "mañana" / "en N días" for upcoming dates. */
 function inDays(days: number): string {
@@ -250,6 +245,7 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
       <MsiFormModal
         open={msiFormOpen}
         walletId={wallet.id}
+        currency={cur}
         onClose={() => setMsiFormOpen(false)}
         onSaved={invalidate}
       />
@@ -267,11 +263,13 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
 function MsiFormModal({
   open,
   walletId,
+  currency,
   onClose,
   onSaved,
 }: {
   open: boolean;
   walletId: number;
+  currency: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -280,7 +278,10 @@ function MsiFormModal({
   const [monthsText, setMonthsText] = useState("12");
   const [purchasedAt, setPurchasedAt] = useState(todayIso());
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [saved, setSaved] = useState<MsiSchedulePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const preview = useMsiPreview(walletId, totalText, monthsText, purchasedAt, open && !saved);
 
   const categories = useQuery({
     queryKey: ["transactionCategories"],
@@ -292,9 +293,11 @@ function MsiFormModal({
 
   const mutation = useMutation({
     mutationFn: (input: MsiPlanInput) => createMsiPlan(input),
-    onSuccess: () => {
+    // Instead of closing silently, show what was scheduled: the plan posts
+    // nothing until each cut date, so this is the user's only feedback.
+    onSuccess: (schedule) => {
       onSaved();
-      onClose();
+      setSaved(schedule);
       setDescription("");
       setTotalText("");
       setMonthsText("12");
@@ -304,6 +307,11 @@ function MsiFormModal({
     },
     onError: (e) => setError(String(e)),
   });
+
+  const closeAll = () => {
+    setSaved(null);
+    onClose();
+  };
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -325,6 +333,19 @@ function MsiFormModal({
       purchasedAt,
       categoryId,
     });
+  }
+
+  if (saved) {
+    return (
+      <Modal title={es.credit.msiSavedTitle} open={open} onClose={closeAll}>
+        <div className="grid gap-4">
+          <MsiSavedInfo preview={saved} currency={currency} />
+          <div className="flex justify-end">
+            <Button onClick={closeAll}>{es.credit.understood}</Button>
+          </div>
+        </div>
+      </Modal>
+    );
   }
 
   return (
@@ -374,6 +395,7 @@ function MsiFormModal({
             {es.credit.msiBackdatedHint}
           </span>
         </Field>
+        <MsiPreviewLine preview={preview} currency={currency} />
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>

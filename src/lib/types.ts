@@ -65,6 +65,20 @@ export interface MsiPlan {
   categoryId: number | null;
 }
 
+/** What an MSI plan will bill and when — the live form preview and the
+ *  save confirmation share this payload. */
+export interface MsiSchedulePreview {
+  /** The regular installment (the first also carries the cent remainder). */
+  monthlyCents: number;
+  firstChargeCents: number;
+  firstChargeDate: string;
+  lastChargeDate: string;
+  months: number;
+  /** Installments already due (back-dated purchase) that post immediately. */
+  alreadyBilledMonths: number;
+  alreadyBilledCents: number;
+}
+
 /** The last closed statement of a credit card and how it stands today. */
 export interface CreditStatement {
   cutDate: string;

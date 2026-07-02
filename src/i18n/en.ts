@@ -333,6 +333,26 @@ export const en: Dict = {
     msiDeleteMessage:
       "Its already-posted installments will be removed from the history too. This cannot be undone.",
     msiInvalidMonths: "Months must be between 2 and 60",
+    // Credit-card wallet form: initial balance becomes existing debt
+    initialDebt: "Current debt",
+    initialDebtHint:
+      "What you already owe on this card today (leave it empty if it starts at zero).",
+    // Live MSI schedule preview + save confirmation
+    msiPreviewLine: "≈ {monthly}/mo · first charge: {amount} on {date}",
+    msiPreviewBackdated:
+      "{n} already-due installments ({amount}) will post immediately.",
+    msiSavedTitle: "Installment purchase registered",
+    msiSavedBody:
+      "The first charge of {amount} will post on your {first} cut-off; the last one on {last}. Each installment will show up in your history on its own.",
+    msiSavedBackdated:
+      "{n} already-due installments were posted right away for {amount}.",
+    // Paying the card via a transfer
+    payContext: "You still owe {amount} from your last statement (pay it before {date}).",
+    payContextPaid: "Statement paid off — this payment gets ahead of your next one.",
+    paySavedTitle: "Payment registered",
+    paySavedRemaining: "You still need {amount} to pay off the statement before {date}.",
+    paySavedDone: "Statement paid off: no interest will accrue. 🎉",
+    understood: "Got it",
   },
   install: {
     title: "Install app",

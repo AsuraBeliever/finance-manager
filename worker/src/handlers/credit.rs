@@ -226,6 +226,41 @@ pub async fn get_credit_card_summary(
     })
 }
 
+/// What an MSI plan will bill and when — shown live while typing and as the
+/// save confirmation, so registering a plan never feels like a silent no-op.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MsiSchedulePreview {
+    /// The regular installment (the first also carries the cent remainder).
+    pub monthly_cents: i64,
+    pub first_charge_cents: i64,
+    pub first_charge_date: String,
+    pub last_charge_date: String,
+    pub months: i64,
+    /// Installments already due (back-dated purchase) that post immediately.
+    pub already_billed_months: i64,
+    pub already_billed_cents: i64,
+}
+
+fn schedule_preview(
+    total_cents: i64,
+    months: i64,
+    purchased: NaiveDate,
+    cut_day: u32,
+    today: NaiveDate,
+) -> MsiSchedulePreview {
+    let billed = msi_installments_due(purchased, cut_day, months as u32, today) as i64;
+    MsiSchedulePreview {
+        monthly_cents: total_cents / months,
+        first_charge_cents: msi_installment_cents(total_cents, months, 1),
+        first_charge_date: msi_installment_date(purchased, cut_day, 1).to_string(),
+        last_charge_date: msi_installment_date(purchased, cut_day, months as u32).to_string(),
+        months,
+        already_billed_months: billed,
+        already_billed_cents: billed_cents(total_cents, months, billed),
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateMsiPlanArgs {
@@ -240,29 +275,33 @@ pub struct CreateMsiPlanArgs {
     pub category_id: Option<i64>,
 }
 
-pub async fn create_msi_plan(db: &D1Database, uid: i64, a: CreateMsiPlanArgs) -> AppResult<()> {
-    if a.description.trim().is_empty() {
-        return Err(AppError::InvalidInput(
-            "la descripción es obligatoria".into(),
-        ));
-    }
-    if a.total_cents <= 0 {
+/// Shared validation for preview + create: the wallet must be the caller's
+/// credit card and the plan must be a sane, non-future purchase.
+async fn validate_msi(
+    db: &D1Database,
+    uid: i64,
+    wallet_id: i64,
+    total_cents: i64,
+    months: i64,
+    purchased_at: Option<&str>,
+) -> AppResult<(u32, NaiveDate, NaiveDate)> {
+    if total_cents <= 0 {
         return Err(AppError::InvalidInput(
             "el monto debe ser mayor a cero".into(),
         ));
     }
-    if !(2..=MAX_MSI_MONTHS).contains(&a.months) {
+    if !(2..=MAX_MSI_MONTHS).contains(&months) {
         return Err(AppError::InvalidInput(format!(
             "los meses deben estar entre 2 y {MAX_MSI_MONTHS}"
         )));
     }
-    let wallet = fetch_wallet(db, uid, a.wallet_id).await?;
+    let wallet = fetch_wallet(db, uid, wallet_id).await?;
     let cut_day = wallet
         .credit_cut_day
         .ok_or_else(|| AppError::InvalidInput("la cartera no es tarjeta de crédito".into()))?
         as u32;
     let today = today_mx();
-    let purchased = match &a.purchased_at {
+    let purchased = match purchased_at {
         Some(s) => parse_date(s, "fecha de compra")?,
         None => today,
     };
@@ -271,6 +310,52 @@ pub async fn create_msi_plan(db: &D1Database, uid: i64, a: CreateMsiPlanArgs) ->
             "la fecha de compra no puede ser futura".into(),
         ));
     }
+    Ok((cut_day, purchased, today))
+}
+
+/// Live "what will this bill" line for the forms — no writes.
+pub async fn preview_msi_plan(
+    db: &D1Database,
+    uid: i64,
+    a: CreateMsiPlanArgs,
+) -> AppResult<MsiSchedulePreview> {
+    let (cut_day, purchased, today) = validate_msi(
+        db,
+        uid,
+        a.wallet_id,
+        a.total_cents,
+        a.months,
+        a.purchased_at.as_deref(),
+    )
+    .await?;
+    Ok(schedule_preview(
+        a.total_cents,
+        a.months,
+        purchased,
+        cut_day,
+        today,
+    ))
+}
+
+pub async fn create_msi_plan(
+    db: &D1Database,
+    uid: i64,
+    a: CreateMsiPlanArgs,
+) -> AppResult<MsiSchedulePreview> {
+    if a.description.trim().is_empty() {
+        return Err(AppError::InvalidInput(
+            "la descripción es obligatoria".into(),
+        ));
+    }
+    let (cut_day, purchased, today) = validate_msi(
+        db,
+        uid,
+        a.wallet_id,
+        a.total_cents,
+        a.months,
+        a.purchased_at.as_deref(),
+    )
+    .await?;
 
     let res = crate::db::exec(
         db,
@@ -298,7 +383,14 @@ pub async fn create_msi_plan(db: &D1Database, uid: i64, a: CreateMsiPlanArgs) ->
     // A back-dated plan may already have billed installments — post them now
     // instead of waiting for tonight's cron.
     let fallback = msi_category(db).await?;
-    post_plan_installments(db, &plan, a.wallet_id, cut_day, fallback, today).await
+    post_plan_installments(db, &plan, a.wallet_id, cut_day, fallback, today).await?;
+    Ok(schedule_preview(
+        a.total_cents,
+        a.months,
+        purchased,
+        cut_day,
+        today,
+    ))
 }
 
 #[derive(Deserialize)]

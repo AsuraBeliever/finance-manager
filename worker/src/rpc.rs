@@ -83,6 +83,7 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "get_credit_card_summary" => {
             out(credit::get_credit_card_summary(db, uid, args(body)?).await?)
         }
+        "preview_msi_plan" => out(credit::preview_msi_plan(db, uid, args(body)?).await?),
         "create_msi_plan" => out(credit::create_msi_plan(db, uid, args(body)?).await?),
         "delete_msi_plan" => out(credit::delete_msi_plan(db, uid, args(body)?).await?),
 

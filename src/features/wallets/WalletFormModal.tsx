@@ -137,7 +137,15 @@ export function WalletFormModal({
     setName(wallet?.name ?? "");
     setCategoryId(wallet?.categoryId ?? null);
     setCurrencyCode(wallet?.currencyCode ?? "MXN");
-    setBalanceText(wallet ? (wallet.initialBalanceCents / 100).toFixed(2) : "");
+    // Credit cards store existing debt as a negative initial balance; the
+    // form always shows it as the positive "what I owe" number.
+    setBalanceText(
+      wallet
+        ? wallet.categoryName === "Tarjeta de crédito"
+          ? (Math.max(0, -wallet.initialBalanceCents) / 100).toFixed(2)
+          : (wallet.initialBalanceCents / 100).toFixed(2)
+        : "",
+    );
     setParentWalletId(wallet?.parentWalletId ?? null);
     setSkin(wallet?.skin ?? null);
     setCustomColor(skinAccent(wallet?.skin) ?? wallet?.color ?? COLORS[0]);
@@ -220,6 +228,8 @@ export function WalletFormModal({
       setError(es.wallets.invalidAmount);
       return;
     }
+    // On a credit card the field is "current debt", stored as negative balance.
+    const initialBalanceCents = isCreditCategory ? -cents : cents;
     let yieldRateBps: number | null = null;
     if (yieldEnabled) {
       const pct = parseFloat(yieldRateText.replace(",", "."));
@@ -272,7 +282,7 @@ export function WalletFormModal({
       name,
       categoryId: finalCategory,
       currencyCode,
-      initialBalanceCents: cents,
+      initialBalanceCents,
       color: skinAccent(effectiveSkin(skin, catName)) ?? COLORS[0],
       skin,
       notes: notes.trim() === "" ? null : notes.trim(),
@@ -395,8 +405,13 @@ export function WalletFormModal({
             )}
           </p>
         ) : (
-          <Field label={es.wallets.initialBalance}>
+          <Field label={isCreditCategory ? es.credit.initialDebt : es.wallets.initialBalance}>
             <MoneyInput value={balanceText} onChange={setBalanceText} />
+            {isCreditCategory && (
+              <span className="mt-1 block text-xs text-fg-subtle">
+                {es.credit.initialDebtHint}
+              </span>
+            )}
           </Field>
         )}
 

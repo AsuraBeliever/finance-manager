@@ -72,7 +72,7 @@ puente Tauri original), respuesta JSON o `{"error": "..."}` (400/401/404/500).
 | Área | Comandos |
 |---|---|
 | Carteras | `list_wallets`, `get_wallet`, `create_wallet`, `update_wallet`, `archive_wallet`, `delete_wallet`, `list_wallet_categories` |
-| Tarjetas de crédito | `get_credit_card_summary` (deuda, saldo al corte, por pagar, fecha límite, utilización, crédito disponible, MSI), `create_msi_plan`, `delete_msi_plan` — lógica de calendario en `finanzas-core::credit`; el cron postea las mensualidades MSI |
+| Tarjetas de crédito | `get_credit_card_summary` (deuda, saldo al corte, por pagar, fecha límite, utilización, crédito disponible, MSI), `preview_msi_plan` (calendario en vivo para el form), `create_msi_plan` (devuelve el mismo calendario para la confirmación), `delete_msi_plan` — lógica de calendario en `finanzas-core::credit`; el cron postea las mensualidades MSI |
 | Transacciones | `add_income`, `add_expense`, `add_transfer` (los tres aceptan `clientId` opcional para idempotencia del outbox offline), `list_transactions`, `delete_transaction`, `list_transaction_categories`, `create_transaction_category` |
 | Dashboard | `get_dashboard_summary` (foto del momento: saldos, donas, inversiones) |
 | Analytics | `get_spending_trends`, `get_category_breakdown` — ambos aceptan `period` (`{kind}`: `currentMonth` \| `lastMonths{months}` \| `month{year,month}` \| `day{date}` \| `range{from,to}`); la ventana se resuelve en `finanzas-core::period` |
