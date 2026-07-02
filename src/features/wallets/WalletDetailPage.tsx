@@ -20,6 +20,7 @@ import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 import { TransactionFormModal } from "../transactions/TransactionFormModal";
 import { TransactionList } from "../transactions/TransactionList";
+import { CreditCardPanel } from "./CreditCardPanel";
 import { WalletFormModal } from "./WalletFormModal";
 
 export function WalletDetailPage() {
@@ -137,6 +138,9 @@ export function WalletDetailPage() {
         </p>
         {w.notes && <p className="mt-2 text-sm text-fg-muted">{w.notes}</p>}
       </div>
+
+      {/* Statement panel + MSI — only when this wallet is a credit card. */}
+      {w.creditCutDay != null && <CreditCardPanel wallet={w} />}
 
       {/* Apartados (pockets) of this wallet — only for top-level wallets, since
           apartados stay one level deep. */}

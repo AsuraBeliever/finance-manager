@@ -143,7 +143,10 @@ pub async fn list_subscriptions(
     let mut charged_mxn: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
     let mut monthly_total_mxn_cents = 0i64;
     for c in charges {
-        let mxn = to_mxn(c.total_cents, rates.get(&c.currency_code).copied().unwrap_or(0));
+        let mxn = to_mxn(
+            c.total_cents,
+            rates.get(&c.currency_code).copied().unwrap_or(0),
+        );
         *charged_mxn.entry(c.subscription_id).or_insert(0) += mxn;
         monthly_total_mxn_cents += mxn;
     }

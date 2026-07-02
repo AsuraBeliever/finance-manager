@@ -132,7 +132,12 @@ fn build(r: GoalRow, today: NaiveDate) -> SavingsGoal {
         linked_wallet_id: r.linked_wallet_id,
         target_date: r.target_date,
         cadence: r.contribution_cadence,
-        goal_kind: if r.goal_kind == "fund" { "fund" } else { "purchase" }.into(),
+        goal_kind: if r.goal_kind == "fund" {
+            "fund"
+        } else {
+            "purchase"
+        }
+        .into(),
         plan,
         is_behind,
     }
@@ -253,7 +258,9 @@ fn validate(input: &GoalInput) -> AppResult<()> {
         return Err(AppError::InvalidInput("la meta debe ser positiva".into()));
     }
     if input.wallet_id.is_none() {
-        return Err(AppError::InvalidInput("elige una cartera para la meta".into()));
+        return Err(AppError::InvalidInput(
+            "elige una cartera para la meta".into(),
+        ));
     }
     Ok(())
 }
@@ -592,12 +599,26 @@ pub async fn convert_goal_to_wallet(db: &D1Database, uid: i64, a: ConvertArgs) -
             stmt(
                 db,
                 insert,
-                jsv![src_id, "transfer_out", goal.saved_cents, group, goal.name, today],
+                jsv![
+                    src_id,
+                    "transfer_out",
+                    goal.saved_cents,
+                    group,
+                    goal.name,
+                    today
+                ],
             )?,
             stmt(
                 db,
                 insert,
-                jsv![new_id, "transfer_in", goal.saved_cents, group, goal.name, today],
+                jsv![
+                    new_id,
+                    "transfer_in",
+                    goal.saved_cents,
+                    group,
+                    goal.name,
+                    today
+                ],
             )?,
             stmt(
                 db,

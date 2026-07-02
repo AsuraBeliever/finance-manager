@@ -4,6 +4,7 @@
 //! the calculators from here.
 
 pub mod budget;
+pub mod credit;
 pub mod error;
 pub mod goals;
 pub mod investments;

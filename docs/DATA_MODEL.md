@@ -105,8 +105,24 @@ CREATE TABLE wallets (
   yield_frequency TEXT,          -- 'weekly' | 'biweekly' | 'monthly'
   yield_anchor_date TEXT,        -- 'YYYY-MM-DD' día en que se activó
   yield_last_paid_date TEXT,     -- 'YYYY-MM-DD' fin del último periodo abonado
+  credit_cut_day INTEGER,        -- migración 0027; 1-31 = tarjeta de crédito, NULL = cartera normal
+  credit_due_days INTEGER,       -- días después del corte para pagar sin intereses (~20 en MX)
+  credit_limit_cents INTEGER,    -- línea de crédito; NULL = sin registrar
+  credit_anniversary TEXT,       -- 'MM-DD' cobro de anualidad; NULL = sin registrar
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Compras a meses sin intereses de una tarjeta de crédito (migración 0027).
+CREATE TABLE msi_plans (
+  id INTEGER PRIMARY KEY,
+  wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  total_cents INTEGER NOT NULL CHECK (total_cents > 0),
+  months INTEGER NOT NULL CHECK (months > 1),
+  purchased_at TEXT NOT NULL,    -- 'YYYY-MM-DD'
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_msi_wallet ON msi_plans(wallet_id);
 
 CREATE TABLE transaction_categories (
   id INTEGER PRIMARY KEY,
@@ -363,3 +379,4 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
 - **wallets.sort_order** (migración 0007): orden de despliegue definido por el usuario (arrastrar para reordenar). Menor = primero; empates por `created_at, id`. Carteras nuevas van al final (`MAX(sort_order)+1`). `reorder_wallets` reescribe el `sort_order` de cada id según su índice (batch atómico, scoped por usuario).
 
 - **carteras con rendimiento** (migración 0012): una cartera normal (no inversión) cuyo saldo crece solo, como las cuentas Klar/Nu que pagan interés diario con abono periódico. Activarla fija `yield_rate_bps` (>0), `yield_frequency` y `yield_anchor_date`/`yield_last_paid_date` = hoy (sin retroactivo). El cron diario (`handlers::wallet_yield::accrue_yield`) recorre cada cartera activa y, por cada periodo vencido, inserta UNA transacción `income` (categoría semilla *Intereses*) y avanza `yield_last_paid_date`. Idempotente: `client_id = yield:<wallet>:<fin-periodo>` (índice único) + el cursor solo avanza. La fórmula (interés compuesto diario ACT/365, misma convención que la cajita Nu) es pura en `finanzas_core::wallet_yield` con tests. El saldo sigue siendo calculado (initial + Σ transacciones); los abonos son transacciones reales, editables/borrables.
+- **tarjetas de crédito** (migración 0027): `credit_cut_day` (1-31) marca la cartera como tarjeta — los gastos vuelven el saldo negativo (deuda = −saldo) y pagarla es una transferencia normal desde una cartera de débito. Todo lo derivado es puro en `finanzas_core::credit` (fechas de corte con clamp a fin de mes, fecha límite = corte + `credit_due_days`, calendario MSI) y se arma en `get_credit_card_summary`: **saldo al corte** = deuda al día del último corte; **por pagar del corte** = saldo al corte − abonos (income/transfer_in) posteriores al corte; **utilización** = deuda ÷ límite; **crédito disponible** = límite − deuda − MSI aún no facturado. Convención: el corte cierra al final de su día (una transacción fechada el día del corte pertenece al estado que cierra ese día). **MSI** (`msi_plans`): el plan NO es una transacción; el cron diario postea un gasto por mensualidad en cada fecha de corte (`client_id = msi:<plan>:<n>`, idempotente), con el remanente de centavos en la primera. Así la deuda refleja lo facturado (como el estado de cuenta) y lo no facturado igual resta crédito disponible. Borrar un plan borra sus gastos posteados (batch).

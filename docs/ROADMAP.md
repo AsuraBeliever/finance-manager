@@ -11,3 +11,4 @@ Ideas ordenadas por valor estimado. Ninguna está comprometida.
 - **Vincular inversión a cartera**: al cerrar una inversión, generar automáticamente la transferencia del rendimiento a la cartera ligada (`linked_wallet_id`).
 - **Reportes**: vista mensual/anual con tendencias por categoría.
 - **CETES reinversión**: opción de reinvertir al vencimiento encadenando inversiones.
+- **Motor de notificaciones** (acordado 2026-07-01, siguiente milestone): cron diario evalúa reglas y genera avisos por tres canales — campanita in-app, push (Web Push; iOS PWA 16.4+) y correo. Ajustes → Notificaciones por tema, todo apagado por defecto: tarjetas (N días antes del corte, antes de la fecha límite, utilización > X%), metas (recordatorio de abono con frecuencia elegible, atraso vs fecha límite, meta cumplida), suscripciones (cobro próximo). Interruptor por canal por tema.

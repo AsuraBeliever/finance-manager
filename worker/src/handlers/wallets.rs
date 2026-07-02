@@ -22,7 +22,9 @@ const WALLET_SELECT: &str = "
                      WHERE g.linked_wallet_id = w.id AND g.archived_at IS NULL), 0)
              AS reserved_cents,
            w.color, w.skin, w.notes, w.parent_wallet_id, w.is_archived,
-           w.yield_rate_bps, w.yield_frequency, w.yield_anchor_date, w.created_at
+           w.yield_rate_bps, w.yield_frequency, w.yield_anchor_date,
+           w.credit_cut_day, w.credit_due_days, w.credit_limit_cents,
+           w.credit_anniversary, w.created_at
     FROM wallets w
     JOIN wallet_categories wc ON wc.id = w.category_id";
 
@@ -46,6 +48,14 @@ struct WalletRow {
     yield_rate_bps: Option<i64>,
     yield_frequency: Option<String>,
     yield_anchor_date: Option<String>,
+    #[serde(default)]
+    credit_cut_day: Option<i64>,
+    #[serde(default)]
+    credit_due_days: Option<i64>,
+    #[serde(default)]
+    credit_limit_cents: Option<i64>,
+    #[serde(default)]
+    credit_anniversary: Option<String>,
     created_at: String,
 }
 
@@ -68,6 +78,10 @@ impl From<WalletRow> for Wallet {
             yield_rate_bps: r.yield_rate_bps,
             yield_frequency: r.yield_frequency,
             yield_anchor_date: r.yield_anchor_date,
+            credit_cut_day: r.credit_cut_day,
+            credit_due_days: r.credit_due_days,
+            credit_limit_cents: r.credit_limit_cents,
+            credit_anniversary: r.credit_anniversary,
             created_at: r.created_at,
         }
     }
@@ -113,6 +127,56 @@ fn validate(name: &str) -> AppResult<()> {
         return Err(AppError::InvalidInput("el nombre es obligatorio".into()));
     }
     Ok(())
+}
+
+/// Credit-card config as stored: (cut_day, due_days, limit, anniversary).
+/// The cut day is the discriminator — without it the wallet is a plain one and
+/// every other credit field is dropped. Effective due_days defaults at read
+/// time, not here, so the column reflects what the user actually typed.
+type CreditConfig = (Option<i64>, Option<i64>, Option<i64>, Option<String>);
+
+fn validate_credit(
+    cut_day: Option<i64>,
+    due_days: Option<i64>,
+    limit_cents: Option<i64>,
+    anniversary: Option<&str>,
+) -> AppResult<CreditConfig> {
+    let Some(day) = cut_day else {
+        return Ok((None, None, None, None));
+    };
+    if !(1..=31).contains(&day) {
+        return Err(AppError::InvalidInput(
+            "el día de corte debe estar entre 1 y 31".into(),
+        ));
+    }
+    if let Some(d) = due_days {
+        if !(1..=60).contains(&d) {
+            return Err(AppError::InvalidInput(
+                "los días para pagar deben estar entre 1 y 60".into(),
+            ));
+        }
+    }
+    if let Some(l) = limit_cents {
+        if l <= 0 {
+            return Err(AppError::InvalidInput(
+                "el límite de crédito debe ser mayor a cero".into(),
+            ));
+        }
+    }
+    let anniversary = match anniversary.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(s) => {
+            // 'MM-DD'; reuse the pure parser so stored values always resolve.
+            let today = crate::db::today_mx();
+            if finanzas_core::credit::next_anniversary(today, s).is_none() {
+                return Err(AppError::InvalidInput(
+                    "la fecha de anualidad debe ser MM-DD".into(),
+                ));
+            }
+            Some(s.to_string())
+        }
+        None => None,
+    };
+    Ok((Some(day), due_days, limit_cents, anniversary))
 }
 
 #[derive(Deserialize)]
@@ -165,10 +229,24 @@ pub struct CreateWalletArgs {
     pub yield_frequency: Option<String>,
     #[serde(default)]
     pub parent_wallet_id: Option<i64>,
+    #[serde(default)]
+    pub credit_cut_day: Option<i64>,
+    #[serde(default)]
+    pub credit_due_days: Option<i64>,
+    #[serde(default)]
+    pub credit_limit_cents: Option<i64>,
+    #[serde(default)]
+    pub credit_anniversary: Option<String>,
 }
 
 pub async fn create_wallet(db: &D1Database, uid: i64, a: CreateWalletArgs) -> AppResult<Wallet> {
     validate(&a.name)?;
+    let (cut_day, due_days, limit_cents, anniversary) = validate_credit(
+        a.credit_cut_day,
+        a.credit_due_days,
+        a.credit_limit_cents,
+        a.credit_anniversary.as_deref(),
+    )?;
     // When yield is on, accrual starts today — no retroactive interest.
     let (rate_bps, frequency, anchor) =
         match validate_yield(a.yield_rate_bps, a.yield_frequency.as_deref())? {
@@ -182,11 +260,12 @@ pub async fn create_wallet(db: &D1Database, uid: i64, a: CreateWalletArgs) -> Ap
     let res = exec(
         db,
         "INSERT INTO wallets (user_id, name, category_id, currency_code, initial_balance_cents, color, skin, notes,
-                              parent_wallet_id, yield_rate_bps, yield_frequency, yield_anchor_date, yield_last_paid_date, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12,
+                              parent_wallet_id, yield_rate_bps, yield_frequency, yield_anchor_date, yield_last_paid_date,
+                              credit_cut_day, credit_due_days, credit_limit_cents, credit_anniversary, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13, ?14, ?15, ?16,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM wallets WHERE user_id = ?1), 0))",
         jsv![uid, a.name.trim(), a.category_id, a.currency_code, a.initial_balance_cents, a.color, a.skin, a.notes,
-             a.parent_wallet_id, rate_bps, frequency, anchor],
+             a.parent_wallet_id, rate_bps, frequency, anchor, cut_day, due_days, limit_cents, anniversary],
     )
     .await?;
     fetch_wallet(db, uid, last_row_id(&res)?).await
@@ -207,11 +286,25 @@ pub struct UpdateWalletArgs {
     pub yield_frequency: Option<String>,
     #[serde(default)]
     pub parent_wallet_id: Option<i64>,
+    #[serde(default)]
+    pub credit_cut_day: Option<i64>,
+    #[serde(default)]
+    pub credit_due_days: Option<i64>,
+    #[serde(default)]
+    pub credit_limit_cents: Option<i64>,
+    #[serde(default)]
+    pub credit_anniversary: Option<String>,
 }
 
 pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> AppResult<Wallet> {
     validate(&a.name)?;
     let yield_on = validate_yield(a.yield_rate_bps, a.yield_frequency.as_deref())?;
+    let (cut_day, due_days, limit_cents, anniversary) = validate_credit(
+        a.credit_cut_day,
+        a.credit_due_days,
+        a.credit_limit_cents,
+        a.credit_anniversary.as_deref(),
+    )?;
     // Turning yield on for the first time stamps today as the anchor; an already
     // running wallet keeps its anchor/last-paid (COALESCE) so its history is
     // untouched. Turning it off clears everything but leaves posted interest.
@@ -225,7 +318,9 @@ pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> Ap
              yield_anchor_date = CASE WHEN ?10 IS NULL THEN NULL
                                       ELSE COALESCE(yield_anchor_date, ?12) END,
              yield_last_paid_date = CASE WHEN ?10 IS NULL THEN NULL
-                                         ELSE COALESCE(yield_last_paid_date, ?12) END
+                                         ELSE COALESCE(yield_last_paid_date, ?12) END,
+             credit_cut_day = ?14, credit_due_days = ?15,
+             credit_limit_cents = ?16, credit_anniversary = ?17
          WHERE id = ?1 AND user_id = ?2",
         jsv![
             a.id,
@@ -240,7 +335,11 @@ pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> Ap
             yield_on.as_ref().map(|(bps, _)| *bps),
             yield_on.as_ref().map(|(_, freq)| freq.clone()),
             crate::db::today_mx().to_string(),
-            a.parent_wallet_id
+            a.parent_wallet_id,
+            cut_day,
+            due_days,
+            limit_cents,
+            anniversary
         ],
     )
     .await?;

@@ -3,6 +3,7 @@ import type {
   Budget,
   CalculatorId,
   CategoryBreakdown,
+  CreditCardSummary,
   Currency,
   DashboardSummary,
   ExchangeRate,
@@ -102,6 +103,14 @@ export interface WalletInput {
   yieldFrequency: string | null;
   /** Parent wallet to nest under as an apartado, or null for standalone. */
   parentWalletId: number | null;
+  /** Day of month (1-31) the statement closes; null = not a credit card. */
+  creditCutDay: number | null;
+  /** Days after the cut to pay without interest (null = default 20). */
+  creditDueDays: number | null;
+  /** Credit line in cents, or null when untracked. */
+  creditLimitCents: number | null;
+  /** 'MM-DD' the bank charges the annual fee, or null when untracked. */
+  creditAnniversary: string | null;
 }
 
 export const listWallets = (includeArchived = false) =>
@@ -123,6 +132,23 @@ export const reorderWallets = (ids: number[]) =>
   rpc<void>("reorder_wallets", { ids });
 
 export const deleteWallet = (id: number) => rpc<void>("delete_wallet", { id });
+
+export const getCreditCardSummary = (walletId: number) =>
+  rpc<CreditCardSummary>("get_credit_card_summary", { walletId });
+
+export interface MsiPlanInput {
+  walletId: number;
+  description: string;
+  totalCents: number;
+  months: number;
+  /** 'YYYY-MM-DD'; omitted = today. Back-dated plans post due charges at once. */
+  purchasedAt: string | null;
+}
+
+export const createMsiPlan = (input: MsiPlanInput) =>
+  rpc<void>("create_msi_plan", { ...input });
+
+export const deleteMsiPlan = (id: number) => rpc<void>("delete_msi_plan", { id });
 
 export interface SimpleTxInput {
   walletId: number;

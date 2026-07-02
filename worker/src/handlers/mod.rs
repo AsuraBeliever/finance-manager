@@ -1,5 +1,6 @@
 pub mod analytics;
 pub mod budgets;
+pub mod credit;
 pub mod dashboard;
 pub mod goals;
 pub mod investments;
