@@ -276,10 +276,10 @@ export const en: Dict = {
     invalidAmount: "Invalid amount",
   },
   credit: {
-    // Wallet form
-    enable: "This is a credit card",
-    enableHint:
-      "Track your cut-off day and payment deadline. Spending becomes debt; paying the card is a transfer from another wallet.",
+    // Wallet form (shown when the wallet's category is "Tarjeta de crédito")
+    formHint:
+      "Set your cut-off day to activate the debt, statement and MSI panel. Spending becomes debt; paying the card is a transfer from another wallet.",
+    cutDayNeeded: "Set the cut-off day to save the card details",
     cutDay: "Cut-off day",
     cutDayHint: "The day of the month your bank closes the cycle.",
     dueDays: "Days to pay",

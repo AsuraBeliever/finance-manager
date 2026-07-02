@@ -282,10 +282,10 @@ export const esDict = {
     invalidAmount: "Monto inválido",
   },
   credit: {
-    // Wallet form
-    enable: "Es tarjeta de crédito",
-    enableHint:
-      "Registra tu día de corte y fecha límite. Los gastos se vuelven deuda; pagar la tarjeta es una transferencia desde otra cartera.",
+    // Wallet form (shown when the wallet's category is "Tarjeta de crédito")
+    formHint:
+      "Registra tu día de corte para activar el panel de deuda, saldo al corte y MSI. Los gastos se vuelven deuda; pagar la tarjeta es una transferencia desde otra cartera.",
+    cutDayNeeded: "Registra el día de corte para guardar los datos de tarjeta",
     cutDay: "Día de corte",
     cutDayHint: "El día del mes en que el banco cierra tu periodo.",
     dueDays: "Días para pagar",
