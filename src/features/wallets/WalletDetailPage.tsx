@@ -4,16 +4,23 @@ import {
   ArchiveRestore,
   ArrowLeftRight,
   Pencil,
+  PiggyBank,
   Plus,
   Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
-import { archiveWallet, deleteWallet, getWallet, listTransactions } from "../../lib/api";
+import {
+  archiveWallet,
+  deleteWallet,
+  getWallet,
+  listTransactions,
+  listWallets,
+} from "../../lib/api";
 import type { Transaction } from "../../lib/types";
 import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
@@ -31,12 +38,17 @@ export function WalletDetailPage() {
   const [txFormOpen, setTxFormOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [addApartadoOpen, setAddApartadoOpen] = useState(false);
 
   const wallet = useQuery({
     queryKey: ["wallets", walletId],
     queryFn: () => getWallet(walletId),
     enabled: Number.isFinite(walletId),
   });
+
+  // This wallet's apartados (pockets nested under it).
+  const allWallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
+  const apartados = (allWallets.data ?? []).filter((x) => x.parentWalletId === walletId);
 
   const transactions = useQuery({
     queryKey: ["transactions", { walletId }],
@@ -50,6 +62,14 @@ export function WalletDetailPage() {
         ? new Map([[wallet.data.id, wallet.data.currencyCode]])
         : undefined,
     [wallet.data],
+  );
+
+  const wd = wallet.data;
+  // Stable parent descriptor for the "add pocket" form (category + currency
+  // inherited from this wallet).
+  const apartadoParent = useMemo(
+    () => (wd ? { id: wd.id, categoryId: wd.categoryId, currencyCode: wd.currencyCode } : undefined),
+    [wd?.id, wd?.categoryId, wd?.currencyCode],
   );
 
   const archive = useMutation({
@@ -125,6 +145,45 @@ export function WalletDetailPage() {
         {w.notes && <p className="mt-2 text-sm text-fg-muted">{w.notes}</p>}
       </div>
 
+      {/* Apartados (pockets) of this wallet — only for top-level wallets, since
+          apartados stay one level deep. */}
+      {w.parentWalletId == null && (
+        <div className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-medium">{es.wallets.apartadosLabel}</h3>
+            <Button variant="ghost" onClick={() => setAddApartadoOpen(true)}>
+              <span className="flex items-center gap-2">
+                <Plus size={15} /> {es.wallets.addApartado}
+              </span>
+            </Button>
+          </div>
+          {apartados.length === 0 ? (
+            <p className="text-sm text-fg-subtle">{es.wallets.noApartados}</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {apartados.map((a) => (
+                <li key={a.id}>
+                  <Link
+                    to={`/carteras/${a.id}`}
+                    className="flex items-center gap-2.5 rounded-xl border border-border-muted bg-surface-raised px-3.5 py-2.5 transition-colors hover:border-accent/40"
+                  >
+                    <span
+                      className="h-6 w-1 shrink-0 rounded-full"
+                      style={{ background: a.color ?? "var(--color-accent)" }}
+                    />
+                    <PiggyBank size={15} className="shrink-0 text-fg-subtle" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-fg">{a.name}</span>
+                    <span className="shrink-0 text-sm font-medium tabular-nums text-fg">
+                      {formatCents(a.balanceCents, a.currencyCode)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-medium">{es.transactions.title}</h3>
         <Button variant="ghost" onClick={() => setTxFormOpen(true)}>
@@ -152,6 +211,11 @@ export function WalletDetailPage() {
       )}
 
       <WalletFormModal open={editOpen} onClose={() => setEditOpen(false)} wallet={w} />
+      <WalletFormModal
+        open={addApartadoOpen}
+        onClose={() => setAddApartadoOpen(false)}
+        defaultParent={apartadoParent}
+      />
       <TransactionFormModal
         open={txFormOpen || editingTx !== null}
         transaction={editingTx ?? undefined}

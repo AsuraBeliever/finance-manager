@@ -242,6 +242,8 @@ export const esDict = {
     parentHint: "Se muestra anidada como apartado de esa cartera.",
     parentNoneHint: "Cartera normal, sin anidar.",
     apartadosLabel: "Apartados",
+    addApartado: "Añadir apartado",
+    noApartados: "Aún no tienes apartados en esta cartera.",
     color: "Color",
     skin: "Diseño de tarjeta",
     skinAuto: "Auto",

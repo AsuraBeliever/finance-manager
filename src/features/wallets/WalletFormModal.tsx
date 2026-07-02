@@ -65,9 +65,18 @@ interface WalletFormModalProps {
   wallet?: Wallet;
   /** When set, the form graduates a fund goal into a new wallet. */
   convert?: WalletConvert;
+  /** When set, a new wallet is created as an apartado of this parent (category
+   *  and currency inherited from it). Used by "add pocket" on a wallet. */
+  defaultParent?: { id: number; categoryId: number; currencyCode: string };
 }
 
-export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormModalProps) {
+export function WalletFormModal({
+  open,
+  onClose,
+  wallet,
+  convert,
+  defaultParent,
+}: WalletFormModalProps) {
   const queryClient = useQueryClient();
   const categories = useQuery({
     queryKey: ["walletCategories"],
@@ -105,6 +114,20 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
       setError(null);
       return;
     }
+    if (!wallet && defaultParent) {
+      // New apartado: inherit the parent's category + currency (hidden fields).
+      setName("");
+      setCategoryId(defaultParent.categoryId);
+      setCurrencyCode(defaultParent.currencyCode);
+      setBalanceText("");
+      setParentWalletId(defaultParent.id);
+      setSkin(null);
+      setCustomColor(COLORS[0]);
+      setNotes("");
+      setYieldEnabled(false);
+      setError(null);
+      return;
+    }
     setName(wallet?.name ?? "");
     setCategoryId(wallet?.categoryId ?? null);
     setCurrencyCode(wallet?.currencyCode ?? "MXN");
@@ -117,7 +140,7 @@ export function WalletFormModal({ open, onClose, wallet, convert }: WalletFormMo
     setYieldRateText(wallet?.yieldRateBps != null ? String(wallet.yieldRateBps / 100) : "");
     setYieldFrequency(wallet?.yieldFrequency ?? "weekly");
     setError(null);
-  }, [open, wallet, convert]);
+  }, [open, wallet, convert, defaultParent]);
 
   const invalidateAfterConvert = () => {
     for (const key of ["wallets", "savingsGoals", "transactions", "dashboard"]) {

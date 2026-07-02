@@ -237,6 +237,8 @@ export const en: Dict = {
     parentHint: "Shown nested as a pocket of that wallet.",
     parentNoneHint: "A normal wallet, not nested.",
     apartadosLabel: "Pockets",
+    addApartado: "Add pocket",
+    noApartados: "No pockets in this wallet yet.",
     color: "Color",
     skin: "Card design",
     skinAuto: "Auto",
