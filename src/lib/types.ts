@@ -61,6 +61,8 @@ export interface MsiPlan {
   nextChargeDate: string | null;
   nextChargeCents: number | null;
   purchasedAt: string;
+  /** Category its installments file under; null = reserved MSI category. */
+  categoryId: number | null;
 }
 
 /** The last closed statement of a credit card and how it stands today. */

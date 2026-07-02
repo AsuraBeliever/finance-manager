@@ -133,6 +133,7 @@ export function TransactionFormModal({
           totalCents: cents,
           months,
           purchasedAt: date,
+          categoryId,
         });
       }
       // Captures go through the offline outbox: sent right away when online,
@@ -251,8 +252,8 @@ export function TransactionFormModal({
         )}
 
         {/* MSI purchase on a credit card: replaces the plain expense with an
-            installment plan. Category is hidden — the monthly charges post
-            under the reserved MSI category. */}
+            installment plan. The chosen category (below, same picker as any
+            expense) is what the monthly charges file under. */}
         {isCreditWallet && (
           <div className="rounded-lg border border-border-muted p-3">
             <label className="flex cursor-pointer items-start gap-2.5">
@@ -284,7 +285,7 @@ export function TransactionFormModal({
           </div>
         )}
 
-        {tab !== "transfer" && !msiActive && (
+        {tab !== "transfer" && (
           <Field label={es.transactions.category}>
             <select
               className={inputClass}

@@ -82,6 +82,9 @@ pub struct MsiPlanView {
     pub next_charge_date: Option<String>,
     pub next_charge_cents: Option<i64>,
     pub purchased_at: String,
+    /// Spending category the installments file under; None = the reserved
+    /// 'Meses sin intereses' one.
+    pub category_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -91,6 +94,8 @@ struct MsiPlanRow {
     total_cents: i64,
     months: i64,
     purchased_at: String,
+    #[serde(default)]
+    category_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -154,7 +159,7 @@ pub async fn get_credit_card_summary(
 
     let plans: Vec<MsiPlanRow> = all(
         db,
-        "SELECT id, description, total_cents, months, purchased_at
+        "SELECT id, description, total_cents, months, purchased_at, category_id
          FROM msi_plans WHERE wallet_id = ?1 ORDER BY created_at, id",
         jsv![wallet.id],
     )
@@ -183,6 +188,7 @@ pub async fn get_credit_card_summary(
             next_charge_date: next.as_ref().map(|(d, _)| d.clone()),
             next_charge_cents: next.map(|(_, c)| c),
             purchased_at: p.purchased_at,
+            category_id: p.category_id,
         });
     }
 
@@ -228,6 +234,10 @@ pub struct CreateMsiPlanArgs {
     pub total_cents: i64,
     pub months: i64,
     pub purchased_at: Option<String>,
+    /// Spending category for the installments (same free choice as any
+    /// expense); None falls back to the reserved MSI category.
+    #[serde(default)]
+    pub category_id: Option<i64>,
 }
 
 pub async fn create_msi_plan(db: &D1Database, uid: i64, a: CreateMsiPlanArgs) -> AppResult<()> {
@@ -264,14 +274,15 @@ pub async fn create_msi_plan(db: &D1Database, uid: i64, a: CreateMsiPlanArgs) ->
 
     let res = crate::db::exec(
         db,
-        "INSERT INTO msi_plans (wallet_id, description, total_cents, months, purchased_at)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO msi_plans (wallet_id, description, total_cents, months, purchased_at, category_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         jsv![
             a.wallet_id,
             a.description.trim(),
             a.total_cents,
             a.months,
-            purchased.to_string()
+            purchased.to_string(),
+            a.category_id
         ],
     )
     .await?;
@@ -281,19 +292,13 @@ pub async fn create_msi_plan(db: &D1Database, uid: i64, a: CreateMsiPlanArgs) ->
         total_cents: a.total_cents,
         months: a.months,
         purchased_at: purchased.to_string(),
+        category_id: a.category_id,
     };
 
     // A back-dated plan may already have billed installments — post them now
     // instead of waiting for tonight's cron.
-    post_plan_installments(
-        db,
-        &plan,
-        a.wallet_id,
-        cut_day,
-        msi_category(db).await?,
-        today,
-    )
-    .await
+    let fallback = msi_category(db).await?;
+    post_plan_installments(db, &plan, a.wallet_id, cut_day, fallback, today).await
 }
 
 #[derive(Deserialize)]
@@ -352,12 +357,14 @@ pub async fn post_msi_installments(db: &D1Database) -> AppResult<()> {
         total_cents: i64,
         months: i64,
         purchased_at: String,
+        #[serde(default)]
+        category_id: Option<i64>,
         cut_day: i64,
     }
     let plans: Vec<PlanWithCut> = all(
         db,
         "SELECT p.id, p.wallet_id, p.description, p.total_cents, p.months,
-                p.purchased_at, w.credit_cut_day AS cut_day
+                p.purchased_at, p.category_id, w.credit_cut_day AS cut_day
          FROM msi_plans p
          JOIN wallets w ON w.id = p.wallet_id
          WHERE w.credit_cut_day IS NOT NULL AND w.is_archived = 0",
@@ -367,7 +374,7 @@ pub async fn post_msi_installments(db: &D1Database) -> AppResult<()> {
     if plans.is_empty() {
         return Ok(());
     }
-    let category = msi_category(db).await?;
+    let fallback = msi_category(db).await?;
     let today = today_mx();
     for p in plans {
         let row = MsiPlanRow {
@@ -376,9 +383,10 @@ pub async fn post_msi_installments(db: &D1Database) -> AppResult<()> {
             total_cents: p.total_cents,
             months: p.months,
             purchased_at: p.purchased_at,
+            category_id: p.category_id,
         };
         if let Err(e) =
-            post_plan_installments(db, &row, p.wallet_id, p.cut_day as u32, category, today).await
+            post_plan_installments(db, &row, p.wallet_id, p.cut_day as u32, fallback, today).await
         {
             worker::console_warn!("msi posting failed for plan {}: {e}", p.id);
         }
@@ -386,15 +394,18 @@ pub async fn post_msi_installments(db: &D1Database) -> AppResult<()> {
     Ok(())
 }
 
-/// Posts the due installments of one plan owned by `wallet_id`.
+/// Posts the due installments of one plan owned by `wallet_id`. Installments
+/// file under the plan's own category; `fallback` (the reserved MSI one)
+/// covers plans created without one.
 async fn post_plan_installments(
     db: &D1Database,
     plan: &MsiPlanRow,
     wallet_id: i64,
     cut_day: u32,
-    category: Option<i64>,
+    fallback: Option<i64>,
     today: NaiveDate,
 ) -> AppResult<()> {
+    let category = plan.category_id.or(fallback);
     let purchased = parse_date(&plan.purchased_at, "fecha de compra")?;
     let due = msi_installments_due(purchased, cut_day, plan.months as u32, today) as i64;
     if due == 0 {

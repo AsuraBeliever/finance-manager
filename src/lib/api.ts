@@ -143,6 +143,8 @@ export interface MsiPlanInput {
   months: number;
   /** 'YYYY-MM-DD'; omitted = today. Back-dated plans post due charges at once. */
   purchasedAt: string | null;
+  /** Spending category for the installments; null = reserved MSI category. */
+  categoryId: number | null;
 }
 
 export const createMsiPlan = (input: MsiPlanInput) =>

@@ -12,12 +12,14 @@ import {
   createMsiPlan,
   deleteMsiPlan,
   getCreditCardSummary,
+  listTransactionCategories,
   type MsiPlanInput,
 } from "../../lib/api";
 import { todayIso } from "../../lib/date";
 import { formatCents, parseToCents } from "../../lib/money";
 import type { MsiPlan, Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
+import { seedName } from "../../i18n/seed";
 
 /** Short locale-aware date like "5 jul" (year only when it differs). */
 function formatDay(iso: string): string {
@@ -277,7 +279,16 @@ function MsiFormModal({
   const [totalText, setTotalText] = useState("");
   const [monthsText, setMonthsText] = useState("12");
   const [purchasedAt, setPurchasedAt] = useState(todayIso());
+  const [categoryId, setCategoryId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const categories = useQuery({
+    queryKey: ["transactionCategories"],
+    queryFn: listTransactionCategories,
+  });
+  const expenseCategories = (categories.data ?? []).filter(
+    (c) => c.kind === "expense",
+  );
 
   const mutation = useMutation({
     mutationFn: (input: MsiPlanInput) => createMsiPlan(input),
@@ -288,6 +299,7 @@ function MsiFormModal({
       setTotalText("");
       setMonthsText("12");
       setPurchasedAt(todayIso());
+      setCategoryId(null);
       setError(null);
     },
     onError: (e) => setError(String(e)),
@@ -311,6 +323,7 @@ function MsiFormModal({
       totalCents,
       months,
       purchasedAt,
+      categoryId,
     });
   }
 
@@ -339,6 +352,22 @@ function MsiFormModal({
             />
           </Field>
         </div>
+        <Field label={es.transactions.category}>
+          <select
+            className={inputClass}
+            value={categoryId ?? ""}
+            onChange={(e) =>
+              setCategoryId(e.target.value === "" ? null : Number(e.target.value))
+            }
+          >
+            <option value="">{es.transactions.noCategory}</option>
+            {expenseCategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {seedName(c.name, c.isSystem)}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label={es.credit.msiPurchasedAt}>
           <DateInput value={purchasedAt} onChange={setPurchasedAt} />
           <span className="mt-1 block text-xs text-fg-subtle">
