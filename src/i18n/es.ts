@@ -328,6 +328,10 @@ export const esDict = {
     msiPendingTotal: "MSI por facturar",
     msiDescription: "¿Qué compraste?",
     msiDescriptionPlaceholder: "iPhone, pantalla, vuelos…",
+    msiToggle: "Compra a meses sin intereses (MSI)",
+    msiToggleHint:
+      "En lugar de un gasto único, cada mensualidad se cargará sola en tu historial en cada corte.",
+    msiNeedsDescription: "Describe la compra para nombrar sus mensualidades",
     msiTotal: "Monto total",
     msiMonths: "Meses",
     msiPurchasedAt: "Fecha de compra",

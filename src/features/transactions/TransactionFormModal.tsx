@@ -5,7 +5,12 @@ import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
 import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
-import { listTransactionCategories, listWallets, updateTransaction } from "../../lib/api";
+import {
+  createMsiPlan,
+  listTransactionCategories,
+  listWallets,
+  updateTransaction,
+} from "../../lib/api";
 import { submitOrQueue } from "../../lib/outbox";
 import { parseToCents } from "../../lib/money";
 import { todayIso } from "../../lib/date";
@@ -52,6 +57,8 @@ export function TransactionFormModal({
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(todayIso());
+  const [msiEnabled, setMsiEnabled] = useState(false);
+  const [msiMonthsText, setMsiMonthsText] = useState("12");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,6 +66,8 @@ export function TransactionFormModal({
     setError(null);
     setToWalletId(null);
     setAmountToText("");
+    setMsiEnabled(false);
+    setMsiMonthsText("12");
     if (transaction) {
       // Edit mode: prefill from the existing income/expense.
       setTab(transaction.kind === "expense" ? "expense" : "income");
@@ -88,6 +97,13 @@ export function TransactionFormModal({
 
   const visibleCategories = (categories.data ?? []).filter((c) => c.kind === tab);
 
+  // New expenses on a configured credit card can be MSI purchases: instead of
+  // one expense, an MSI plan is created and each installment posts itself on
+  // its cut date (see CreditCardPanel — this is the same flow, reachable from
+  // anywhere). Edits never convert to/from MSI.
+  const isCreditWallet = !isEdit && tab === "expense" && fromWallet?.creditCutDay != null;
+  const msiActive = isCreditWallet && msiEnabled;
+
   const mutation = useMutation({
     mutationFn: async () => {
       const cents = parseToCents(amountText);
@@ -103,6 +119,22 @@ export function TransactionFormModal({
       };
       // Edits go straight to the server (online-only, like delete); no outbox.
       if (transaction) return updateTransaction(transaction.id, common);
+      // MSI purchase: creates the plan (online-only); the installments post
+      // themselves on each cut date, so no expense is booked here.
+      if (msiActive) {
+        if (common.description === null)
+          throw new Error(es.credit.msiNeedsDescription);
+        const months = parseInt(msiMonthsText, 10);
+        if (!isFinite(months) || months < 2 || months > 60)
+          throw new Error(es.credit.msiInvalidMonths);
+        return createMsiPlan({
+          walletId: wid,
+          description: common.description,
+          totalCents: cents,
+          months,
+          purchasedAt: date,
+        });
+      }
       // Captures go through the offline outbox: sent right away when online,
       // queued (and replayed idempotently) when there is no connection.
       if (tab === "income") return submitOrQueue("add_income", common);
@@ -126,6 +158,7 @@ export function TransactionFormModal({
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["creditCard"] });
       onClose();
     },
     onError: (e) => setError(e instanceof Error ? e.message : String(e)),
@@ -217,7 +250,41 @@ export function TransactionFormModal({
           </Field>
         )}
 
-        {tab !== "transfer" && (
+        {/* MSI purchase on a credit card: replaces the plain expense with an
+            installment plan. Category is hidden — the monthly charges post
+            under the reserved MSI category. */}
+        {isCreditWallet && (
+          <div className="rounded-lg border border-border-muted p-3">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={msiEnabled}
+                onChange={(e) => setMsiEnabled(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-accent"
+              />
+              <span className="text-sm">
+                {es.credit.msiToggle}
+                <span className="mt-0.5 block text-xs text-fg-subtle">
+                  {es.credit.msiToggleHint}
+                </span>
+              </span>
+            </label>
+            {msiEnabled && (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Field label={es.credit.msiMonths}>
+                  <input
+                    className={inputClass}
+                    value={msiMonthsText}
+                    onChange={(e) => setMsiMonthsText(e.target.value)}
+                    inputMode="numeric"
+                  />
+                </Field>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab !== "transfer" && !msiActive && (
           <Field label={es.transactions.category}>
             <select
               className={inputClass}
@@ -236,11 +303,13 @@ export function TransactionFormModal({
           </Field>
         )}
 
-        <Field label={es.transactions.description}>
+        <Field label={msiActive ? es.credit.msiDescription : es.transactions.description}>
           <input
             className={inputClass}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            placeholder={msiActive ? es.credit.msiDescriptionPlaceholder : undefined}
+            required={msiActive}
           />
         </Field>
 
