@@ -341,6 +341,7 @@ export const esDict = {
     msiInvalidMonths: "Los meses deben estar entre 2 y 60",
     // Credit-card wallet form: initial balance becomes existing debt
     initialDebt: "Deuda actual",
+    initialDebtLine: "Deuda inicial",
     initialDebtHint:
       "Lo que ya debes hoy en esta tarjeta (si la estrenas en ceros, déjalo vacío).",
     // Live MSI schedule preview + save confirmation

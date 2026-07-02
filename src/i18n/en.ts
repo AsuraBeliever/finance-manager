@@ -335,6 +335,7 @@ export const en: Dict = {
     msiInvalidMonths: "Months must be between 2 and 60",
     // Credit-card wallet form: initial balance becomes existing debt
     initialDebt: "Current debt",
+    initialDebtLine: "Starting debt",
     initialDebtHint:
       "What you already owe on this card today (leave it empty if it starts at zero).",
     // Live MSI schedule preview + save confirmation

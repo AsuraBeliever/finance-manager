@@ -132,10 +132,21 @@ export function WalletDetailPage() {
         <p className="text-3xl font-semibold tabular-nums">
           {formatCents(w.balanceCents, w.currencyCode)}
         </p>
-        <p className="mt-1 text-xs text-fg-subtle">
-          {es.wallets.initialBalance}:{" "}
-          {formatCents(w.initialBalanceCents, w.currencyCode)}
-        </p>
+        {/* On a credit card the initial balance is registered debt, so
+            "Saldo inicial" would be wrong; show it as debt (or nothing). */}
+        {w.creditCutDay != null ? (
+          w.initialBalanceCents < 0 && (
+            <p className="mt-1 text-xs text-fg-subtle">
+              {es.credit.initialDebtLine}:{" "}
+              {formatCents(-w.initialBalanceCents, w.currencyCode)}
+            </p>
+          )
+        ) : (
+          <p className="mt-1 text-xs text-fg-subtle">
+            {es.wallets.initialBalance}:{" "}
+            {formatCents(w.initialBalanceCents, w.currencyCode)}
+          </p>
+        )}
         {w.notes && <p className="mt-2 text-sm text-fg-muted">{w.notes}</p>}
       </div>
 
