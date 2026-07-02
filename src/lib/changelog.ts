@@ -12,6 +12,28 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.20.0",
+    date: "2026-07-02",
+    es: [
+      "Metas con fecha límite: pones para cuándo la quieres y te dice cuánto apartar por periodo; te avisa si vas atrasado o si venció.",
+      "Tipos de meta: «comprar algo» (al completarla se registra el gasto) o «juntar un fondo» (que puedes pasar a su propia cartera, con estilo).",
+      "Apartar a una meta ya no usa montos negativos: ahora hay botones claros de Apartar y Liberar, con aporte sugerido.",
+      "Toda caja de dinero muestra el signo $ y el formato con comas y centavos mientras escribes.",
+      "Apartados de cartera: una cartera puede tener bolsillos (p. ej. BBVA con un apartado «Viaje a Japón»), que se muestran anidados y se despliegan al tocarlos.",
+      "Transacciones: filtro por tipo con botones y por categoría según el tipo; el filtro se recuerda. Los movimientos de apartados aparecen en el historial.",
+      "Calendario mejorado: año editable con flechas, ya no se recorta dentro de las ventanas.",
+    ],
+    en: [
+      "Goals with a deadline: set when you want it and it tells you how much to set aside each period; it flags if you're behind or overdue.",
+      "Goal types: \"buy something\" (completing it books the expense) or \"build a fund\" (which you can turn into its own wallet, with style).",
+      "Adding to a goal no longer uses negative amounts: clear Reserve and Release buttons now, with a suggested contribution.",
+      "Every money field shows the $ sign and comma/cents formatting as you type.",
+      "Wallet pockets: a wallet can hold pockets (e.g. BBVA with a \"Japan trip\" pocket), shown nested and expandable on tap.",
+      "Transactions: filter by type with buttons and by category per type; the filter is remembered. Pocket moves show up in the history.",
+      "Better calendar: editable year with arrows, no longer clipped inside dialogs.",
+    ],
+  },
+  {
     version: "2.19.3",
     date: "2026-06-28",
     es: [
