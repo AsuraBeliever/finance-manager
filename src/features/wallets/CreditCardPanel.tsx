@@ -317,12 +317,11 @@ function MsiFormModal({
   return (
     <Modal title={es.credit.msiAdd} open={open} onClose={onClose}>
       <form onSubmit={submit} className="grid gap-4">
-        <Field label={es.credit.msiDescription}>
+        <Field label={es.transactions.description}>
           <input
             className={inputClass}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder={es.credit.msiDescriptionPlaceholder}
             required
             autoFocus
           />

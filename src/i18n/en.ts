@@ -320,8 +320,6 @@ export const en: Dict = {
     msiNextCharge: "Next charge: {amount} on {date}",
     msiDone: "Paid off ✓",
     msiPendingTotal: "Unbilled MSI",
-    msiDescription: "What did you buy?",
-    msiDescriptionPlaceholder: "iPhone, TV, flights…",
     msiToggle: "Interest-free installment purchase (MSI)",
     msiToggleHint:
       "Instead of a single expense, each monthly charge will post itself to your history on every cut-off.",

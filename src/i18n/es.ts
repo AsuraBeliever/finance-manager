@@ -326,8 +326,6 @@ export const esDict = {
     msiNextCharge: "Próximo cargo: {amount} el {date}",
     msiDone: "Liquidado ✓",
     msiPendingTotal: "MSI por facturar",
-    msiDescription: "¿Qué compraste?",
-    msiDescriptionPlaceholder: "iPhone, pantalla, vuelos…",
     msiToggle: "Compra a meses sin intereses (MSI)",
     msiToggleHint:
       "En lugar de un gasto único, cada mensualidad se cargará sola en tu historial en cada corte.",

@@ -303,12 +303,11 @@ export function TransactionFormModal({
           </Field>
         )}
 
-        <Field label={msiActive ? es.credit.msiDescription : es.transactions.description}>
+        <Field label={es.transactions.description}>
           <input
             className={inputClass}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder={msiActive ? es.credit.msiDescriptionPlaceholder : undefined}
             required={msiActive}
           />
         </Field>
