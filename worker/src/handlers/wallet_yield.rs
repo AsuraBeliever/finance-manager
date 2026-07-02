@@ -43,7 +43,8 @@ struct IdRow {
 
 /// Closing balance of `wallet_id` at end of `date` (inclusive): initial balance
 /// plus the signed sum of every transaction up to and including that day.
-async fn balance_as_of(db: &D1Database, wallet_id: i64, date: &str) -> AppResult<i64> {
+/// Also used by handlers::credit for the statement balance at the cut.
+pub async fn balance_as_of(db: &D1Database, wallet_id: i64, date: &str) -> AppResult<i64> {
     let row: Option<BalanceRow> = first(
         db,
         "SELECT w.initial_balance_cents + COALESCE((

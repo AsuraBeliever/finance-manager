@@ -48,6 +48,19 @@ pub struct Wallet {
     pub yield_frequency: Option<String>,
     /// 'YYYY-MM-DD' the day yield was switched on (None when off).
     pub yield_anchor_date: Option<String>,
+    /// Credit card: day of month (1-31) the statement closes. None = a plain
+    /// wallet; set = this wallet is a credit card and debt = -balance.
+    #[serde(default)]
+    pub credit_cut_day: Option<i64>,
+    /// Days after the cut to pay the statement without interest (MX: ~20).
+    #[serde(default)]
+    pub credit_due_days: Option<i64>,
+    /// Credit line in cents, or None when the user doesn't track it.
+    #[serde(default)]
+    pub credit_limit_cents: Option<i64>,
+    /// 'MM-DD' the bank charges the annual fee, or None when untracked.
+    #[serde(default)]
+    pub credit_anniversary: Option<String>,
     pub created_at: String,
 }
 

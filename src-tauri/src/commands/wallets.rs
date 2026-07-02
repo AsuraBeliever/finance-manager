@@ -43,6 +43,11 @@ fn wallet_from_row(r: &Row) -> rusqlite::Result<Wallet> {
         yield_rate_bps: None,
         yield_frequency: None,
         yield_anchor_date: None,
+        // Credit cards are a cloud-only feature; same dead desktop path.
+        credit_cut_day: None,
+        credit_due_days: None,
+        credit_limit_cents: None,
+        credit_anniversary: None,
         created_at: r.get("created_at")?,
     })
 }

@@ -10,8 +10,8 @@ use worker::{D1Database, Request, Response, RouteContext};
 
 use crate::error::{db_err, error_response};
 use crate::handlers::{
-    analytics, budgets, dashboard, goals, investments, settings, subscriptions, transactions,
-    wallets,
+    analytics, budgets, credit, dashboard, goals, investments, settings, subscriptions,
+    transactions, wallets,
 };
 use crate::market;
 
@@ -79,6 +79,13 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "reorder_wallets" => out(wallets::reorder_wallets(db, uid, args(body)?).await?),
         "delete_wallet" => out(wallets::delete_wallet(db, uid, args(body)?).await?),
 
+        // ---- credit cards ----
+        "get_credit_card_summary" => {
+            out(credit::get_credit_card_summary(db, uid, args(body)?).await?)
+        }
+        "create_msi_plan" => out(credit::create_msi_plan(db, uid, args(body)?).await?),
+        "delete_msi_plan" => out(credit::delete_msi_plan(db, uid, args(body)?).await?),
+
         // ---- transactions ----
         "add_income" => out(transactions::add_income(db, uid, args(body)?).await?),
         "add_expense" => out(transactions::add_expense(db, uid, args(body)?).await?),
@@ -124,9 +131,7 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         }
         "delete_savings_goal" => out(goals::delete_savings_goal(db, uid, args(body)?).await?),
         "use_savings_goal" => out(goals::use_savings_goal(db, uid, args(body)?).await?),
-        "convert_goal_to_wallet" => {
-            out(goals::convert_goal_to_wallet(db, uid, args(body)?).await?)
-        }
+        "convert_goal_to_wallet" => out(goals::convert_goal_to_wallet(db, uid, args(body)?).await?),
         "reorder_savings_goals" => out(goals::reorder_savings_goals(db, uid, args(body)?).await?),
 
         // ---- budgets ----
