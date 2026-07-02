@@ -15,6 +15,7 @@ import {
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { Field, inputClass } from "../../components/Field";
+import { MoneyInput } from "../../components/MoneyInput";
 import {
   getInvestmentCatalog,
   simulateInvestment,
@@ -107,19 +108,26 @@ function MoneyField({
   label,
   value,
   onChange,
+  money = true,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  /** Money fields get the $ + thousands formatting; plain ones (years) don't. */
+  money?: boolean;
 }) {
   return (
     <Field label={label}>
-      <input
-        className={inputClass}
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      {money ? (
+        <MoneyInput value={value} onChange={onChange} />
+      ) : (
+        <input
+          className={inputClass}
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
     </Field>
   );
 }
@@ -245,7 +253,7 @@ function ProjectMode({
             </select>
           </Field>
           <RateField rate={rate} setRate={setRate} />
-          <MoneyField label={es.simulator.years} value={years} onChange={setYears} />
+          <MoneyField label={es.simulator.years} value={years} onChange={setYears} money={false} />
           {doubling && (
             <p className="text-xs text-fg-subtle">
               {es.simulator.doublesIn.replace("{years}", doubling)}
@@ -363,7 +371,7 @@ function GoalMode({
           <MoneyField label={es.simulator.goalTarget} value={target} onChange={setTarget} />
           <MoneyField label={es.simulator.initial} value={initial} onChange={setInitial} />
           <RateField rate={rate} setRate={setRate} />
-          <MoneyField label={es.simulator.years} value={years} onChange={setYears} />
+          <MoneyField label={es.simulator.years} value={years} onChange={setYears} money={false} />
         </div>
       </Card>
       <div className="space-y-4">
@@ -489,7 +497,7 @@ function CompareMode({
               ))}
             </select>
           </Field>
-          <MoneyField label={es.simulator.years} value={years} onChange={setYears} />
+          <MoneyField label={es.simulator.years} value={years} onChange={setYears} money={false} />
           <div className="space-y-2 pt-1">
             <p className="text-[0.8rem] font-medium text-fg-muted">{es.simulator.presets}</p>
             {instruments.map((inst, idx) => (

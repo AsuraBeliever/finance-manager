@@ -353,8 +353,13 @@ pub async fn list_transactions(
         params.push(wid.to_js());
     }
     if let Some(kind) = &f.kind {
-        sql.push_str(" AND t.kind = ?");
-        params.push(kind.to_js());
+        if kind == "transfer" {
+            // A single "transfer" filter covers both directions.
+            sql.push_str(" AND t.kind IN ('transfer_in', 'transfer_out')");
+        } else {
+            sql.push_str(" AND t.kind = ?");
+            params.push(kind.to_js());
+        }
     }
     if let Some(cid) = f.category_id {
         sql.push_str(" AND t.category_id = ?");
@@ -368,7 +373,40 @@ pub async fn list_transactions(
         sql.push_str(" AND t.occurred_at <= ?");
         params.push(to.to_js());
     }
-    sql.push_str(" ORDER BY t.occurred_at DESC, t.id DESC LIMIT ? OFFSET ?");
+
+    // Apartado moves to/from goals are shown as read-only informational rows so
+    // the history tracks where money went (they live in goal_contributions and
+    // never touch balances — see migration 0022). They carry no real kind or
+    // category, so skip them whenever the user is filtering by either.
+    if f.kind.is_none() && f.category_id.is_none() {
+        sql.push_str(
+            " UNION ALL
+             SELECT -gc.id, g.linked_wallet_id, w2.name,
+                    CASE WHEN gc.amount_cents >= 0 THEN 'reserve' ELSE 'release' END,
+                    ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, gc.created_at
+             FROM goal_contributions gc
+             JOIN savings_goals g ON g.id = gc.goal_id
+             JOIN wallets w2 ON w2.id = g.linked_wallet_id
+             WHERE g.user_id = ? AND g.linked_wallet_id IS NOT NULL",
+        );
+        params.push(uid.to_js());
+        if let Some(wid) = f.wallet_id {
+            sql.push_str(" AND g.linked_wallet_id = ?");
+            params.push(wid.to_js());
+        }
+        if let Some(from) = &f.from {
+            sql.push_str(" AND gc.occurred_at >= ?");
+            params.push(from.to_js());
+        }
+        if let Some(to) = &f.to {
+            sql.push_str(" AND gc.occurred_at <= ?");
+            params.push(to.to_js());
+        }
+    }
+
+    // Order by column position (occurred_at = 10, id = 1): names are ambiguous
+    // across a compound UNION in SQLite, positions are not.
+    sql.push_str(" ORDER BY 10 DESC, 1 DESC LIMIT ? OFFSET ?");
     params.push(f.limit.unwrap_or(100).to_js());
     params.push(f.offset.unwrap_or(0).to_js());
 
@@ -406,20 +444,37 @@ impl From<CategoryRow> for TransactionCategory {
 
 /// Categories offered in the pickers: the user's own plus the seeds they
 /// haven't hidden. `is_hidden` is always false here.
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryListArgs {
+    /// Include the reserved "Metas" category — true for the transactions filter
+    /// (so you can filter by it), false for the entry form (can't pick it).
+    #[serde(default)]
+    pub include_reserved: bool,
+}
+
 pub async fn list_transaction_categories(
     db: &D1Database,
     uid: i64,
+    a: CategoryListArgs,
 ) -> AppResult<Vec<TransactionCategory>> {
+    let reserved = if a.include_reserved {
+        ""
+    } else {
+        " AND tc.is_reserved = 0"
+    };
     let rows: Vec<CategoryRow> = all(
         db,
-        "SELECT tc.id, tc.name, tc.kind, tc.icon, tc.color, tc.is_system, 0 AS is_hidden
-         FROM transaction_categories tc
-         LEFT JOIN category_order co ON co.user_id = ?1 AND co.category_id = tc.id
-         WHERE (tc.user_id IS NULL OR tc.user_id = ?1)
-           AND NOT EXISTS (
-             SELECT 1 FROM hidden_categories h
-             WHERE h.user_id = ?1 AND h.category_id = tc.id)
-         ORDER BY tc.kind, (co.position IS NULL), co.position, tc.is_system DESC, tc.id",
+        &format!(
+            "SELECT tc.id, tc.name, tc.kind, tc.icon, tc.color, tc.is_system, 0 AS is_hidden
+             FROM transaction_categories tc
+             LEFT JOIN category_order co ON co.user_id = ?1 AND co.category_id = tc.id
+             WHERE (tc.user_id IS NULL OR tc.user_id = ?1){reserved}
+               AND NOT EXISTS (
+                 SELECT 1 FROM hidden_categories h
+                 WHERE h.user_id = ?1 AND h.category_id = tc.id)
+             ORDER BY tc.kind, (co.position IS NULL), co.position, tc.is_system DESC, tc.id"
+        ),
         jsv![uid],
     )
     .await?;
@@ -439,7 +494,8 @@ pub async fn list_manage_categories(
                         WHERE h.user_id = ?1 AND h.category_id = tc.id) AS is_hidden
          FROM transaction_categories tc
          LEFT JOIN category_order co ON co.user_id = ?1 AND co.category_id = tc.id
-         WHERE tc.user_id IS NULL OR tc.user_id = ?1
+         WHERE (tc.user_id IS NULL OR tc.user_id = ?1)
+           AND tc.is_reserved = 0
          ORDER BY tc.kind, (co.position IS NULL), co.position, tc.is_system DESC, tc.id",
         jsv![uid],
     )

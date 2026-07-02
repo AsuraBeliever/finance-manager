@@ -27,6 +27,7 @@ import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
+import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import {
   addInvestmentMovement,
@@ -353,13 +354,7 @@ export function InvestmentDetailPage() {
         {simEnabled && (
           <div className="mb-4 grid grid-cols-2 gap-3">
             <Field label={es.investments.projectionContribution}>
-              <input
-                className={inputClass}
-                inputMode="decimal"
-                placeholder="0"
-                value={simContribution}
-                onChange={(e) => setSimContribution(e.target.value)}
-              />
+              <MoneyInput value={simContribution} onChange={setSimContribution} />
             </Field>
             <Field label={es.simulator.cadence}>
               <select
@@ -557,15 +552,7 @@ export function InvestmentDetailPage() {
           className="grid gap-4"
         >
           <Field label={es.investments.movementAmount}>
-            <input
-              className={inputClass}
-              value={movementValue}
-              onChange={(e) => setMovementValue(e.target.value)}
-              placeholder="0.00"
-              inputMode="decimal"
-              required
-              autoFocus
-            />
+            <MoneyInput value={movementValue} onChange={setMovementValue} required autoFocus />
           </Field>
           <Field label={es.investments.movementDate}>
             <DateInput value={movementDate} onChange={setMovementDate} min={d.startDate} />
@@ -619,15 +606,7 @@ export function InvestmentDetailPage() {
           className="grid gap-4"
         >
           <Field label={es.investments.snapshotValue}>
-            <input
-              className={inputClass}
-              value={snapshotValue}
-              onChange={(e) => setSnapshotValue(e.target.value)}
-              placeholder="0.00"
-              inputMode="decimal"
-              required
-              autoFocus
-            />
+            <MoneyInput value={snapshotValue} onChange={setSnapshotValue} required autoFocus />
           </Field>
           <Field label={es.investments.snapshotDate}>
             <DateInput value={snapshotDate} onChange={setSnapshotDate} />

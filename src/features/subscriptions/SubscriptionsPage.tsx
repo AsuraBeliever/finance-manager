@@ -8,6 +8,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { DateInput } from "../../components/DateInput";
 import { EmptyState } from "../../components/EmptyState";
 import { Field, inputClass } from "../../components/Field";
+import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
 import { matchBrand } from "../../lib/brandIcons";
@@ -287,12 +288,7 @@ function SubscriptionFormModal({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={es.subscriptions.amount}>
-            <input
-              className={inputClass}
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+            <MoneyInput value={amount} onChange={setAmount} />
           </Field>
           <Field label={es.investments.currency}>
             <select

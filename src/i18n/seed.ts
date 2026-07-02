@@ -25,6 +25,7 @@ const EN: Record<string, string> = {
   Salud: "Health",
   Suscripciones: "Subscriptions",
   "Otro gasto": "Other expense",
+  Metas: "Goals",
   // Currencies
   "Peso mexicano": "Mexican peso",
   "Dólar estadounidense": "US dollar",

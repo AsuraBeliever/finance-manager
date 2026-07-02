@@ -87,7 +87,7 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "update_transaction" => out(transactions::update_transaction(db, uid, args(body)?).await?),
         "delete_transaction" => out(transactions::delete_transaction(db, uid, args(body)?).await?),
         "list_transaction_categories" => {
-            out(transactions::list_transaction_categories(db, uid).await?)
+            out(transactions::list_transaction_categories(db, uid, args(body)?).await?)
         }
         "list_manage_categories" => out(transactions::list_manage_categories(db, uid).await?),
         "create_transaction_category" => {
@@ -124,6 +124,9 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         }
         "delete_savings_goal" => out(goals::delete_savings_goal(db, uid, args(body)?).await?),
         "use_savings_goal" => out(goals::use_savings_goal(db, uid, args(body)?).await?),
+        "convert_goal_to_wallet" => {
+            out(goals::convert_goal_to_wallet(db, uid, args(body)?).await?)
+        }
         "reorder_savings_goals" => out(goals::reorder_savings_goals(db, uid, args(body)?).await?),
 
         // ---- budgets ----

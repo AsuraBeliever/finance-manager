@@ -27,6 +27,8 @@ export interface Wallet {
   color: string | null;
   skin: string | null;
   notes: string | null;
+  /** Parent wallet this is an apartado (pocket) of, or null when standalone. */
+  parentWalletId: number | null;
   isArchived: boolean;
   /** Annual yield rate in basis points, or null when the wallet earns nothing. */
   yieldRateBps: number | null;
@@ -38,6 +40,11 @@ export interface Wallet {
 }
 
 export type TransactionKind = "income" | "expense" | "transfer_in" | "transfer_out";
+
+/** A transaction row's kind as shown in the history. Beyond the real kinds, the
+ *  list also surfaces read-only apartado moves to/from goals ("reserve" /
+ *  "release") for tracking — these never affect balances. */
+export type TxRowKind = TransactionKind | "reserve" | "release";
 
 export interface TransactionCategory {
   id: number;
@@ -54,7 +61,7 @@ export interface Transaction {
   id: number;
   walletId: number;
   walletName: string;
-  kind: TransactionKind;
+  kind: TxRowKind;
   amountCents: number;
   categoryId: number | null;
   categoryName: string | null;
@@ -270,6 +277,27 @@ export interface SpendingTrends {
 
 // ---- savings goals ----
 
+/** How often the user plans to contribute toward a goal with a deadline. */
+export type GoalCadence = "daily" | "weekly" | "monthly" | "yearly";
+
+/** What a goal is for: buying something (completing spends it) or a savings
+ *  fund (you draw it down over time, or graduate it into its own wallet). */
+export type GoalKind = "purchase" | "fund";
+
+/** Contribution plan for a goal with a deadline (computed in Rust). */
+export interface ContributionPlan {
+  /** Cadence periods left until the deadline (0 when met or overdue). */
+  periodsLeft: number;
+  /** Suggested amount to set aside each period to arrive on time. */
+  perPeriodCents: number;
+  /** Whole days to the deadline; negative once it has passed. */
+  daysLeft: number;
+  /** True once the deadline passed with money still owed. */
+  overdue: boolean;
+  /** How far below the steady pace the saved amount is (0 = on/ahead). */
+  behindCents: number;
+}
+
 export interface SavingsGoal {
   id: number;
   name: string;
@@ -281,6 +309,16 @@ export interface SavingsGoal {
   progressBps: number;
   /** Wallet remembered as the default source for contributions, if any. */
   linkedWalletId: number | null;
+  /** Deadline 'YYYY-MM-DD' to reach the target by, if set. */
+  targetDate: string | null;
+  /** Contribution cadence, set alongside the deadline. */
+  cadence: GoalCadence | null;
+  /** Plan, present only when both a deadline and cadence are set. */
+  plan: ContributionPlan | null;
+  /** True when the goal has fallen below its steady pace. */
+  isBehind: boolean;
+  /** Purchase (completing spends it) or fund (savings you draw down). */
+  goalKind: GoalKind;
 }
 
 export interface GoalInput {
@@ -289,8 +327,14 @@ export interface GoalInput {
   color: string | null;
   currencyCode: string;
   targetCents: number;
-  /** Wallet to make this goal an apartado of (null = track only). */
+  /** Wallet the goal reserves from (required). */
   walletId: number | null;
+  /** Optional deadline 'YYYY-MM-DD'. */
+  targetDate: string | null;
+  /** Contribution cadence (defaults to monthly when a deadline is set). */
+  cadence: GoalCadence | null;
+  /** Purchase or fund. */
+  goalKind: GoalKind;
 }
 
 // ---- budgets ----

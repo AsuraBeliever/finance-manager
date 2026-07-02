@@ -21,7 +21,7 @@ const WALLET_SELECT: &str = "
            COALESCE((SELECT SUM(g.saved_cents) FROM savings_goals g
                      WHERE g.linked_wallet_id = w.id AND g.archived_at IS NULL), 0)
              AS reserved_cents,
-           w.color, w.skin, w.notes, w.is_archived,
+           w.color, w.skin, w.notes, w.parent_wallet_id, w.is_archived,
            w.yield_rate_bps, w.yield_frequency, w.yield_anchor_date, w.created_at
     FROM wallets w
     JOIN wallet_categories wc ON wc.id = w.category_id";
@@ -40,6 +40,8 @@ struct WalletRow {
     color: Option<String>,
     skin: Option<String>,
     notes: Option<String>,
+    #[serde(default)]
+    parent_wallet_id: Option<i64>,
     is_archived: i64,
     yield_rate_bps: Option<i64>,
     yield_frequency: Option<String>,
@@ -61,6 +63,7 @@ impl From<WalletRow> for Wallet {
             color: r.color,
             skin: r.skin,
             notes: r.notes,
+            parent_wallet_id: r.parent_wallet_id,
             is_archived: r.is_archived != 0,
             yield_rate_bps: r.yield_rate_bps,
             yield_frequency: r.yield_frequency,
@@ -160,6 +163,8 @@ pub struct CreateWalletArgs {
     pub notes: Option<String>,
     pub yield_rate_bps: Option<i64>,
     pub yield_frequency: Option<String>,
+    #[serde(default)]
+    pub parent_wallet_id: Option<i64>,
 }
 
 pub async fn create_wallet(db: &D1Database, uid: i64, a: CreateWalletArgs) -> AppResult<Wallet> {
@@ -177,11 +182,11 @@ pub async fn create_wallet(db: &D1Database, uid: i64, a: CreateWalletArgs) -> Ap
     let res = exec(
         db,
         "INSERT INTO wallets (user_id, name, category_id, currency_code, initial_balance_cents, color, skin, notes,
-                              yield_rate_bps, yield_frequency, yield_anchor_date, yield_last_paid_date, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11,
+                              parent_wallet_id, yield_rate_bps, yield_frequency, yield_anchor_date, yield_last_paid_date, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM wallets WHERE user_id = ?1), 0))",
         jsv![uid, a.name.trim(), a.category_id, a.currency_code, a.initial_balance_cents, a.color, a.skin, a.notes,
-             rate_bps, frequency, anchor],
+             a.parent_wallet_id, rate_bps, frequency, anchor],
     )
     .await?;
     fetch_wallet(db, uid, last_row_id(&res)?).await
@@ -200,6 +205,8 @@ pub struct UpdateWalletArgs {
     pub notes: Option<String>,
     pub yield_rate_bps: Option<i64>,
     pub yield_frequency: Option<String>,
+    #[serde(default)]
+    pub parent_wallet_id: Option<i64>,
 }
 
 pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> AppResult<Wallet> {
@@ -213,6 +220,7 @@ pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> Ap
         "UPDATE wallets
          SET name = ?3, category_id = ?4, currency_code = ?5,
              initial_balance_cents = ?6, color = ?7, skin = ?8, notes = ?9,
+             parent_wallet_id = ?13,
              yield_rate_bps = ?10, yield_frequency = ?11,
              yield_anchor_date = CASE WHEN ?10 IS NULL THEN NULL
                                       ELSE COALESCE(yield_anchor_date, ?12) END,
@@ -231,7 +239,8 @@ pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> Ap
             a.notes,
             yield_on.as_ref().map(|(bps, _)| *bps),
             yield_on.as_ref().map(|(_, freq)| freq.clone()),
-            crate::db::today_mx().to_string()
+            crate::db::today_mx().to_string(),
+            a.parent_wallet_id
         ],
     )
     .await?;

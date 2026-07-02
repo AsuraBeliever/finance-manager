@@ -1,19 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Archive,
-  ArchiveRestore,
-  ArrowLeftRight,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeftRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
-import { archiveWallet, deleteWallet, getWallet, listTransactions } from "../../lib/api";
+import { WalletCard } from "../../components/WalletCard";
+import {
+  archiveWallet,
+  deleteWallet,
+  getWallet,
+  listTransactions,
+  listWallets,
+} from "../../lib/api";
 import type { Transaction } from "../../lib/types";
 import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
@@ -31,12 +31,17 @@ export function WalletDetailPage() {
   const [txFormOpen, setTxFormOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [addApartadoOpen, setAddApartadoOpen] = useState(false);
 
   const wallet = useQuery({
     queryKey: ["wallets", walletId],
     queryFn: () => getWallet(walletId),
     enabled: Number.isFinite(walletId),
   });
+
+  // This wallet's apartados (pockets nested under it).
+  const allWallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
+  const apartados = (allWallets.data ?? []).filter((x) => x.parentWalletId === walletId);
 
   const transactions = useQuery({
     queryKey: ["transactions", { walletId }],
@@ -50,6 +55,14 @@ export function WalletDetailPage() {
         ? new Map([[wallet.data.id, wallet.data.currencyCode]])
         : undefined,
     [wallet.data],
+  );
+
+  const wd = wallet.data;
+  // Stable parent descriptor for the "add pocket" form (category + currency
+  // inherited from this wallet).
+  const apartadoParent = useMemo(
+    () => (wd ? { id: wd.id, categoryId: wd.categoryId, currencyCode: wd.currencyCode } : undefined),
+    [wd?.id, wd?.categoryId, wd?.currencyCode],
   );
 
   const archive = useMutation({
@@ -125,6 +138,28 @@ export function WalletDetailPage() {
         {w.notes && <p className="mt-2 text-sm text-fg-muted">{w.notes}</p>}
       </div>
 
+      {/* Apartados (pockets) of this wallet — only for top-level wallets, since
+          apartados stay one level deep. */}
+      {w.parentWalletId == null && (
+        <div className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-medium">{es.wallets.apartadosLabel}</h3>
+            <Button variant="ghost" onClick={() => setAddApartadoOpen(true)}>
+              <span className="flex items-center gap-2">
+                <Plus size={15} /> {es.wallets.addApartado}
+              </span>
+            </Button>
+          </div>
+          {apartados.length > 0 && (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] items-start gap-4">
+              {apartados.map((a) => (
+                <WalletCard key={a.id} wallet={a} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-medium">{es.transactions.title}</h3>
         <Button variant="ghost" onClick={() => setTxFormOpen(true)}>
@@ -152,6 +187,11 @@ export function WalletDetailPage() {
       )}
 
       <WalletFormModal open={editOpen} onClose={() => setEditOpen(false)} wallet={w} />
+      <WalletFormModal
+        open={addApartadoOpen}
+        onClose={() => setAddApartadoOpen(false)}
+        defaultParent={apartadoParent}
+      />
       <TransactionFormModal
         open={txFormOpen || editingTx !== null}
         transaction={editingTx ?? undefined}

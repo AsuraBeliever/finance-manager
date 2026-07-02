@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../../components/Button";
 import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
+import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import {
   createInvestment,
@@ -332,14 +333,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
 
         <div className="grid grid-cols-2 gap-3">
           <Field label={es.investments.principal}>
-            <input
-              className={inputClass}
-              value={principalText}
-              onChange={(e) => setPrincipalText(e.target.value)}
-              placeholder="0.00"
-              inputMode="decimal"
-              required
-            />
+            <MoneyInput value={principalText} onChange={setPrincipalText} required />
           </Field>
           <Field label={es.investments.startDate}>
             <DateInput value={startDate} onChange={setStartDate} />
@@ -438,13 +432,7 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
                 />
               </Field>
               <Field label={es.investments.bonddiaRemanentes}>
-                <input
-                  className={inputClass}
-                  value={remanentesText}
-                  onChange={(e) => setRemanentesText(e.target.value)}
-                  placeholder="0.00"
-                  inputMode="decimal"
-                />
+                <MoneyInput value={remanentesText} onChange={setRemanentesText} />
               </Field>
             </div>
             <p className="-mt-2 text-xs text-fg-subtle">{es.investments.bonddiaHint}</p>

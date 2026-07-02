@@ -306,6 +306,45 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
 - **Orden de metas** (0018, `savings_goals.sort_order`): orden de despliegue por
   arrastre (`reorder_savings_goals`, igual que `reorder_wallets`). La primera
   (menor `sort_order`) es la "principal" — gauge/círculo en el resumen; el resto, barras.
+- **Apartados de cartera** (0026, `wallets.parent_wallet_id`): una cartera puede
+  ser apartado (bolsillo) de otra. Es **organizativo** — cada cartera mantiene su
+  propio saldo; el UI anida los apartados bajo su padre (p. ej. BBVA $10k + su
+  apartado "Viaje" $40k). NULL = independiente. Al graduar un fondo a cartera
+  (`convert_goal_to_wallet`) el nuevo wallet queda como apartado de la cartera en
+  que estaba la meta. Solo un nivel de profundidad (los apartados no pueden ser
+  padres en el UI).
+- **Tipo de meta** (0025, `savings_goals.goal_kind` = `purchase` | `fund`): toda
+  meta va ligada a una cartera (se quitó el "solo seguimiento" del UI). `purchase`
+  = juntar para comprar; completar (`use_savings_goal`) postea el gasto real y
+  archiva. `fund` = juntar un fondo; el dinero se queda apartado y puedes
+  **graduar** la meta a su propia cartera con `convert_goal_to_wallet`: crea una
+  cartera con el nombre de la meta y mueve el apartado ahí con una transferencia
+  (patrimonio intacto), luego archiva la meta. (Gastar un fondo poco a poco =
+  etapa 2.) Metas existentes → `purchase` por defecto.
+- **Categoría reservada "Metas"** (0023, `transaction_categories.is_reserved`):
+  al **usar** (gastar) una meta se postea un gasto real categorizado en esta
+  categoría semilla, en vez del antiguo prefijo `"Meta:"` en la descripción (que
+  rompía el bilingüe). `is_reserved = 1` la excluye de los selectores de
+  categoría (`list_transaction_categories`) y de la pantalla de administración
+  (`list_manage_categories`), así nunca se elige a mano — solo viene de metas. Su
+  nombre se traduce en `src/i18n/seed.ts` (Metas → Goals).
+- **Rastro de apartados** (0022, tabla `goal_contributions`): cada aporte/retiro
+  a una meta apartada se registra como evento (`amount_cents` con signo, +
+  apartar / − liberar). Es **solo informativo**: el dinero nunca sale de la
+  cartera (sigue en saldo y patrimonio), así que vive en su propia tabla y
+  `list_transactions` lo mezcla con `UNION ALL` en el historial como filas de
+  solo lectura (`kind` sintético `reserve`/`release`, id negativo, sin categoría)
+  — se omiten al filtrar por tipo o categoría. NUNCA toca el cálculo de saldo ni
+  de flujo (esos leen `transactions`). El earmark vigente sigue en
+  `savings_goals.saved_cents`; esto es la bitácora.
+- **Fecha límite de meta** (0021, `target_date` + `contribution_cadence`): ambas
+  NULL = meta sin plazo (igual que antes). Con plazo, `finanzas_core::goals`
+  calcula en cada lectura (nunca se almacena) el `ContributionPlan`: cuánto
+  apartar por periodo (`per_period_cents` = restante ÷ periodos al plazo según la
+  cadencia diaria/semanal/mensual/anual, redondeado hacia arriba) y si va
+  **atrasada** (`behind_cents` = lo ahorrado vs. el ritmo lineal desde `created_at`
+  hasta `target_date`). Vencida = plazo pasado con dinero pendiente. La cadencia
+  se fija junto con la fecha (default mensual); quitar la fecha limpia ambas.
 - **Suscripción activa a una fecha** D = `started_at <= D AND (ended_at IS NULL OR ended_at > D)`.
   Cancelar (set inactive) cierra la ventana y conserva historia; borrar la pierde.
 - **Cobrado en el periodo = cargos reales** (0020, `transactions.subscription_id`):

@@ -37,6 +37,10 @@ pub struct Wallet {
     /// Card skin: a catalog id ("oro"), a custom gradient, or an imported image.
     pub skin: Option<String>,
     pub notes: Option<String>,
+    /// Parent wallet this is an "apartado" (pocket) of, or None when standalone.
+    /// Organizational only — the UI nests it under the parent.
+    #[serde(default)]
+    pub parent_wallet_id: Option<i64>,
     pub is_archived: bool,
     /// Yield: annual rate in basis points, or None when the wallet earns nothing.
     pub yield_rate_bps: Option<i64>,

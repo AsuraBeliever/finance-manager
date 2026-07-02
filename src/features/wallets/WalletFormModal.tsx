@@ -3,11 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Palette, Upload } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
+import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import {
+  convertGoalToWallet,
   createWallet,
   listCurrencies,
   listWalletCategories,
+  listWallets,
   updateWallet,
   type WalletInput,
 } from "../../lib/api";
@@ -41,25 +44,52 @@ async function compressImage(file: File): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.72);
 }
 
+/** Graduating a fund goal into a wallet: the form is prefilled with the goal's
+ *  style and, on save, runs the conversion instead of a plain create. Balance
+ *  comes from the transfer (the field is hidden). */
+export interface WalletConvert {
+  goalId: number;
+  name: string;
+  color: string | null;
+  currencyCode: string;
+  savedCents: number;
+  sourceCategoryId: number | null;
+  /** Wallet the goal was saved in — the graduated fund nests under it. */
+  sourceWalletId: number | null;
+}
+
 interface WalletFormModalProps {
   open: boolean;
   onClose: () => void;
   /** When set, the form edits this wallet instead of creating one. */
   wallet?: Wallet;
+  /** When set, the form graduates a fund goal into a new wallet. */
+  convert?: WalletConvert;
+  /** When set, a new wallet is created as an apartado of this parent (category
+   *  and currency inherited from it). Used by "add pocket" on a wallet. */
+  defaultParent?: { id: number; categoryId: number; currencyCode: string };
 }
 
-export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps) {
+export function WalletFormModal({
+  open,
+  onClose,
+  wallet,
+  convert,
+  defaultParent,
+}: WalletFormModalProps) {
   const queryClient = useQueryClient();
   const categories = useQuery({
     queryKey: ["walletCategories"],
     queryFn: listWalletCategories,
   });
   const currencies = useQuery({ queryKey: ["currencies"], queryFn: listCurrencies });
+  const walletsQ = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
 
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [currencyCode, setCurrencyCode] = useState("MXN");
   const [balanceText, setBalanceText] = useState("");
+  const [parentWalletId, setParentWalletId] = useState<number | null>(null);
   const [skin, setSkin] = useState<string | null>(null);
   const [customColor, setCustomColor] = useState(COLORS[0]);
   const [notes, setNotes] = useState("");
@@ -71,10 +101,38 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
 
   useEffect(() => {
     if (!open) return;
+    if (convert) {
+      setName(convert.name);
+      setCategoryId(convert.sourceCategoryId);
+      setCurrencyCode(convert.currencyCode);
+      setBalanceText(""); // balance arrives via the transfer, not editable here
+      setParentWalletId(convert.sourceWalletId); // nest under the source wallet
+      setSkin(null);
+      setCustomColor(convert.color ?? COLORS[0]);
+      setNotes("");
+      setYieldEnabled(false);
+      setError(null);
+      return;
+    }
+    if (!wallet && defaultParent) {
+      // New apartado: inherit the parent's category + currency (hidden fields).
+      setName("");
+      setCategoryId(defaultParent.categoryId);
+      setCurrencyCode(defaultParent.currencyCode);
+      setBalanceText("");
+      setParentWalletId(defaultParent.id);
+      setSkin(null);
+      setCustomColor(COLORS[0]);
+      setNotes("");
+      setYieldEnabled(false);
+      setError(null);
+      return;
+    }
     setName(wallet?.name ?? "");
     setCategoryId(wallet?.categoryId ?? null);
     setCurrencyCode(wallet?.currencyCode ?? "MXN");
     setBalanceText(wallet ? (wallet.initialBalanceCents / 100).toFixed(2) : "");
+    setParentWalletId(wallet?.parentWalletId ?? null);
     setSkin(wallet?.skin ?? null);
     setCustomColor(skinAccent(wallet?.skin) ?? wallet?.color ?? COLORS[0]);
     setNotes(wallet?.notes ?? "");
@@ -82,7 +140,14 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
     setYieldRateText(wallet?.yieldRateBps != null ? String(wallet.yieldRateBps / 100) : "");
     setYieldFrequency(wallet?.yieldFrequency ?? "weekly");
     setError(null);
-  }, [open, wallet]);
+  }, [open, wallet, convert, defaultParent]);
+
+  const invalidateAfterConvert = () => {
+    for (const key of ["wallets", "savingsGoals", "transactions", "dashboard"]) {
+      queryClient.invalidateQueries({ queryKey: [key] });
+    }
+    onClose();
+  };
 
   const mutation = useMutation({
     mutationFn: (input: WalletInput) =>
@@ -91,6 +156,19 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
       onClose();
     },
+    onError: (e) => setError(String(e)),
+  });
+
+  const convertMut = useMutation({
+    mutationFn: (s: {
+      name: string;
+      color: string;
+      categoryId: number;
+      skin: string | null;
+      notes: string | null;
+      parentWalletId: number | null;
+    }) => convertGoalToWallet(convert!.goalId, s),
+    onSuccess: invalidateAfterConvert,
     onError: (e) => setError(String(e)),
   });
 
@@ -107,13 +185,27 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    const finalCategory = categoryId ?? categories.data?.[0]?.id;
+    if (finalCategory === undefined) return;
+    const catNameFor = categories.data?.find((c) => c.id === finalCategory)?.name;
+
+    if (convert) {
+      convertMut.mutate({
+        name,
+        color: skinAccent(effectiveSkin(skin, catNameFor)) ?? COLORS[0],
+        categoryId: finalCategory,
+        skin,
+        notes: notes.trim() === "" ? null : notes.trim(),
+        parentWalletId,
+      });
+      return;
+    }
+
     const cents = balanceText.trim() === "" ? 0 : parseToCents(balanceText);
     if (cents === null) {
       setError(es.wallets.invalidAmount);
       return;
     }
-    const finalCategory = categoryId ?? categories.data?.[0]?.id;
-    if (finalCategory === undefined) return;
     let yieldRateBps: number | null = null;
     if (yieldEnabled) {
       const pct = parseFloat(yieldRateText.replace(",", "."));
@@ -132,10 +224,17 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
       color: skinAccent(effectiveSkin(skin, catName)) ?? COLORS[0],
       skin,
       notes: notes.trim() === "" ? null : notes.trim(),
+      parentWalletId,
       yieldRateBps,
       yieldFrequency: yieldRateBps != null ? yieldFrequency : null,
     });
   }
+
+  // Only top-level, non-archived wallets can be a parent (apartados stay one
+  // level deep), and never the wallet being edited itself.
+  const eligibleParents = (walletsQ.data ?? []).filter(
+    (w) => w.id !== wallet?.id && w.parentWalletId == null && !w.isArchived,
+  );
 
   const imgSelected = !!skin && skin.startsWith("img:");
   const gradSelected = !!skin && skin.startsWith("grad:");
@@ -147,7 +246,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
 
   return (
     <Modal
-      title={wallet ? es.wallets.editWallet : es.wallets.newWallet}
+      title={convert ? es.goals.convertToWallet : wallet ? es.wallets.editWallet : es.wallets.newWallet}
       open={open}
       onClose={onClose}
     >
@@ -163,44 +262,78 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={es.wallets.category}>
-            <select
-              className={inputClass}
-              value={categoryId ?? categories.data?.[0]?.id ?? ""}
-              onChange={(e) => setCategoryId(Number(e.target.value))}
-            >
-              {categories.data?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {seedName(c.name, c.isSystem)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={es.wallets.currency}>
-            <select
-              className={inputClass}
-              value={currencyCode}
-              onChange={(e) => setCurrencyCode(e.target.value)}
-            >
-              {currencies.data?.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.code} — {seedName(c.name)}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <Field label={es.wallets.initialBalance}>
-          <input
+        <Field label={es.wallets.parentWallet}>
+          <select
             className={inputClass}
-            value={balanceText}
-            onChange={(e) => setBalanceText(e.target.value)}
-            placeholder="0.00"
-            inputMode="decimal"
-          />
+            value={parentWalletId ?? ""}
+            onChange={(e) => {
+              const pid = e.target.value === "" ? null : Number(e.target.value);
+              setParentWalletId(pid);
+              // An apartado inherits its parent's category + currency.
+              const par = walletsQ.data?.find((w) => w.id === pid);
+              if (par) {
+                setCategoryId(par.categoryId);
+                setCurrencyCode(par.currencyCode);
+              }
+            }}
+          >
+            <option value="">{es.wallets.parentNone}</option>
+            {eligibleParents.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-fg-subtle">
+            {parentWalletId != null ? es.wallets.parentHint : es.wallets.parentNoneHint}
+          </span>
         </Field>
+
+        {/* An apartado inherits its parent's category and currency, so those
+            aren't shown — only a standalone wallet picks them. */}
+        {parentWalletId == null && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={es.wallets.category}>
+              <select
+                className={inputClass}
+                value={categoryId ?? categories.data?.[0]?.id ?? ""}
+                onChange={(e) => setCategoryId(Number(e.target.value))}
+              >
+                {categories.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {seedName(c.name, c.isSystem)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={es.wallets.currency}>
+              <select
+                className={inputClass}
+                value={currencyCode}
+                onChange={(e) => setCurrencyCode(e.target.value)}
+              >
+                {currencies.data?.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} — {seedName(c.name)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        )}
+
+        {convert ? (
+          <p className="rounded-lg bg-surface-overlay px-3 py-2 text-xs text-fg-muted">
+            {es.goals.convertMoves.replace(
+              "{amount}",
+              formatCents(convert.savedCents, convert.currencyCode),
+            )}
+          </p>
+        ) : (
+          <Field label={es.wallets.initialBalance}>
+            <MoneyInput value={balanceText} onChange={setBalanceText} />
+          </Field>
+        )}
 
         {/* Card skin picker */}
         <Field label={es.wallets.skin}>
@@ -296,7 +429,9 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
         </Field>
 
         {/* Yield: wallets that grow on their own (Klar, Nu…) accrue interest
-            automatically via the daily cron; see worker wallet_yield. */}
+            automatically via the daily cron; see worker wallet_yield. Not shown
+            when graduating a fund goal (set it later by editing the wallet). */}
+        {!convert && (
         <div className="rounded-lg border border-border-muted p-3">
           <label className="flex cursor-pointer items-start gap-2.5">
             <input
@@ -348,6 +483,7 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
             </div>
           )}
         </div>
+        )}
 
         {error && <p className="text-sm text-danger">{error}</p>}
         {wallet && (
@@ -360,8 +496,8 @@ export function WalletFormModal({ open, onClose, wallet }: WalletFormModalProps)
           <Button type="button" variant="ghost" onClick={onClose}>
             {es.common.cancel}
           </Button>
-          <Button type="submit" disabled={mutation.isPending}>
-            {es.common.save}
+          <Button type="submit" disabled={convert ? convertMut.isPending : mutation.isPending}>
+            {convert ? es.goals.convertToWallet : es.common.save}
           </Button>
         </div>
       </form>

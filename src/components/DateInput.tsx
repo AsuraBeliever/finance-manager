@@ -9,7 +9,8 @@ import {
 } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { inputClass } from "./Field";
 import { es } from "../i18n/es";
 
@@ -28,24 +29,72 @@ interface DateInputProps {
 /** Themed calendar picker. The native <input type="date"> popup in WebKitGTK
  *  grabs input focus and freezes the window until it loses focus, so dates
  *  are picked with our own popover instead. */
+/** Popover width in px (matches the w-72 calendar). */
+const POPOVER_W = 288;
+
 export function DateInput({ value, onChange, min }: DateInputProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"days" | "months">("days");
   const selected = value ? parseISO(value) : new Date();
   const [view, setView] = useState(startOfMonth(selected));
-  const rootRef = useRef<HTMLDivElement>(null);
+  // Editable year in the month picker: a local text buffer so partial typing
+  // ("20…") doesn't snap, committing to `view` only once it's a full valid year.
+  const [yearText, setYearText] = useState(String(view.getFullYear()));
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  // Keep the year field in sync when the year changes via the arrows or by
+  // jumping months/years elsewhere.
+  useEffect(() => {
+    setYearText(String(view.getFullYear()));
+  }, [view]);
+
+  /** Step the viewed year by ±1, clamped to the supported range. */
+  function stepYear(delta: number) {
+    const y = Math.min(new Date().getFullYear() + 100, Math.max(YEAR_FROM, view.getFullYear() + delta));
+    setView(new Date(y, view.getMonth(), 1));
+  }
+
+  // The calendar renders in a portal at <body> with fixed positioning so it
+  // overlaps any modal/overflow instead of being clipped inside it. Anchor it to
+  // the trigger, flipping above when there isn't room below, and keep it on
+  // screen horizontally.
+  function reposition() {
+    const b = btnRef.current;
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    const left = Math.max(8, Math.min(r.right - POPOVER_W, window.innerWidth - POPOVER_W - 8));
+    const popH = popRef.current?.offsetHeight ?? 340;
+    const below = r.bottom + 8;
+    const top = below + popH > window.innerHeight - 8 && r.top - popH - 8 > 8 ? r.top - popH - 8 : below;
+    setPos({ top, left });
+  }
+
+  useLayoutEffect(() => {
+    if (open) reposition();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, view]);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onMove = () => reposition();
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onMove);
+    // capture phase so scrolling inside the modal also repositions the popover
+    window.addEventListener("scroll", onMove, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onMove, true);
     };
   }, [open]);
 
@@ -67,8 +116,9 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <button
+        ref={btnRef}
         type="button"
         className={`${inputClass} flex items-center justify-between gap-2 text-left`}
         onClick={() => {
@@ -85,39 +135,44 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
         <Calendar size={15} className="shrink-0 text-fg-subtle" />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-muted bg-surface-overlay p-3 shadow-2xl">
+      {open &&
+        createPortal(
+          <div
+            ref={popRef}
+            style={{ position: "fixed", top: pos.top, left: pos.left }}
+            className="z-[60] w-72 rounded-xl border border-border-muted bg-surface-overlay p-3 shadow-2xl"
+          >
           {mode === "months" ? (
             <>
               <div className="mb-3 flex items-center justify-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setView((v) => addMonths(v, -12))}
+                  onClick={() => stepYear(-1)}
+                  aria-label={es.common.prevYear}
                   className="rounded-md p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg"
                 >
                   <ChevronLeft size={16} />
                 </button>
-                <select
-                  className="rounded-lg border border-border-muted bg-surface py-1 pl-2 text-sm font-medium text-fg outline-none"
-                  value={view.getFullYear()}
-                  onChange={(e) =>
-                    setView(new Date(Number(e.target.value), view.getMonth(), 1))
-                  }
-                >
-                  {Array.from(
-                    { length: new Date().getFullYear() + 2 - YEAR_FROM },
-                    (_, i) => YEAR_FROM + i,
-                  )
-                    .reverse()
-                    .map((y) => (
-                      <option key={y} value={y}>
-                        {y}
-                      </option>
-                    ))}
-                </select>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={yearText}
+                  onChange={(e) => {
+                    const t = e.target.value.replace(/\D/g, "").slice(0, 4);
+                    setYearText(t);
+                    if (t.length === 4) {
+                      const y = Number(t);
+                      if (y >= YEAR_FROM) setView(new Date(y, view.getMonth(), 1));
+                    }
+                  }}
+                  onBlur={() => setYearText(String(view.getFullYear()))}
+                  className="w-16 rounded-lg border border-border-muted bg-surface py-1 text-center text-sm font-medium tabular-nums text-fg outline-none focus:border-accent"
+                />
                 <button
                   type="button"
-                  onClick={() => setView((v) => addMonths(v, 12))}
+                  onClick={() => stepYear(1)}
+                  aria-label={es.common.nextYear}
                   className="rounded-md p-1.5 text-fg-muted hover:bg-surface-raised hover:text-fg"
                 >
                   <ChevronRight size={16} />
@@ -143,12 +198,12 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
                         setView(new Date(view.getFullYear(), i, 1));
                         setMode("days");
                       }}
-                      className={`rounded-lg py-2 text-sm capitalize transition-colors ${
+                      className={`rounded-lg border border-transparent py-2 text-sm capitalize transition-colors ${
                         disabled
                           ? "cursor-not-allowed text-fg-subtle"
                           : isCurrent
-                            ? "bg-accent-dim/15 font-semibold text-accent hover:bg-surface-raised"
-                            : "text-fg hover:bg-surface-raised"
+                            ? "bg-accent-dim/15 font-semibold text-accent hover:border-accent hover:bg-surface-raised"
+                            : "text-fg hover:border-accent hover:bg-surface-raised"
                       }`}
                     >
                       {m}
@@ -205,14 +260,14 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
                   type="button"
                   disabled={disabled}
                   onClick={() => pick(day)}
-                  className={`rounded-lg py-1.5 text-sm tabular-nums transition-colors ${
+                  className={`rounded-lg border border-transparent py-1.5 text-sm tabular-nums transition-colors ${
                     isSelected
                       ? "bg-accent-dim font-semibold text-surface"
                       : disabled
                         ? "cursor-not-allowed text-fg-subtle"
                         : isToday
-                          ? "font-semibold text-accent hover:bg-surface-raised"
-                          : "text-fg hover:bg-surface-raised"
+                          ? "font-semibold text-accent hover:border-accent hover:bg-surface-raised"
+                          : "text-fg hover:border-accent hover:bg-surface-raised"
                   }`}
                 >
                   {day}
@@ -237,8 +292,9 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
           </button>
           </>
           )}
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

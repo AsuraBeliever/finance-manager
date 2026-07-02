@@ -100,6 +100,8 @@ export interface WalletInput {
   yieldRateBps: number | null;
   /** Payout cadence ('weekly' | 'biweekly' | 'monthly'); used when yield is on. */
   yieldFrequency: string | null;
+  /** Parent wallet to nest under as an apartado, or null for standalone. */
+  parentWalletId: number | null;
 }
 
 export const listWallets = (includeArchived = false) =>
@@ -141,7 +143,8 @@ export interface TransferInput {
 
 export interface TxFilter {
   walletId?: number;
-  kind?: TransactionKind;
+  /** A real kind, or "transfer" to match both transfer directions. */
+  kind?: TransactionKind | "transfer";
   categoryId?: number;
   from?: string;
   to?: string;
@@ -170,6 +173,11 @@ export const deleteTransaction = (id: number) =>
 
 export const listTransactionCategories = () =>
   rpc<TransactionCategory[]>("list_transaction_categories");
+
+/** Categories for the transactions filter — includes the reserved "Metas" so
+ *  you can filter by it (the entry form uses the plain list, which hides it). */
+export const listFilterCategories = () =>
+  rpc<TransactionCategory[]>("list_transaction_categories", { includeReserved: true });
 
 /** Full set for the category manager: own + all seeds, each with `isHidden`. */
 export const listManageCategories = () =>
@@ -224,6 +232,20 @@ export const contributeSavingsGoal = (id: number, amountCents: number) =>
   rpc<SavingsGoal>("contribute_savings_goal", { id, amountCents });
 
 export const useSavingsGoal = (id: number) => rpc<void>("use_savings_goal", { id });
+
+/** Graduate a fund goal into its own wallet (moves the reserved money there).
+ *  Optional style overrides the defaults (goal name/color, source category). */
+export const convertGoalToWallet = (
+  id: number,
+  style?: {
+    name?: string;
+    color?: string | null;
+    categoryId?: number;
+    skin?: string | null;
+    notes?: string | null;
+    parentWalletId?: number | null;
+  },
+) => rpc<void>("convert_goal_to_wallet", { id, ...style });
 
 export const deleteSavingsGoal = (id: number) =>
   rpc<void>("delete_savings_goal", { id });
