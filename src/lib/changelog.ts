@@ -12,6 +12,24 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.21.0",
+    date: "2026-07-02",
+    es: [
+      "Tarjetas de crédito de verdad: marca una cartera como tarjeta y registra su día de corte, días para pagar, límite de crédito y anualidad.",
+      "El detalle de la tarjeta muestra tu deuda, el saldo al corte y cuánto pagar antes de la fecha límite para no generar intereses.",
+      "Barra de uso del crédito (verde/ámbar/rojo) y crédito disponible, contando también lo comprometido a meses.",
+      "Compras a meses sin intereses (MSI): regístralas una vez y cada mensualidad se carga sola en tu historial en cada corte.",
+      "Pagar la tarjeta es tan simple como siempre: una transferencia desde tu cartera de débito.",
+    ],
+    en: [
+      "Real credit cards: mark a wallet as a card and track its cut-off day, days to pay, credit limit and annual fee.",
+      "The card's detail shows your debt, the statement balance and how much to pay before the deadline to avoid interest.",
+      "Credit usage bar (green/amber/red) and available credit, also counting what's committed to installments.",
+      "Interest-free installment purchases (MSI): register them once and each monthly charge posts itself on every cut-off.",
+      "Paying the card stays as simple as ever: a transfer from your debit wallet.",
+    ],
+  },
+  {
     version: "2.20.0",
     date: "2026-07-02",
     es: [
