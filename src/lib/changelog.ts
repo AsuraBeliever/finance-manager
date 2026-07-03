@@ -12,6 +12,26 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.22.0",
+    date: "2026-07-02",
+    es: [
+      "Compra a MSI desde el formulario normal de gasto: si la cartera elegida es una tarjeta con corte, marca «Compra a meses sin intereses» y listo.",
+      "Cada compra a MSI lleva su categoría de gasto, así las mensualidades cuentan en tus presupuestos y análisis.",
+      "Al capturar un MSI ves en vivo «≈ $X al mes · primer cargo el día D», y al guardar una confirmación con el primer y último cargo.",
+      "Pagar la tarjeta con más contexto: al transferirle ves cuánto falta del corte y su fecha límite, y al guardar te dice si quedó liquidado o cuánto falta.",
+      "Al dar de alta una tarjeta puedes registrar la deuda que ya traías («Deuda actual»).",
+      "Configurar una tarjeta es más directo: elegir la categoría «Tarjeta de crédito» muestra sus campos, sin interruptor aparte.",
+    ],
+    en: [
+      "MSI purchases from the regular expense form: if the chosen wallet is a card with a cut-off, tick \"Interest-free installments\" and you're done.",
+      "Each MSI purchase carries its expense category, so the monthly charges count in your budgets and analytics.",
+      "While entering an MSI you see live \"≈ $X per month · first charge on day D\", and a confirmation with the first and last charge on save.",
+      "Paying the card with more context: when transferring to it you see what's left of the statement and its due date, and on save it tells you whether it's settled or how much is missing.",
+      "When creating a card you can register the debt you already carried (\"Current debt\").",
+      "Setting up a card is more direct: picking the \"Credit card\" category reveals its fields, no separate toggle.",
+    ],
+  },
+  {
     version: "2.21.0",
     date: "2026-07-02",
     es: [

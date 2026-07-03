@@ -59,7 +59,13 @@ npm run tauri dev                            # shell de escritorio
 - Strings de UI SOLO en `src/i18n/` (bilingüe es/en); nada hardcodeado en componentes. `es.ts` es la forma canónica (`esDict`); al agregar una clave, agrégala también en `en.ts`. Los componentes importan `es` (un proxy al idioma activo) y usan `es.x`; el idioma se cambia en Ajustes (`src/i18n/store.ts`) y el router se remonta al cambiar. OJO: textos a nivel de módulo (fuera de un componente) quedan congelados al idioma inicial — defínelos dentro del componente.
 - **Cambios de esquema**: solo vía migración nueva en `worker/migrations/*.sql` + actualizar `docs/DATA_MODEL.md`.
 - **Calculadoras de inversión nuevas**: implementar `InvestmentCalculator` en finanzas-core + registry + tests + cargar su `CalcContext` en ambos loaders (worker y src-tauri) + form; guía en `docs/INVESTMENTS.md`.
-- Git: conventional commits; milestone por branch `feat/<nombre>`, merge `--no-ff` a `main`, tag semver al completar. Fixes triviales directo a `main`.
+- Git: conventional commits. TODO cambio de producto (cualquier `feat`, o una serie
+  de commits relacionados) se desarrolla en branch `feat/<nombre>` y llega a `main`
+  SOLO vía release: commit `chore(release)` (bump en `package.json` + entrada en
+  `src/lib/changelog.ts`) + merge `--no-ff` + tag semver. Directo a `main` únicamente
+  un `fix`/`chore`/`docs` trivial y aislado (un commit); un `feat` directo a `main`
+  NUNCA. Solo se deploya un tag: si `main` tiene trabajo sin taguear, primero se
+  corta el release. Regla de oro: `main` siempre = último release.
 - Tests de fórmulas financieras obligatorios, con valores de referencia calculados a mano.
 
 ## Estado actual
