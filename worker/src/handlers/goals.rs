@@ -85,7 +85,10 @@ struct GoalRow {
     contribution_cadence: Option<String>,
     #[serde(default)]
     goal_kind: String,
-    /// Day the goal started ('YYYY-MM-DD'), the pace anchor for the plan.
+    /// Day the deadline was set ('YYYY-MM-DD') — the pace anchor for the plan.
+    #[serde(default)]
+    plan_anchor_date: Option<String>,
+    /// Day the goal started ('YYYY-MM-DD'); pace fallback for pre-0030 rows.
     created_at: String,
 }
 
@@ -101,10 +104,15 @@ fn progress_bps(saved: i64, target: i64) -> i64 {
 /// `today` when the goal has both a deadline and a cadence. A goal missing
 /// either (or with an unparseable date/cadence) simply carries no plan.
 fn build(r: GoalRow, today: NaiveDate) -> SavingsGoal {
+    let pace_start = r
+        .plan_anchor_date
+        .as_deref()
+        .and_then(parse_date)
+        .or_else(|| parse_date(&r.created_at));
     let (plan, is_behind) = match (
         r.target_date.as_deref().and_then(parse_date),
         r.contribution_cadence.as_deref().and_then(Cadence::parse),
-        parse_date(&r.created_at),
+        pace_start,
     ) {
         (Some(deadline), Some(cadence), Some(start)) => {
             let p = plan_contribution(
@@ -149,7 +157,8 @@ fn parse_date(s: &str) -> Option<NaiveDate> {
 }
 
 const SELECT: &str = "SELECT id, name, icon, color, currency_code, target_cents, saved_cents,
-        linked_wallet_id, target_date, contribution_cadence, goal_kind, date(created_at) AS created_at
+        linked_wallet_id, target_date, contribution_cadence, goal_kind, plan_anchor_date,
+        date(created_at) AS created_at
         FROM savings_goals";
 
 async fn fetch_goal(db: &D1Database, uid: i64, id: i64) -> AppResult<SavingsGoal> {
@@ -177,7 +186,7 @@ pub async fn list_savings_goals(
         db,
         "SELECT g.id, g.name, g.icon, g.color, g.currency_code, g.target_cents,
                 g.linked_wallet_id, g.target_date, g.contribution_cadence, g.goal_kind,
-                date(g.created_at) AS created_at,
+                g.plan_anchor_date, date(g.created_at) AS created_at,
                 COALESCE((SELECT s.saved_cents FROM goal_snapshots s
                           WHERE s.goal_id = g.id AND s.as_of <= ?2
                           ORDER BY s.as_of DESC, s.id DESC LIMIT 1), 0) AS saved_cents
@@ -299,8 +308,8 @@ pub async fn create_savings_goal(
         db,
         "INSERT INTO savings_goals
            (user_id, name, icon, color, currency_code, target_cents, linked_wallet_id,
-            target_date, contribution_cadence, goal_kind, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+            target_date, contribution_cadence, goal_kind, plan_anchor_date, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM savings_goals WHERE user_id = ?1), 0))",
         jsv![
             uid,
@@ -312,7 +321,9 @@ pub async fn create_savings_goal(
             linked_wallet_id,
             target_date,
             cadence,
-            goal_kind(&a)
+            goal_kind(&a),
+            // The pace starts when the deadline exists (here: at creation).
+            target_date.as_ref().map(|_| today_mx().to_string())
         ],
     )
     .await?;
@@ -339,9 +350,17 @@ pub async fn update_savings_goal(
     let (target_date, cadence) = resolve_deadline(&a.input)?;
     let res = exec(
         db,
+        // The pace anchor restarts whenever the deadline is set or moved (the
+        // plan begins that day, not at the goal's creation), clears when the
+        // deadline is removed, and stays put otherwise.
         "UPDATE savings_goals
          SET name = ?3, icon = ?4, color = ?5, currency_code = ?6, target_cents = ?7,
-             linked_wallet_id = ?8, target_date = ?9, contribution_cadence = ?10, goal_kind = ?11
+             linked_wallet_id = ?8,
+             plan_anchor_date = CASE
+               WHEN ?9 IS NULL THEN NULL
+               WHEN target_date IS NULL OR target_date <> ?9 THEN ?12
+               ELSE COALESCE(plan_anchor_date, ?12) END,
+             target_date = ?9, contribution_cadence = ?10, goal_kind = ?11
          WHERE id = ?1 AND user_id = ?2",
         jsv![
             a.id,
@@ -354,7 +373,8 @@ pub async fn update_savings_goal(
             linked_wallet_id,
             target_date,
             cadence,
-            goal_kind(&a.input)
+            goal_kind(&a.input),
+            today_mx().to_string()
         ],
     )
     .await?;

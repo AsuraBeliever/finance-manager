@@ -249,6 +249,7 @@ CREATE TABLE savings_goals (     -- meta con monto ahorrado manual; progreso = s
   currency_code TEXT NOT NULL DEFAULT 'MXN' REFERENCES currencies(code),
   target_cents INTEGER NOT NULL CHECK (target_cents > 0),
   saved_cents INTEGER NOT NULL DEFAULT 0 CHECK (saved_cents >= 0),
+  plan_anchor_date TEXT,         -- 0030: día en que se puso/movió la fecha límite (ancla del ritmo)
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -359,9 +360,16 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
   calcula en cada lectura (nunca se almacena) el `ContributionPlan`: cuánto
   apartar por periodo (`per_period_cents` = restante ÷ periodos al plazo según la
   cadencia diaria/semanal/mensual/anual, redondeado hacia arriba) y si va
-  **atrasada** (`behind_cents` = lo ahorrado vs. el ritmo lineal desde `created_at`
-  hasta `target_date`). Vencida = plazo pasado con dinero pendiente. La cadencia
-  se fija junto con la fecha (default mensual); quitar la fecha limpia ambas.
+  **atrasada** (`behind_cents` = lo ahorrado vs. el ritmo lineal desde
+  `plan_anchor_date` hasta `target_date`). Vencida = plazo pasado con dinero
+  pendiente. La cadencia se fija junto con la fecha (default mensual); quitar la
+  fecha limpia ambas.
+- **Ancla del ritmo** (0030, `plan_anchor_date`): el día en que se PUSO la fecha
+  límite — se estampa al fijarla o moverla, se limpia al quitarla y `created_at`
+  queda solo como fallback de filas pre-0030. Antes el ritmo anclaba en
+  `created_at`, así que ponerle plazo a una meta vieja la marcaba «atrasada» al
+  instante (fingía que debiste ahorrar desde su creación hacia un plazo que aún
+  no existía).
 - **Suscripción activa a una fecha** D = `started_at <= D AND (ended_at IS NULL OR ended_at > D)`.
   Cancelar (set inactive) cierra la ventana y conserva historia; borrar la pierde.
 - **Cobrado en el periodo = cargos reales** (0020, `transactions.subscription_id`):
