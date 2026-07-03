@@ -21,6 +21,7 @@ import { logout, me } from "./lib/auth";
 import { useOnline } from "./lib/online";
 import { flush } from "./lib/outbox";
 import { LoginPage } from "./features/auth/LoginPage";
+import { NotificationBell } from "./features/notifications/NotificationBell";
 import { UpdateBanner } from "./features/update/UpdateBanner";
 import { WhatsNewAuto } from "./features/update/WhatsNew";
 import { hydrateThemeFromServer } from "./lib/theme";
@@ -153,6 +154,7 @@ export default function App() {
           <h1 className="truncate font-display text-xl font-semibold tracking-tight text-fg">
             {appearance.appName || es.app.name}
           </h1>
+          <NotificationBell />
         </div>
         <nav className="flex flex-col gap-0.5 px-3">
           {navItems.map(({ to, label, icon: Icon, end }) => (
@@ -224,6 +226,9 @@ export default function App() {
       <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 md:px-8 md:py-6 md:pb-6">
         <Outlet />
       </main>
+
+      {/* Mobile: no top bar exists, so the bell floats over the content. */}
+      <NotificationBell floating />
 
       {/* Mobile bottom navigation */}
       <nav

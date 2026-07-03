@@ -45,6 +45,7 @@ import { todayIso } from "../../lib/date";
 import { POSITIVE, useChartTokens } from "../../lib/palette";
 import type { SimCadence } from "../../lib/types";
 import { es } from "../../i18n/es";
+import { InvestmentRemindersCard } from "../notifications/InvestmentRemindersCard";
 import { InvestmentFormModal } from "./InvestmentFormModal";
 
 const SIM_GOLD = "#c9a14a";
@@ -531,6 +532,8 @@ export function InvestmentDetailPage() {
           </ul>
         </section>
       )}
+
+      {!d.isClosed && <InvestmentRemindersCard investmentId={invId} />}
 
       <InvestmentFormModal open={editOpen} onClose={() => setEditOpen(false)} investment={d} />
 

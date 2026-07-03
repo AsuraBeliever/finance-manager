@@ -11,8 +11,12 @@ import type {
   GoalInput,
   InvestmentDetail,
   InvestmentProjection,
+  InvestmentReminder,
   InvestmentWithValue,
+  NotificationList,
   Portfolio,
+  ReminderCadence,
+  ReminderKind,
   SimCadence,
   SimulateInput,
   SimResult,
@@ -406,3 +410,22 @@ export interface BanxicoRate {
 
 export const fetchBanxicoRate = (kind: BanxicoSeriesKind) =>
   rpc<BanxicoRate>("fetch_banxico_rate", { kind });
+
+// ---- notifications ----
+
+export const listNotifications = (limit = 30) =>
+  rpc<NotificationList>("list_notifications", { limit });
+
+/** Mark specific notifications read, or every unread one when ids is omitted. */
+export const markNotificationsRead = (ids?: number[]) =>
+  rpc<void>("mark_notifications_read", ids ? { ids } : {});
+
+export const listInvestmentReminders = (investmentId: number) =>
+  rpc<InvestmentReminder[]>("list_investment_reminders", { investmentId });
+
+/** Upsert a per-investment reminder; a null cadence removes it. */
+export const setInvestmentReminder = (
+  investmentId: number,
+  kind: ReminderKind,
+  cadence: ReminderCadence | null,
+) => rpc<void>("set_investment_reminder", { investmentId, kind, cadence });

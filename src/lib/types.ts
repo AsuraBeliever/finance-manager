@@ -455,3 +455,28 @@ export interface SubInput {
   walletId: number | null;
   categoryId: number | null;
 }
+
+// ---- notifications ----
+
+/** One in-app alert. `kind` is an i18n key; `paramsJson` holds the raw values
+ *  (cents, dates, names) the frontend interpolates in the active locale. */
+export interface AppNotification {
+  id: number;
+  kind: string;
+  paramsJson: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationList {
+  items: AppNotification[];
+  unreadCount: number;
+}
+
+export type ReminderKind = "contribute" | "performance";
+export type ReminderCadence = "daily" | "weekly" | "biweekly" | "monthly";
+
+export interface InvestmentReminder {
+  kind: ReminderKind;
+  cadence: ReminderCadence;
+}

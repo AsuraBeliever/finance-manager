@@ -672,6 +672,89 @@ export const esDict = {
     view: "Ver novedades",
     notifyOnUpdate: "Avisarme al actualizar",
   },
+  notifications: {
+    title: "Notificaciones",
+    empty: "Sin avisos por ahora.",
+    markAllRead: "Marcar todas como leídas",
+    generic: "Tienes un aviso nuevo.",
+    today: "hoy",
+    tomorrow: "mañana",
+    inDays: "en {n} días",
+    settingsHint: "Elige qué avisos quieres recibir y con cuánta anticipación.",
+    manage: "Configurar notificaciones",
+    pageHint:
+      "Los avisos llegan a la campanita cada mañana (8:00). Activa una categoría con su casilla y afina cada regla.",
+    daysBefore: "días antes",
+    utilizationThreshold: "Avisar cuando pase de",
+    categories: {
+      credit: "Tarjetas de crédito",
+      goals: "Metas",
+      subscriptions: "Suscripciones",
+      investments: "Inversiones",
+    },
+    periodWords: {
+      daily: "hoy",
+      weekly: "esta semana",
+      biweekly: "esta quincena",
+      monthly: "este mes",
+      yearly: "este año",
+    },
+    rules: {
+      creditCutSoon: "Se acerca el corte",
+      creditDueSoon: "Se acerca la fecha límite de pago",
+      creditUtilization: "Uso alto de la línea de crédito",
+      creditAnniversary: "Anualidad próxima",
+      creditMsiPosted: "Se cargó una mensualidad MSI",
+      goalContribution: "Te toca apartar (según la frecuencia de la meta)",
+      goalBehind: "Vas atrás del ritmo",
+      goalDeadlineSoon: "Fecha límite próxima",
+      goalCompleted: "Meta cumplida",
+      subChargeSoon: "Cobro próximo",
+      subChargeToday: "Cobro hoy",
+      invContribute: "Recordatorios de aportar",
+      invPerformance: "Resumen de rendimiento",
+      invCetesMaturity: "CETES por vencer",
+    },
+    invRulesHint:
+      "«Aportar» y «rendimiento» se programan en el detalle de cada inversión; aquí solo enciendes o apagas sus avisos.",
+    reminders: {
+      title: "Recordatorios",
+      contribute: "Recuérdame aportar",
+      performance: "Dime cuánto ha generado",
+      hint: "Los avisos llegan a la campanita en la mañana de cada ocurrencia.",
+      globalOff:
+        "Los avisos de inversiones están apagados en Ajustes → Notificaciones.",
+      cadences: {
+        daily: "Diario",
+        weekly: "Semanal",
+        biweekly: "Quincenal",
+        monthly: "Mensual",
+      },
+    },
+  },
+  notificationKinds: {
+    "credit.cutSoon":
+      "{wallet}: tu corte es {when} ({date}). Deuda actual: {debt}.",
+    "credit.dueSoon":
+      "{wallet}: paga {amount} antes del {date} ({when}) para no generar intereses.",
+    "credit.utilization":
+      "{wallet}: llevas {utilization} de tu línea de crédito usada.",
+    "credit.anniversary": "{wallet}: tu anualidad se cobra {when} ({date}).",
+    "credit.msiPosted": "{wallet}: se cargó tu mensualidad {description} por {amount}.",
+    "goal.contribution": "«{name}»: aparta {amount} {period} para llegar a tiempo.",
+    "goal.behind":
+      "«{name}»: vas {behind} por debajo del ritmo. Un abono extra te empareja.",
+    "goal.deadlineSoon":
+      "«{name}»: la fecha límite es {when} ({date}) y te faltan {remaining}.",
+    "goal.completed": "¡Meta cumplida! «{name}» llegó a {target}. 🎉",
+    "sub.chargeSoon": "{name}: se cobrará {amount} {when} ({date}).",
+    "sub.chargeToday": "{name}: hoy se cobra {amount}.",
+    "inv.contribute": "{name}: es tu día de aportar a esta inversión.",
+    "inv.performance":
+      "{name}: llevas {value}; generó {gainSince} desde el {since} ({totalGain} en total).",
+    "inv.performanceFirst": "{name}: llevas {value}; ha generado {totalGain} en total.",
+    "inv.cetesMaturity": "{name}: vence {when} ({date}).",
+  },
   offline: {
     banner: "Sin conexión — mostrando los últimos datos sincronizados",
     savedPending: "Sin conexión: el movimiento se guardó y se sincronizará al reconectar.",

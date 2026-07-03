@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es as dateLocaleEs, enUS as dateLocaleEn } from "date-fns/locale";
-import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Sparkles, Tags } from "lucide-react";
+import { Bell, ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Sparkles, Tags } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { InstallButton } from "../../components/InstallButton";
@@ -209,6 +209,18 @@ export function SettingsPage() {
           </h3>
           <DevicesList />
         </section>
+
+        <Link
+          to="/ajustes/notificaciones"
+          className="flex items-center gap-3 rounded-xl border border-border-muted bg-surface-raised p-5 transition-colors hover:bg-surface-overlay"
+        >
+          <Bell size={16} className="shrink-0 text-fg-subtle" />
+          <div className="min-w-0 flex-1">
+            <h3 className="font-medium">{es.notifications.title}</h3>
+            <p className="text-xs text-fg-subtle">{es.notifications.settingsHint}</p>
+          </div>
+          <ChevronRight size={16} className="shrink-0 text-fg-subtle" />
+        </Link>
 
         <Link
           to="/ajustes/contrasena"
