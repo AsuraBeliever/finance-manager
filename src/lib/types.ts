@@ -360,6 +360,13 @@ export interface ContributionPlan {
   periodsLeft: number;
   /** Suggested amount to set aside each period to arrive on time. */
   perPeriodCents: number;
+  /** This period's quota, frozen at the period start (doesn't shrink as you
+   *  contribute — partial progress reads "2,000 of 2,400"). */
+  periodQuotaCents: number;
+  /** What's still missing to cover this period's quota (0 = covered). */
+  periodMissingCents: number;
+  /** Net amount contributed within the current cadence period. */
+  contributedThisPeriodCents: number;
   /** Whole days to the deadline; negative once it has passed. */
   daysLeft: number;
   /** True once the deadline passed with money still owed. */
