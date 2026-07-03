@@ -462,6 +462,122 @@ pub async fn contribute_savings_goal(
     Ok(goal)
 }
 
+#[derive(Deserialize)]
+struct ContributionRow {
+    goal_id: i64,
+    amount_cents: i64,
+}
+
+/// The contribution row, only if its goal belongs to the caller.
+async fn fetch_contribution(db: &D1Database, uid: i64, id: i64) -> AppResult<ContributionRow> {
+    first(
+        db,
+        "SELECT gc.goal_id, gc.amount_cents FROM goal_contributions gc
+         JOIN savings_goals g ON g.id = gc.goal_id
+         WHERE gc.id = ?1 AND g.user_id = ?2",
+        jsv![id, uid],
+    )
+    .await?
+    .ok_or(AppError::NotFound("movimiento de apartado"))
+}
+
+/// Apply `delta` to a goal's earmark exactly like a fresh contribution would:
+/// re-earmarking more (delta > 0) is capped by the wallet's available, and the
+/// earmark never drops below zero.
+async fn validate_delta(
+    db: &D1Database,
+    uid: i64,
+    goal: &SavingsGoal,
+    delta: i64,
+) -> AppResult<()> {
+    if delta > 0 {
+        if let Some(wallet_id) = goal.linked_wallet_id {
+            if delta > wallet_available(db, uid, wallet_id).await? {
+                return Err(AppError::InvalidInput(
+                    "no hay suficiente disponible en la cartera para apartar ese monto".into(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateContributionArgs {
+    /// goal_contributions.id
+    pub id: i64,
+    /// New signed amount: positive = reserved, negative = released.
+    pub amount_cents: i64,
+    pub occurred_at: String,
+}
+
+/// Edit an apartado move from the transactions history: the goal's earmark
+/// shifts by the difference, with the same guards as contributing.
+pub async fn update_goal_contribution(
+    db: &D1Database,
+    uid: i64,
+    a: UpdateContributionArgs,
+) -> AppResult<()> {
+    if a.amount_cents == 0 {
+        return Err(AppError::InvalidInput("el monto no puede ser cero".into()));
+    }
+    NaiveDate::parse_from_str(&a.occurred_at, "%Y-%m-%d")
+        .map_err(|_| AppError::InvalidInput("fecha inválida".into()))?;
+    let row = fetch_contribution(db, uid, a.id).await?;
+    let goal = fetch_goal(db, uid, row.goal_id).await?;
+    let delta = a.amount_cents - row.amount_cents;
+    validate_delta(db, uid, &goal, delta).await?;
+    batch(
+        db,
+        vec![
+            stmt(
+                db,
+                "UPDATE savings_goals SET saved_cents = MAX(0, saved_cents + ?2) WHERE id = ?1",
+                jsv![row.goal_id, delta],
+            )?,
+            stmt(
+                db,
+                "UPDATE goal_contributions SET amount_cents = ?2, occurred_at = ?3 WHERE id = ?1",
+                jsv![a.id, a.amount_cents, a.occurred_at],
+            )?,
+        ],
+    )
+    .await?;
+    let goal = fetch_goal(db, uid, row.goal_id).await?;
+    snapshot_goal(db, goal.id, goal.saved_cents).await?;
+    Ok(())
+}
+
+/// Delete an apartado move from the transactions history, undoing its effect
+/// on the goal's earmark (deleting a reserve un-earmarks; deleting a release
+/// re-earmarks, guarded by the wallet's available).
+pub async fn delete_goal_contribution(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<()> {
+    let row = fetch_contribution(db, uid, a.id).await?;
+    let goal = fetch_goal(db, uid, row.goal_id).await?;
+    let delta = -row.amount_cents;
+    validate_delta(db, uid, &goal, delta).await?;
+    batch(
+        db,
+        vec![
+            stmt(
+                db,
+                "UPDATE savings_goals SET saved_cents = MAX(0, saved_cents + ?2) WHERE id = ?1",
+                jsv![row.goal_id, delta],
+            )?,
+            stmt(
+                db,
+                "DELETE FROM goal_contributions WHERE id = ?1",
+                jsv![a.id],
+            )?,
+        ],
+    )
+    .await?;
+    let goal = fetch_goal(db, uid, row.goal_id).await?;
+    snapshot_goal(db, goal.id, goal.saved_cents).await?;
+    Ok(())
+}
+
 /// "Use" a goal: spend the money you saved for it. For an apartado, a real
 /// expense posts on its wallet for the saved amount (money finally leaves), then
 /// the goal is archived; a track-only goal is just archived. Releases the

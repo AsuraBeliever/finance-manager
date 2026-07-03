@@ -421,6 +421,10 @@ export const en: Dict = {
     emptyDescription: "Log your first income, expense or transfer.",
     deleteConfirmTitle: "Delete transaction",
     deleteConfirm: "Delete this transaction? If it's a transfer, both legs are removed.",
+    apartadoEditTitle: "Edit pocket move",
+    apartadoDeleteTitle: "Delete pocket move",
+    apartadoDeleteConfirm:
+      "Delete this move? The goal's reserved amount adjusts as if it never happened.",
     invalidAmount: "Invalid amount",
     transferHint: "If the wallets use different currencies, enter both amounts.",
   },

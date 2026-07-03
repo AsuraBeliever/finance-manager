@@ -429,6 +429,10 @@ export const esDict = {
     deleteConfirmTitle: "Eliminar transacción",
     deleteConfirm:
       "¿Eliminar esta transacción? Si es una transferencia se eliminan ambas partes.",
+    apartadoEditTitle: "Editar movimiento de apartado",
+    apartadoDeleteTitle: "Eliminar movimiento de apartado",
+    apartadoDeleteConfirm:
+      "¿Eliminar este movimiento? Lo apartado en la meta se ajustará como si nunca hubiera pasado.",
     invalidAmount: "Monto inválido",
     transferHint: "Si las carteras usan monedas distintas, captura ambos montos.",
   },
