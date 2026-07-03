@@ -12,6 +12,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.22.1",
+    date: "2026-07-03",
+    es: [
+      "Los movimientos de apartados (Apartado/Liberado) en el historial ahora tienen lápiz y bote: edita su monto o fecha, o bórralos, y lo apartado en la meta se ajusta solo.",
+    ],
+    en: [
+      "Pocket moves (Reserved/Released) in the history now have pencil and trash: edit their amount or date, or delete them, and the goal's reserved amount adjusts itself.",
+    ],
+  },
+  {
     version: "2.22.0",
     date: "2026-07-02",
     es: [
