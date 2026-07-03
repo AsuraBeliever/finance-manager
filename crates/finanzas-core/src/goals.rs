@@ -5,7 +5,7 @@
 //! the worker feeds in `today_mx()` and the goal's stored dates. No money is
 //! stored from this; it's recomputed on every read.
 
-use chrono::{Datelike, NaiveDate};
+use chrono::{Datelike, Duration, NaiveDate};
 use serde::Serialize;
 
 /// How often the user plans to contribute. Drives how the remaining amount is
@@ -42,6 +42,14 @@ pub struct ContributionPlan {
     /// Suggested amount to set aside each period to reach the target on time.
     /// When overdue, this is everything still owed (you need it all now).
     pub per_period_cents: i64,
+    /// This period's quota, frozen at what the plan asked when the period
+    /// started — contributing during the period doesn't shrink it, so partial
+    /// progress reads as "you put 2,000 of 2,400" instead of a new plan.
+    pub period_quota_cents: i64,
+    /// What's still missing to cover this period's quota; 0 once covered.
+    pub period_missing_cents: i64,
+    /// Net amount contributed within the current cadence period (floored at 0).
+    pub contributed_this_period_cents: i64,
     /// Whole days from today to the deadline; negative once it has passed.
     pub days_left: i64,
     /// True once the deadline has passed with money still owed.
@@ -50,6 +58,16 @@ pub struct ContributionPlan {
     /// span from start to deadline) the saved amount is right now. 0 when on or
     /// ahead of pace. Drives the "behind" badge.
     pub behind_cents: i64,
+}
+
+/// First day of the cadence period `today` falls in (weeks start on Monday).
+pub fn period_start(cadence: Cadence, today: NaiveDate) -> NaiveDate {
+    match cadence {
+        Cadence::Daily => today,
+        Cadence::Weekly => today - Duration::days(today.weekday().num_days_from_monday() as i64),
+        Cadence::Monthly => today.with_day(1).expect("day 1 always valid"),
+        Cadence::Yearly => today.with_ordinal(1).expect("ordinal 1 always valid"),
+    }
 }
 
 /// Number of cadence periods from `today` to `deadline`, before clamping. May be
@@ -77,10 +95,13 @@ fn div_ceil(n: i64, d: i64) -> i64 {
 
 /// Work out the contribution plan for a goal.
 ///
-/// - `start`: the day the goal began (its `created_at`), used as the pace anchor.
+/// - `start`: the day the plan began (when the deadline was set), the pace anchor.
 /// - `deadline`: the day the target should be reached by.
 /// - `today`: the current business day.
 /// - `target_cents` / `saved_cents`: the goal's objective and current progress.
+/// - `contributed_this_period_cents`: net amount put in during the current
+///   cadence period; it freezes this period's quota so partial contributions
+///   report "you're 400 short" instead of re-spreading the whole plan.
 pub fn plan_contribution(
     start: NaiveDate,
     deadline: NaiveDate,
@@ -88,10 +109,12 @@ pub fn plan_contribution(
     cadence: Cadence,
     target_cents: i64,
     saved_cents: i64,
+    contributed_this_period_cents: i64,
 ) -> ContributionPlan {
     let remaining = (target_cents - saved_cents).max(0);
     let days_left = (deadline - today).num_days();
     let overdue = remaining > 0 && today > deadline;
+    let contributed = contributed_this_period_cents.max(0);
 
     let (periods_left, per_period_cents) = if remaining == 0 {
         (0, 0)
@@ -103,9 +126,25 @@ pub fn plan_contribution(
         (periods, div_ceil(remaining, periods))
     };
 
+    // The quota spreads what was remaining when the period STARTED (current
+    // remaining plus what already came in this period) over the same period
+    // count, so it holds steady while the period's money arrives.
+    let (period_quota_cents, period_missing_cents) = if remaining == 0 {
+        (0, 0)
+    } else if overdue {
+        (remaining, remaining)
+    } else {
+        let periods = periods_between(today, deadline, cadence).max(1);
+        let quota = div_ceil(remaining + contributed, periods);
+        (quota, (quota - contributed).max(0))
+    };
+
     ContributionPlan {
         periods_left,
         per_period_cents,
+        period_quota_cents,
+        period_missing_cents,
+        contributed_this_period_cents: contributed,
         days_left,
         overdue,
         behind_cents: behind_cents(start, deadline, today, target_cents, saved_cents),
@@ -151,6 +190,7 @@ mod tests {
             Cadence::Monthly,
             120_000,
             60_000,
+            0,
         );
         // Jul→Dec = 5 months. Remaining 60,000 / 5 = 12,000 per month.
         assert_eq!(p.periods_left, 5);
@@ -169,6 +209,7 @@ mod tests {
             Cadence::Monthly,
             120_000,
             40_000,
+            0,
         );
         // Remaining 80,000 / 5 = 16,000 per month (higher than the original pace).
         assert_eq!(p.per_period_cents, 16_000);
@@ -186,6 +227,7 @@ mod tests {
             Cadence::Daily,
             10_000,
             0,
+            0,
         );
         assert_eq!(p.periods_left, 3);
         assert_eq!(p.per_period_cents, 3_334);
@@ -201,6 +243,7 @@ mod tests {
             Cadence::Weekly,
             20_000,
             0,
+            0,
         );
         assert_eq!(p.periods_left, 2);
         assert_eq!(p.per_period_cents, 10_000);
@@ -215,6 +258,7 @@ mod tests {
             Cadence::Monthly,
             100_000,
             30_000,
+            0,
         );
         assert!(p.overdue);
         assert_eq!(p.periods_left, 0);
@@ -233,6 +277,7 @@ mod tests {
             Cadence::Monthly,
             100_000,
             100_000,
+            0,
         );
         assert_eq!(p.periods_left, 0);
         assert_eq!(p.per_period_cents, 0);
@@ -250,8 +295,107 @@ mod tests {
             Cadence::Monthly,
             50_000,
             10_000,
+            0,
         );
         assert_eq!(p.periods_left, 1);
         assert_eq!(p.per_period_cents, 40_000);
+    }
+
+    #[test]
+    fn partial_contribution_keeps_the_period_quota() {
+        // $12,000 by Dec 31, monthly, plan set Jul 3 → 5 periods, $2,400/mo.
+        // Contributing $2,000 mid-month must NOT re-spread the plan: the month's
+        // quota stays $2,400 and $400 is still missing.
+        let p = plan_contribution(
+            d("2026-07-03"),
+            d("2026-12-31"),
+            d("2026-07-03"),
+            Cadence::Monthly,
+            1_200_000,
+            200_000, // saved after the $2,000 contribution
+            200_000, // contributed within July
+        );
+        // quota = ceil((1,000,000 + 200,000) / 5) = 240,000
+        assert_eq!(p.period_quota_cents, 240_000);
+        assert_eq!(p.period_missing_cents, 40_000);
+        assert_eq!(p.contributed_this_period_cents, 200_000);
+        // The forward-looking split still relaxes for the remaining months.
+        assert_eq!(p.per_period_cents, 200_000);
+    }
+
+    #[test]
+    fn covered_period_reports_nothing_missing() {
+        // Same plan, the full $2,400 already in this month.
+        let p = plan_contribution(
+            d("2026-07-03"),
+            d("2026-12-31"),
+            d("2026-07-03"),
+            Cadence::Monthly,
+            1_200_000,
+            240_000,
+            240_000,
+        );
+        assert_eq!(p.period_quota_cents, 240_000);
+        assert_eq!(p.period_missing_cents, 0);
+    }
+
+    #[test]
+    fn untouched_period_quota_equals_the_per_period_split() {
+        // With nothing contributed yet this period both numbers agree.
+        let p = plan_contribution(
+            d("2026-07-03"),
+            d("2026-12-31"),
+            d("2026-07-03"),
+            Cadence::Monthly,
+            1_200_000,
+            0,
+            0,
+        );
+        assert_eq!(p.per_period_cents, 240_000);
+        assert_eq!(p.period_quota_cents, 240_000);
+        assert_eq!(p.period_missing_cents, 240_000);
+    }
+
+    #[test]
+    fn net_releases_never_deflate_the_quota() {
+        // Releasing more than was put in this period floors the net at zero, so
+        // the quota falls back to the plain forward split.
+        let p = plan_contribution(
+            d("2026-07-03"),
+            d("2026-12-31"),
+            d("2026-07-03"),
+            Cadence::Monthly,
+            1_200_000,
+            0,
+            -100_000,
+        );
+        assert_eq!(p.period_quota_cents, 240_000);
+        assert_eq!(p.period_missing_cents, 240_000);
+        assert_eq!(p.contributed_this_period_cents, 0);
+    }
+
+    #[test]
+    fn period_start_per_cadence() {
+        // 2026-07-02 is a Thursday; its ISO week starts Monday 2026-06-29.
+        assert_eq!(
+            period_start(Cadence::Daily, d("2026-07-02")),
+            d("2026-07-02")
+        );
+        assert_eq!(
+            period_start(Cadence::Weekly, d("2026-07-02")),
+            d("2026-06-29")
+        );
+        assert_eq!(
+            period_start(Cadence::Weekly, d("2026-06-29")),
+            d("2026-06-29")
+        );
+        assert_eq!(
+            period_start(Cadence::Monthly, d("2026-07-31")),
+            d("2026-07-01")
+        );
+        assert_eq!(
+            period_start(Cadence::Yearly, d("2026-07-02")),
+            d("2026-01-01")
+        );
     }
 }

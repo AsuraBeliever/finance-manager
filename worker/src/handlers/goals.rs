@@ -5,9 +5,11 @@
 //! expense and archives it. Track-only goals (no wallet) are abstract progress.
 //! Progress in basis points, capped at 100%. All scoped by user_id.
 
+use std::collections::HashMap;
+
 use chrono::NaiveDate;
 use finanzas_core::error::{AppError, AppResult};
-use finanzas_core::goals::{plan_contribution, Cadence, ContributionPlan};
+use finanzas_core::goals::{period_start, plan_contribution, Cadence, ContributionPlan};
 use finanzas_core::period::{resolve_period, Period};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
@@ -100,10 +102,53 @@ fn progress_bps(saved: i64, target: i64) -> i64 {
     }
 }
 
+/// What each goal had saved when its current cadence period started (the
+/// latest snapshot strictly before the period; goals born this period start
+/// from 0). Progress this period = saved now − this baseline, which freezes
+/// the period quota: contributing doesn't shrink it, and releasing money that
+/// was already there before the period doesn't erase this period's effort.
+async fn period_baselines(
+    db: &D1Database,
+    uid: i64,
+    today: NaiveDate,
+) -> AppResult<HashMap<i64, i64>> {
+    #[derive(Deserialize)]
+    struct Row {
+        goal_id: i64,
+        baseline_cents: i64,
+    }
+    let rows: Vec<Row> = all(
+        db,
+        "SELECT g.id AS goal_id,
+                COALESCE((SELECT s.saved_cents FROM goal_snapshots s
+                          WHERE s.goal_id = g.id
+                            AND s.as_of < CASE g.contribution_cadence
+                                  WHEN 'daily' THEN ?2
+                                  WHEN 'weekly' THEN ?3
+                                  WHEN 'yearly' THEN ?4
+                                  ELSE ?5 END
+                          ORDER BY s.as_of DESC, s.id DESC LIMIT 1), 0) AS baseline_cents
+         FROM savings_goals g
+         WHERE g.user_id = ?1 AND g.contribution_cadence IS NOT NULL",
+        jsv![
+            uid,
+            today.to_string(),
+            period_start(Cadence::Weekly, today).to_string(),
+            period_start(Cadence::Yearly, today).to_string(),
+            period_start(Cadence::Monthly, today).to_string()
+        ],
+    )
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.goal_id, r.baseline_cents))
+        .collect())
+}
+
 /// Build the API goal from a DB row, computing the contribution plan against
 /// `today` when the goal has both a deadline and a cadence. A goal missing
 /// either (or with an unparseable date/cadence) simply carries no plan.
-fn build(r: GoalRow, today: NaiveDate) -> SavingsGoal {
+fn build(r: GoalRow, today: NaiveDate, contributed_period_cents: i64) -> SavingsGoal {
     let pace_start = r
         .plan_anchor_date
         .as_deref()
@@ -122,6 +167,7 @@ fn build(r: GoalRow, today: NaiveDate) -> SavingsGoal {
                 cadence,
                 r.target_cents,
                 r.saved_cents,
+                contributed_period_cents,
             );
             let behind = p.behind_cents > 0;
             (Some(p), behind)
@@ -169,7 +215,11 @@ async fn fetch_goal(db: &D1Database, uid: i64, id: i64) -> AppResult<SavingsGoal
     )
     .await?
     .ok_or(AppError::NotFound("meta"))?;
-    Ok(build(row, today_mx()))
+    let today = today_mx();
+    let baselines = period_baselines(db, uid, today).await?;
+    let baseline = baselines.get(&row.id).copied().unwrap_or(0);
+    let progress = (row.saved_cents - baseline).max(0);
+    Ok(build(row, today, progress))
 }
 
 pub async fn list_savings_goals(
@@ -198,7 +248,15 @@ pub async fn list_savings_goals(
     )
     .await?;
     let today = today_mx();
-    Ok(rows.into_iter().map(|r| build(r, today)).collect())
+    let baselines = period_baselines(db, uid, today).await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            let baseline = baselines.get(&r.id).copied().unwrap_or(0);
+            let progress = (r.saved_cents - baseline).max(0);
+            build(r, today, progress)
+        })
+        .collect())
 }
 
 #[derive(Deserialize)]

@@ -80,6 +80,20 @@ function cadenceAdverb(c: GoalCadence | null): string {
   }
 }
 
+/** Period noun ("Este mes" / "This week") for the progress sentence. */
+function periodNoun(c: GoalCadence | null): string {
+  switch (c) {
+    case "daily":
+      return es.goals.periodDaily;
+    case "weekly":
+      return es.goals.periodWeekly;
+    case "yearly":
+      return es.goals.periodYearly;
+    default:
+      return es.goals.periodMonthly;
+  }
+}
+
 /** A goal card wrapped for drag-to-reorder. Dragging starts from the grip so
  *  the edit/delete/contribute controls stay clickable. The first card (lowest
  *  sort_order) is the dashboard's principal gauge. */
@@ -213,10 +227,34 @@ function SortableGoalCard({
           ) : (
             <>
               <p className="text-fg-muted">
-                {es.goals.planReserve
-                  .replace("{amount}", formatCents(g.plan.perPeriodCents, g.currencyCode))
-                  .replace("{cadence}", cadenceAdverb(g.cadence))
-                  .replace("{date}", formatDate(g.targetDate ?? ""))}
+                {/* The period quota is frozen at the period start: partial money
+                    reads as progress ("2,000 of 2,400"), never a re-spread plan. */}
+                {g.plan.contributedThisPeriodCents <= 0
+                  ? es.goals.planReserve
+                      .replace(
+                        "{amount}",
+                        formatCents(g.plan.periodQuotaCents, g.currencyCode),
+                      )
+                      .replace("{cadence}", cadenceAdverb(g.cadence))
+                      .replace("{date}", formatDate(g.targetDate ?? ""))
+                  : g.plan.periodMissingCents > 0
+                    ? es.goals.planProgress
+                        .replace("{period}", periodNoun(g.cadence))
+                        .replace(
+                          "{done}",
+                          formatCents(g.plan.contributedThisPeriodCents, g.currencyCode),
+                        )
+                        .replace(
+                          "{quota}",
+                          formatCents(g.plan.periodQuotaCents, g.currencyCode),
+                        )
+                        .replace(
+                          "{missing}",
+                          formatCents(g.plan.periodMissingCents, g.currencyCode),
+                        )
+                    : es.goals.planCovered
+                        .replace("{period}", periodNoun(g.cadence))
+                        .replace("{date}", formatDate(g.targetDate ?? ""))}
               </p>
               {g.isBehind && (
                 <p className="mt-1 text-fg-subtle">
@@ -651,7 +689,12 @@ function ContributeModal({
     : null;
   const currency = goal?.currencyCode ?? "MXN";
   const canRelease = (goal?.savedCents ?? 0) > 0;
-  const suggested = mode === "reserve" ? (goal?.plan?.perPeriodCents ?? 0) : 0;
+  // Suggest what's missing to cover this period; once covered, the next
+  // period's split.
+  const suggested =
+    mode === "reserve"
+      ? goal?.plan?.periodMissingCents || (goal?.plan?.perPeriodCents ?? 0)
+      : 0;
 
   const tab = (m: "reserve" | "release", label: string) => (
     <button
