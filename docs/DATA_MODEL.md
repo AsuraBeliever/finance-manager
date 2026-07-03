@@ -191,6 +191,30 @@ CREATE TABLE investment_movements (   -- aportaciones y retiros posteriores al i
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_inv_mov ON investment_movements(investment_id, occurred_at);
+
+CREATE TABLE notifications (              -- avisos in-app (campanita), migración 0029
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL,                     -- clave i18n ('credit.dueSoon', …); el frontend renderiza el texto
+  params_json TEXT NOT NULL DEFAULT '{}', -- datos crudos (centavos, fechas, nombres) que se interpolan
+  dedupe_key TEXT NOT NULL,               -- '<kind>:<entidad>:<fecha-objetivo>'
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  read_at TEXT                            -- NULL = no leída
+);
+CREATE UNIQUE INDEX idx_notifications_dedupe ON notifications(user_id, dedupe_key);
+CREATE INDEX idx_notifications_user ON notifications(user_id, created_at DESC);
+
+CREATE TABLE investment_reminders (       -- recordatorios por inversión, migración 0029
+  id INTEGER PRIMARY KEY,
+  investment_id INTEGER NOT NULL REFERENCES investments(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('contribute','performance')),
+  cadence TEXT NOT NULL CHECK (cadence IN ('daily','weekly','biweekly','monthly')),
+  anchor_date TEXT NOT NULL,              -- las ocurrencias corren en anchor + k·periodo (k ≥ 1)
+  last_fired_date TEXT,                   -- última ocurrencia avisada (cursor del cron)
+  last_value_cents INTEGER,               -- valor en el último resumen (delta de rendimiento)
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX idx_inv_reminder_unique ON investment_reminders(investment_id, kind);
 ```
 
 ## Semántica de movimientos de inversión
@@ -381,3 +405,4 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
 
 - **carteras con rendimiento** (migración 0012): una cartera normal (no inversión) cuyo saldo crece solo, como las cuentas Klar/Nu que pagan interés diario con abono periódico. Activarla fija `yield_rate_bps` (>0), `yield_frequency` y `yield_anchor_date`/`yield_last_paid_date` = hoy (sin retroactivo). El cron diario (`handlers::wallet_yield::accrue_yield`) recorre cada cartera activa y, por cada periodo vencido, inserta UNA transacción `income` (categoría semilla *Intereses*) y avanza `yield_last_paid_date`. Idempotente: `client_id = yield:<wallet>:<fin-periodo>` (índice único) + el cursor solo avanza. La fórmula (interés compuesto diario ACT/365, misma convención que la cajita Nu) es pura en `finanzas_core::wallet_yield` con tests. El saldo sigue siendo calculado (initial + Σ transacciones); los abonos son transacciones reales, editables/borrables.
 - **tarjetas de crédito** (migración 0027): `credit_cut_day` (1-31) marca la cartera como tarjeta — los gastos vuelven el saldo negativo (deuda = −saldo) y pagarla es una transferencia normal desde una cartera de débito. Todo lo derivado es puro en `finanzas_core::credit` (fechas de corte con clamp a fin de mes, fecha límite = corte + `credit_due_days`, calendario MSI) y se arma en `get_credit_card_summary`: **saldo al corte** = deuda al día del último corte; **por pagar del corte** = saldo al corte − abonos (income/transfer_in) posteriores al corte; **utilización** = deuda ÷ límite; **crédito disponible** = límite − deuda − MSI aún no facturado. Convención: el corte cierra al final de su día (una transacción fechada el día del corte pertenece al estado que cierra ese día). **MSI** (`msi_plans`): el plan NO es una transacción; el cron diario postea un gasto por mensualidad en cada fecha de corte (`client_id = msi:<plan>:<n>`, idempotente), con el remanente de centavos en la primera. Las mensualidades toman la categoría del plan (`msi_plans.category_id`, elegible como en cualquier gasto; NULL = la reservada *Meses sin intereses*), así cuentan en presupuestos/analytics. Así la deuda refleja lo facturado (como el estado de cuenta) y lo no facturado igual resta crédito disponible. Borrar un plan borra sus gastos posteados (batch).
+- **notificaciones** (migración 0029): el cron de las 14:00 UTC (08:00 CDMX) evalúa reglas por usuario y llena `notifications`; el cron nocturno (07:00 UTC) no las toca. Solo usuarios con la setting `notification_prefs` (JSON por categoría → check maestro + reglas con parámetros y canales; ausencia = apagado) generan trabajo. El texto NO se guarda: `kind` es una clave i18n y `params_json` lleva los datos crudos — la campanita interpola en el idioma activo. Idempotencia con `dedupe_key` único por usuario (`<kind>:<entidad>:<fecha-objetivo>`, `INSERT OR IGNORE`): las ventanas «≤ N días antes» disparan una sola vez y los re-runs son no-ops. Retención: se borran filas de más de 60 días. Los recordatorios por inversión viven en `investment_reminders` (cursor `last_fired_date` + `last_value_cents` para el delta del resumen de rendimiento); la lógica pura de ocurrencias (`due_occurrence`: nunca retro-emite, colapsa huecos largos a UNA ocurrencia, clamp de fin de mes sin deriva) está en `finanzas_core::notify` con tests.

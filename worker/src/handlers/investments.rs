@@ -87,7 +87,7 @@ const INVESTMENT_SELECT: &str = "
            params_json, linked_wallet_id, is_closed, notes, created_at
     FROM investments";
 
-async fn fetch_investment(db: &D1Database, uid: i64, id: i64) -> AppResult<Investment> {
+pub(crate) async fn fetch_investment(db: &D1Database, uid: i64, id: i64) -> AppResult<Investment> {
     let sql = format!("{INVESTMENT_SELECT} WHERE id = ?1 AND user_id = ?2");
     first::<InvestmentRow>(db, &sql, jsv![id, uid])
         .await?
@@ -212,7 +212,7 @@ async fn load_calc_context(db: &D1Database, inv: &Investment) -> AppResult<CalcC
     Ok(ctx)
 }
 
-async fn with_value(
+pub(crate) async fn with_value(
     db: &D1Database,
     inv: Investment,
     as_of: NaiveDate,

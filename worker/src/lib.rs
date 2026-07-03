@@ -40,11 +40,12 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .await
 }
 
-/// Daily market-data refresh (cron, UTC) — replaces the desktop's
-/// on-startup fetch. Failures are logged (visible via `wrangler tail`) and
-/// otherwise silent, same semantics as the desktop app.
+/// Daily crons (UTC). 07:00 (01:00 CDMX) refreshes market data and posts the
+/// money the night owes (yield, MSI, snapshots); 14:00 (08:00 CDMX) evaluates
+/// notification rules over those fresh numbers, at an hour a human reads them.
+/// Failures are logged (visible via `wrangler tail`) and otherwise silent.
 #[event(scheduled)]
-pub async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
+pub async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
     console_error_panic_hook::set_once();
     let db = match env.d1("DB") {
         Ok(d) => d,
@@ -53,6 +54,12 @@ pub async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) 
             return;
         }
     };
+    if event.cron() == "0 14 * * *" {
+        if let Err(e) = handlers::notifications::generate_all(&db).await {
+            console_error!("notification generation failed: {e}");
+        }
+        return;
+    }
     if let Err(e) = market::fetch_and_store_rates(&db, false).await {
         console_error!("exchange rate auto-update failed: {e}");
     }

@@ -10,8 +10,8 @@ use worker::{D1Database, Request, Response, RouteContext};
 
 use crate::error::{db_err, error_response};
 use crate::handlers::{
-    analytics, budgets, credit, dashboard, goals, investments, settings, subscriptions,
-    transactions, wallets,
+    analytics, budgets, credit, dashboard, goals, investments, notifications, settings,
+    subscriptions, transactions, wallets,
 };
 use crate::market;
 
@@ -156,6 +156,18 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         }
         "delete_subscription" => {
             out(subscriptions::delete_subscription(db, uid, args(body)?).await?)
+        }
+
+        // ---- notifications ----
+        "list_notifications" => out(notifications::list_notifications(db, uid, args(body)?).await?),
+        "mark_notifications_read" => {
+            out(notifications::mark_notifications_read(db, uid, args(body)?).await?)
+        }
+        "list_investment_reminders" => {
+            out(notifications::list_investment_reminders(db, uid, args(body)?).await?)
+        }
+        "set_investment_reminder" => {
+            out(notifications::set_investment_reminder(db, uid, args(body)?).await?)
         }
 
         // ---- investments ----

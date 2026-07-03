@@ -10,6 +10,7 @@ pub mod goals;
 pub mod investments;
 pub mod market;
 pub mod models;
+pub mod notify;
 pub mod period;
 pub mod subscription;
 pub mod wallet_yield;
