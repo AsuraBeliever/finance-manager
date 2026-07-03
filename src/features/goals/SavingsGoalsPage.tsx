@@ -656,8 +656,12 @@ function ContributeModal({
   const [error, setError] = useState<string | null>(null);
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
 
-  // Reset whenever the modal opens for a different goal.
+  // Reset on every open (closing clears lastId), so reopening the same goal
+  // never lands on the previous visit's tab or leftover amount.
   const [lastId, setLastId] = useState<number | null>(null);
+  if (!goal && lastId !== null) {
+    setLastId(null);
+  }
   if (goal && goal.id !== lastId) {
     setLastId(goal.id);
     setMode("reserve");
@@ -670,6 +674,15 @@ function ContributeModal({
       const cents = parseToCents(amount);
       if (!goal || cents === null || cents <= 0)
         return Promise.reject(new Error(es.investments.invalidAmount));
+      if (mode === "release" && cents > goal.savedCents)
+        return Promise.reject(
+          new Error(
+            es.goals.releaseTooMuch.replace(
+              "{amount}",
+              formatCents(goal.savedCents, goal.currencyCode),
+            ),
+          ),
+        );
       return contributeSavingsGoal(goal.id, mode === "release" ? -cents : cents);
     },
     onSuccess: () => {

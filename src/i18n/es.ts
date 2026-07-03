@@ -104,6 +104,7 @@ export const esDict = {
     cadenceAdvWeekly: "a la semana",
     cadenceAdvMonthly: "al mes",
     cadenceAdvYearly: "al año",
+    releaseTooMuch: "No puedes liberar más de lo apartado ({amount}).",
     behindBadge: "Atrasada",
     behindHint: "Vas {amount} por debajo del ritmo.",
     overdueBadge: "Fecha vencida",

@@ -99,6 +99,7 @@ export const en: Dict = {
     cadenceAdvWeekly: "a week",
     cadenceAdvMonthly: "a month",
     cadenceAdvYearly: "a year",
+    releaseTooMuch: "You can't release more than what's reserved ({amount}).",
     behindBadge: "Behind",
     behindHint: "You're {amount} below pace.",
     overdueBadge: "Overdue",

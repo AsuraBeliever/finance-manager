@@ -496,15 +496,14 @@ pub async fn contribute_savings_goal(
         return Err(AppError::InvalidInput("el monto no puede ser cero".into()));
     }
     let goal = fetch_goal(db, uid, a.id).await?;
-    // A withdrawal can't release more than what's saved.
-    let amount = if a.amount_cents < 0 {
-        a.amount_cents.max(-goal.saved_cents)
-    } else {
-        a.amount_cents
-    };
-    if amount == 0 {
-        return Err(AppError::InvalidInput("no hay nada que retirar".into()));
+    // A release can't exceed what's saved — reject instead of clamping
+    // silently, so the UI and the ledger always agree on what happened.
+    if a.amount_cents < 0 && -a.amount_cents > goal.saved_cents {
+        return Err(AppError::InvalidInput(
+            "no puedes liberar más de lo apartado en la meta".into(),
+        ));
     }
+    let amount = a.amount_cents;
 
     // Apartado deposits can't reserve more than the wallet has available.
     if amount > 0 {
