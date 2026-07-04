@@ -269,6 +269,19 @@ export const updateSavingsGoal = (id: number, input: GoalInput) =>
 export const contributeSavingsGoal = (id: number, amountCents: number) =>
   rpc<SavingsGoal>("contribute_savings_goal", { id, amountCents });
 
+/** Edit an apartado move shown in the transactions history. `id` is the
+ *  goal_contributions id (the list row's id negated); amount is signed
+ *  (positive = reserved, negative = released). */
+export const updateGoalContribution = (
+  id: number,
+  amountCents: number,
+  occurredAt: string,
+) => rpc<void>("update_goal_contribution", { id, amountCents, occurredAt });
+
+/** Delete an apartado move, undoing its effect on the goal's earmark. */
+export const deleteGoalContribution = (id: number) =>
+  rpc<void>("delete_goal_contribution", { id });
+
 export const useSavingsGoal = (id: number) => rpc<void>("use_savings_goal", { id });
 
 /** Graduate a fund goal into its own wallet (moves the reserved money there).

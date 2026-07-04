@@ -93,10 +93,18 @@ export const esDict = {
     cadenceYearly: "Anual",
     // Plan line on the card. {amount} {cadence} {date} get replaced.
     planReserve: "Aparta {amount} {cadence} para llegar el {date}.",
+    // Partial progress within the current period: quota stays fixed.
+    planProgress: "{period} llevas {done} de {quota}: te faltan {missing}.",
+    planCovered: "{period} ya está cubierto. Vas en camino para el {date}.",
+    periodDaily: "Hoy",
+    periodWeekly: "Esta semana",
+    periodMonthly: "Este mes",
+    periodYearly: "Este año",
     cadenceAdvDaily: "al día",
     cadenceAdvWeekly: "a la semana",
     cadenceAdvMonthly: "al mes",
     cadenceAdvYearly: "al año",
+    releaseTooMuch: "No puedes liberar más de lo apartado ({amount}).",
     behindBadge: "Atrasada",
     behindHint: "Vas {amount} por debajo del ritmo.",
     overdueBadge: "Fecha vencida",
@@ -429,6 +437,10 @@ export const esDict = {
     deleteConfirmTitle: "Eliminar transacción",
     deleteConfirm:
       "¿Eliminar esta transacción? Si es una transferencia se eliminan ambas partes.",
+    apartadoEditTitle: "Editar movimiento de apartado",
+    apartadoDeleteTitle: "Eliminar movimiento de apartado",
+    apartadoDeleteConfirm:
+      "¿Eliminar este movimiento? Lo apartado en la meta se ajustará como si nunca hubiera pasado.",
     invalidAmount: "Monto inválido",
     transferHint: "Si las carteras usan monedas distintas, captura ambos montos.",
   },

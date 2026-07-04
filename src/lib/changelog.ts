@@ -12,6 +12,36 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.22.2",
+    date: "2026-07-03",
+    es: [
+      "El plan de una meta empieza cuando le pones la fecha límite: ya no aparece «Atrasada» de la nada al ponerle plazo a una meta que ya existía.",
+      "La cuota del periodo se mantiene fija: si te tocan $2,400 este mes y aportas $2,000, ahora dice «llevas $2,000 de $2,400: te faltan $400» en vez de rehacer el plan.",
+      "Al cubrir la cuota del periodo te lo confirma: «Este mes ya está cubierto».",
+      "El sugerido del botón Aportar es lo que falta del periodo, no la cuota completa.",
+      "Ya no puedes liberar más dinero del que tiene apartado la meta: sale un aviso claro en lugar de vaciarla en silencio.",
+      "El formulario Aportar/Liberar abre limpio cada vez; ya no se queda pegado en «Liberar».",
+    ],
+    en: [
+      "A goal's plan starts when you set its deadline: no more phantom \"Behind\" the moment you add a date to an existing goal.",
+      "The period quota stays fixed: if this month asks for $2,400 and you put in $2,000, it now says \"you've put in $2,000 of $2,400: $400 to go\" instead of re-spreading the plan.",
+      "Covering the period's quota gets confirmed: \"This month is covered\".",
+      "The Contribute button's suggestion is what's left for the period, not the full quota.",
+      "You can no longer release more money than the goal holds: a clear error shows instead of silently draining it.",
+      "The Contribute/Release form opens fresh every time; it no longer sticks on \"Release\".",
+    ],
+  },
+  {
+    version: "2.22.1",
+    date: "2026-07-03",
+    es: [
+      "Los movimientos de apartados (Apartado/Liberado) en el historial ahora tienen lápiz y bote: edita su monto o fecha, o bórralos, y lo apartado en la meta se ajusta solo.",
+    ],
+    en: [
+      "Pocket moves (Reserved/Released) in the history now have pencil and trash: edit their amount or date, or delete them, and the goal's reserved amount adjusts itself.",
+    ],
+  },
+  {
     version: "2.22.0",
     date: "2026-07-02",
     es: [
