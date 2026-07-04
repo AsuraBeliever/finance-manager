@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "../../components/PageHeader";
-import { getSetting, setSetting } from "../../lib/api";
+import {
+  getSetting,
+  listInvestmentReminders,
+  listInvestments,
+  setInvestmentReminder,
+  setSetting,
+} from "../../lib/api";
+import type { ReminderCadence, ReminderKind } from "../../lib/types";
 import { es } from "../../i18n/es";
 import {
   CATEGORY_IDS,
@@ -118,19 +124,19 @@ export function NotificationSettingsPage() {
                       {spec.daysBefore !== undefined && (
                         <span className="flex items-center gap-1.5 text-xs text-fg-subtle">
                           <input
-                            type="number"
-                            min={0}
-                            max={60}
+                            type="text"
+                            inputMode="numeric"
                             value={rule.daysBefore ?? spec.daysBefore}
                             disabled={!category.enabled || !rule.enabled}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const digits = e.target.value.replace(/\D/g, "").slice(0, 2);
                               update((p) => {
-                                p[cat].rules[spec.id].daysBefore = Math.max(
-                                  0,
-                                  Math.min(60, Number(e.target.value) || 0),
+                                p[cat].rules[spec.id].daysBefore = Math.min(
+                                  60,
+                                  Number(digits) || 0,
                                 );
-                              })
-                            }
+                              });
+                            }}
                             className="w-14 rounded-lg border border-border-muted bg-surface px-2 py-1 text-center text-xs text-fg disabled:opacity-50"
                           />
                           {es.notifications.daysBefore}
@@ -140,17 +146,17 @@ export function NotificationSettingsPage() {
                         <span className="flex items-center gap-1.5 text-xs text-fg-subtle">
                           {es.notifications.utilizationThreshold}
                           <input
-                            type="number"
-                            min={1}
-                            max={100}
+                            type="text"
+                            inputMode="numeric"
                             value={Math.round((rule.thresholdBps ?? spec.thresholdBps) / 100)}
                             disabled={!category.enabled || !rule.enabled}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
                               update((p) => {
                                 p[cat].rules[spec.id].thresholdBps =
-                                  Math.max(1, Math.min(100, Number(e.target.value) || 70)) * 100;
-                              })
-                            }
+                                  Math.max(1, Math.min(100, Number(digits) || 70)) * 100;
+                              });
+                            }}
                             className="w-14 rounded-lg border border-border-muted bg-surface px-2 py-1 text-center text-xs text-fg disabled:opacity-50"
                           />
                           %
@@ -160,12 +166,7 @@ export function NotificationSettingsPage() {
                   );
                 })}
                 {cat === "investments" && (
-                  <p className="text-xs leading-relaxed text-fg-subtle">
-                    {es.notifications.invRulesHint}{" "}
-                    <Link to="/inversiones" className="text-accent hover:underline">
-                      {es.nav.investments}
-                    </Link>
-                  </p>
+                  <InvestmentRemindersSection disabled={!category.enabled} />
                 )}
               </div>
             </section>
@@ -173,5 +174,79 @@ export function NotificationSettingsPage() {
         })}
       </div>
     </>
+  );
+}
+
+const REMINDER_KINDS: ReminderKind[] = ["contribute", "performance"];
+const CADENCES: ReminderCadence[] = ["daily", "weekly", "biweekly", "monthly"];
+
+/** Per-investment reminder frequencies ("remind me to contribute every X" /
+ *  "summarize returns every X"), configured here and nowhere else. */
+function InvestmentRemindersSection({ disabled }: { disabled: boolean }) {
+  const queryClient = useQueryClient();
+  const investments = useQuery({
+    queryKey: ["investments", {}],
+    queryFn: () => listInvestments(),
+  });
+  const reminders = useQuery({
+    queryKey: ["investmentReminders"],
+    queryFn: listInvestmentReminders,
+  });
+  const save = useMutation({
+    mutationFn: (a: { id: number; kind: ReminderKind; cadence: ReminderCadence | null }) =>
+      setInvestmentReminder(a.id, a.kind, a.cadence),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["investmentReminders"] }),
+  });
+
+  const open = (investments.data ?? []).filter((i) => !i.isClosed);
+  if (open.length === 0) return null;
+  const byKey = new Map(
+    (reminders.data ?? []).map((r) => [`${r.investmentId}:${r.kind}`, r.cadence]),
+  );
+  const cadenceLabels = es.notifications.reminders.cadences as Record<string, string>;
+  const kindLabels: Record<ReminderKind, string> = {
+    contribute: es.notifications.reminders.contribute,
+    performance: es.notifications.reminders.performance,
+  };
+
+  return (
+    <div className="mt-1 border-t border-border-muted pt-3">
+      <p className="text-xs font-medium text-fg-muted">{es.notifications.perInvestment}</p>
+      <p className="mt-0.5 mb-2 text-xs text-fg-subtle">
+        {es.notifications.perInvestmentHint}
+      </p>
+      <div className="flex flex-col gap-2">
+        {open.map((inv) => (
+          <div key={inv.id} className="flex flex-wrap items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm text-fg-muted">{inv.name}</span>
+            {REMINDER_KINDS.map((kind) => (
+              <label key={kind} className="flex items-center gap-1.5 text-xs text-fg-subtle">
+                {kindLabels[kind]}
+                <select
+                  value={byKey.get(`${inv.id}:${kind}`) ?? ""}
+                  disabled={disabled || save.isPending || reminders.isPending}
+                  onChange={(e) =>
+                    save.mutate({
+                      id: inv.id,
+                      kind,
+                      cadence: (e.target.value || null) as ReminderCadence | null,
+                    })
+                  }
+                  className="rounded-lg border border-border-muted bg-surface px-2 py-1 text-xs text-fg disabled:opacity-50"
+                >
+                  <option value="">{es.notifications.reminders.off}</option>
+                  {CADENCES.map((c) => (
+                    <option key={c} value={c}>
+                      {cadenceLabels[c]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -198,29 +198,28 @@ pub async fn mark_notifications_read(db: &D1Database, uid: i64, a: MarkReadArgs)
 
 // ---- RPC: per-investment reminders ----
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InvestmentIdArgs {
-    pub investment_id: i64,
-}
-
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InvestmentReminderView {
+    pub investment_id: i64,
     pub kind: String,
     pub cadence: String,
 }
 
+/// Every reminder across the caller's investments — the notification settings
+/// page (the only place reminders are configured) renders them per investment.
 pub async fn list_investment_reminders(
     db: &D1Database,
     uid: i64,
-    a: InvestmentIdArgs,
 ) -> AppResult<Vec<InvestmentReminderView>> {
-    fetch_investment(db, uid, a.investment_id).await?; // ownership
     all(
         db,
-        "SELECT kind, cadence FROM investment_reminders WHERE investment_id = ?1 ORDER BY kind",
-        jsv![a.investment_id],
+        "SELECT r.investment_id AS investmentId, r.kind, r.cadence
+         FROM investment_reminders r
+         JOIN investments i ON i.id = r.investment_id
+         WHERE i.user_id = ?1
+         ORDER BY r.investment_id, r.kind",
+        jsv![uid],
     )
     .await
 }

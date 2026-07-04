@@ -727,15 +727,13 @@ export const esDict = {
       invPerformance: "Resumen de rendimiento",
       invCetesMaturity: "CETES por vencer",
     },
-    invRulesHint:
-      "«Aportar» y «rendimiento» se programan en el detalle de cada inversión; aquí solo enciendes o apagas sus avisos.",
+    perInvestment: "Por inversión",
+    perInvestmentHint:
+      "Elige cada cuándo te recuerda aportar y cada cuándo te resume el rendimiento de cada inversión.",
     reminders: {
-      title: "Recordatorios",
-      contribute: "Recuérdame aportar",
-      performance: "Dime cuánto ha generado",
-      hint: "Los avisos llegan a la campanita en la mañana de cada ocurrencia.",
-      globalOff:
-        "Los avisos de inversiones están apagados en Ajustes → Notificaciones.",
+      contribute: "Aportar",
+      performance: "Rendimiento",
+      off: "Apagado",
       cadences: {
         daily: "Diario",
         weekly: "Semanal",

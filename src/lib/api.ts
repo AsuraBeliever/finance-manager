@@ -433,8 +433,10 @@ export const listNotifications = (limit = 30) =>
 export const markNotificationsRead = (ids?: number[]) =>
   rpc<void>("mark_notifications_read", ids ? { ids } : {});
 
-export const listInvestmentReminders = (investmentId: number) =>
-  rpc<InvestmentReminder[]>("list_investment_reminders", { investmentId });
+/** Every reminder across the user's investments (configured only in
+ *  Ajustes → Notificaciones). */
+export const listInvestmentReminders = () =>
+  rpc<InvestmentReminder[]>("list_investment_reminders");
 
 /** Upsert a per-investment reminder; a null cadence removes it. */
 export const setInvestmentReminder = (

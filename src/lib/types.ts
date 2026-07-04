@@ -484,6 +484,7 @@ export type ReminderKind = "contribute" | "performance";
 export type ReminderCadence = "daily" | "weekly" | "biweekly" | "monthly";
 
 export interface InvestmentReminder {
+  investmentId: number;
   kind: ReminderKind;
   cadence: ReminderCadence;
 }

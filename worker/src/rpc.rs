@@ -170,7 +170,7 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
             out(notifications::mark_notifications_read(db, uid, args(body)?).await?)
         }
         "list_investment_reminders" => {
-            out(notifications::list_investment_reminders(db, uid, args(body)?).await?)
+            out(notifications::list_investment_reminders(db, uid).await?)
         }
         "set_investment_reminder" => {
             out(notifications::set_investment_reminder(db, uid, args(body)?).await?)

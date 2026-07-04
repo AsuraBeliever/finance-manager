@@ -715,14 +715,13 @@ export const en: Dict = {
       invPerformance: "Performance summary",
       invCetesMaturity: "CETES maturing",
     },
-    invRulesHint:
-      '"Contribute" and "performance" are scheduled on each investment\'s detail page; here you only switch their alerts on or off.',
+    perInvestment: "Per investment",
+    perInvestmentHint:
+      "Choose how often each investment reminds you to contribute and how often it summarizes its returns.",
     reminders: {
-      title: "Reminders",
-      contribute: "Remind me to contribute",
-      performance: "Tell me how much it has earned",
-      hint: "Alerts land in the bell on the morning of each occurrence.",
-      globalOff: "Investment alerts are turned off in Settings → Notifications.",
+      contribute: "Contribute",
+      performance: "Returns",
+      off: "Off",
       cadences: {
         daily: "Daily",
         weekly: "Weekly",
