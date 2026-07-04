@@ -518,6 +518,8 @@ struct GoalRow {
     saved_cents: i64,
     target_date: Option<String>,
     contribution_cadence: Option<String>,
+    #[serde(default)]
+    plan_anchor_date: Option<String>,
     created_date: String,
 }
 
@@ -531,11 +533,15 @@ async fn evaluate_goals(
     let goals: Vec<GoalRow> = all(
         db,
         "SELECT id, name, currency_code, target_cents, saved_cents, target_date,
-                contribution_cadence, substr(created_at, 1, 10) AS created_date
+                contribution_cadence, plan_anchor_date,
+                substr(created_at, 1, 10) AS created_date
          FROM savings_goals WHERE user_id = ?1 AND archived_at IS NULL",
         jsv![uid],
     )
     .await?;
+    // Same period baseline the goals page uses, so the reminder talks about
+    // the SAME missing amount the card shows (and stays quiet once covered).
+    let baselines = super::goals::period_baselines(db, uid, today).await?;
     for g in goals {
         if p.active("completed").is_some() && g.saved_cents >= g.target_cents {
             // No period in the key: congratulate once, ever.
@@ -558,10 +564,14 @@ async fn evaluate_goals(
         let (Ok(deadline), Some(cadence), Ok(start)) = (
             NaiveDate::parse_from_str(date_s, "%Y-%m-%d"),
             Cadence::parse(cad_s),
-            NaiveDate::parse_from_str(&g.created_date, "%Y-%m-%d"),
+            NaiveDate::parse_from_str(
+                g.plan_anchor_date.as_deref().unwrap_or(&g.created_date),
+                "%Y-%m-%d",
+            ),
         ) else {
             continue;
         };
+        let baseline = baselines.get(&g.id).copied().unwrap_or(0);
         let plan = plan_contribution(
             start,
             deadline,
@@ -569,17 +579,19 @@ async fn evaluate_goals(
             cadence,
             g.target_cents,
             g.saved_cents,
+            (g.saved_cents - baseline).max(0),
         );
 
-        if p.active("contribution").is_some() && !plan.overdue && plan.per_period_cents > 0 {
-            // Fires on the first cron morning of each cadence period.
+        if p.active("contribution").is_some() && !plan.overdue && plan.period_missing_cents > 0 {
+            // Fires on the first cron morning of each cadence period, with
+            // what's still missing for it; a covered period stays silent.
             out.push(Pending::new(
                 "goal.contribution",
                 g.id,
                 &period_key(cadence, today),
                 serde_json::json!({
                     "name": g.name,
-                    "amountCents": plan.per_period_cents,
+                    "amountCents": plan.period_missing_cents,
                     "cadence": cad_s,
                     "currencyCode": g.currency_code,
                 }),

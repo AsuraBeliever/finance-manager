@@ -107,7 +107,7 @@ fn progress_bps(saved: i64, target: i64) -> i64 {
 /// from 0). Progress this period = saved now − this baseline, which freezes
 /// the period quota: contributing doesn't shrink it, and releasing money that
 /// was already there before the period doesn't erase this period's effort.
-async fn period_baselines(
+pub(crate) async fn period_baselines(
     db: &D1Database,
     uid: i64,
     today: NaiveDate,
