@@ -53,19 +53,19 @@ export function NotificationSettingsPage() {
 
   if (!prefs) {
     return (
-      <>
+      <div className="mx-auto w-full max-w-3xl">
         <PageHeader
           title={es.notifications.title}
           backTo="/ajustes"
           backLabel={es.settings.back}
         />
         <p className="text-sm text-fg-subtle">{es.common.loading}</p>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-3xl">
       <PageHeader
         title={es.notifications.title}
         backTo="/ajustes"
@@ -73,7 +73,7 @@ export function NotificationSettingsPage() {
       />
       <p className="mb-6 max-w-xl text-sm text-fg-muted">{es.notifications.pageHint}</p>
 
-      <div className="grid max-w-3xl gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {CATEGORY_IDS.map((cat) => {
           const category = prefs[cat];
           const catLabels = es.notifications.categories as Record<string, string>;
@@ -173,7 +173,7 @@ export function NotificationSettingsPage() {
           );
         })}
       </div>
-    </>
+    </div>
   );
 }
 
