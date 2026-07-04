@@ -166,7 +166,14 @@ export function NotificationSettingsPage() {
                   );
                 })}
                 {cat === "investments" && (
-                  <InvestmentRemindersSection disabled={!category.enabled} />
+                  <InvestmentRemindersSection
+                    disabled={!category.enabled}
+                    // Only rules that are switched on offer their per-investment
+                    // frequency; both off hides the whole section.
+                    kinds={REMINDER_KINDS.filter(
+                      (k) => category.rules[k]?.enabled,
+                    )}
+                  />
                 )}
               </div>
             </section>
@@ -181,8 +188,15 @@ const REMINDER_KINDS: ReminderKind[] = ["contribute", "performance"];
 const CADENCES: ReminderCadence[] = ["daily", "weekly", "biweekly", "monthly"];
 
 /** Per-investment reminder frequencies ("remind me to contribute every X" /
- *  "summarize returns every X"), configured here and nowhere else. */
-function InvestmentRemindersSection({ disabled }: { disabled: boolean }) {
+ *  "summarize returns every X"), configured here and nowhere else. Only the
+ *  kinds whose rule is enabled are shown. */
+function InvestmentRemindersSection({
+  disabled,
+  kinds,
+}: {
+  disabled: boolean;
+  kinds: ReminderKind[];
+}) {
   const queryClient = useQueryClient();
   const investments = useQuery({
     queryKey: ["investments", {}],
@@ -200,7 +214,7 @@ function InvestmentRemindersSection({ disabled }: { disabled: boolean }) {
   });
 
   const open = (investments.data ?? []).filter((i) => !i.isClosed);
-  if (open.length === 0) return null;
+  if (open.length === 0 || kinds.length === 0) return null;
   const byKey = new Map(
     (reminders.data ?? []).map((r) => [`${r.investmentId}:${r.kind}`, r.cadence]),
   );
@@ -220,7 +234,7 @@ function InvestmentRemindersSection({ disabled }: { disabled: boolean }) {
         {open.map((inv) => (
           <div key={inv.id} className="flex flex-wrap items-center gap-2">
             <span className="min-w-0 flex-1 truncate text-sm text-fg-muted">{inv.name}</span>
-            {REMINDER_KINDS.map((kind) => (
+            {kinds.map((kind) => (
               <label key={kind} className="flex items-center gap-1.5 text-xs text-fg-subtle">
                 {kindLabels[kind]}
                 <select
