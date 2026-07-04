@@ -24,6 +24,8 @@ export interface CategoryPrefs {
 export type CategoryId = "credit" | "goals" | "subscriptions" | "investments";
 
 export interface NotificationPrefs {
+  /** Master switch for the email channel (digest to the account's address). */
+  emailEnabled: boolean;
   credit: CategoryPrefs;
   goals: CategoryPrefs;
   subscriptions: CategoryPrefs;
@@ -73,7 +75,7 @@ function defaultRule(spec: RuleSpec): RulePrefs {
 }
 
 export function defaultPrefs(): NotificationPrefs {
-  const out = {} as NotificationPrefs;
+  const out = { emailEnabled: false } as NotificationPrefs;
   for (const cat of CATEGORY_IDS) {
     const rules: Record<string, RulePrefs> = {};
     for (const spec of RULE_CATALOG[cat]) rules[spec.id] = defaultRule(spec);
@@ -92,6 +94,7 @@ export function mergePrefs(json: string | null): NotificationPrefs {
   } catch {
     return base;
   }
+  base.emailEnabled = saved.emailEnabled === true;
   for (const cat of CATEGORY_IDS) {
     const s = saved[cat];
     if (!s) continue;

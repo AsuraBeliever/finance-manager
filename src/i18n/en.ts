@@ -686,6 +686,10 @@ export const en: Dict = {
       "Alerts land in the bell every morning (8:00). Turn a category on with its checkbox and tune each rule.",
     daysBefore: "days before",
     utilizationThreshold: "Alert when above",
+    emailMaster: "Also send by email",
+    emailHint:
+      "Every morning a single email arrives at {email} with the alerts you mark with the envelope. The bell keeps working as usual.",
+    emailRule: "Include in the email",
     categories: {
       credit: "Credit cards",
       goals: "Goals",

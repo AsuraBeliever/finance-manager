@@ -1017,6 +1017,7 @@ dependencies = [
 name = "finanzas-worker"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "console_error_panic_hook",
  "finanzas-core",
@@ -1025,6 +1026,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "worker",

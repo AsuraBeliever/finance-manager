@@ -16,6 +16,10 @@ chrono = { workspace = true }
 # session-token hashing (one SHA-256 per request; cheap even in WASM)
 sha2 = "0.10"
 hex = "0.4"
+# SMTP over worker::Socket (notification emails): async read/write helpers
+# and base64 for AUTH PLAIN + UTF-8 subject encoding
+tokio = { version = "1", default-features = false, features = ["io-util"] }
+base64 = "0.22"
 # JS interop for SubtleCrypto (PBKDF2) and crypto.getRandomValues
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"

@@ -5,6 +5,8 @@
 
 mod auth;
 mod db;
+mod email;
+mod email_text;
 mod error;
 mod handlers;
 mod market;
@@ -57,6 +59,16 @@ pub async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
     if event.cron() == "0 14 * * *" {
         if let Err(e) = handlers::notifications::generate_all(&db).await {
             console_error!("notification generation failed: {e}");
+        }
+        // Email digest right after: alerts marked 'pending' go out in one
+        // message per user. Without SMTP config the channel just sleeps.
+        match email::EmailConfig::from_env(&env) {
+            Some(cfg) => {
+                if let Err(e) = handlers::notifications::send_pending_emails(&db, &cfg).await {
+                    console_error!("notification emails failed: {e}");
+                }
+            }
+            None => worker::console_log!("smtp not configured; skipping notification emails"),
         }
         return;
     }

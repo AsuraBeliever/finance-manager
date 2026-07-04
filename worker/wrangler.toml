@@ -41,3 +41,7 @@ PBKDF2_ITERATIONS = "100000"
 # Google OAuth client id (not secret; appears in the consent URL). Set to the
 # real id before deploy: the Client ID from Google Cloud → Credentials.
 GOOGLE_CLIENT_ID = "736484669055-ub19ovg5t6ccrmbjd5vlpi65pu0j8stn.apps.googleusercontent.com"
+# Link inside notification emails. SMTP_HOST/PORT/SECURE/USERNAME/PASSWORD/FROM
+# go via `wrangler secret put` (never in this file — the repo is public); with
+# no SMTP configured the email channel simply sleeps.
+APP_URL = "https://finanzas.aseth.workers.dev"

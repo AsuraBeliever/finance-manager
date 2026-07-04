@@ -698,6 +698,10 @@ export const esDict = {
       "Los avisos llegan a la campanita cada mañana (8:00). Activa una categoría con su casilla y afina cada regla.",
     daysBefore: "días antes",
     utilizationThreshold: "Avisar cuando pase de",
+    emailMaster: "Enviar también por correo",
+    emailHint:
+      "Cada mañana te llega un solo correo a {email} con los avisos que marques con el sobre. La campanita sigue funcionando igual.",
+    emailRule: "Incluir en el correo",
     categories: {
       credit: "Tarjetas de crédito",
       goals: "Metas",

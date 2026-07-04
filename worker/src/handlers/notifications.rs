@@ -71,15 +71,15 @@ pub struct CategoryPrefs {
 }
 
 impl CategoryPrefs {
-    /// The rule, only when the category master check, the rule itself and its
-    /// in-app channel are all on.
+    /// The rule, only when the category master check and the rule itself are
+    /// on. An enabled rule always reaches the bell; `channels.email` decides
+    /// whether it ALSO goes out by mail (see `email_wanted`) — `channels.inApp`
+    /// is kept in the stored JSON for compatibility but not consulted.
     fn active(&self, name: &str) -> Option<&Rule> {
         if !self.enabled {
             return None;
         }
-        self.rules
-            .get(name)
-            .filter(|r| r.enabled && r.channels.in_app)
+        self.rules.get(name).filter(|r| r.enabled)
     }
 
     fn days_before(&self, name: &str, default: i64) -> Option<i64> {
@@ -91,6 +91,8 @@ impl CategoryPrefs {
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct NotificationPrefs {
+    /// Master switch for the email channel (digest to the account's address).
+    pub email_enabled: bool,
     pub credit: CategoryPrefs,
     pub goals: CategoryPrefs,
     pub subscriptions: CategoryPrefs,
@@ -330,6 +332,34 @@ pub async fn generate_all(db: &D1Database) -> AppResult<()> {
     Ok(())
 }
 
+/// Whether this alert should also go out by email: the user's master email
+/// switch plus the specific rule's email channel. The kind names the rule
+/// ('credit.dueSoon' → credit/dueSoon), so the decision stays in one place.
+fn email_wanted(prefs: &NotificationPrefs, kind: &str) -> bool {
+    if !prefs.email_enabled {
+        return false;
+    }
+    let Some((cat, rule)) = kind.split_once('.') else {
+        return false;
+    };
+    let category = match cat {
+        "credit" => &prefs.credit,
+        "goal" => &prefs.goals,
+        "sub" => &prefs.subscriptions,
+        "inv" => &prefs.investments,
+        _ => return false,
+    };
+    let rule = if rule == "performanceFirst" {
+        "performance"
+    } else {
+        rule
+    };
+    category
+        .active(rule)
+        .map(|r| r.channels.email)
+        .unwrap_or(false)
+}
+
 async fn generate_for_user(
     db: &D1Database,
     uid: i64,
@@ -346,32 +376,48 @@ async fn generate_for_user(
     if prefs.subscriptions.enabled {
         evaluate_subscriptions(db, uid, &prefs.subscriptions, today, &mut out).await?;
     }
-    insert_pending(db, uid, out).await?;
+    insert_pending(db, uid, out, prefs).await?;
     if prefs.investments.enabled {
         // Handled apart: each fired reminder pairs its INSERT with the cursor
         // UPDATE in one batch, so the two can't drift.
-        evaluate_investments(db, uid, &prefs.investments, today).await?;
+        evaluate_investments(db, uid, &prefs.investments, today, prefs).await?;
     }
     Ok(())
 }
 
-async fn insert_pending(db: &D1Database, uid: i64, pending: Vec<Pending>) -> AppResult<()> {
+async fn insert_pending(
+    db: &D1Database,
+    uid: i64,
+    pending: Vec<Pending>,
+    prefs: &NotificationPrefs,
+) -> AppResult<()> {
     if pending.is_empty() {
         return Ok(());
     }
     let stmts = pending
         .iter()
-        .map(|p| insert_stmt(db, uid, p))
+        .map(|p| insert_stmt(db, uid, p, email_wanted(prefs, p.kind)))
         .collect::<AppResult<Vec<_>>>()?;
     batch_chunks(db, stmts, 20).await
 }
 
-fn insert_stmt(db: &D1Database, uid: i64, p: &Pending) -> AppResult<worker::D1PreparedStatement> {
+fn insert_stmt(
+    db: &D1Database,
+    uid: i64,
+    p: &Pending,
+    email: bool,
+) -> AppResult<worker::D1PreparedStatement> {
     stmt(
         db,
-        "INSERT OR IGNORE INTO notifications (user_id, kind, params_json, dedupe_key)
-         VALUES (?1, ?2, ?3, ?4)",
-        jsv![uid, p.kind, p.params.to_string(), p.dedupe_key],
+        "INSERT OR IGNORE INTO notifications (user_id, kind, params_json, dedupe_key, email_status)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        jsv![
+            uid,
+            p.kind,
+            p.params.to_string(),
+            p.dedupe_key,
+            email.then_some("pending")
+        ],
     )
 }
 
@@ -710,6 +756,7 @@ async fn evaluate_investments(
     uid: i64,
     p: &CategoryPrefs,
     today: NaiveDate,
+    prefs: &NotificationPrefs,
 ) -> AppResult<()> {
     let contribute_on = p.active("contribute").is_some();
     let performance_on = p.active("performance").is_some();
@@ -734,7 +781,7 @@ async fn evaluate_investments(
             if !on {
                 continue;
             }
-            if let Err(e) = fire_reminder(db, uid, &r, today).await {
+            if let Err(e) = fire_reminder(db, uid, &r, today, prefs).await {
                 console_warn!("investment reminder {} failed: {e}", r.id);
             }
         }
@@ -800,7 +847,7 @@ async fn evaluate_investments(
                 }
             }
         }
-        insert_pending(db, uid, out).await?;
+        insert_pending(db, uid, out, prefs).await?;
     }
     Ok(())
 }
@@ -812,6 +859,7 @@ async fn fire_reminder(
     uid: i64,
     r: &ReminderRow,
     today: NaiveDate,
+    prefs: &NotificationPrefs,
 ) -> AppResult<()> {
     let Some(cadence) = ReminderCadence::parse(&r.cadence) else {
         return Ok(());
@@ -867,7 +915,7 @@ async fn fire_reminder(
     };
 
     let stmts = vec![
-        insert_stmt(db, uid, &pending)?,
+        insert_stmt(db, uid, &pending, email_wanted(prefs, pending.kind))?,
         stmt(
             db,
             "UPDATE investment_reminders SET last_fired_date = ?2, last_value_cents = ?3
@@ -876,5 +924,93 @@ async fn fire_reminder(
         )?,
     ];
     batch(db, stmts).await?;
+    Ok(())
+}
+
+// ---- cron: email digest ----
+
+/// Send one digest email per user holding 'pending' alerts, in Spanish,
+/// rendered server-side from the same kind + params the bell stores. A failed
+/// send stays 'pending' and retries on the next morning's cron.
+pub async fn send_pending_emails(
+    db: &D1Database,
+    cfg: &crate::email::EmailConfig,
+) -> AppResult<()> {
+    #[derive(Deserialize)]
+    struct UserRow {
+        user_id: i64,
+        email: String,
+    }
+    #[derive(Deserialize)]
+    struct AlertRow {
+        id: i64,
+        kind: String,
+        params_json: String,
+    }
+    let users: Vec<UserRow> = all(
+        db,
+        "SELECT DISTINCT n.user_id, u.email
+         FROM notifications n JOIN users u ON u.id = n.user_id
+         WHERE n.email_status = 'pending'",
+        vec![],
+    )
+    .await?;
+    for u in users {
+        let alerts: Vec<AlertRow> = all(
+            db,
+            "SELECT id, kind, params_json FROM notifications
+             WHERE user_id = ?1 AND email_status = 'pending'
+             ORDER BY id LIMIT 50",
+            jsv![u.user_id],
+        )
+        .await?;
+        if alerts.is_empty() {
+            continue;
+        }
+        let items = alerts
+            .iter()
+            .map(|a| {
+                format!(
+                    "<li style=\"margin:0 0 10px\">{}</li>",
+                    crate::email_text::render_es(&a.kind, &a.params_json)
+                )
+            })
+            .collect::<String>();
+        let subject = if alerts.len() == 1 {
+            "Tienes un aviso nuevo en tus finanzas".to_string()
+        } else {
+            format!("Tienes {} avisos nuevos en tus finanzas", alerts.len())
+        };
+        let link = if cfg.app_url.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "<p style=\"margin:18px 0 0\"><a href=\"{0}\" style=\"color:#7c5cff\">Abrir la app</a></p>",
+                cfg.app_url
+            )
+        };
+        let body = format!(
+            "<div style=\"font-family:sans-serif;font-size:15px;line-height:1.5;color:#222;max-width:520px\">\
+             <p style=\"margin:0 0 14px\">Buenos días. Esto es lo que hay hoy:</p>\
+             <ul style=\"padding-left:20px;margin:0\">{items}</ul>{link}\
+             <p style=\"margin:18px 0 0;font-size:12px;color:#888\">Puedes apagar estos correos en Ajustes → Notificaciones.</p>\
+             </div>"
+        );
+        match crate::email::send(cfg, &u.email, &subject, &body).await {
+            Ok(()) => {
+                let ids = alerts
+                    .iter()
+                    .map(|a| a.id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let sql =
+                    format!("UPDATE notifications SET email_status = 'sent' WHERE id IN ({ids})");
+                exec(db, &sql, vec![]).await?;
+            }
+            Err(e) => {
+                console_warn!("email digest failed for user {}: {e}", u.user_id);
+            }
+        }
+    }
     Ok(())
 }

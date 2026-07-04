@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Mail } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
+import { me } from "../../lib/auth";
 import {
   getSetting,
   listInvestmentReminders,
@@ -73,6 +75,15 @@ export function NotificationSettingsPage() {
       />
       <p className="mb-6 max-w-xl text-sm text-fg-muted">{es.notifications.pageHint}</p>
 
+      <EmailMasterCard
+        enabled={prefs.emailEnabled}
+        onChange={(on) =>
+          update((p) => {
+            p.emailEnabled = on;
+          })
+        }
+      />
+
       <div className="grid gap-4 lg:grid-cols-2">
         {CATEGORY_IDS.map((cat) => {
           const category = prefs[cat];
@@ -121,6 +132,25 @@ export function NotificationSettingsPage() {
                         />
                         {ruleLabel(cat, spec.id)}
                       </label>
+                      {prefs.emailEnabled && (
+                        <label
+                          title={es.notifications.emailRule}
+                          className="flex cursor-pointer items-center gap-1 text-xs text-fg-subtle"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={rule.channels.email}
+                            disabled={!category.enabled || !rule.enabled}
+                            onChange={(e) =>
+                              update((p) => {
+                                p[cat].rules[spec.id].channels.email = e.target.checked;
+                              })
+                            }
+                            className="accent-accent"
+                          />
+                          <Mail size={13} />
+                        </label>
+                      )}
                       {spec.daysBefore !== undefined && (
                         <span className="flex items-center gap-1.5 text-xs text-fg-subtle">
                           <input
@@ -262,5 +292,39 @@ function InvestmentRemindersSection({
         ))}
       </div>
     </div>
+  );
+}
+
+/** Master switch for the email channel: the morning digest goes to the
+ *  account's address; per-rule envelopes pick what it includes. */
+function EmailMasterCard({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  const session = useQuery({ queryKey: ["me"], queryFn: me, staleTime: Infinity });
+  return (
+    <section className="mb-4 rounded-xl border border-border-muted bg-surface-raised p-5">
+      <label className="flex cursor-pointer items-center gap-2.5">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onChange(e.target.checked)}
+          className="h-4 w-4 accent-accent"
+        />
+        <Mail size={16} className="text-fg-subtle" />
+        <h3 className="font-display text-base font-medium text-fg">
+          {es.notifications.emailMaster}
+        </h3>
+      </label>
+      <p className="mt-2 text-xs leading-relaxed text-fg-subtle">
+        {es.notifications.emailHint.replace(
+          "{email}",
+          session.data?.email ?? "",
+        )}
+      </p>
+    </section>
   );
 }
