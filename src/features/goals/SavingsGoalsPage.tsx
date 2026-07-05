@@ -16,95 +16,33 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useState, type ReactNode } from "react";
-import { Check, GripVertical, Pencil, PiggyBank, Plus, Trash2, Wallet } from "lucide-react";
+import { useState } from "react";
+import { GripVertical, PiggyBank, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
-import { ColorPicker } from "../../components/ColorPicker";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
-import { DateInput } from "../../components/DateInput";
 import { EmptyState } from "../../components/EmptyState";
-import { Field, inputClass } from "../../components/Field";
-import { MoneyInput } from "../../components/MoneyInput";
-import { ProgressBar } from "../../components/ProgressBar";
-import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
 import {
-  contributeSavingsGoal,
-  createSavingsGoal,
   deleteSavingsGoal,
   listSavingsGoals,
   listWallets,
   reorderSavingsGoals,
-  updateSavingsGoal,
   useSavingsGoal,
 } from "../../lib/api";
 import { WalletFormModal } from "../wallets/WalletFormModal";
-import { formatCents, parseToCents } from "../../lib/money";
-import { CHART_COLORS } from "../../lib/palette";
-import type { GoalCadence, GoalKind, SavingsGoal } from "../../lib/types";
+import { formatCents } from "../../lib/money";
+import type { SavingsGoal } from "../../lib/types";
 import { es } from "../../i18n/es";
-
-/** Today's date as ISO 'YYYY-MM-DD' (the earliest selectable deadline). */
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** A sensible default deadline (~3 months out) prefilled when the user turns
- *  on a deadline, so they can just tweak it instead of starting from scratch. */
-function defaultDeadlineISO(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 3);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Short, locale-aware date like "30 nov 2026" for the plan line. */
-function formatDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-/** Adverbial cadence ("al mes" / "a month") for the plan sentence. */
-function cadenceAdverb(c: GoalCadence | null): string {
-  switch (c) {
-    case "daily":
-      return es.goals.cadenceAdvDaily;
-    case "weekly":
-      return es.goals.cadenceAdvWeekly;
-    case "yearly":
-      return es.goals.cadenceAdvYearly;
-    default:
-      return es.goals.cadenceAdvMonthly;
-  }
-}
-
-/** Period noun ("Este mes" / "This week") for the progress sentence. */
-function periodNoun(c: GoalCadence | null): string {
-  switch (c) {
-    case "daily":
-      return es.goals.periodDaily;
-    case "weekly":
-      return es.goals.periodWeekly;
-    case "yearly":
-      return es.goals.periodYearly;
-    default:
-      return es.goals.periodMonthly;
-  }
-}
+import { ContributeModal } from "./ContributeModal";
+import { GoalCard } from "./GoalCard";
+import { GoalFormModal } from "./GoalFormModal";
 
 /** A goal card wrapped for drag-to-reorder. Dragging starts from the grip so
  *  the edit/delete/contribute controls stay clickable. The first card (lowest
  *  sort_order) is the dashboard's principal gauge. */
 function SortableGoalCard({
   goal: g,
-  walletName,
-  onEdit,
-  onDelete,
-  onContribute,
-  onUse,
-  onConvert,
+  ...cardProps
 }: {
   goal: SavingsGoal;
   walletName: string | null;
@@ -122,18 +60,14 @@ function SortableGoalCard({
     transition,
     zIndex: isDragging ? 10 : undefined,
   };
-  const done = g.progressBps >= 10000;
-  const remaining = Math.max(0, g.targetCents - g.savedCents);
-  const color = g.color ?? "var(--color-accent)";
   return (
-    <section
-      ref={setNodeRef}
+    <GoalCard
+      goal={g}
+      {...cardProps}
+      containerRef={setNodeRef}
       style={style}
-      className={`group rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card transition-colors duration-300 hover:border-accent/40 ${
-        isDragging ? "opacity-90" : ""
-      }`}
-    >
-      <div className="mb-4 flex items-center gap-2">
+      dragging={isDragging}
+      dragHandle={
         <button
           type="button"
           {...attributes}
@@ -144,153 +78,8 @@ function SortableGoalCard({
         >
           <GripVertical size={16} />
         </button>
-        <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-          style={{ backgroundColor: `color-mix(in oklab, ${color} 22%, transparent)` }}
-        >
-          <PiggyBank size={17} style={{ color }} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate font-display text-lg font-medium text-fg">{g.name}</h3>
-          <p className="truncate text-xs text-fg-subtle">
-            {walletName ? `${es.goals.apartadoIn} ${walletName}` : es.goals.trackOnly}
-          </p>
-        </div>
-        <div className="touch-action-reveal flex shrink-0 gap-1 transition-opacity">
-          <button
-            onClick={onEdit}
-            className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-overlay hover:text-fg"
-          >
-            <Pencil size={15} />
-          </button>
-          <button
-            onClick={onDelete}
-            className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-danger/10 hover:text-danger"
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      </div>
-
-      <p className="font-display text-2xl font-semibold tabular-nums text-fg">
-        {formatCents(g.savedCents, g.currencyCode)}
-        <span className="ml-1.5 text-sm font-normal text-fg-subtle">
-          {es.goals.of} {formatCents(g.targetCents, g.currencyCode)}
-        </span>
-      </p>
-
-      <ProgressBar className="mt-3" value={g.progressBps / 10000} color={color} />
-
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-sm tabular-nums">
-          <span className="font-semibold text-accent">
-            {done ? es.goals.completed : `${Math.round(g.progressBps / 100)}%`}
-          </span>
-          {!done && (
-            <span className="text-fg-subtle">
-              {" · "}
-              {es.goals.remaining} {formatCents(remaining, g.currencyCode)}
-            </span>
-          )}
-        </span>
-        <div className="flex shrink-0 gap-1">
-          <Button variant="ghost" onClick={onContribute}>
-            {es.goals.contribute}
-          </Button>
-          {g.savedCents > 0 &&
-            (g.goalKind === "fund" ? (
-              <Button variant="ghost" onClick={onConvert}>
-                <span className="flex items-center gap-1.5">
-                  <Wallet size={14} /> {es.goals.convertToWallet}
-                </span>
-              </Button>
-            ) : (
-              <Button variant="ghost" onClick={onUse}>
-                <span className="flex items-center gap-1.5">
-                  <Check size={14} /> {es.goals.buy}
-                </span>
-              </Button>
-            ))}
-        </div>
-      </div>
-
-      {g.plan && !done && (
-        <div className="mt-3 border-t border-border-muted pt-3 text-xs">
-          {g.plan.overdue ? (
-            <p className="text-fg-subtle">
-              <BadgeTag tone="danger">{es.goals.overdueBadge}</BadgeTag>{" "}
-              {es.goals.overdueHint.replace(
-                "{amount}",
-                formatCents(remaining, g.currencyCode),
-              )}
-            </p>
-          ) : (
-            <>
-              <p className="text-fg-muted">
-                {/* The period quota is frozen at the period start: partial money
-                    reads as progress ("2,000 of 2,400"), never a re-spread plan. */}
-                {g.plan.contributedThisPeriodCents <= 0
-                  ? es.goals.planReserve
-                      .replace(
-                        "{amount}",
-                        formatCents(g.plan.periodQuotaCents, g.currencyCode),
-                      )
-                      .replace("{cadence}", cadenceAdverb(g.cadence))
-                      .replace("{date}", formatDate(g.targetDate ?? ""))
-                  : g.plan.periodMissingCents > 0
-                    ? es.goals.planProgress
-                        .replace("{period}", periodNoun(g.cadence))
-                        .replace(
-                          "{done}",
-                          formatCents(g.plan.contributedThisPeriodCents, g.currencyCode),
-                        )
-                        .replace(
-                          "{quota}",
-                          formatCents(g.plan.periodQuotaCents, g.currencyCode),
-                        )
-                        .replace(
-                          "{missing}",
-                          formatCents(g.plan.periodMissingCents, g.currencyCode),
-                        )
-                    : es.goals.planCovered
-                        .replace("{period}", periodNoun(g.cadence))
-                        .replace("{date}", formatDate(g.targetDate ?? ""))}
-              </p>
-              {g.isBehind && (
-                <p className="mt-1 text-fg-subtle">
-                  <BadgeTag tone="warning">{es.goals.behindBadge}</BadgeTag>{" "}
-                  {es.goals.behindHint.replace(
-                    "{amount}",
-                    formatCents(g.plan.behindCents, g.currencyCode),
-                  )}
-                </p>
-              )}
-            </>
-          )}
-          {(g.plan.overdue || g.isBehind) && (
-            <button
-              onClick={onEdit}
-              className="mt-2 font-medium text-accent transition-colors hover:text-accent/80"
-            >
-              {es.goals.adjustDate}
-            </button>
-          )}
-        </div>
-      )}
-    </section>
-  );
-}
-
-/** Tiny inline status pill used by goal cards (behind / overdue). */
-function BadgeTag({ tone, children }: { tone: "warning" | "danger"; children: ReactNode }) {
-  const cls =
-    tone === "danger"
-      ? "bg-danger/12 text-danger"
-      : "bg-amber-500/15 text-amber-600 dark:text-amber-400";
-  return (
-    <span className={`mr-0.5 inline-block rounded-md px-1.5 py-0.5 font-semibold ${cls}`}>
-      {children}
-    </span>
+      }
+    />
   );
 }
 
@@ -449,337 +238,5 @@ export function SavingsGoalsPage() {
         />
       )}
     </>
-  );
-}
-
-function GoalFormModal({
-  open,
-  goal,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  goal: SavingsGoal | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
-  const [name, setName] = useState("");
-  const [target, setTarget] = useState("");
-  const [currency, setCurrency] = useState("MXN");
-  const [walletId, setWalletId] = useState<number | null>(null);
-  const [goalKind, setGoalKind] = useState<GoalKind>("purchase");
-  const [color, setColor] = useState<string>(CHART_COLORS[0]);
-  const [deadlineEnabled, setDeadlineEnabled] = useState(false);
-  const [deadline, setDeadline] = useState<string>("");
-  const [cadence, setCadence] = useState<GoalCadence>("monthly");
-  const [error, setError] = useState<string | null>(null);
-
-  // Reset fields whenever the modal opens for a new/edited goal. New goals
-  // default to the first wallet (every goal is now backed by real money).
-  const [lastKey, setLastKey] = useState<string>("");
-  const key = `${open}-${goal?.id ?? "new"}`;
-  if (open && key !== lastKey) {
-    setLastKey(key);
-    setName(goal?.name ?? "");
-    setTarget(goal ? (goal.targetCents / 100).toString() : "");
-    setCurrency(goal?.currencyCode ?? "MXN");
-    setWalletId(goal?.linkedWalletId ?? wallets.data?.[0]?.id ?? null);
-    setGoalKind(goal?.goalKind ?? "purchase");
-    setColor(goal?.color ?? CHART_COLORS[0]);
-    setDeadlineEnabled(goal?.targetDate != null);
-    setDeadline(goal?.targetDate ?? "");
-    setCadence(goal?.cadence ?? "monthly");
-    setError(null);
-  }
-
-  // Fall back to the first wallet if none is chosen yet (e.g. the wallets query
-  // hadn't resolved when the modal opened), so a new goal always has one.
-  const effectiveWalletId = walletId ?? wallets.data?.[0]?.id ?? null;
-  const linkedWallet = wallets.data?.find((w) => w.id === effectiveWalletId) ?? null;
-  const effectiveCurrency = linkedWallet?.currencyCode ?? currency;
-
-  const save = useMutation({
-    mutationFn: () => {
-      const cents = parseToCents(target);
-      if (!name.trim() || cents === null || cents <= 0)
-        return Promise.reject(new Error(es.investments.invalidAmount));
-      if (effectiveWalletId == null)
-        return Promise.reject(new Error(es.goals.apartadoWallet));
-      const input = {
-        name: name.trim(),
-        icon: null,
-        color,
-        currencyCode: effectiveCurrency,
-        targetCents: cents,
-        walletId: effectiveWalletId,
-        targetDate: deadlineEnabled && deadline ? deadline : null,
-        cadence: deadlineEnabled && deadline ? cadence : null,
-        goalKind,
-      };
-      return goal ? updateSavingsGoal(goal.id, input) : createSavingsGoal(input);
-    },
-    onSuccess: () => {
-      onSaved();
-      onClose();
-    },
-    onError: (e) => setError(e instanceof Error ? e.message : String(e)),
-  });
-
-  return (
-    <Modal open={open} onClose={onClose} title={goal ? es.goals.editGoal : es.goals.newGoal}>
-      <div className="flex flex-col gap-4">
-        <Field label={es.goals.name}>
-          <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
-        <Field label={es.goals.kindLabel}>
-          <div className="flex gap-1 rounded-xl bg-surface-overlay p-1">
-            {(
-              [
-                ["purchase", es.goals.kindPurchase],
-                ["fund", es.goals.kindFund],
-              ] as const
-            ).map(([val, label]) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setGoalKind(val)}
-                className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  goalKind === val
-                    ? "bg-surface-raised text-fg shadow-sm"
-                    : "text-fg-subtle hover:text-fg"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <span className="mt-1 block text-xs text-fg-subtle">
-            {goalKind === "fund" ? es.goals.kindFundHint : es.goals.kindPurchaseHint}
-          </span>
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={es.goals.target}>
-            <MoneyInput value={target} onChange={setTarget} />
-          </Field>
-          <Field label={es.investments.currency}>
-            <input className={inputClass} value={effectiveCurrency} disabled readOnly />
-          </Field>
-        </div>
-        <Field label={es.goals.apartadoWallet}>
-          <select
-            className={inputClass}
-            value={effectiveWalletId ?? ""}
-            onChange={(e) => setWalletId(e.target.value === "" ? null : Number(e.target.value))}
-          >
-            {wallets.data?.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} ({w.currencyCode})
-              </option>
-            ))}
-          </select>
-          <span className="mt-1 block text-xs text-fg-subtle">{es.goals.apartadoHint}</span>
-        </Field>
-        {/* Deadline is opt-in via a clear switch; flipping it on reveals the
-            date + cadence right away (prefilled), so it's configured in place. */}
-        <div className="rounded-lg border border-border-muted p-3">
-          <label className="flex cursor-pointer items-start gap-2.5">
-            <input
-              type="checkbox"
-              checked={deadlineEnabled}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setDeadlineEnabled(on);
-                if (on && !deadline) setDeadline(defaultDeadlineISO());
-              }}
-              className="mt-0.5 h-4 w-4 accent-accent"
-            />
-            <span className="text-sm">
-              {es.goals.enableDeadline}
-              <span className="mt-0.5 block text-xs text-fg-subtle">
-                {es.goals.deadlineHint}
-              </span>
-            </span>
-          </label>
-
-          {deadlineEnabled && (
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label={es.goals.deadlineDateLabel}>
-                <DateInput value={deadline} onChange={setDeadline} min={todayISO()} />
-              </Field>
-              <Field label={es.goals.cadenceLabel}>
-                <select
-                  className={inputClass}
-                  value={cadence}
-                  onChange={(e) => setCadence(e.target.value as GoalCadence)}
-                >
-                  <option value="daily">{es.goals.cadenceDaily}</option>
-                  <option value="weekly">{es.goals.cadenceWeekly}</option>
-                  <option value="monthly">{es.goals.cadenceMonthly}</option>
-                  <option value="yearly">{es.goals.cadenceYearly}</option>
-                </select>
-              </Field>
-            </div>
-          )}
-        </div>
-        <Field label={es.common.color ?? "Color"}>
-          <ColorPicker value={color} onChange={setColor} />
-        </Field>
-        {error && <p className="text-sm text-danger">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {es.common.cancel}
-          </Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
-            {es.common.save}
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function ContributeModal({
-  goal,
-  onClose,
-  onSaved,
-}: {
-  goal: SavingsGoal | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  // Two clear actions, both with positive amounts: "reserve" adds money to the
-  // goal, "release" returns it. The backend still takes a signed delta — we
-  // negate behind the scenes so the user never types a negative number.
-  const [mode, setMode] = useState<"reserve" | "release">("reserve");
-  const [amount, setAmount] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
-
-  // Reset on every open (closing clears lastId), so reopening the same goal
-  // never lands on the previous visit's tab or leftover amount.
-  const [lastId, setLastId] = useState<number | null>(null);
-  if (!goal && lastId !== null) {
-    setLastId(null);
-  }
-  if (goal && goal.id !== lastId) {
-    setLastId(goal.id);
-    setMode("reserve");
-    setAmount("");
-    setError(null);
-  }
-
-  const save = useMutation({
-    mutationFn: () => {
-      const cents = parseToCents(amount);
-      if (!goal || cents === null || cents <= 0)
-        return Promise.reject(new Error(es.investments.invalidAmount));
-      if (mode === "release" && cents > goal.savedCents)
-        return Promise.reject(
-          new Error(
-            es.goals.releaseTooMuch.replace(
-              "{amount}",
-              formatCents(goal.savedCents, goal.currencyCode),
-            ),
-          ),
-        );
-      return contributeSavingsGoal(goal.id, mode === "release" ? -cents : cents);
-    },
-    onSuccess: () => {
-      setAmount("");
-      onSaved();
-      onClose();
-    },
-    onError: (e) => setError(e instanceof Error ? e.message : String(e)),
-  });
-
-  // For an apartado goal, show how much is free to reserve in its wallet.
-  const apartadoWallet = goal?.linkedWalletId
-    ? (wallets.data?.find((w) => w.id === goal.linkedWalletId) ?? null)
-    : null;
-  const available = apartadoWallet
-    ? apartadoWallet.balanceCents - apartadoWallet.reservedCents
-    : null;
-  const currency = goal?.currencyCode ?? "MXN";
-  const canRelease = (goal?.savedCents ?? 0) > 0;
-  // Suggest what's missing to cover this period; once covered, the next
-  // period's split.
-  const suggested =
-    mode === "reserve"
-      ? goal?.plan?.periodMissingCents || (goal?.plan?.perPeriodCents ?? 0)
-      : 0;
-
-  const tab = (m: "reserve" | "release", label: string) => (
-    <button
-      type="button"
-      onClick={() => setMode(m)}
-      className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-        mode === m
-          ? "bg-surface-raised text-fg shadow-sm"
-          : "text-fg-subtle hover:text-fg"
-      }`}
-    >
-      {label}
-    </button>
-  );
-
-  return (
-    <Modal open={goal !== null} onClose={onClose} title={es.goals.contributeTitle}>
-      <div className="flex flex-col gap-4">
-        <div className="flex gap-1 rounded-xl bg-surface-overlay p-1">
-          {tab("reserve", es.goals.reserveTab)}
-          {canRelease && tab("release", es.goals.releaseTab)}
-        </div>
-
-        {mode === "reserve" && apartadoWallet && available !== null && (
-          <p className="rounded-lg bg-surface-overlay px-3 py-2 text-xs text-fg-muted">
-            {es.goals.apartadoOf} <span className="font-medium text-fg">{apartadoWallet.name}</span> ·{" "}
-            {es.goals.available}{" "}
-            <span className="font-medium tabular-nums text-fg">
-              {formatCents(available, apartadoWallet.currencyCode)}
-            </span>
-          </p>
-        )}
-        {mode === "release" && goal && (
-          <p className="rounded-lg bg-surface-overlay px-3 py-2 text-xs text-fg-muted">
-            {es.goals.reservedLabel}{" "}
-            <span className="font-medium tabular-nums text-fg">
-              {formatCents(goal.savedCents, currency)}
-            </span>
-          </p>
-        )}
-
-        <Field label={es.goals.amount}>
-          <MoneyInput value={amount} onChange={setAmount} autoFocus />
-        </Field>
-        {suggested > 0 && (
-          <button
-            type="button"
-            onClick={() => setAmount((suggested / 100).toString())}
-            className="-mt-2 self-start rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
-          >
-            {es.goals.suggestedChip} {formatCents(suggested, currency)}
-          </button>
-        )}
-        <p className="-mt-1 text-xs text-fg-subtle">
-          {mode === "reserve"
-            ? apartadoWallet
-              ? es.goals.reserveHint
-              : es.goals.reserveTrackHint
-            : apartadoWallet
-              ? es.goals.releaseHint
-              : es.goals.releaseTrackHint}
-        </p>
-        {error && <p className="text-sm text-danger">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {es.common.cancel}
-          </Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
-            {mode === "reserve" ? es.goals.reserveAction : es.goals.releaseAction}
-          </Button>
-        </div>
-      </div>
-    </Modal>
   );
 }

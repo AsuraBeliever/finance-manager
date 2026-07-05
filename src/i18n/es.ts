@@ -116,6 +116,7 @@ export const esDict = {
     apartadoHint: "El dinero se reserva dentro de esta cartera; sigue siendo tuyo, solo apartado.",
     apartadoNoneHint: "Meta abstracta, sin dinero real detrás (ideal para empezar).",
     apartadoIn: "Apartado en",
+    walletSectionTitle: "Metas apartadas en esta cartera",
     apartadoOf: "Apartado de",
     trackOnly: "Solo seguimiento",
     available: "disponible:",

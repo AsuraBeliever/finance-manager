@@ -18,6 +18,7 @@ import type { Transaction } from "../../lib/types";
 import { formatCents } from "../../lib/money";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
+import { WalletGoalsSection } from "../goals/WalletGoalsSection";
 import { TransactionFormModal } from "../transactions/TransactionFormModal";
 import { TransactionList } from "../transactions/TransactionList";
 import { CreditCardPanel } from "./CreditCardPanel";
@@ -174,6 +175,9 @@ export function WalletDetailPage() {
           )}
         </div>
       )}
+
+      {/* Goals whose apartado is reserved inside this wallet. */}
+      <WalletGoalsSection walletId={walletId} />
 
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-medium">{es.transactions.title}</h3>
