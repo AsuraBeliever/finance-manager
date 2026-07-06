@@ -418,6 +418,7 @@ export const en: Dict = {
     noCategory: "Uncategorized",
     description: "Description",
     date: "Date",
+    time: "Time",
     allWallets: "All wallets",
     allKinds: "All types",
     typeAll: "All",

@@ -134,6 +134,8 @@ fn tx_from_row(r: &Row) -> rusqlite::Result<Transaction> {
         transfer_group_id: r.get("transfer_group_id")?,
         description: r.get("description")?,
         occurred_at: r.get("occurred_at")?,
+        // Legacy desktop DB (read-only backup) never tracked a time.
+        occurred_time: None,
         created_at: r.get("created_at")?,
     })
 }

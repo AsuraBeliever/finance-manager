@@ -138,6 +138,8 @@ export interface Transaction {
   transferGroupId: string | null;
   description: string | null;
   occurredAt: string;
+  /** Local wall-clock time 'HH:MM' the movement happened, or null if untimed. */
+  occurredTime: string | null;
   createdAt: string;
 }
 

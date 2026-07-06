@@ -26,6 +26,20 @@ fn validate_date(date: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Normalizes an optional local wall-clock time to 'HH:MM' (24h), or None when
+/// absent/blank. Rejects anything that isn't a real time so the column always
+/// holds a value the UI can render back.
+fn validate_time(time: Option<String>) -> AppResult<Option<String>> {
+    match time.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        None => Ok(None),
+        Some(s) => {
+            let t = chrono::NaiveTime::parse_from_str(s, "%H:%M")
+                .map_err(|_| AppError::InvalidInput("hora inválida (se espera HH:MM)".into()))?;
+            Ok(Some(t.format("%H:%M").to_string()))
+        }
+    }
+}
+
 async fn wallet_exists(db: &D1Database, uid: i64, id: i64) -> AppResult<()> {
     let row: Option<CountRow> = first(
         db,
@@ -48,6 +62,9 @@ pub struct SimpleTxArgs {
     pub category_id: Option<i64>,
     pub description: Option<String>,
     pub occurred_at: String,
+    /// Local wall-clock time 'HH:MM' of the movement; None keeps it timeless.
+    #[serde(default)]
+    pub occurred_time: Option<String>,
     /// Offline-outbox idempotency: a replay with the same id never inserts twice.
     pub client_id: Option<String>,
     /// Set when this expense is a subscription charge, so the dashboard can
@@ -69,6 +86,7 @@ async fn insert_simple(
 ) -> AppResult<i64> {
     validate_amount(a.amount_cents)?;
     validate_date(&a.occurred_at)?;
+    let occurred_time = validate_time(a.occurred_time)?;
     wallet_exists(db, uid, a.wallet_id).await?;
     if let Some(client_id) = &a.client_id {
         // already applied (response was lost mid-flight): return the same id
@@ -84,9 +102,9 @@ async fn insert_simple(
     }
     let res = exec(
         db,
-        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at, client_id, subscription_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        jsv![a.wallet_id, kind, a.amount_cents, a.category_id, a.description, a.occurred_at, a.client_id, a.subscription_id],
+        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at, occurred_time, client_id, subscription_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        jsv![a.wallet_id, kind, a.amount_cents, a.category_id, a.description, a.occurred_at, occurred_time, a.client_id, a.subscription_id],
     )
     .await?;
     last_row_id(&res)
@@ -109,6 +127,9 @@ pub struct TransferArgs {
     pub amount_to_cents: i64,
     pub description: Option<String>,
     pub occurred_at: String,
+    /// Local wall-clock time 'HH:MM'; shared by both legs. None keeps it timeless.
+    #[serde(default)]
+    pub occurred_time: Option<String>,
     /// Offline-outbox idempotency; stored on the transfer_out leg only.
     pub client_id: Option<String>,
 }
@@ -117,6 +138,7 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
     validate_amount(a.amount_from_cents)?;
     validate_amount(a.amount_to_cents)?;
     validate_date(&a.occurred_at)?;
+    let occurred_time = validate_time(a.occurred_time)?;
     if a.from_wallet_id == a.to_wallet_id {
         return Err(AppError::InvalidInput(
             "la cartera origen y destino deben ser distintas".into(),
@@ -144,8 +166,8 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
 
     let group_id = new_group_id();
     // Both legs in one batch: a transfer never half-applies.
-    let insert = "INSERT INTO transactions (wallet_id, kind, amount_cents, transfer_group_id, description, occurred_at, client_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
+    let insert = "INSERT INTO transactions (wallet_id, kind, amount_cents, transfer_group_id, description, occurred_at, occurred_time, client_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)";
     let stmts = vec![
         stmt(
             db,
@@ -157,6 +179,7 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
                 group_id,
                 a.description,
                 a.occurred_at,
+                occurred_time,
                 a.client_id
             ],
         )?,
@@ -170,6 +193,7 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
                 group_id,
                 a.description,
                 a.occurred_at,
+                occurred_time,
                 Option::<String>::None
             ],
         )?,
@@ -230,6 +254,9 @@ pub struct UpdateTxArgs {
     pub category_id: Option<i64>,
     pub description: Option<String>,
     pub occurred_at: String,
+    /// Local wall-clock time 'HH:MM'; None clears it.
+    #[serde(default)]
+    pub occurred_time: Option<String>,
 }
 
 /// Edits an income/expense transaction (amount, wallet, category, note, date).
@@ -237,6 +264,7 @@ pub struct UpdateTxArgs {
 pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> AppResult<()> {
     validate_amount(a.amount_cents)?;
     validate_date(&a.occurred_at)?;
+    let occurred_time = validate_time(a.occurred_time)?;
     wallet_exists(db, uid, a.wallet_id).await?;
 
     #[derive(Deserialize)]
@@ -262,7 +290,8 @@ pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> A
     let res = exec(
         db,
         "UPDATE transactions
-         SET wallet_id = ?2, amount_cents = ?3, category_id = ?4, description = ?5, occurred_at = ?6
+         SET wallet_id = ?2, amount_cents = ?3, category_id = ?4, description = ?5,
+             occurred_at = ?6, occurred_time = ?7
          WHERE id = ?1",
         jsv![
             a.id,
@@ -270,7 +299,8 @@ pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> A
             a.amount_cents,
             a.category_id,
             a.description,
-            a.occurred_at
+            a.occurred_at,
+            occurred_time
         ],
     )
     .await?;
@@ -311,6 +341,8 @@ struct TxRow {
     transfer_group_id: Option<String>,
     description: Option<String>,
     occurred_at: String,
+    #[serde(default)]
+    occurred_time: Option<String>,
     created_at: String,
 }
 
@@ -327,6 +359,7 @@ impl From<TxRow> for Transaction {
             transfer_group_id: r.transfer_group_id,
             description: r.description,
             occurred_at: r.occurred_at,
+            occurred_time: r.occurred_time,
             created_at: r.created_at,
         }
     }
@@ -341,7 +374,7 @@ pub async fn list_transactions(
     let mut sql = String::from(
         "SELECT t.id, t.wallet_id, w.name AS wallet_name, t.kind, t.amount_cents,
                 t.category_id, tc.name AS category_name, t.transfer_group_id,
-                t.description, t.occurred_at, t.created_at
+                t.description, t.occurred_at, t.occurred_time, t.created_at
          FROM transactions t
          JOIN wallets w ON w.id = t.wallet_id
          LEFT JOIN transaction_categories tc ON tc.id = t.category_id
@@ -383,7 +416,7 @@ pub async fn list_transactions(
             " UNION ALL
              SELECT -gc.id, g.linked_wallet_id, w2.name,
                     CASE WHEN gc.amount_cents >= 0 THEN 'reserve' ELSE 'release' END,
-                    ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, gc.created_at
+                    ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, NULL, gc.created_at
              FROM goal_contributions gc
              JOIN savings_goals g ON g.id = gc.goal_id
              JOIN wallets w2 ON w2.id = g.linked_wallet_id
@@ -404,9 +437,11 @@ pub async fn list_transactions(
         }
     }
 
-    // Order by column position (occurred_at = 10, id = 1): names are ambiguous
-    // across a compound UNION in SQLite, positions are not.
-    sql.push_str(" ORDER BY 10 DESC, 1 DESC LIMIT ? OFFSET ?");
+    // Order by column position (occurred_at = 10, occurred_time = 11, id = 1):
+    // names are ambiguous across a compound UNION in SQLite, positions are not.
+    // Within a day, timed rows sort by time; NULL times (legacy/apartado) sort
+    // last (SQLite ranks NULL below any value, so it trails in DESC).
+    sql.push_str(" ORDER BY 10 DESC, 11 DESC, 1 DESC LIMIT ? OFFSET ?");
     params.push(f.limit.unwrap_or(100).to_js());
     params.push(f.offset.unwrap_or(0).to_js());
 

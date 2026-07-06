@@ -20,6 +20,7 @@ import {
   updateGoalContribution,
 } from "../../lib/api";
 import { formatCents, parseToCents } from "../../lib/money";
+import { formatTime } from "../../lib/date";
 import type { Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
@@ -138,6 +139,7 @@ export function TransactionList({
               </p>
               <p className="text-xs text-fg-subtle">
                 {t.occurredAt}
+                {t.occurredTime && <> · {formatTime(t.occurredTime)}</>}
                 {showWallet && <> · {t.walletName}</>}
                 {t.categoryName && t.description && <> · {seedName(t.categoryName)}</>}
               </p>

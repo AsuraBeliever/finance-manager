@@ -337,6 +337,8 @@ pub async fn register_subscription_payment(
             category_id: sub.category_id,
             description: Some(sub.name.clone()),
             occurred_at: today_mx().format("%Y-%m-%d").to_string(),
+            // Auto-posted subscription charge: no meaningful wall-clock time.
+            occurred_time: None,
             client_id: None,
             subscription_id: Some(sub.id),
         },

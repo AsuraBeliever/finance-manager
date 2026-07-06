@@ -91,6 +91,9 @@ pub struct Transaction {
     pub transfer_group_id: Option<String>,
     pub description: Option<String>,
     pub occurred_at: String,
+    /// Local wall-clock time 'HH:MM' the movement happened; None for legacy
+    /// rows and apartado rows that predate/lack a time.
+    pub occurred_time: Option<String>,
     pub created_at: String,
 }
 

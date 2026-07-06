@@ -164,6 +164,8 @@ export interface SimpleTxInput {
   categoryId: number | null;
   description: string | null;
   occurredAt: string;
+  /** Local wall-clock time 'HH:MM', or null to leave the movement untimed. */
+  occurredTime: string | null;
 }
 
 export interface TransferInput {
@@ -173,6 +175,8 @@ export interface TransferInput {
   amountToCents: number;
   description: string | null;
   occurredAt: string;
+  /** Local wall-clock time 'HH:MM', or null to leave the movement untimed. */
+  occurredTime: string | null;
 }
 
 export interface TxFilter {

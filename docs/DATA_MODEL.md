@@ -144,6 +144,7 @@ CREATE TABLE transactions (
   transfer_group_id TEXT,                 -- UUIDv4 compartido por las 2 piernas de una transferencia
   description TEXT,
   occurred_at TEXT NOT NULL,              -- 'YYYY-MM-DD'
+  occurred_time TEXT,                     -- 0031: hora local 'HH:MM' (24h) del movimiento; NULL = sin hora (legacy/apartado)
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   client_id TEXT,                         -- 0003: idempotencia del outbox offline
   subscription_id INTEGER REFERENCES subscriptions(id)  -- 0020: gasto que pagó una suscripción (NULL = transacción normal)

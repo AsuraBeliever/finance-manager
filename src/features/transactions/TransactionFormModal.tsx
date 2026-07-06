@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/Button";
 import { DateInput } from "../../components/DateInput";
+import { TimeInput } from "../../components/TimeInput";
 import { Field, inputClass } from "../../components/Field";
 import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
@@ -14,7 +15,7 @@ import {
 } from "../../lib/api";
 import { submitOrQueue } from "../../lib/outbox";
 import { formatCents, parseToCents } from "../../lib/money";
-import { formatDayMonth, todayIso } from "../../lib/date";
+import { formatDayMonth, nowTime, todayIso } from "../../lib/date";
 import type {
   CreditCardSummary,
   MsiSchedulePreview,
@@ -63,6 +64,7 @@ export function TransactionFormModal({
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(todayIso());
+  const [time, setTime] = useState(nowTime());
   const [msiEnabled, setMsiEnabled] = useState(false);
   const [msiMonthsText, setMsiMonthsText] = useState("12");
   // Saving an MSI plan or a card payment ends on a confirmation screen (the
@@ -90,6 +92,7 @@ export function TransactionFormModal({
       setCategoryId(transaction.categoryId);
       setDescription(transaction.description ?? "");
       setDate(transaction.occurredAt);
+      setTime(transaction.occurredTime ?? "");
     } else {
       setTab("income");
       setWalletId(defaultWalletId ?? null);
@@ -97,6 +100,7 @@ export function TransactionFormModal({
       setCategoryId(null);
       setDescription("");
       setDate(todayIso());
+      setTime(nowTime());
     }
   }, [open, defaultWalletId, transaction]);
 
@@ -150,6 +154,7 @@ export function TransactionFormModal({
         categoryId,
         description: description.trim() === "" ? null : description.trim(),
         occurredAt: date,
+        occurredTime: time === "" ? null : time,
       };
       // Edits go straight to the server (online-only, like delete); no outbox.
       if (transaction) return updateTransaction(transaction.id, common);
@@ -187,6 +192,7 @@ export function TransactionFormModal({
         amountToCents: toCents,
         description: common.description,
         occurredAt: date,
+        occurredTime: common.occurredTime,
       });
     },
     onSuccess: async (data) => {
@@ -346,12 +352,16 @@ export function TransactionFormModal({
           </Field>
         )}
 
+        <Field label={es.transactions.amount}>
+          <MoneyInput value={amountText} onChange={setAmountText} required autoFocus />
+        </Field>
+
         <div className="grid grid-cols-2 gap-3">
-          <Field label={es.transactions.amount}>
-            <MoneyInput value={amountText} onChange={setAmountText} required autoFocus />
-          </Field>
           <Field label={es.transactions.date}>
             <DateInput value={date} onChange={setDate} />
+          </Field>
+          <Field label={es.transactions.time}>
+            <TimeInput value={time} onChange={setTime} />
           </Field>
         </div>
 

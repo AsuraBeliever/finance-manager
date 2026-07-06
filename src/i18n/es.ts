@@ -426,6 +426,7 @@ export const esDict = {
     noCategory: "Sin categoría",
     description: "Descripción",
     date: "Fecha",
+    time: "Hora",
     allWallets: "Todas las carteras",
     allKinds: "Todos los tipos",
     typeAll: "Todos",
