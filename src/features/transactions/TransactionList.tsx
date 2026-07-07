@@ -22,6 +22,7 @@ import {
 import { formatCents, parseToCents } from "../../lib/money";
 import { transactionTime } from "../../lib/date";
 import { useTimezone } from "../../lib/timezone";
+import { useClock } from "../../lib/timeFormat";
 import type { Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
@@ -60,6 +61,7 @@ export function TransactionList({
 }: TransactionListProps) {
   const queryClient = useQueryClient();
   const tz = useTimezone();
+  const clock = useClock();
   const [toDelete, setToDelete] = useState<number | null>(null);
   // Apartado rows are goal_contributions surfaced with a negated id; editing
   // or deleting them adjusts the goal's earmark, so they get their own flow.
@@ -143,7 +145,7 @@ export function TransactionList({
               <p className="text-xs text-fg-subtle">
                 {t.occurredAt}
                 {(() => {
-                  const time = transactionTime(t.occurredTime, t.createdAt, tz);
+                  const time = transactionTime(t.occurredTime, t.createdAt, tz, clock);
                   return time && <> · {time}</>;
                 })()}
                 {showWallet && <> · {t.walletName}</>}

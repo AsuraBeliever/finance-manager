@@ -23,6 +23,7 @@ import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 import { getLocale, setLocale, useLocale, type Locale } from "../../i18n/store";
 import { listTimezones, setTimezone, useTimezone } from "../../lib/timezone";
+import { setClock, useClock, type Clock } from "../../lib/timeFormat";
 import { inputClass } from "../../components/Field";
 
 /** SQLite UTC timestamp ("YYYY-MM-DD HH:MM:SS") → relative phrase in the active locale. */
@@ -109,6 +110,7 @@ export function SettingsPage() {
   const session = useQuery({ queryKey: ["me"], queryFn: me, staleTime: Infinity });
   const locale = useLocale();
   const timezone = useTimezone();
+  const clock = useClock();
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [changelogOn, setChangelogOn] = useState(changelogEnabled());
 
@@ -166,6 +168,31 @@ export function SettingsPage() {
               </option>
             ))}
           </select>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <span className="text-sm text-fg-muted">{es.settings.clock}</span>
+            <div className="flex rounded-lg bg-surface p-1">
+              {(
+                [
+                  { code: "12", label: es.settings.clock12 },
+                  { code: "24", label: es.settings.clock24 },
+                ] as { code: Clock; label: string }[]
+              ).map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => setClock(c.code)}
+                  className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                    clock === c.code
+                      ? "bg-surface-overlay font-medium text-fg"
+                      : "text-fg-subtle hover:text-fg"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">

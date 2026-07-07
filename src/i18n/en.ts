@@ -621,6 +621,9 @@ export const en: Dict = {
     timezone: "Time zone",
     timezoneHint:
       "Sets the zone movements are shown in. Entries without their own time use their record adapted to this zone.",
+    clock: "Time format",
+    clock12: "12 h",
+    clock24: "24 h",
     currencies: "Currencies",
     currenciesHint:
       "Exchange rates are fetched and kept up to date automatically when you use any currency other than MXN.",

@@ -17,7 +17,7 @@ import {
 } from "../../lib/api";
 import { submitOrQueue } from "../../lib/outbox";
 import { formatCents, parseToCents } from "../../lib/money";
-import { formatDayMonth, nowTime, todayIso } from "../../lib/date";
+import { formatDayMonth, nowTime, timeInputValue, todayIso } from "../../lib/date";
 import { getTimezone } from "../../lib/timezone";
 import type {
   CreditCardSummary,
@@ -103,7 +103,7 @@ export function TransactionFormModal({
       setCategoryId(null);
       setDescription(transaction.description ?? "");
       setDate(transaction.occurredAt);
-      setTime(transaction.occurredTime ?? "");
+      setTime(timeInputValue(transaction.occurredTime, transaction.createdAt, getTimezone()));
     } else if (transaction) {
       // Edit mode: prefill from the existing income/expense.
       setTab(transaction.kind === "expense" ? "expense" : "income");
@@ -112,7 +112,7 @@ export function TransactionFormModal({
       setCategoryId(transaction.categoryId);
       setDescription(transaction.description ?? "");
       setDate(transaction.occurredAt);
-      setTime(transaction.occurredTime ?? "");
+      setTime(timeInputValue(transaction.occurredTime, transaction.createdAt, getTimezone()));
     } else {
       setTab("income");
       setWalletId(defaultWalletId ?? null);

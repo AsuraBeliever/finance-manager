@@ -44,6 +44,9 @@ export function TimeInput({ value, onChange }: TimeInputProps) {
         value={m}
         onChange={(e) => onChange(`${h || "00"}:${e.target.value}`)}
       >
+        <option value="" className="bg-surface-overlay text-fg">
+          --
+        </option>
         {MINUTES.map((mm) => (
           <option key={mm} value={mm} className="bg-surface-overlay text-fg">
             {mm}
