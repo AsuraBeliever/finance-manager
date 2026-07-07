@@ -179,6 +179,19 @@ export interface TransferInput {
   occurredTime: string | null;
 }
 
+/** A whole transfer flattened for the editor (both legs). */
+export interface TransferDetail {
+  /** The transfer_out leg id — the canonical handle for the pair. */
+  id: number;
+  fromWalletId: number;
+  toWalletId: number;
+  amountFromCents: number;
+  amountToCents: number;
+  description: string | null;
+  occurredAt: string;
+  occurredTime: string | null;
+}
+
 export interface TxFilter {
   walletId?: number;
   /** A real kind, or "transfer" to match both transfer directions. */
@@ -198,6 +211,14 @@ export const addExpense = (input: SimpleTxInput) =>
 
 export const addTransfer = (input: TransferInput) =>
   rpc<string>("add_transfer", { ...input });
+
+/** Read a whole transfer (both legs) from any one of its leg ids. */
+export const getTransfer = (id: number) =>
+  rpc<TransferDetail>("get_transfer", { id });
+
+/** Edit both legs of a transfer at once. `id` is any leg id of the pair. */
+export const updateTransfer = (id: number, input: TransferInput) =>
+  rpc<void>("update_transfer", { id, ...input });
 
 export const listTransactions = (filter: TxFilter = {}) =>
   rpc<Transaction[]>("list_transactions", { filter });

@@ -46,7 +46,8 @@ interface TransactionListProps {
   /** Currency for amounts; falls back to MXN per row if not provided. */
   currencyByWallet?: Map<number, string>;
   showWallet?: boolean;
-  /** When provided, income/expense rows get an edit button (transfers don't). */
+  /** When provided, income/expense and transfer rows get an edit button.
+   *  Apartado (reserve/release) rows keep their own inline editor. */
   onEdit?: (t: Transaction) => void;
 }
 
@@ -149,9 +150,9 @@ export function TransactionList({
               {formatCents(t.amountCents, currency)}
             </span>
             {/* Fixed-width action slot so amounts line up whether a row has 0, 1
-                or 2 buttons (transfers only have delete). */}
+                or 2 buttons. */}
             <div className="flex w-16 shrink-0 items-center justify-end gap-1">
-              {(isApartado || (onEdit && (t.kind === "income" || t.kind === "expense"))) && (
+              {(isApartado || onEdit) && (
                 <button
                   onClick={() => (isApartado ? openApartadoEdit(t) : onEdit?.(t))}
                   aria-label={es.common.edit}

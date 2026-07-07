@@ -9,9 +9,11 @@ import { Modal } from "../../components/Modal";
 import {
   createMsiPlan,
   getCreditCardSummary,
+  getTransfer,
   listTransactionCategories,
   listWallets,
   updateTransaction,
+  updateTransfer,
 } from "../../lib/api";
 import { submitOrQueue } from "../../lib/outbox";
 import { formatCents, parseToCents } from "../../lib/money";
@@ -44,6 +46,8 @@ export function TransactionFormModal({
   transaction,
 }: TransactionFormModalProps) {
   const isEdit = transaction !== undefined;
+  const isTransferEdit =
+    transaction?.kind === "transfer_in" || transaction?.kind === "transfer_out";
   const tabs: { id: Tab; label: string }[] = [
     { id: "income", label: es.transactions.income },
     { id: "expense", label: es.transactions.expense },
@@ -54,6 +58,13 @@ export function TransactionFormModal({
   const categories = useQuery({
     queryKey: ["transactionCategories"],
     queryFn: listTransactionCategories,
+  });
+  // Editing a transfer needs both legs (from/to wallets, both amounts); the
+  // clicked row is only one leg, so fetch the whole pair.
+  const transferDetail = useQuery({
+    queryKey: ["transfer", transaction?.id],
+    queryFn: () => getTransfer(transaction!.id),
+    enabled: open && isTransferEdit,
   });
 
   const [tab, setTab] = useState<Tab>("income");
@@ -84,7 +95,15 @@ export function TransactionFormModal({
     setMsiEnabled(false);
     setMsiMonthsText("12");
     setSaved(null);
-    if (transaction) {
+    if (transaction && isTransferEdit) {
+      // Edit mode, transfer: note/date/time come from this leg; the from/to
+      // wallets and both amounts are filled once getTransfer resolves (below).
+      setTab("transfer");
+      setCategoryId(null);
+      setDescription(transaction.description ?? "");
+      setDate(transaction.occurredAt);
+      setTime(transaction.occurredTime ?? "");
+    } else if (transaction) {
       // Edit mode: prefill from the existing income/expense.
       setTab(transaction.kind === "expense" ? "expense" : "income");
       setWalletId(transaction.walletId);
@@ -102,7 +121,18 @@ export function TransactionFormModal({
       setDate(todayIso());
       setTime(nowTime());
     }
-  }, [open, defaultWalletId, transaction]);
+  }, [open, defaultWalletId, transaction, isTransferEdit]);
+
+  // Fill the from/to wallets and both amounts once the transfer's legs load.
+  useEffect(() => {
+    if (!open || !isTransferEdit) return;
+    const d = transferDetail.data;
+    if (!d) return;
+    setWalletId(d.fromWalletId);
+    setToWalletId(d.toWalletId);
+    setAmountText((d.amountFromCents / 100).toFixed(2));
+    setAmountToText((d.amountToCents / 100).toFixed(2));
+  }, [open, isTransferEdit, transferDetail.data]);
 
   const walletList = wallets.data ?? [];
   const fromWallet = walletList.find((w) => w.id === (walletId ?? walletList[0]?.id));
@@ -157,6 +187,22 @@ export function TransactionFormModal({
         occurredTime: time === "" ? null : time,
       };
       // Edits go straight to the server (online-only, like delete); no outbox.
+      if (transaction && tab === "transfer") {
+        const toId = toWalletId ?? walletList.find((w) => w.id !== wid)?.id;
+        if (toId === undefined) throw new Error(es.transactions.toWallet);
+        const toCents = crossCurrency ? parseToCents(amountToText) : cents;
+        if (toCents === null || toCents <= 0)
+          throw new Error(es.transactions.invalidAmount);
+        return updateTransfer(transaction.id, {
+          fromWalletId: wid,
+          toWalletId: toId,
+          amountFromCents: cents,
+          amountToCents: toCents,
+          description: common.description,
+          occurredAt: date,
+          occurredTime: common.occurredTime,
+        });
+      }
       if (transaction) return updateTransaction(transaction.id, common);
       // MSI purchase: creates the plan (online-only); the installments post
       // themselves on each cut date, so no expense is booked here.
@@ -448,7 +494,14 @@ export function TransactionFormModal({
           <Button type="button" variant="ghost" onClick={onClose}>
             {es.common.cancel}
           </Button>
-          <Button type="submit" disabled={mutation.isPending || walletList.length === 0}>
+          <Button
+            type="submit"
+            disabled={
+              mutation.isPending ||
+              walletList.length === 0 ||
+              (isTransferEdit && !transferDetail.data)
+            }
+          >
             {es.common.save}
           </Button>
         </div>

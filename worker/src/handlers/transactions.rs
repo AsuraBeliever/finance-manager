@@ -4,7 +4,7 @@
 
 use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::models::{Transaction, TransactionCategory};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 use worker::D1Database;
 
@@ -307,6 +307,160 @@ pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> A
     if changes(&res) == 0 {
         return Err(AppError::NotFound("transacción"));
     }
+    Ok(())
+}
+
+/// Resolves the transfer_group_id of a leg the caller owns, erroring if the id
+/// isn't theirs or isn't a transfer leg.
+async fn transfer_group_of(db: &D1Database, uid: i64, id: i64) -> AppResult<String> {
+    let row: Option<GroupRow> = first(
+        db,
+        "SELECT t.transfer_group_id FROM transactions t
+         JOIN wallets w ON w.id = t.wallet_id AND w.user_id = ?2
+         WHERE t.id = ?1",
+        jsv![id, uid],
+    )
+    .await?;
+    match row {
+        Some(GroupRow {
+            transfer_group_id: Some(group),
+        }) => Ok(group),
+        Some(_) => Err(AppError::InvalidInput(
+            "esta transacción no es una transferencia".into(),
+        )),
+        None => Err(AppError::NotFound("transacción")),
+    }
+}
+
+/// Both legs of a transfer flattened for the editor: the amounts and wallets of
+/// each direction plus the shared note/date/time.
+#[derive(Deserialize)]
+struct TransferRow {
+    out_id: i64,
+    from_wallet_id: i64,
+    to_wallet_id: i64,
+    amount_from_cents: i64,
+    amount_to_cents: i64,
+    description: Option<String>,
+    occurred_at: String,
+    occurred_time: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferDetail {
+    /// Canonical handle for the transfer: the transfer_out leg's id.
+    id: i64,
+    from_wallet_id: i64,
+    to_wallet_id: i64,
+    amount_from_cents: i64,
+    amount_to_cents: i64,
+    description: Option<String>,
+    occurred_at: String,
+    occurred_time: Option<String>,
+}
+
+impl From<TransferRow> for TransferDetail {
+    fn from(r: TransferRow) -> Self {
+        TransferDetail {
+            id: r.out_id,
+            from_wallet_id: r.from_wallet_id,
+            to_wallet_id: r.to_wallet_id,
+            amount_from_cents: r.amount_from_cents,
+            amount_to_cents: r.amount_to_cents,
+            description: r.description,
+            occurred_at: r.occurred_at,
+            occurred_time: r.occurred_time,
+        }
+    }
+}
+
+/// Reads a whole transfer (both legs) from any one of its leg ids, so the form
+/// can prefill from/to wallets and amounts. The two legs always share the same
+/// group, note, date and time.
+pub async fn get_transfer(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<TransferDetail> {
+    let group = transfer_group_of(db, uid, a.id).await?;
+    let row: Option<TransferRow> = first(
+        db,
+        "SELECT
+           MAX(CASE WHEN kind = 'transfer_out' THEN id END)           AS out_id,
+           MAX(CASE WHEN kind = 'transfer_out' THEN wallet_id END)    AS from_wallet_id,
+           MAX(CASE WHEN kind = 'transfer_in'  THEN wallet_id END)    AS to_wallet_id,
+           MAX(CASE WHEN kind = 'transfer_out' THEN amount_cents END) AS amount_from_cents,
+           MAX(CASE WHEN kind = 'transfer_in'  THEN amount_cents END) AS amount_to_cents,
+           MAX(description) AS description,
+           MAX(occurred_at) AS occurred_at,
+           MAX(occurred_time) AS occurred_time
+         FROM transactions WHERE transfer_group_id = ?1",
+        jsv![group],
+    )
+    .await?;
+    row.map(Into::into).ok_or(AppError::NotFound("transferencia"))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateTransferArgs {
+    /// Any leg id of the transfer to edit.
+    pub id: i64,
+    pub from_wallet_id: i64,
+    pub to_wallet_id: i64,
+    pub amount_from_cents: i64,
+    pub amount_to_cents: i64,
+    pub description: Option<String>,
+    pub occurred_at: String,
+    #[serde(default)]
+    pub occurred_time: Option<String>,
+}
+
+/// Edits both legs of a transfer at once (wallets, amounts, note, date, time),
+/// keeping the same group so it stays one linked pair. One atomic batch.
+pub async fn update_transfer(db: &D1Database, uid: i64, a: UpdateTransferArgs) -> AppResult<()> {
+    validate_amount(a.amount_from_cents)?;
+    validate_amount(a.amount_to_cents)?;
+    validate_date(&a.occurred_at)?;
+    let occurred_time = validate_time(a.occurred_time)?;
+    if a.from_wallet_id == a.to_wallet_id {
+        return Err(AppError::InvalidInput(
+            "la cartera origen y destino deben ser distintas".into(),
+        ));
+    }
+    let group = transfer_group_of(db, uid, a.id).await?;
+    wallet_exists(db, uid, a.from_wallet_id).await?;
+    wallet_exists(db, uid, a.to_wallet_id).await?;
+
+    let upd = "UPDATE transactions
+         SET wallet_id = ?2, amount_cents = ?3, description = ?4, occurred_at = ?5, occurred_time = ?6
+         WHERE transfer_group_id = ?1 AND kind = ?7";
+    let stmts = vec![
+        stmt(
+            db,
+            upd,
+            jsv![
+                group,
+                a.from_wallet_id,
+                a.amount_from_cents,
+                a.description,
+                a.occurred_at,
+                occurred_time,
+                "transfer_out"
+            ],
+        )?,
+        stmt(
+            db,
+            upd,
+            jsv![
+                group,
+                a.to_wallet_id,
+                a.amount_to_cents,
+                a.description,
+                a.occurred_at,
+                occurred_time,
+                "transfer_in"
+            ],
+        )?,
+    ];
+    batch(db, stmts).await?;
     Ok(())
 }
 
