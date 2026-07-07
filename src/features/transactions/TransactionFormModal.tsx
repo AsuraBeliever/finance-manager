@@ -18,6 +18,7 @@ import {
 import { submitOrQueue } from "../../lib/outbox";
 import { formatCents, parseToCents } from "../../lib/money";
 import { formatDayMonth, nowTime, todayIso } from "../../lib/date";
+import { getTimezone } from "../../lib/timezone";
 import type {
   CreditCardSummary,
   MsiSchedulePreview,
@@ -75,7 +76,7 @@ export function TransactionFormModal({
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(todayIso());
-  const [time, setTime] = useState(nowTime());
+  const [time, setTime] = useState(nowTime(getTimezone()));
   const [msiEnabled, setMsiEnabled] = useState(false);
   const [msiMonthsText, setMsiMonthsText] = useState("12");
   // Saving an MSI plan or a card payment ends on a confirmation screen (the
@@ -119,7 +120,7 @@ export function TransactionFormModal({
       setCategoryId(null);
       setDescription("");
       setDate(todayIso());
-      setTime(nowTime());
+      setTime(nowTime(getTimezone()));
     }
   }, [open, defaultWalletId, transaction, isTransferEdit]);
 

@@ -22,6 +22,8 @@ import { deviceLabel, isMobileDevice } from "../../lib/device";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 import { getLocale, setLocale, useLocale, type Locale } from "../../i18n/store";
+import { listTimezones, setTimezone, useTimezone } from "../../lib/timezone";
+import { inputClass } from "../../components/Field";
 
 /** SQLite UTC timestamp ("YYYY-MM-DD HH:MM:SS") → relative phrase in the active locale. */
 function relativeFromUtc(ts: string | null): string {
@@ -106,6 +108,7 @@ export function SettingsPage() {
   });
   const session = useQuery({ queryKey: ["me"], queryFn: me, staleTime: Infinity });
   const locale = useLocale();
+  const timezone = useTimezone();
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [changelogOn, setChangelogOn] = useState(changelogEnabled());
 
@@ -147,6 +150,22 @@ export function SettingsPage() {
               </button>
             ))}
           </div>
+        </section>
+
+        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="mb-1 font-medium">{es.settings.timezone}</h3>
+          <p className="mb-3 text-xs text-fg-subtle">{es.settings.timezoneHint}</p>
+          <select
+            className={inputClass}
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+          >
+            {listTimezones().map((tz) => (
+              <option key={tz} value={tz}>
+                {tz.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
         </section>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">

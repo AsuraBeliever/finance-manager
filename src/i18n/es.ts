@@ -628,6 +628,9 @@ export const esDict = {
     title: "Ajustes",
     back: "Volver a ajustes",
     language: "Idioma",
+    timezone: "Zona horaria",
+    timezoneHint:
+      "Define en qué hora se muestran los movimientos. Los que no tienen hora propia usan su registro convertido a esta zona.",
     currencies: "Monedas",
     currenciesHint:
       "Los tipos de cambio se obtienen y actualizan solos al usar cualquier moneda distinta de MXN.",
