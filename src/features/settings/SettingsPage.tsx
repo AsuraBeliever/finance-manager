@@ -22,6 +22,9 @@ import { deviceLabel, isMobileDevice } from "../../lib/device";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 import { getLocale, setLocale, useLocale, type Locale } from "../../i18n/store";
+import { listTimezones, setTimezone, useTimezone } from "../../lib/timezone";
+import { setClock, useClock, type Clock } from "../../lib/timeFormat";
+import { inputClass } from "../../components/Field";
 
 /** SQLite UTC timestamp ("YYYY-MM-DD HH:MM:SS") → relative phrase in the active locale. */
 function relativeFromUtc(ts: string | null): string {
@@ -106,6 +109,8 @@ export function SettingsPage() {
   });
   const session = useQuery({ queryKey: ["me"], queryFn: me, staleTime: Infinity });
   const locale = useLocale();
+  const timezone = useTimezone();
+  const clock = useClock();
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [changelogOn, setChangelogOn] = useState(changelogEnabled());
 
@@ -146,6 +151,47 @@ export function SettingsPage() {
                 {l.label}
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="mb-1 font-medium">{es.settings.timezone}</h3>
+          <p className="mb-3 text-xs text-fg-subtle">{es.settings.timezoneHint}</p>
+          <select
+            className={inputClass}
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+          >
+            {listTimezones().map((tz) => (
+              <option key={tz} value={tz}>
+                {tz.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <span className="text-sm text-fg-muted">{es.settings.clock}</span>
+            <div className="flex rounded-lg bg-surface p-1">
+              {(
+                [
+                  { code: "12", label: es.settings.clock12 },
+                  { code: "24", label: es.settings.clock24 },
+                ] as { code: Clock; label: string }[]
+              ).map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => setClock(c.code)}
+                  className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                    clock === c.code
+                      ? "bg-surface-overlay font-medium text-fg"
+                      : "text-fg-subtle hover:text-fg"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 

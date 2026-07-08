@@ -4,7 +4,7 @@
 
 use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::models::{Transaction, TransactionCategory};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 use worker::D1Database;
 
@@ -24,6 +24,20 @@ fn validate_date(date: &str) -> AppResult<()> {
     chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
         .map_err(|_| AppError::InvalidInput("fecha inválida (se espera YYYY-MM-DD)".into()))?;
     Ok(())
+}
+
+/// Normalizes an optional local wall-clock time to 'HH:MM' (24h), or None when
+/// absent/blank. Rejects anything that isn't a real time so the column always
+/// holds a value the UI can render back.
+fn validate_time(time: Option<String>) -> AppResult<Option<String>> {
+    match time.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        None => Ok(None),
+        Some(s) => {
+            let t = chrono::NaiveTime::parse_from_str(s, "%H:%M")
+                .map_err(|_| AppError::InvalidInput("hora inválida (se espera HH:MM)".into()))?;
+            Ok(Some(t.format("%H:%M").to_string()))
+        }
+    }
 }
 
 async fn wallet_exists(db: &D1Database, uid: i64, id: i64) -> AppResult<()> {
@@ -48,6 +62,9 @@ pub struct SimpleTxArgs {
     pub category_id: Option<i64>,
     pub description: Option<String>,
     pub occurred_at: String,
+    /// Local wall-clock time 'HH:MM' of the movement; None keeps it timeless.
+    #[serde(default)]
+    pub occurred_time: Option<String>,
     /// Offline-outbox idempotency: a replay with the same id never inserts twice.
     pub client_id: Option<String>,
     /// Set when this expense is a subscription charge, so the dashboard can
@@ -69,6 +86,7 @@ async fn insert_simple(
 ) -> AppResult<i64> {
     validate_amount(a.amount_cents)?;
     validate_date(&a.occurred_at)?;
+    let occurred_time = validate_time(a.occurred_time)?;
     wallet_exists(db, uid, a.wallet_id).await?;
     if let Some(client_id) = &a.client_id {
         // already applied (response was lost mid-flight): return the same id
@@ -84,9 +102,9 @@ async fn insert_simple(
     }
     let res = exec(
         db,
-        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at, client_id, subscription_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        jsv![a.wallet_id, kind, a.amount_cents, a.category_id, a.description, a.occurred_at, a.client_id, a.subscription_id],
+        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at, occurred_time, client_id, subscription_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        jsv![a.wallet_id, kind, a.amount_cents, a.category_id, a.description, a.occurred_at, occurred_time, a.client_id, a.subscription_id],
     )
     .await?;
     last_row_id(&res)
@@ -109,6 +127,9 @@ pub struct TransferArgs {
     pub amount_to_cents: i64,
     pub description: Option<String>,
     pub occurred_at: String,
+    /// Local wall-clock time 'HH:MM'; shared by both legs. None keeps it timeless.
+    #[serde(default)]
+    pub occurred_time: Option<String>,
     /// Offline-outbox idempotency; stored on the transfer_out leg only.
     pub client_id: Option<String>,
 }
@@ -117,6 +138,7 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
     validate_amount(a.amount_from_cents)?;
     validate_amount(a.amount_to_cents)?;
     validate_date(&a.occurred_at)?;
+    let occurred_time = validate_time(a.occurred_time)?;
     if a.from_wallet_id == a.to_wallet_id {
         return Err(AppError::InvalidInput(
             "la cartera origen y destino deben ser distintas".into(),
@@ -144,8 +166,8 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
 
     let group_id = new_group_id();
     // Both legs in one batch: a transfer never half-applies.
-    let insert = "INSERT INTO transactions (wallet_id, kind, amount_cents, transfer_group_id, description, occurred_at, client_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
+    let insert = "INSERT INTO transactions (wallet_id, kind, amount_cents, transfer_group_id, description, occurred_at, occurred_time, client_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)";
     let stmts = vec![
         stmt(
             db,
@@ -157,6 +179,7 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
                 group_id,
                 a.description,
                 a.occurred_at,
+                occurred_time,
                 a.client_id
             ],
         )?,
@@ -170,6 +193,7 @@ pub async fn add_transfer(db: &D1Database, uid: i64, a: TransferArgs) -> AppResu
                 group_id,
                 a.description,
                 a.occurred_at,
+                occurred_time,
                 Option::<String>::None
             ],
         )?,
@@ -230,6 +254,9 @@ pub struct UpdateTxArgs {
     pub category_id: Option<i64>,
     pub description: Option<String>,
     pub occurred_at: String,
+    /// Local wall-clock time 'HH:MM'; None clears it.
+    #[serde(default)]
+    pub occurred_time: Option<String>,
 }
 
 /// Edits an income/expense transaction (amount, wallet, category, note, date).
@@ -237,6 +264,7 @@ pub struct UpdateTxArgs {
 pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> AppResult<()> {
     validate_amount(a.amount_cents)?;
     validate_date(&a.occurred_at)?;
+    let occurred_time = validate_time(a.occurred_time)?;
     wallet_exists(db, uid, a.wallet_id).await?;
 
     #[derive(Deserialize)]
@@ -262,7 +290,8 @@ pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> A
     let res = exec(
         db,
         "UPDATE transactions
-         SET wallet_id = ?2, amount_cents = ?3, category_id = ?4, description = ?5, occurred_at = ?6
+         SET wallet_id = ?2, amount_cents = ?3, category_id = ?4, description = ?5,
+             occurred_at = ?6, occurred_time = ?7
          WHERE id = ?1",
         jsv![
             a.id,
@@ -270,13 +299,168 @@ pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> A
             a.amount_cents,
             a.category_id,
             a.description,
-            a.occurred_at
+            a.occurred_at,
+            occurred_time
         ],
     )
     .await?;
     if changes(&res) == 0 {
         return Err(AppError::NotFound("transacción"));
     }
+    Ok(())
+}
+
+/// Resolves the transfer_group_id of a leg the caller owns, erroring if the id
+/// isn't theirs or isn't a transfer leg.
+async fn transfer_group_of(db: &D1Database, uid: i64, id: i64) -> AppResult<String> {
+    let row: Option<GroupRow> = first(
+        db,
+        "SELECT t.transfer_group_id FROM transactions t
+         JOIN wallets w ON w.id = t.wallet_id AND w.user_id = ?2
+         WHERE t.id = ?1",
+        jsv![id, uid],
+    )
+    .await?;
+    match row {
+        Some(GroupRow {
+            transfer_group_id: Some(group),
+        }) => Ok(group),
+        Some(_) => Err(AppError::InvalidInput(
+            "esta transacción no es una transferencia".into(),
+        )),
+        None => Err(AppError::NotFound("transacción")),
+    }
+}
+
+/// Both legs of a transfer flattened for the editor: the amounts and wallets of
+/// each direction plus the shared note/date/time.
+#[derive(Deserialize)]
+struct TransferRow {
+    out_id: i64,
+    from_wallet_id: i64,
+    to_wallet_id: i64,
+    amount_from_cents: i64,
+    amount_to_cents: i64,
+    description: Option<String>,
+    occurred_at: String,
+    occurred_time: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferDetail {
+    /// Canonical handle for the transfer: the transfer_out leg's id.
+    id: i64,
+    from_wallet_id: i64,
+    to_wallet_id: i64,
+    amount_from_cents: i64,
+    amount_to_cents: i64,
+    description: Option<String>,
+    occurred_at: String,
+    occurred_time: Option<String>,
+}
+
+impl From<TransferRow> for TransferDetail {
+    fn from(r: TransferRow) -> Self {
+        TransferDetail {
+            id: r.out_id,
+            from_wallet_id: r.from_wallet_id,
+            to_wallet_id: r.to_wallet_id,
+            amount_from_cents: r.amount_from_cents,
+            amount_to_cents: r.amount_to_cents,
+            description: r.description,
+            occurred_at: r.occurred_at,
+            occurred_time: r.occurred_time,
+        }
+    }
+}
+
+/// Reads a whole transfer (both legs) from any one of its leg ids, so the form
+/// can prefill from/to wallets and amounts. The two legs always share the same
+/// group, note, date and time.
+pub async fn get_transfer(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<TransferDetail> {
+    let group = transfer_group_of(db, uid, a.id).await?;
+    let row: Option<TransferRow> = first(
+        db,
+        "SELECT
+           MAX(CASE WHEN kind = 'transfer_out' THEN id END)           AS out_id,
+           MAX(CASE WHEN kind = 'transfer_out' THEN wallet_id END)    AS from_wallet_id,
+           MAX(CASE WHEN kind = 'transfer_in'  THEN wallet_id END)    AS to_wallet_id,
+           MAX(CASE WHEN kind = 'transfer_out' THEN amount_cents END) AS amount_from_cents,
+           MAX(CASE WHEN kind = 'transfer_in'  THEN amount_cents END) AS amount_to_cents,
+           MAX(description) AS description,
+           MAX(occurred_at) AS occurred_at,
+           MAX(occurred_time) AS occurred_time
+         FROM transactions WHERE transfer_group_id = ?1",
+        jsv![group],
+    )
+    .await?;
+    row.map(Into::into).ok_or(AppError::NotFound("transferencia"))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateTransferArgs {
+    /// Any leg id of the transfer to edit.
+    pub id: i64,
+    pub from_wallet_id: i64,
+    pub to_wallet_id: i64,
+    pub amount_from_cents: i64,
+    pub amount_to_cents: i64,
+    pub description: Option<String>,
+    pub occurred_at: String,
+    #[serde(default)]
+    pub occurred_time: Option<String>,
+}
+
+/// Edits both legs of a transfer at once (wallets, amounts, note, date, time),
+/// keeping the same group so it stays one linked pair. One atomic batch.
+pub async fn update_transfer(db: &D1Database, uid: i64, a: UpdateTransferArgs) -> AppResult<()> {
+    validate_amount(a.amount_from_cents)?;
+    validate_amount(a.amount_to_cents)?;
+    validate_date(&a.occurred_at)?;
+    let occurred_time = validate_time(a.occurred_time)?;
+    if a.from_wallet_id == a.to_wallet_id {
+        return Err(AppError::InvalidInput(
+            "la cartera origen y destino deben ser distintas".into(),
+        ));
+    }
+    let group = transfer_group_of(db, uid, a.id).await?;
+    wallet_exists(db, uid, a.from_wallet_id).await?;
+    wallet_exists(db, uid, a.to_wallet_id).await?;
+
+    let upd = "UPDATE transactions
+         SET wallet_id = ?2, amount_cents = ?3, description = ?4, occurred_at = ?5, occurred_time = ?6
+         WHERE transfer_group_id = ?1 AND kind = ?7";
+    let stmts = vec![
+        stmt(
+            db,
+            upd,
+            jsv![
+                group,
+                a.from_wallet_id,
+                a.amount_from_cents,
+                a.description,
+                a.occurred_at,
+                occurred_time,
+                "transfer_out"
+            ],
+        )?,
+        stmt(
+            db,
+            upd,
+            jsv![
+                group,
+                a.to_wallet_id,
+                a.amount_to_cents,
+                a.description,
+                a.occurred_at,
+                occurred_time,
+                "transfer_in"
+            ],
+        )?,
+    ];
+    batch(db, stmts).await?;
     Ok(())
 }
 
@@ -311,6 +495,8 @@ struct TxRow {
     transfer_group_id: Option<String>,
     description: Option<String>,
     occurred_at: String,
+    #[serde(default)]
+    occurred_time: Option<String>,
     created_at: String,
 }
 
@@ -327,6 +513,7 @@ impl From<TxRow> for Transaction {
             transfer_group_id: r.transfer_group_id,
             description: r.description,
             occurred_at: r.occurred_at,
+            occurred_time: r.occurred_time,
             created_at: r.created_at,
         }
     }
@@ -341,7 +528,7 @@ pub async fn list_transactions(
     let mut sql = String::from(
         "SELECT t.id, t.wallet_id, w.name AS wallet_name, t.kind, t.amount_cents,
                 t.category_id, tc.name AS category_name, t.transfer_group_id,
-                t.description, t.occurred_at, t.created_at
+                t.description, t.occurred_at, t.occurred_time, t.created_at
          FROM transactions t
          JOIN wallets w ON w.id = t.wallet_id
          LEFT JOIN transaction_categories tc ON tc.id = t.category_id
@@ -383,7 +570,7 @@ pub async fn list_transactions(
             " UNION ALL
              SELECT -gc.id, g.linked_wallet_id, w2.name,
                     CASE WHEN gc.amount_cents >= 0 THEN 'reserve' ELSE 'release' END,
-                    ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, gc.created_at
+                    ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, NULL, gc.created_at
              FROM goal_contributions gc
              JOIN savings_goals g ON g.id = gc.goal_id
              JOIN wallets w2 ON w2.id = g.linked_wallet_id
@@ -404,9 +591,11 @@ pub async fn list_transactions(
         }
     }
 
-    // Order by column position (occurred_at = 10, id = 1): names are ambiguous
-    // across a compound UNION in SQLite, positions are not.
-    sql.push_str(" ORDER BY 10 DESC, 1 DESC LIMIT ? OFFSET ?");
+    // Order by column position (occurred_at = 10, occurred_time = 11, id = 1):
+    // names are ambiguous across a compound UNION in SQLite, positions are not.
+    // Within a day, timed rows sort by time; NULL times (legacy/apartado) sort
+    // last (SQLite ranks NULL below any value, so it trails in DESC).
+    sql.push_str(" ORDER BY 10 DESC, 11 DESC, 1 DESC LIMIT ? OFFSET ?");
     params.push(f.limit.unwrap_or(100).to_js());
     params.push(f.offset.unwrap_or(0).to_js());
 
