@@ -29,14 +29,20 @@ pub fn next_period_end(frequency: &str, last_paid: NaiveDate) -> Option<NaiveDat
     }
 }
 
-/// Interest in cents accrued over `(start, end]`, daily-compounding ACT/365.
+/// Interest in cents accrued over `(start, end]`, daily-compounding ACT/365
+/// with the interest **rounded to the cent each day** — exactly how debit
+/// accounts like Klar or Nu credit daily interest. Rounding once per day (not
+/// once per period) matters at small balances: e.g. $334.73 at 3% accrues
+/// 2.75¢/day, which the bank rounds up to 3¢ and pays 21¢/week, whereas a
+/// single end-of-week rounding would land at only 19¢.
 ///
 /// `start_balance` is the wallet's closing balance at `start` (it already
 /// includes any previously paid interest, so payouts compound on themselves
 /// just like the bank does). `txns` are the signed amounts (income/transfer-in
 /// positive, expense/transfer-out negative) that occurred within `(start, end]`;
-/// each one accrues only from its own date. Returns 0 for a non-positive rate,
-/// an empty window, or an overdrawn balance — a debit account never charges.
+/// each one lands on its own date and starts earning that same day. Returns 0
+/// for a non-positive rate, an empty window, or an overdrawn balance — a debit
+/// account never charges.
 pub fn accrued_interest(
     start_balance: i64,
     txns: &[(NaiveDate, i64)],
@@ -47,26 +53,31 @@ pub fn accrued_interest(
     if end <= start || annual_rate_bps <= 0 {
         return 0;
     }
-    let r = annual_rate_bps as f64 / 10_000.0;
-    let factor = |from: NaiveDate| {
-        let days = (end - from).num_days().max(0);
-        (1.0 + r / 365.0).powi(days as i32)
-    };
+    let daily_rate = annual_rate_bps as f64 / 10_000.0 / 365.0;
 
-    // Compounded value vs. plain end-of-period balance: the gap is the interest.
-    let mut grown = start_balance as f64 * factor(start);
-    let mut principal = start_balance as f64;
-    for (date, amount) in txns {
-        let from = (*date).clamp(start, end);
-        grown += *amount as f64 * factor(from);
-        principal += *amount as f64;
+    // Walk each day in (start, end]: today's deposits/withdrawals land first,
+    // then interest is computed on the running balance, rounded to the cent,
+    // and credited so it compounds into tomorrow — mirroring a bank that pays
+    // and rounds interest daily.
+    let mut balance = start_balance;
+    let mut interest_total: i64 = 0;
+    let mut day = start;
+    while day < end {
+        for (date, amount) in txns {
+            if *date == day {
+                balance += *amount;
+            }
+        }
+        if balance > 0 {
+            let inc = (balance as f64 * daily_rate).round() as i64;
+            if inc > 0 {
+                balance += inc;
+                interest_total += inc;
+            }
+        }
+        day += Duration::days(1);
     }
-    let interest = grown - principal;
-    if interest <= 0.0 {
-        0
-    } else {
-        interest.round() as i64
-    }
+    interest_total
 }
 
 #[cfg(test)]
@@ -88,11 +99,11 @@ mod tests {
 
     #[test]
     fn deposit_accrues_from_its_own_date() {
-        // 0.1%/day. Start $10,000 on Jan 1, valued Jan 3 (2 days, compounded):
-        //   10000 * 1.001^2          = 10,020.01  → 20.01 interest
-        // Deposit $10,000 on Jan 2 earns one day:
-        //   10000 * 1.001            = 10,010.00  → 10.00 interest
-        // Total interest = 30.01 → 3001 cents.
+        // 0.1%/day, rounded to the cent daily.
+        // Day Jan 1 on $10,000.00: round(1000000 * 0.001) = 1000¢ → bal 1_001_000.
+        // Day Jan 2 the $10,000 deposit lands first (bal 2_001_000), then
+        //   round(2001000 * 0.001) = 2001¢.
+        // Total interest = 1000 + 2001 = 3001 cents.
         assert_eq!(
             accrued_interest(
                 1_000_000,
@@ -126,10 +137,18 @@ mod tests {
 
     #[test]
     fn weekly_klar_payout_is_realistic() {
-        // Klar's ~3% on $10,000 for one week:
-        // 1_000_000 * ((1 + 0.03/365)^7 - 1) ≈ 575 cents ($5.75).
+        // Klar's 3% on $10,000 for one week, rounding 82.19¢/day down to 82¢
+        // each of the 7 days = 574 cents ($5.74).
         let interest = accrued_interest(1_000_000, &[], d("2026-01-01"), d("2026-01-08"), 300);
-        assert_eq!(interest, 575);
+        assert_eq!(interest, 574);
+    }
+
+    #[test]
+    fn small_balance_daily_rounding_matches_bank() {
+        // Real Klar case: $334.73 at 3% pays 0.21/week because the bank rounds
+        // 2.75¢/day up to 3¢ (3 × 7 = 21), not 0.19 from a single weekly round.
+        let interest = accrued_interest(33_473, &[], d("2026-06-17"), d("2026-06-24"), 300);
+        assert_eq!(interest, 21);
     }
 
     #[test]
