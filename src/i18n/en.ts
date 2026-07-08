@@ -111,6 +111,7 @@ export const en: Dict = {
     apartadoHint: "The money is reserved inside this wallet; still yours, just earmarked.",
     apartadoNoneHint: "An abstract goal with no real money behind it (great to start).",
     apartadoIn: "Pocket in",
+    walletSectionTitle: "Goals set aside in this wallet",
     apartadoOf: "Pocket of",
     trackOnly: "Track only",
     available: "available:",
