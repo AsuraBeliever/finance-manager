@@ -12,6 +12,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.24.0",
+    date: "2026-07-08",
+    es: [
+      "Tus metas y apartados ahora aparecen dentro de la cartera a la que pertenecen: ves su avance y puedes aportarles sin salir de la cartera.",
+    ],
+    en: [
+      "Your goals and set-asides now appear inside the wallet they belong to: see their progress and contribute without leaving the wallet.",
+    ],
+  },
+  {
     version: "2.23.0",
     date: "2026-07-08",
     es: [
