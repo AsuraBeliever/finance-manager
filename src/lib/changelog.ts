@@ -12,6 +12,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.24.1",
+    date: "2026-07-08",
+    es: [
+      "Las carteras con rendimiento ahora calculan los intereses igual que tu banco (redondeando cada día), así el abono coincide al centavo y ya no tienes que corregirlo a mano.",
+    ],
+    en: [
+      "Yield-bearing wallets now calculate interest the same way your bank does (rounding each day), so the credit matches to the cent and you no longer have to fix it by hand.",
+    ],
+  },
+  {
     version: "2.24.0",
     date: "2026-07-08",
     es: [
