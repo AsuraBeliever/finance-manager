@@ -12,6 +12,24 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.23.0",
+    date: "2026-07-08",
+    es: [
+      "Cada movimiento ahora guarda su hora, no solo la fecha: se registra al momento y puedes editarla escribiéndola a mano (sin menús).",
+      "Elige el formato de hora en Ajustes: 12 h (a. m./p. m.) o 24 h.",
+      "Define tu zona horaria en Ajustes para que las horas se muestren correctas.",
+      "Las transferencias entre carteras ya se pueden editar.",
+      "Tus movimientos anteriores ahora muestran la hora en que los registraste.",
+    ],
+    en: [
+      "Every movement now records its time, not just the date: captured as you enter it, and editable by typing it in (no dropdowns).",
+      "Pick your time format in Settings: 12 h (a.m./p.m.) or 24 h.",
+      "Set your timezone in Settings so times display correctly.",
+      "Transfers between wallets can now be edited.",
+      "Your past movements now show the time you recorded them.",
+    ],
+  },
+  {
     version: "2.22.2",
     date: "2026-07-03",
     es: [
