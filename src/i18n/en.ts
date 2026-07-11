@@ -642,6 +642,8 @@ export const en: Dict = {
     emailPlaceholder: "you@email.com",
     password: "Password",
     passwordHint: "At least 8 characters",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     login: "Sign in",
     register: "Create account",
     switchToRegister: "No account? Sign up",

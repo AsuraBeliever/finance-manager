@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { TrendingUp } from "lucide-react";
+import { Eye, EyeOff, TrendingUp } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Field, inputClass } from "../../components/Field";
 import { GoogleIcon } from "../../components/GoogleIcon";
@@ -15,6 +15,7 @@ export function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -90,15 +91,26 @@ export function LoginPage() {
             />
           </Field>
           <Field label={es.auth.password}>
-            <input
-              type="password"
-              className={inputClass}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              minLength={mode === "register" ? 8 : undefined}
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                className={`${inputClass} pr-10`}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                minLength={mode === "register" ? 8 : undefined}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? es.auth.hidePassword : es.auth.showPassword}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-fg-subtle transition-colors hover:text-fg"
+              >
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
             {mode === "register" && (
               <p className="mt-1 text-xs text-fg-subtle">{es.auth.passwordHint}</p>
             )}

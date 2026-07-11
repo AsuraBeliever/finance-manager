@@ -652,6 +652,8 @@ export const esDict = {
     emailPlaceholder: "tu@correo.com",
     password: "Contraseña",
     passwordHint: "Mínimo 8 caracteres",
+    showPassword: "Mostrar contraseña",
+    hidePassword: "Ocultar contraseña",
     login: "Entrar",
     register: "Crear cuenta",
     switchToRegister: "¿No tienes cuenta? Regístrate",
