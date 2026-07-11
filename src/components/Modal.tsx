@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { es } from "../i18n/es";
 
 interface ModalProps {
@@ -38,7 +39,10 @@ export function Modal({
   // Fixed cards lock to 80dvh; fluid cards grow with content up to the cap.
   const height = fixedHeight ? "h-[80dvh] max-h-[90dvh]" : "max-h-[90dvh]";
 
-  return (
+  // Portal to <body>: dashboard widgets live inside react-grid-layout items
+  // that carry a CSS transform, which would otherwise make this fixed overlay
+  // resolve against the widget instead of the viewport (off-centre, clipped).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm sm:p-6"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
@@ -58,6 +62,7 @@ export function Modal({
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
