@@ -213,6 +213,8 @@ export const en: Dict = {
     incomeByCategory: "Income by category",
     previously: "before",
     noPeriodData: "No activity in this period",
+    movementsCount: "{n} movements",
+    movementOne: "1 movement",
     uncategorized: "Uncategorized",
     hideBalance: "Hide balance",
     showBalance: "Show balance",

@@ -5,12 +5,13 @@
 use std::collections::HashMap;
 
 use finanzas_core::error::{AppError, AppResult};
+use finanzas_core::models::Transaction;
 use finanzas_core::period::{resolve_period, Period, ResolvedPeriod};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
 use super::dashboard::{load_rates, to_mxn};
-use crate::db::{all, today_mx};
+use crate::db::{all, today_mx, ToJs};
 use crate::jsv;
 
 /// SQL date literals (`YYYY-MM-DD`) for a resolved window. Bound as parameters,
@@ -110,6 +111,87 @@ pub async fn get_category_breakdown(
         total_mxn_cents,
         slices,
     })
+}
+
+// ---- per-category drill-down ----
+
+/// The transactions behind one slice of the breakdown: same kind and window,
+/// filtered to a single category (`categoryId = null` means the "Sin categoría"
+/// slice, i.e. rows with no category). Amounts stay in their wallet's currency
+/// (the row renders its own currency), unlike the MXN-normalized slice totals.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryTxArgs {
+    pub kind: String, // 'income' | 'expense'
+    #[serde(default)]
+    pub period: Period,
+    #[serde(default)]
+    pub category_id: Option<i64>,
+}
+
+#[derive(Deserialize)]
+struct CatTxRow {
+    id: i64,
+    wallet_id: i64,
+    wallet_name: String,
+    kind: String,
+    amount_cents: i64,
+    category_id: Option<i64>,
+    category_name: Option<String>,
+    description: Option<String>,
+    occurred_at: String,
+    occurred_time: Option<String>,
+    created_at: String,
+}
+
+pub async fn get_category_transactions(
+    db: &D1Database,
+    uid: i64,
+    a: CategoryTxArgs,
+) -> AppResult<Vec<Transaction>> {
+    if a.kind != "income" && a.kind != "expense" {
+        return Err(AppError::InvalidInput("tipo inválido".into()));
+    }
+    let (start, end, _, _) = window_bounds(&resolve_period(&a.period, today_mx()));
+    let mut params = jsv![uid, a.kind, start, end];
+    // Match the exact slice: a real category by id, or the NULL bucket.
+    let cat_clause = match a.category_id {
+        Some(cid) => {
+            params.push(cid.to_js());
+            "t.category_id = ?5"
+        }
+        None => "t.category_id IS NULL",
+    };
+    let sql = format!(
+        "SELECT t.id, t.wallet_id, w.name AS wallet_name, t.kind, t.amount_cents,
+                t.category_id, c.name AS category_name,
+                t.description, t.occurred_at, t.occurred_time, t.created_at
+         FROM transactions t
+         JOIN wallets w ON w.id = t.wallet_id
+         LEFT JOIN transaction_categories c ON c.id = t.category_id
+         WHERE w.user_id = ?1 AND t.kind = ?2
+           AND t.occurred_at >= ?3 AND t.occurred_at < ?4
+           AND {cat_clause}
+         ORDER BY t.occurred_at DESC, t.occurred_time DESC, t.id DESC"
+    );
+    let rows: Vec<CatTxRow> = all(db, &sql, params).await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| Transaction {
+            id: r.id,
+            wallet_id: r.wallet_id,
+            wallet_name: r.wallet_name,
+            kind: r.kind,
+            amount_cents: r.amount_cents,
+            category_id: r.category_id,
+            category_name: r.category_name,
+            transfer_group_id: None,
+            description: r.description,
+            occurred_at: r.occurred_at,
+            occurred_time: r.occurred_time,
+            created_at: r.created_at,
+        })
+        .collect())
 }
 
 // ---- period trends ----

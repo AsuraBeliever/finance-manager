@@ -274,6 +274,14 @@ export const getCategoryBreakdown = (
   period: Period = { kind: "currentMonth" },
 ) => rpc<CategoryBreakdown>("get_category_breakdown", { kind, period });
 
+/** The transactions behind one breakdown slice (categoryId null = "Sin categoría"). */
+export const getCategoryTransactions = (
+  kind: "income" | "expense",
+  categoryId: number | null,
+  period: Period = { kind: "currentMonth" },
+) =>
+  rpc<Transaction[]>("get_category_transactions", { kind, categoryId, period });
+
 export const getSpendingTrends = (period: Period = { kind: "currentMonth" }) =>
   rpc<SpendingTrends>("get_spending_trends", { period });
 

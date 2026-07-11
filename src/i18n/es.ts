@@ -219,6 +219,8 @@ export const esDict = {
     incomeByCategory: "Ingreso por categoría",
     previously: "antes",
     noPeriodData: "Sin movimientos en este periodo",
+    movementsCount: "{n} movimientos",
+    movementOne: "1 movimiento",
     uncategorized: "Sin categoría",
     hideBalance: "Ocultar saldo",
     showBalance: "Mostrar saldo",

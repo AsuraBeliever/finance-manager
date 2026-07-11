@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { StatWidget } from "../../../components/StatWidget";
 import { getCategoryBreakdown } from "../../../lib/api";
@@ -7,6 +8,7 @@ import { CHART_COLORS } from "../../../lib/palette";
 import type { Period } from "../../../lib/types";
 import { es } from "../../../i18n/es";
 import { seedName } from "../../../i18n/seed";
+import { CategoryDetailModal, type CategoryDetailTarget } from "./CategoryDetailModal";
 
 /** Donut + ranked category list for income or expense over the given period. */
 export function BreakdownWidget({
@@ -18,6 +20,7 @@ export function BreakdownWidget({
   title: string;
   period: Period;
 }) {
+  const [detail, setDetail] = useState<CategoryDetailTarget | null>(null);
   const q = useQuery({
     queryKey: ["breakdown", kind, period],
     queryFn: () => getCategoryBreakdown(kind, period),
@@ -73,27 +76,42 @@ export function BreakdownWidget({
           </div>
         </div>
 
-        <ul className="min-w-[10rem] flex-1 space-y-2">
+        <ul className="min-w-[10rem] flex-1 space-y-1">
           {data.slices.map((s, i) => {
             const pct = total > 0 ? Math.round((s.mxnCents / total) * 100) : 0;
             return (
-              <li key={s.categoryId ?? "none"} className="flex items-center gap-2 text-sm">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: colorFor(i, s.color) }}
-                />
-                <span className="truncate text-fg-muted">{seedName(s.name)}</span>
-                <span className="ml-auto tabular-nums text-fg">
-                  {formatCents(s.mxnCents, "MXN")}
-                </span>
-                <span className="w-9 shrink-0 text-right text-xs tabular-nums text-fg-subtle">
-                  {pct}%
-                </span>
+              <li key={s.categoryId ?? "none"}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDetail({ categoryId: s.categoryId, name: s.name, mxnCents: s.mxnCents })
+                  }
+                  className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-sm transition-colors hover:bg-surface-overlay"
+                >
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: colorFor(i, s.color) }}
+                  />
+                  <span className="truncate text-fg-muted">{seedName(s.name)}</span>
+                  <span className="ml-auto tabular-nums text-fg">
+                    {formatCents(s.mxnCents, "MXN")}
+                  </span>
+                  <span className="w-9 shrink-0 text-right text-xs tabular-nums text-fg-subtle">
+                    {pct}%
+                  </span>
+                </button>
               </li>
             );
           })}
         </ul>
       </div>
+
+      <CategoryDetailModal
+        kind={kind}
+        period={period}
+        target={detail}
+        onClose={() => setDetail(null)}
+      />
     </StatWidget>
   );
 }
