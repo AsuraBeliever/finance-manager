@@ -62,6 +62,8 @@ export function CategoryDetailModal({
       title={target ? seedName(target.name) : ""}
       open={target !== null}
       onClose={onClose}
+      solid
+      fixedHeight
     >
       {target && (
         <div className="flex flex-col gap-4">
