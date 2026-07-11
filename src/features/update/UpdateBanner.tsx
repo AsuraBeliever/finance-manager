@@ -22,6 +22,41 @@ async function deployedBuildId(): Promise<string | null> {
   }
 }
 
+// A service worker precaches the app shell, which is what makes local dev
+// painful: after `npm run build` the browser keeps serving the cached shell
+// until the SW updates (a flaky, multi-reload dance). On localhost we don't
+// need offline support, so we skip SW registration entirely and tear down any
+// existing one — every reload then serves the freshest build straight from
+// `wrangler dev`, no update banner and no server restart needed. Production
+// (the real domain) is untouched and keeps the full update flow below.
+const isLocalDev =
+  typeof location !== "undefined" &&
+  (location.hostname === "localhost" || location.hostname === "127.0.0.1");
+
+/** Localhost only: unregister any service worker and drop its caches so the
+ *  shell is never served stale, then reload once to leave SW control behind. */
+function LocalDevNoServiceWorker() {
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    (async () => {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      const controlled = regs.length > 0 || !!navigator.serviceWorker.controller;
+      await Promise.all(regs.map((r) => r.unregister()));
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      // If a SW was controlling this load, the page came from its cache; reload
+      // once (guarded so it can't loop) to render the just-built shell.
+      if (controlled && sessionStorage.getItem("sw-cleared") !== "1") {
+        sessionStorage.setItem("sw-cleared", "1");
+        location.reload();
+      }
+    })();
+  }, []);
+  return null;
+}
+
 /** Shows an "Actualizar" bar when a new version has been deployed. Two
  *  independent detectors feed the same banner:
  *
@@ -32,6 +67,13 @@ async function deployedBuildId(): Promise<string | null> {
  *     this bundle against the deployed version.json and, when they differ,
  *     offer a hard reload. Runs independently of SW registration. */
 export function UpdateBanner() {
+  // `useRegisterSW` (below) registers the SW on mount, so gate the whole
+  // component out on localhost rather than calling the hook conditionally.
+  if (isLocalDev) return <LocalDevNoServiceWorker />;
+  return <ProdUpdateBanner />;
+}
+
+function ProdUpdateBanner() {
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const {
     needRefresh: [needRefresh],
