@@ -126,11 +126,21 @@ struct BalanceRow {
 
 /// Per-wallet balance as of `cutoff` (exclusive): initial + Σ transactions
 /// strictly before that date. `cutoff` is a 'YYYY-MM-DD' bound parameter.
+///
+/// The initial balance only counts once the wallet exists as of `cutoff` —
+/// otherwise a period before the wallet was opened would report its opening
+/// money out of thin air. "Exists" means it was created before `cutoff` or has
+/// any transaction before it (the latter covers back-dated movements, so the
+/// opening figure travels with the earliest activity).
 async fn wallet_balances_at(db: &D1Database, uid: i64, cutoff: &str) -> AppResult<Vec<BalanceRow>> {
     all(
         db,
         "SELECT w.id, w.name, w.color, w.currency_code,
-                w.initial_balance_cents + COALESCE((
+                CASE WHEN date(w.created_at) < ?2
+                       OR EXISTS (SELECT 1 FROM transactions t
+                                  WHERE t.wallet_id = w.id AND t.occurred_at < ?2)
+                     THEN w.initial_balance_cents ELSE 0 END
+                + COALESCE((
                   SELECT SUM(CASE t.kind
                                WHEN 'income' THEN t.amount_cents
                                WHEN 'transfer_in' THEN t.amount_cents
