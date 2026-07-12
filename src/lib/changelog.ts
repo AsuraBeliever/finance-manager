@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.26.0",
+    date: "2026-07-12",
+    es: [
+      "En el resumen del inicio, cuando eliges un periodo sin movimientos ya no aparecen tarjetas vacías con «sin actividad»: solo se muestra lo que sí tiene datos (y el patrimonio en ceros).",
+      "El patrimonio de fechas anteriores a que existiera una cartera ya no incluye su saldo inicial: los meses previos a abrirla se ven en ceros, como corresponde.",
+      "Los presupuestos ya no aparecen en periodos anteriores a haberlos creado.",
+    ],
+    en: [
+      "On the home overview, choosing a period with no activity no longer shows empty “no activity” cards: only widgets with data appear (with net worth at zero).",
+      "Net worth for dates before a wallet existed no longer includes its opening balance: months prior to opening it now show zero, as they should.",
+      "Budgets no longer show up in periods before you created them.",
+    ],
+  },
+  {
     version: "2.25.0",
     date: "2026-07-12",
     es: [
