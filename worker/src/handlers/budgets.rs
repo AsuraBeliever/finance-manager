@@ -128,7 +128,7 @@ pub async fn list_budgets(db: &D1Database, uid: i64, a: BudgetArgs) -> AppResult
 
     Ok(rows
         .into_iter()
-        .map(|b| {
+        .filter_map(|b| {
             let spent = match b.category_id {
                 None => overall,
                 Some(cid) => by_cat.get(&cid).copied().unwrap_or(0),
@@ -142,7 +142,13 @@ pub async fn list_budgets(db: &D1Database, uid: i64, a: BudgetArgs) -> AppResult
                 .filter(|v| !v.is_empty())
                 .unwrap_or(&fallback);
             let limit = prorated_limit(history, resolved.start, resolved.end);
-            Budget {
+            // A zero prorated limit means the budget did not exist during this
+            // period (its first limit change is later): drop it so past periods
+            // don't list budgets that were never set then.
+            if limit <= 0 {
+                return None;
+            }
+            Some(Budget {
                 progress_bps: progress_bps(spent, limit),
                 spent_mxn_cents: spent,
                 id: b.id,
@@ -150,7 +156,7 @@ pub async fn list_budgets(db: &D1Database, uid: i64, a: BudgetArgs) -> AppResult
                 category_name: b.category_name,
                 color: b.color,
                 limit_cents: limit,
-            }
+            })
         })
         .collect())
 }
