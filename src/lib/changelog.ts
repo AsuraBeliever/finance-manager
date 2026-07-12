@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.25.0",
+    date: "2026-07-12",
+    es: [
+      "En el resumen del inicio, toca una categoría de «Gasto por categoría» o «Ingreso por categoría» para ver el desglose de todas las transacciones que la componen en el periodo elegido.",
+      "Ya puedes mostrar u ocultar la contraseña al iniciar sesión o registrarte, con el ícono de ojo.",
+    ],
+    en: [
+      "On the home overview, tap a category in “Expenses by category” or “Income by category” to see the breakdown of every transaction behind it for the selected period.",
+      "You can now show or hide your password when signing in or registering, using the eye icon.",
+    ],
+  },
+  {
     version: "2.24.1",
     date: "2026-07-08",
     es: [

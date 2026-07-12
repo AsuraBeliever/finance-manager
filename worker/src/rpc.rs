@@ -123,6 +123,9 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "get_category_breakdown" => {
             out(analytics::get_category_breakdown(db, uid, args(body)?).await?)
         }
+        "get_category_transactions" => {
+            out(analytics::get_category_transactions(db, uid, args(body)?).await?)
+        }
         "get_spending_trends" => out(analytics::get_spending_trends(db, uid, args(body)?).await?),
 
         // ---- savings goals ----
