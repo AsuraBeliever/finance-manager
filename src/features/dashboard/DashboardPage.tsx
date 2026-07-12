@@ -40,10 +40,11 @@ export function DashboardPage() {
     queryKey: ["spendingTrends", period],
     queryFn: () => getSpendingTrends(period),
   });
-  // Same keys the widgets use (deduped) — only to decide which cells exist.
-  const budgets = useQuery({ queryKey: ["budgets"], queryFn: () => listBudgets() });
-  const goals = useQuery({ queryKey: ["savingsGoals"], queryFn: () => listSavingsGoals() });
-  const subs = useQuery({ queryKey: ["subscriptions"], queryFn: () => listSubscriptions() });
+  // Same keys the widgets use (deduped) — period-scoped, so a widget's cell only
+  // exists when that widget actually has something to show for the period.
+  const budgets = useQuery({ queryKey: ["budgets", period], queryFn: () => listBudgets(period) });
+  const goals = useQuery({ queryKey: ["savingsGoals", period], queryFn: () => listSavingsGoals(period) });
+  const subs = useQuery({ queryKey: ["subscriptions", period], queryFn: () => listSubscriptions(period) });
   const [resetSignal, setResetSignal] = useState(0);
 
   if (summary.isPending)
@@ -190,41 +191,47 @@ export function DashboardPage() {
     { key: "networth", w: 12, h: 4, minW: 4, minH: 3, node: heroNode },
   ];
 
-  // Always present so changing the period never adds/removes the widget (which
-  // would reflow the grid). Empty periods render a same-size placeholder.
-  items.push({
-    key: "flow",
-    w: 12,
-    h: 5,
-    minH: 3,
-    node: (
-      <StatWidget title={es.dashboard.flow}>
-        {t && <FlowChart trends={t} />}
-      </StatWidget>
-    ),
-  });
+  // Period-dependent widgets are shown only when the period actually has the
+  // relevant activity, so browsing an empty month drops their cells instead of
+  // leaving "no activity" placeholders (the grid reconciles the changing set).
+  if (t && t.buckets.length > 0) {
+    items.push({
+      key: "flow",
+      w: 12,
+      h: 5,
+      minH: 3,
+      node: (
+        <StatWidget title={es.dashboard.flow}>
+          <FlowChart trends={t} />
+        </StatWidget>
+      ),
+    });
+  }
   if ((budgets.data?.length ?? 0) > 0) {
     items.push({ key: "budget", w: 4, h: 5, node: <BudgetWidget period={period} /> });
   }
-  // Always present (period-dependent content, fixed size) — see the flow note.
-  items.push({
-    key: "breakdownExpense",
-    w: 4,
-    h: 5,
-    node: (
-      <BreakdownWidget kind="expense" title={es.dashboard.expenseByCategory} period={period} />
-    ),
-  });
-  items.push({
-    key: "breakdownIncome",
-    w: 4,
-    h: 5,
-    node: <BreakdownWidget kind="income" title={es.dashboard.incomeByCategory} period={period} />,
-  });
+  if (t && t.expenseMxnCents > 0) {
+    items.push({
+      key: "breakdownExpense",
+      w: 4,
+      h: 5,
+      node: (
+        <BreakdownWidget kind="expense" title={es.dashboard.expenseByCategory} period={period} />
+      ),
+    });
+  }
+  if (t && t.incomeMxnCents > 0) {
+    items.push({
+      key: "breakdownIncome",
+      w: 4,
+      h: 5,
+      node: <BreakdownWidget kind="income" title={es.dashboard.incomeByCategory} period={period} />,
+    });
+  }
   if ((goals.data?.length ?? 0) > 0) {
     items.push({ key: "goals", w: 4, h: 5, node: <GoalsWidget period={period} /> });
   }
-  if ((subs.data?.subscriptions.length ?? 0) > 0) {
+  if ((subs.data?.subscriptions.filter((sub) => sub.chargedInPeriod).length ?? 0) > 0) {
     items.push({ key: "subscriptions", w: 4, h: 5, node: <SubscriptionsWidget period={period} /> });
   }
   if (walletDonut.length > 0) {
@@ -299,7 +306,9 @@ export function DashboardPage() {
   }
 
   // Income-vs-expense totals (two bars) for the same global period, at the bottom.
-  items.push({ key: "flowRange", w: 12, h: 5, minH: 3, node: <FlowRangeWidget period={period} /> });
+  if (t && (t.incomeMxnCents > 0 || t.expenseMxnCents > 0)) {
+    items.push({ key: "flowRange", w: 12, h: 5, minH: 3, node: <FlowRangeWidget period={period} /> });
+  }
 
   return (
     <>
