@@ -981,26 +981,31 @@ pub async fn project_investment(
         }
     };
 
-    // Dates of each imagined contribution, from one cadence step after today.
+    // Dates of each imagined contribution. "none" = a single lump sum added now
+    // (grows the whole horizon); the recurring cadences step forward from today.
     let mut contribs: Vec<NaiveDate> = Vec::new();
-    if a.contribution_cents > 0 && a.cadence != "none" {
-        let step_days = match a.cadence.as_str() {
-            "weekly" => Some(7),
-            "biweekly" => Some(14),
-            _ => None, // monthly handled by calendar months
-        };
-        let mut d = match step_days {
-            Some(n) => today + Duration::days(n),
-            None => today + Months::new(1),
-        };
-        let mut k = 2u32;
-        while d <= end {
-            contribs.push(d);
-            d = match step_days {
-                Some(n) => today + Duration::days(n * k as i64),
-                None => today + Months::new(k),
+    if a.contribution_cents > 0 {
+        if a.cadence == "none" {
+            contribs.push(today);
+        } else {
+            let step_days = match a.cadence.as_str() {
+                "weekly" => Some(7),
+                "biweekly" => Some(14),
+                _ => None, // monthly handled by calendar months
             };
-            k += 1;
+            let mut d = match step_days {
+                Some(n) => today + Duration::days(n),
+                None => today + Months::new(1),
+            };
+            let mut k = 2u32;
+            while d <= end {
+                contribs.push(d);
+                d = match step_days {
+                    Some(n) => today + Duration::days(n * k as i64),
+                    None => today + Months::new(k),
+                };
+                k += 1;
+            }
         }
     }
 
