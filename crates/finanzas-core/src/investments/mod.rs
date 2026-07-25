@@ -168,19 +168,18 @@ pub fn net_invested(inv: &Investment, ctx: &CalcContext, as_of: NaiveDate) -> i6
 }
 
 /// Apply a signed cash movement to a títulos-anchored ("exact mode") BONDDIA
-/// position, converting the cash into fund shares at the current NAV so the
-/// money grows with the fund afterwards instead of sitting as flat cash (which
-/// drifts from cetesdirecto day by day). Whole shares change `titulos`; the
-/// sub-share remainder — plus the cent lost to flooring the títulos value —
-/// rides in `remanentes_cents`, so the position's value moves by EXACTLY
-/// `delta_cents` (positive = deposit, negative = withdrawal). Returns the new
-/// `(titulos, remanentes_cents)`.
+/// position exactly the way cetesdirecto does: take the whole position value in
+/// cash (títulos at NAV **plus** the existing remanente), apply the movement,
+/// then buy as many whole títulos as that total covers and keep the leftover as
+/// cash. So the sweep also invests any remanente that has grown past one share —
+/// the share count lands on the same number cetesdirecto shows, with no manual
+/// resync. `delta_cents` is signed (positive = deposit, negative = withdrawal),
+/// and the value moves by EXACTLY `delta_cents`. Returns `(titulos, remanentes_cents)`.
 ///
 /// With no cached NAV (`price_micros` None/0) there is nothing to price shares
-/// against, so the whole delta stays as cash — the caller then reflects it now
-/// and it reconciles when the user next resyncs títulos. A withdrawal larger
-/// than the whole position also falls back to cash rather than minting negative
-/// títulos.
+/// against, so the whole delta just stays as cash until the NAV is known. A
+/// movement that would drop the value below zero also falls back to cash rather
+/// than minting negative títulos.
 pub fn bonddia_cash_split(
     titulos: i64,
     remanentes_cents: i64,
@@ -191,18 +190,15 @@ pub fn bonddia_cash_split(
         Some(p) if p > 0 => p as i128,
         _ => return (titulos, remanentes_cents + delta_cents),
     };
-    // Whole shares the cash buys (deposit) or releases (withdrawal) at the NAV;
-    // integer division truncates toward zero, so it never over-mints shares.
-    let titulos_delta = (delta_cents as i128 * 10_000 / price) as i64;
-    let new_titulos = titulos + titulos_delta;
-    if new_titulos < 0 {
+    // Whole position as cash: floor(títulos × NAV) + remanente, then the movement.
+    let base = titulos as i128 * price / 10_000;
+    let value = base + remanentes_cents as i128 + delta_cents as i128;
+    if value < 0 {
         return (titulos, remanentes_cents + delta_cents);
     }
-    // Compensate with the ACTUAL change in the floored títulos value, so
-    // value_at's `floor(titulos × price) + remanentes` shifts by exactly delta.
-    let base_before = (titulos as i128 * price / 10_000) as i64;
-    let base_after = (new_titulos as i128 * price / 10_000) as i64;
-    let new_remanentes = remanentes_cents + delta_cents - (base_after - base_before);
+    // Re-express as the most whole títulos the value covers + leftover cash.
+    let new_titulos = (value * 10_000 / price) as i64;
+    let new_remanentes = (value - new_titulos as i128 * price / 10_000) as i64;
     (new_titulos, new_remanentes)
 }
 
@@ -344,19 +340,28 @@ mod tests {
     }
 
     #[test]
-    fn bonddia_cash_split_converts_deposit_to_titulos_exactly() {
+    fn bonddia_cash_split_matches_cetesdirecto_share_count() {
         let price = 2_349_862;
-        // Real case: 2923 títulos + $2.06 remanentes, a $3,000 deposit.
-        // shares = 3_000_000_000 / 2_349_862 = 1276 (truncated) → 4199 títulos.
+        // Real case: 2923 títulos + $2.06 cash, a $3,000 deposit. Sweeping the
+        // whole $9,870.70 into shares → 4200 títulos (exactly what cetesdirecto
+        // showed) + $1.28 leftover cash.
         let (t, r) = bonddia_cash_split(2923, 206, Some(price), 300_000);
-        assert_eq!((t, r), (4199, 363));
+        assert_eq!((t, r), (4200, 128));
         // value = floor(títulos × price / 10_000) + remanentes moves by EXACTLY
         // the deposit — no cent lost to flooring.
         let val = |t: i64, r: i64| (t as i128 * price as i128 / 10_000) as i64 + r;
         assert_eq!(val(t, r) - val(2923, 206), 300_000);
-        // And, unlike flat cash, the bulk now rides in títulos that grow with the
-        // NAV, so it no longer drifts from cetesdirecto day by day.
-        assert!(t > 2923);
+    }
+
+    #[test]
+    fn bonddia_cash_split_sweeps_accumulated_remanente_into_shares() {
+        // A remanente grown past one share's price gets invested on the next
+        // movement, as cetesdirecto sweeps idle cash. $2.40 cash (> one $2.3499
+        // share) with a $0 net movement still buys a whole share.
+        let price = 2_349_862;
+        let (t, r) = bonddia_cash_split(1000, 240, Some(price), 0);
+        assert_eq!(t, 1001);
+        assert!((0..price / 10_000).contains(&r));
     }
 
     #[test]
