@@ -755,17 +755,39 @@ pub async fn add_investment_movement(
         ("income", format!("Retiro de {}", inv.name))
     };
 
+    // A deposit (expense) files under the default 'Inversiones' category (seed
+    // 0033) so it isn't left uncategorized; a withdrawal (income) has no natural
+    // seed category and stays NULL. The subquery yields NULL if the category is
+    // missing, which the column allows.
+    #[derive(Deserialize)]
+    struct CategoryIdRow {
+        id: i64,
+    }
+    let category_id: Option<i64> = if a.kind == "deposit" {
+        let cat: Option<CategoryIdRow> = first(
+            db,
+            "SELECT id FROM transaction_categories
+             WHERE user_id IS NULL AND kind = 'expense' AND name = 'Inversiones' LIMIT 1",
+            vec![],
+        )
+        .await?;
+        cat.map(|c| c.id)
+    } else {
+        None
+    };
+
     batch(
         db,
         vec![
             stmt(
                 db,
-                "INSERT INTO transactions (wallet_id, kind, amount_cents, description, occurred_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 jsv![
                     wallet_id,
                     tx_kind,
                     wallet_amount,
+                    category_id,
                     description,
                     a.occurred_at
                 ],

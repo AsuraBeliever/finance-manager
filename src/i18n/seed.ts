@@ -27,6 +27,7 @@ const EN: Record<string, string> = {
   "Otro gasto": "Other expense",
   Metas: "Goals",
   "Meses sin intereses": "Interest-free installments",
+  Inversiones: "Investments",
   // Currencies
   "Peso mexicano": "Mexican peso",
   "Dólar estadounidense": "US dollar",
