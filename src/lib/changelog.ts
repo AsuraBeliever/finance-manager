@@ -12,6 +12,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.27.0",
+    date: "2026-07-24",
+    es: [
+      "Al aportar o retirar en una inversión BONDDIA (la de cetesdirecto por títulos), el total ahora sube o baja al instante por el monto del movimiento, tal como en tu app de cetesdirecto. Antes el aporte salía de tu cartera pero no se reflejaba en la inversión.",
+      "Los aportes y retiros que haces desde una cartera hacia una inversión ahora quedan clasificados en la categoría «Inversiones» (antes salían sin categoría en tus gastos e ingresos).",
+      "La proyección «¿cuánto crecería?» ahora considera bien una aportación única (sin repetición): antes la ignoraba y no mostraba el crecimiento.",
+      "En el detalle de una cartera, el número grande ahora es lo realmente disponible (saldo menos lo apartado en metas), con una línea de «Total con apartados» debajo.",
+    ],
+    en: [
+      "Depositing into or withdrawing from a BONDDIA investment (cetesdirecto's títulos-based fund) now moves the total by the movement amount immediately, just like in your cetesdirecto app. Before, the deposit left your wallet but didn't show up in the investment.",
+      "Contributions and withdrawals you make from a wallet into an investment are now filed under the “Investments” category (they used to be uncategorized in your expenses and income).",
+      "The “how much would it grow?” projection now handles a one-time contribution (no repetition) correctly: it used to ignore it and show no growth.",
+      "On a wallet's detail, the big number is now what's actually available (balance minus what's reserved in goals), with a “Total with pockets” line below.",
+    ],
+  },
+  {
     version: "2.26.0",
     date: "2026-07-12",
     es: [
