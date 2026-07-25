@@ -755,26 +755,22 @@ pub async fn add_investment_movement(
         ("income", format!("Retiro de {}", inv.name))
     };
 
-    // A deposit (expense) files under the default 'Inversiones' category (seed
-    // 0033) so it isn't left uncategorized; a withdrawal (income) has no natural
-    // seed category and stays NULL. The subquery yields NULL if the category is
-    // missing, which the column allows.
+    // Both legs file under the seed 'Inversiones' category so neither is left
+    // uncategorized: a deposit posts an expense (seed 0033) and a withdrawal
+    // posts an income (seed 0034), each under the sibling of the matching kind.
+    // The lookup yields None if the seed is missing, which the column allows.
     #[derive(Deserialize)]
     struct CategoryIdRow {
         id: i64,
     }
-    let category_id: Option<i64> = if a.kind == "deposit" {
-        let cat: Option<CategoryIdRow> = first(
-            db,
-            "SELECT id FROM transaction_categories
-             WHERE user_id IS NULL AND kind = 'expense' AND name = 'Inversiones' LIMIT 1",
-            vec![],
-        )
-        .await?;
-        cat.map(|c| c.id)
-    } else {
-        None
-    };
+    let cat: Option<CategoryIdRow> = first(
+        db,
+        "SELECT id FROM transaction_categories
+         WHERE user_id IS NULL AND kind = ?1 AND name = 'Inversiones' LIMIT 1",
+        jsv![tx_kind],
+    )
+    .await?;
+    let category_id: Option<i64> = cat.map(|c| c.id);
 
     batch(
         db,
