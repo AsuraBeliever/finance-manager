@@ -12,6 +12,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.27.2",
+    date: "2026-07-24",
+    es: [
+      "Los aportes y retiros a una inversión BONDDIA por títulos ahora calculan el número de títulos igual que cetesdirecto: se toma todo el efectivo disponible (el que dejó suelto la operación anterior más el aporte) y se compran los títulos enteros que alcancen. Así el conteo de títulos coincide con cetesdirecto por sí solo, sin tener que ajustarlo a mano.",
+    ],
+    en: [
+      "Deposits and withdrawals to a títulos-based BONDDIA investment now compute the share count the same way cetesdirecto does: it takes all available cash (whatever the previous operation left over, plus the new amount) and buys as many whole shares as it covers. So the títulos count matches cetesdirecto on its own, with no manual adjusting.",
+    ],
+  },
+  {
     version: "2.27.1",
     date: "2026-07-24",
     es: [
