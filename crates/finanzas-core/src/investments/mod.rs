@@ -167,6 +167,45 @@ pub fn net_invested(inv: &Investment, ctx: &CalcContext, as_of: NaiveDate) -> i6
     total
 }
 
+/// Apply a signed cash movement to a títulos-anchored ("exact mode") BONDDIA
+/// position, converting the cash into fund shares at the current NAV so the
+/// money grows with the fund afterwards instead of sitting as flat cash (which
+/// drifts from cetesdirecto day by day). Whole shares change `titulos`; the
+/// sub-share remainder — plus the cent lost to flooring the títulos value —
+/// rides in `remanentes_cents`, so the position's value moves by EXACTLY
+/// `delta_cents` (positive = deposit, negative = withdrawal). Returns the new
+/// `(titulos, remanentes_cents)`.
+///
+/// With no cached NAV (`price_micros` None/0) there is nothing to price shares
+/// against, so the whole delta stays as cash — the caller then reflects it now
+/// and it reconciles when the user next resyncs títulos. A withdrawal larger
+/// than the whole position also falls back to cash rather than minting negative
+/// títulos.
+pub fn bonddia_cash_split(
+    titulos: i64,
+    remanentes_cents: i64,
+    price_micros: Option<i64>,
+    delta_cents: i64,
+) -> (i64, i64) {
+    let price = match price_micros {
+        Some(p) if p > 0 => p as i128,
+        _ => return (titulos, remanentes_cents + delta_cents),
+    };
+    // Whole shares the cash buys (deposit) or releases (withdrawal) at the NAV;
+    // integer division truncates toward zero, so it never over-mints shares.
+    let titulos_delta = (delta_cents as i128 * 10_000 / price) as i64;
+    let new_titulos = titulos + titulos_delta;
+    if new_titulos < 0 {
+        return (titulos, remanentes_cents + delta_cents);
+    }
+    // Compensate with the ACTUAL change in the floored títulos value, so
+    // value_at's `floor(titulos × price) + remanentes` shifts by exactly delta.
+    let base_before = (titulos as i128 * price / 10_000) as i64;
+    let base_after = (new_titulos as i128 * price / 10_000) as i64;
+    let new_remanentes = remanentes_cents + delta_cents - (base_after - base_before);
+    (new_titulos, new_remanentes)
+}
+
 #[cfg(test)]
 pub(crate) fn test_investment(calculator: &str, principal_cents: i64, params: &str) -> Investment {
     Investment {
@@ -302,6 +341,43 @@ mod tests {
         // before the withdrawal happened
         let earlier = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
         assert_eq!(net_invested(&inv, &ctx, earlier), 150_000);
+    }
+
+    #[test]
+    fn bonddia_cash_split_converts_deposit_to_titulos_exactly() {
+        let price = 2_349_862;
+        // Real case: 2923 títulos + $2.06 remanentes, a $3,000 deposit.
+        // shares = 3_000_000_000 / 2_349_862 = 1276 (truncated) → 4199 títulos.
+        let (t, r) = bonddia_cash_split(2923, 206, Some(price), 300_000);
+        assert_eq!((t, r), (4199, 363));
+        // value = floor(títulos × price / 10_000) + remanentes moves by EXACTLY
+        // the deposit — no cent lost to flooring.
+        let val = |t: i64, r: i64| (t as i128 * price as i128 / 10_000) as i64 + r;
+        assert_eq!(val(t, r) - val(2923, 206), 300_000);
+        // And, unlike flat cash, the bulk now rides in títulos that grow with the
+        // NAV, so it no longer drifts from cetesdirecto day by day.
+        assert!(t > 2923);
+    }
+
+    #[test]
+    fn bonddia_cash_split_round_trips_at_a_stable_nav() {
+        let price = Some(2_349_862);
+        let (t, r) = bonddia_cash_split(2923, 206, price, 300_000);
+        // Deleting the same deposit at the same NAV restores the position exactly.
+        assert_eq!(bonddia_cash_split(t, r, price, -300_000), (2923, 206));
+    }
+
+    #[test]
+    fn bonddia_cash_split_without_nav_stays_as_cash() {
+        // No cached NAV: nothing to price shares against, keep it as cash.
+        assert_eq!(
+            bonddia_cash_split(2923, 206, None, 300_000),
+            (2923, 300_206)
+        );
+        assert_eq!(
+            bonddia_cash_split(2923, 206, Some(0), 300_000),
+            (2923, 300_206)
+        );
     }
 
     #[test]

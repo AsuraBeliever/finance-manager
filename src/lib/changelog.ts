@@ -12,6 +12,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.27.1",
+    date: "2026-07-24",
+    es: [
+      "Al aportar o retirar en una inversión BONDDIA por títulos (la de cetesdirecto), el dinero ahora se convierte a títulos al precio del día, así que además de reflejarse al instante sigue creciendo con el fondo. Antes se quedaba como efectivo que no crecía y se desviaba unos centavos cada día de tu saldo real de cetesdirecto.",
+    ],
+    en: [
+      "When you deposit into or withdraw from a títulos-based BONDDIA investment (cetesdirecto's), the money is now converted to fund shares at that day's price, so on top of showing up immediately it keeps growing with the fund. Before, it stayed as cash that didn't grow and drifted a few cents a day from your real cetesdirecto balance.",
+    ],
+  },
+  {
     version: "2.27.0",
     date: "2026-07-24",
     es: [
