@@ -44,6 +44,12 @@ export function WalletDetailPage() {
   // This wallet's apartados (pockets nested under it).
   const allWallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
   const apartados = (allWallets.data ?? []).filter((x) => x.parentWalletId === walletId);
+  // Pocket money left the parent's balance via transfer, so summing the pockets
+  // (same currency) back reconstructs the real bank total shown under the
+  // spendable amount. Goals reserve inside the balance already (reservedCents).
+  const apartadosCents = apartados
+    .filter((a) => a.currencyCode === wallet.data?.currencyCode)
+    .reduce((sum, a) => sum + a.balanceCents, 0);
 
   const transactions = useQuery({
     queryKey: ["transactions", { walletId }],
@@ -130,9 +136,19 @@ export function WalletDetailPage() {
             {seedName(w.categoryName)} · {w.currencyCode}
           </span>
         </div>
+        {/* The big number is what's actually spendable: the balance minus goal
+            reserves. Pocket wallets already left the balance, so the real bank
+            total (below, small) adds them back. Both apartados — goals and
+            pockets — are listed further down the page. */}
         <p className="text-3xl font-semibold tabular-nums">
-          {formatCents(w.balanceCents, w.currencyCode)}
+          {formatCents(w.balanceCents - w.reservedCents, w.currencyCode)}
         </p>
+        {(w.reservedCents > 0 || apartadosCents > 0) && (
+          <p className="mt-1 text-xs text-fg-subtle tabular-nums">
+            {es.wallets.totalWithReserved}:{" "}
+            {formatCents(w.balanceCents + apartadosCents, w.currencyCode)}
+          </p>
+        )}
         {/* On a credit card the initial balance is registered debt, so
             "Saldo inicial" would be wrong; show it as debt (or nothing). */}
         {w.creditCutDay != null ? (
