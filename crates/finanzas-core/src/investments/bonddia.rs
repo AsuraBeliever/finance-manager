@@ -198,6 +198,42 @@ mod tests {
     }
 
     #[test]
+    fn titulos_mode_cash_deposit_raises_value_one_for_one() {
+        // The fix for exact-mode deposits folds cash into remanentes so the total
+        // moves like cetesdirecto. A $3,000 deposit (remanentes 206 → 300_206)
+        // must lift the value by exactly 300_000 over the same títulos × price.
+        let ctx = CalcContext {
+            bonddia_price_micros: Some(2_349_862),
+            ..Default::default()
+        };
+        let as_of = NaiveDate::from_ymd_opt(2026, 7, 24).unwrap();
+        let base = Bonddia
+            .value_at(
+                &test_investment(
+                    "bonddia",
+                    600,
+                    r#"{"titulos": 2923, "remanentes_cents": 206}"#,
+                ),
+                &ctx,
+                as_of,
+            )
+            .unwrap();
+        let after = Bonddia
+            .value_at(
+                &test_investment(
+                    "bonddia",
+                    600,
+                    r#"{"titulos": 2923, "remanentes_cents": 300206}"#,
+                ),
+                &ctx,
+                as_of,
+            )
+            .unwrap();
+        assert_eq!(base, (2923i128 * 2_349_862 / 10_000) as i64 + 206);
+        assert_eq!(after - base, 300_000);
+    }
+
+    #[test]
     fn titulos_mode_falls_back_to_history_without_price() {
         let ctx = CalcContext {
             rate_history: history(&[("2025-01-01", 1000)]),

@@ -685,6 +685,30 @@ pub struct AddMovementArgs {
     pub wallet_id: Option<i64>,
 }
 
+/// A títulos-anchored ("exact mode") BONDDIA values as `títulos × price +
+/// remanentes`, which ignores cash movements: a deposit leaves the wallet but
+/// the total doesn't budge until the user resyncs the share count. To make the
+/// total move one-for-one like cetesdirecto, fold the cash into `remanentes_cents`
+/// (the fund's cash not yet converted to títulos). `delta_cents` is signed:
+/// positive for a deposit, negative for a withdrawal. Returns the updated
+/// params_json, or None when this isn't an exact-mode BONDDIA (nothing to fold).
+fn exact_mode_remanentes(calculator: &str, params_json: &str, delta_cents: i64) -> Option<String> {
+    if calculator != "bonddia" {
+        return None;
+    }
+    let mut params: serde_json::Value = serde_json::from_str(params_json).ok()?;
+    let titulos = params.get("titulos").and_then(serde_json::Value::as_i64)?;
+    if titulos <= 0 {
+        return None;
+    }
+    let current = params
+        .get("remanentes_cents")
+        .and_then(serde_json::Value::as_i64)
+        .unwrap_or(0);
+    params["remanentes_cents"] = serde_json::Value::from(current + delta_cents);
+    serde_json::to_string(&params).ok()
+}
+
 pub async fn add_investment_movement(
     db: &D1Database,
     uid: i64,
@@ -711,16 +735,33 @@ pub async fn add_investment_movement(
         ));
     }
 
+    // For exact-mode BONDDIA, fold the cash into remanentes so the value reflects
+    // it immediately (same string reused by both the wallet and no-wallet paths).
+    let cash_delta = if a.kind == "withdrawal" {
+        -a.amount_cents
+    } else {
+        a.amount_cents
+    };
+    let new_params = exact_mode_remanentes(&inv.calculator, &inv.params_json, cash_delta);
+
     let Some(wallet_id) = a.wallet_id else {
         // No wallet side: external contribution/withdrawal (e.g. the very first
-        // deposit before any wallet exists). Just record the movement.
-        exec(
+        // deposit before any wallet exists). Record the movement (and, for
+        // exact-mode BONDDIA, the remanentes bump) in one batch.
+        let mut stmts = vec![stmt(
             db,
             "INSERT INTO investment_movements (investment_id, kind, amount_cents, occurred_at)
              VALUES (?1, ?2, ?3, ?4)",
             jsv![a.investment_id, a.kind, a.amount_cents, a.occurred_at],
-        )
-        .await?;
+        )?];
+        if let Some(params) = &new_params {
+            stmts.push(stmt(
+                db,
+                "UPDATE investments SET params_json = ?1 WHERE id = ?2 AND user_id = ?3",
+                jsv![params, a.investment_id, uid],
+            )?);
+        }
+        batch(db, stmts).await?;
         return Ok(());
     };
 
@@ -772,49 +813,62 @@ pub async fn add_investment_movement(
     .await?;
     let category_id: Option<i64> = cat.map(|c| c.id);
 
-    batch(
-        db,
-        vec![
-            stmt(
-                db,
-                "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                jsv![
-                    wallet_id,
-                    tx_kind,
-                    wallet_amount,
-                    category_id,
-                    description,
-                    a.occurred_at
-                ],
-            )?,
-            stmt(
-                db,
-                "INSERT INTO investment_movements
-                   (investment_id, kind, amount_cents, occurred_at, linked_transaction_id)
-                 VALUES (?1, ?2, ?3, ?4, last_insert_rowid())",
-                jsv![a.investment_id, a.kind, a.amount_cents, a.occurred_at],
-            )?,
-            stmt(
-                db,
-                "UPDATE investments SET linked_wallet_id = ?1 WHERE id = ?2 AND user_id = ?3",
-                jsv![wallet_id, a.investment_id, uid],
-            )?,
-        ],
-    )
-    .await?;
+    let mut stmts = vec![
+        stmt(
+            db,
+            "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            jsv![
+                wallet_id,
+                tx_kind,
+                wallet_amount,
+                category_id,
+                description,
+                a.occurred_at
+            ],
+        )?,
+        stmt(
+            db,
+            "INSERT INTO investment_movements
+               (investment_id, kind, amount_cents, occurred_at, linked_transaction_id)
+             VALUES (?1, ?2, ?3, ?4, last_insert_rowid())",
+            jsv![a.investment_id, a.kind, a.amount_cents, a.occurred_at],
+        )?,
+        stmt(
+            db,
+            "UPDATE investments SET linked_wallet_id = ?1 WHERE id = ?2 AND user_id = ?3",
+            jsv![wallet_id, a.investment_id, uid],
+        )?,
+    ];
+    if let Some(params) = &new_params {
+        stmts.push(stmt(
+            db,
+            "UPDATE investments SET params_json = ?1 WHERE id = ?2 AND user_id = ?3",
+            jsv![params, a.investment_id, uid],
+        )?);
+    }
+    batch(db, stmts).await?;
     Ok(())
 }
 
 pub async fn delete_investment_movement(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<()> {
-    // Ownership check + grab the linked transaction (if any) in one lookup.
+    // Ownership check + everything the deletion touches, in one lookup: the linked
+    // transaction (if any) and the movement/investment fields needed to reverse an
+    // exact-mode BONDDIA remanentes fold.
     #[derive(Deserialize)]
     struct MovementLinkRow {
+        kind: String,
+        amount_cents: i64,
+        investment_id: i64,
         linked_transaction_id: Option<i64>,
+        calculator: String,
+        params_json: String,
     }
     let row: Option<MovementLinkRow> = first(
         db,
-        "SELECT m.linked_transaction_id FROM investment_movements m
+        "SELECT m.kind, m.amount_cents, m.investment_id, m.linked_transaction_id,
+                i.calculator, i.params_json
+         FROM investment_movements m
          JOIN investments i ON i.id = m.investment_id AND i.user_id = ?2
          WHERE m.id = ?1",
         jsv![a.id, uid],
@@ -822,33 +876,37 @@ pub async fn delete_investment_movement(db: &D1Database, uid: i64, a: IdArgs) ->
     .await?;
     let row = row.ok_or(AppError::NotFound("movimiento"))?;
 
-    match row.linked_transaction_id {
-        // Drop the wallet transaction too so the money returns; both in one
-        // batch. (Deleting the tx would cascade-delete the movement anyway, but
-        // being explicit keeps the intent clear and order-independent.)
-        Some(tx_id) => {
-            batch(
-                db,
-                vec![
-                    stmt(
-                        db,
-                        "DELETE FROM investment_movements WHERE id = ?1",
-                        jsv![a.id],
-                    )?,
-                    stmt(db, "DELETE FROM transactions WHERE id = ?1", jsv![tx_id])?,
-                ],
-            )
-            .await?;
-        }
-        None => {
-            exec(
-                db,
-                "DELETE FROM investment_movements WHERE id = ?1",
-                jsv![a.id],
-            )
-            .await?;
-        }
+    // Deleting a deposit must undo the cash it folded into remanentes, and vice
+    // versa — the reverse sign of what add_investment_movement applied.
+    let cash_delta = if row.kind == "withdrawal" {
+        row.amount_cents
+    } else {
+        -row.amount_cents
+    };
+
+    let mut stmts = vec![stmt(
+        db,
+        "DELETE FROM investment_movements WHERE id = ?1",
+        jsv![a.id],
+    )?];
+    // Drop the wallet transaction too so the money returns. (Deleting the tx
+    // would cascade-delete the movement anyway, but being explicit keeps the
+    // intent clear and order-independent.)
+    if let Some(tx_id) = row.linked_transaction_id {
+        stmts.push(stmt(
+            db,
+            "DELETE FROM transactions WHERE id = ?1",
+            jsv![tx_id],
+        )?);
     }
+    if let Some(params) = exact_mode_remanentes(&row.calculator, &row.params_json, cash_delta) {
+        stmts.push(stmt(
+            db,
+            "UPDATE investments SET params_json = ?1 WHERE id = ?2 AND user_id = ?3",
+            jsv![params, row.investment_id, uid],
+        )?);
+    }
+    batch(db, stmts).await?;
     Ok(())
 }
 
