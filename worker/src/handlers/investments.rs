@@ -8,7 +8,8 @@ use finanzas_core::investments::simulate::{
 };
 use finanzas_core::investments::xirr::{xirr, CashFlow};
 use finanzas_core::investments::{
-    find, net_invested, parse_bonddia_price, registry, CalcContext, Movement, Snapshot,
+    bonddia_cash_split, find, net_invested, parse_bonddia_price, registry, CalcContext, Movement,
+    Snapshot,
 };
 
 use super::dashboard::{convert, load_rates};
@@ -685,14 +686,30 @@ pub struct AddMovementArgs {
     pub wallet_id: Option<i64>,
 }
 
-/// A títulos-anchored ("exact mode") BONDDIA values as `títulos × price +
-/// remanentes`, which ignores cash movements: a deposit leaves the wallet but
-/// the total doesn't budge until the user resyncs the share count. To make the
-/// total move one-for-one like cetesdirecto, fold the cash into `remanentes_cents`
-/// (the fund's cash not yet converted to títulos). `delta_cents` is signed:
-/// positive for a deposit, negative for a withdrawal. Returns the updated
-/// params_json, or None when this isn't an exact-mode BONDDIA (nothing to fold).
-fn exact_mode_remanentes(calculator: &str, params_json: &str, delta_cents: i64) -> Option<String> {
+/// Latest official BONDDIA NAV per título (micros) from the global market cache,
+/// or None when it hasn't been scraped yet. Used to price exact-mode movements.
+async fn bonddia_price_micros(db: &D1Database) -> AppResult<Option<i64>> {
+    let raw: Option<ValueRow> = first(
+        db,
+        "SELECT value FROM settings WHERE user_id = 0 AND key = 'bonddia_price'",
+        vec![],
+    )
+    .await?;
+    Ok(raw.and_then(|r| parse_bonddia_price(&r.value)))
+}
+
+/// For a títulos-anchored ("exact mode") BONDDIA, a cash movement is converted
+/// into fund shares at the current NAV (see `bonddia_cash_split`) so the total
+/// moves by exactly the amount AND grows with the fund afterwards — flat cash
+/// would drift from cetesdirecto day by day. `delta_cents` is signed: positive
+/// for a deposit, negative for a withdrawal. Returns the updated params_json, or
+/// None when this isn't an exact-mode BONDDIA (nothing to convert).
+fn exact_mode_params(
+    calculator: &str,
+    params_json: &str,
+    price_micros: Option<i64>,
+    delta_cents: i64,
+) -> Option<String> {
     if calculator != "bonddia" {
         return None;
     }
@@ -701,11 +718,14 @@ fn exact_mode_remanentes(calculator: &str, params_json: &str, delta_cents: i64) 
     if titulos <= 0 {
         return None;
     }
-    let current = params
+    let remanentes = params
         .get("remanentes_cents")
         .and_then(serde_json::Value::as_i64)
         .unwrap_or(0);
-    params["remanentes_cents"] = serde_json::Value::from(current + delta_cents);
+    let (new_titulos, new_remanentes) =
+        bonddia_cash_split(titulos, remanentes, price_micros, delta_cents);
+    params["titulos"] = serde_json::Value::from(new_titulos);
+    params["remanentes_cents"] = serde_json::Value::from(new_remanentes);
     serde_json::to_string(&params).ok()
 }
 
@@ -735,14 +755,20 @@ pub async fn add_investment_movement(
         ));
     }
 
-    // For exact-mode BONDDIA, fold the cash into remanentes so the value reflects
-    // it immediately (same string reused by both the wallet and no-wallet paths).
+    // For exact-mode BONDDIA, convert the cash into títulos at the current NAV so
+    // the value reflects it now and keeps growing (same string reused by both the
+    // wallet and no-wallet paths).
     let cash_delta = if a.kind == "withdrawal" {
         -a.amount_cents
     } else {
         a.amount_cents
     };
-    let new_params = exact_mode_remanentes(&inv.calculator, &inv.params_json, cash_delta);
+    let price_micros = if inv.calculator == "bonddia" {
+        bonddia_price_micros(db).await?
+    } else {
+        None
+    };
+    let new_params = exact_mode_params(&inv.calculator, &inv.params_json, price_micros, cash_delta);
 
     let Some(wallet_id) = a.wallet_id else {
         // No wallet side: external contribution/withdrawal (e.g. the very first
@@ -876,12 +902,18 @@ pub async fn delete_investment_movement(db: &D1Database, uid: i64, a: IdArgs) ->
     .await?;
     let row = row.ok_or(AppError::NotFound("movimiento"))?;
 
-    // Deleting a deposit must undo the cash it folded into remanentes, and vice
-    // versa — the reverse sign of what add_investment_movement applied.
+    // Deleting a deposit must undo the títulos/cash it added, and vice versa —
+    // the reverse sign of what add_investment_movement applied, priced at the
+    // current NAV (an exact round-trip when the NAV hasn't moved since).
     let cash_delta = if row.kind == "withdrawal" {
         row.amount_cents
     } else {
         -row.amount_cents
+    };
+    let price_micros = if row.calculator == "bonddia" {
+        bonddia_price_micros(db).await?
+    } else {
+        None
     };
 
     let mut stmts = vec![stmt(
@@ -899,7 +931,9 @@ pub async fn delete_investment_movement(db: &D1Database, uid: i64, a: IdArgs) ->
             jsv![tx_id],
         )?);
     }
-    if let Some(params) = exact_mode_remanentes(&row.calculator, &row.params_json, cash_delta) {
+    if let Some(params) =
+        exact_mode_params(&row.calculator, &row.params_json, price_micros, cash_delta)
+    {
         stmts.push(stmt(
             db,
             "UPDATE investments SET params_json = ?1 WHERE id = ?2 AND user_id = ?3",
