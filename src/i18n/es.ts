@@ -442,6 +442,8 @@ export const esDict = {
     deleteConfirmTitle: "Eliminar transacción",
     deleteConfirm:
       "¿Eliminar esta transacción? Si es una transferencia se eliminan ambas partes.",
+    deleteInvestmentLegConfirm:
+      "Esta transferencia es el movimiento de una inversión: al eliminarla también se elimina la aportación o el retiro en la inversión. ¿Continuar?",
     apartadoEditTitle: "Editar movimiento de apartado",
     apartadoDeleteTitle: "Eliminar movimiento de apartado",
     apartadoDeleteConfirm:
@@ -511,10 +513,14 @@ export const esDict = {
     movementDate: "Fecha",
     movementWallet: "Cartera",
     movementWalletNone: "Ninguna (movimiento externo)",
-    movementWalletDepositHint: "El dinero saldrá de esta cartera como gasto.",
-    movementWalletWithdrawalHint: "El dinero entrará a esta cartera como ingreso.",
+    movementWalletDepositHint:
+      "El dinero saldrá de esta cartera como transferencia (no cuenta como gasto).",
+    movementWalletWithdrawalHint:
+      "El dinero entrará a esta cartera como transferencia (no cuenta como ingreso).",
     movementDeleteConfirm: "¿Eliminar este movimiento?",
     movementDeleteTitle: "Eliminar movimiento",
+    movementEditTitle: "Editar movimiento",
+    movementKind: "Tipo",
     cryptoSymbol: "Criptomoneda",
     cryptoQuantity: "Cantidad",
     cryptoPrincipalHint: "Lo que has gastado en comprarla (MXN), para calcular tu rendimiento.",

@@ -223,6 +223,20 @@ export interface InvestmentMovement {
   occurredAt: string;
 }
 
+/** A movement plus what the editor needs around it: which investment it belongs
+ *  to, and the wallet of its transfer leg (null = external movement). */
+export interface MovementDetail {
+  id: number;
+  investmentId: number;
+  investmentName: string;
+  kind: "deposit" | "withdrawal";
+  amountCents: number;
+  occurredAt: string;
+  walletId: number | null;
+  currencyCode: string;
+  startDate: string;
+}
+
 /** Investment fields are flattened together with the computed values (serde flatten). */
 export type InvestmentWithValue = Investment & {
   currentValueCents: number;

@@ -46,6 +46,7 @@ import { POSITIVE, useChartTokens } from "../../lib/palette";
 import type { SimCadence } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
+import { MovementEditModal } from "./MovementEditModal";
 
 const SIM_GOLD = "#c9a14a";
 const SIM_CADENCES: SimCadence[] = ["monthly", "biweekly", "weekly", "none"];
@@ -73,6 +74,7 @@ export function InvestmentDetailPage() {
   const [movementError, setMovementError] = useState<string | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [movementToDelete, setMovementToDelete] = useState<number | null>(null);
+  const [movementToEdit, setMovementToEdit] = useState<number | null>(null);
 
   const detail = useQuery({
     queryKey: ["investments", invId],
@@ -496,6 +498,13 @@ export function InvestmentDetailPage() {
                     {formatCents(m.amountCents, d.currencyCode)}
                   </span>
                   <button
+                    onClick={() => setMovementToEdit(m.id)}
+                    aria-label={es.common.edit}
+                    className="touch-action-reveal rounded-md p-1 text-fg-subtle transition-all hover:bg-surface-overlay hover:text-fg"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
                     onClick={() => setMovementToDelete(m.id)}
                     aria-label={es.common.delete}
                     className="touch-action-reveal rounded-md p-1 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
@@ -533,6 +542,12 @@ export function InvestmentDetailPage() {
       )}
 
       <InvestmentFormModal open={editOpen} onClose={() => setEditOpen(false)} investment={d} />
+
+      <MovementEditModal
+        open={movementToEdit !== null}
+        onClose={() => setMovementToEdit(null)}
+        movementId={movementToEdit ?? undefined}
+      />
 
       <Modal
         title={

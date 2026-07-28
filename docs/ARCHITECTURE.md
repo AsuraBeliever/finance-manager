@@ -76,7 +76,7 @@ puente Tauri original), respuesta JSON o `{"error": "..."}` (400/401/404/500).
 | Transacciones | `add_income`, `add_expense`, `add_transfer` (los tres aceptan `clientId` opcional para idempotencia del outbox offline), `list_transactions`, `delete_transaction`, `list_transaction_categories`, `create_transaction_category` |
 | Dashboard | `get_dashboard_summary` (foto del momento: saldos, donas, inversiones) |
 | Analytics | `get_spending_trends`, `get_category_breakdown` — ambos aceptan `period` (`{kind}`: `currentMonth` \| `lastMonths{months}` \| `month{year,month}` \| `day{date}` \| `range{from,to}`); la ventana se resuelve en `finanzas-core::period` |
-| Inversiones | `list_investments`, `create_investment`, `update_investment`, `close_investment`, `delete_investment`, `get_investment_detail`, `add_snapshot`, `add_investment_movement`, `delete_investment_movement`, `list_calculators`, `get_investment_catalog` |
+| Inversiones | `list_investments`, `create_investment`, `update_investment`, `close_investment`, `delete_investment`, `get_investment_detail`, `add_snapshot`, `add_investment_movement`, `get_investment_movement` (por id o por su transacción), `update_investment_movement`, `delete_investment_movement`, `list_calculators`, `get_investment_catalog` |
 | Ajustes / mercado | `list_currencies`, `add_currency`, `get_exchange_rates`, `set_exchange_rate`, `fetch_exchange_rates`, `fetch_banxico_rate`, `refresh_market_data_cmd`, `get_setting`, `set_setting` |
 
 Datos de mercado: cron trigger diario (07:00 UTC ≈ 01:00 CDMX) refresca fx,

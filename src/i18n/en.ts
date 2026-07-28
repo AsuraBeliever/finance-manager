@@ -433,6 +433,8 @@ export const en: Dict = {
     emptyDescription: "Log your first income, expense or transfer.",
     deleteConfirmTitle: "Delete transaction",
     deleteConfirm: "Delete this transaction? If it's a transfer, both legs are removed.",
+    deleteInvestmentLegConfirm:
+      "This transfer is an investment move: deleting it also deletes the deposit or withdrawal on the investment. Continue?",
     apartadoEditTitle: "Edit pocket move",
     apartadoDeleteTitle: "Delete pocket move",
     apartadoDeleteConfirm:
@@ -502,10 +504,14 @@ export const en: Dict = {
     movementDate: "Date",
     movementWallet: "Wallet",
     movementWalletNone: "None (external movement)",
-    movementWalletDepositHint: "The money will leave this wallet as an expense.",
-    movementWalletWithdrawalHint: "The money will enter this wallet as income.",
+    movementWalletDepositHint:
+      "The money will leave this wallet as a transfer (it won't count as an expense).",
+    movementWalletWithdrawalHint:
+      "The money will enter this wallet as a transfer (it won't count as income).",
     movementDeleteConfirm: "Delete this movement?",
     movementDeleteTitle: "Delete movement",
+    movementEditTitle: "Edit movement",
+    movementKind: "Type",
     cryptoSymbol: "Cryptocurrency",
     cryptoQuantity: "Quantity",
     cryptoPrincipalHint: "What you spent buying it (MXN), to compute your return.",

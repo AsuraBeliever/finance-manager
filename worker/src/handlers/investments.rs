@@ -791,11 +791,16 @@ pub async fn add_investment_movement(
         return Ok(());
     };
 
-    // Wallet side: a deposit leaves the wallet (expense), a withdrawal returns to
-    // it (income), in the wallet's own currency. The transaction, the movement
-    // (linked to it) and the remembered default wallet all post in one batch so
-    // money never half-moves. last_insert_rowid() carries the just-inserted
-    // transaction id within the batch transaction.
+    // Wallet side: the money only changes place (wallet ↔ investment), it isn't
+    // earned or spent, so a deposit posts a 'transfer_out' and a withdrawal a
+    // 'transfer_in' on that wallet, in its own currency. Counting them as
+    // income/expense would inflate both totals every time the same money goes
+    // back and forth. The investment isn't a wallet, so this leg has no sibling:
+    // transfer_group_id stays NULL (the marker for an investment leg) and the
+    // link lives in investment_movements.linked_transaction_id. The transaction,
+    // the movement (linked to it) and the remembered default wallet all post in
+    // one batch so money never half-moves. last_insert_rowid() carries the
+    // just-inserted transaction id within the batch transaction.
     #[derive(Deserialize)]
     struct CurrencyRow {
         currency_code: String,
@@ -817,38 +822,22 @@ pub async fn add_investment_movement(
     )?;
 
     let (tx_kind, description) = if a.kind == "deposit" {
-        ("expense", format!("Aporte a {}", inv.name))
+        ("transfer_out", format!("Aporte a {}", inv.name))
     } else {
-        ("income", format!("Retiro de {}", inv.name))
+        ("transfer_in", format!("Retiro de {}", inv.name))
     };
 
-    // Both legs file under the seed 'Inversiones' category so neither is left
-    // uncategorized: a deposit posts an expense (seed 0033) and a withdrawal
-    // posts an income (seed 0034), each under the sibling of the matching kind.
-    // The lookup yields None if the seed is missing, which the column allows.
-    #[derive(Deserialize)]
-    struct CategoryIdRow {
-        id: i64,
-    }
-    let cat: Option<CategoryIdRow> = first(
-        db,
-        "SELECT id FROM transaction_categories
-         WHERE user_id IS NULL AND kind = ?1 AND name = 'Inversiones' LIMIT 1",
-        jsv![tx_kind],
-    )
-    .await?;
-    let category_id: Option<i64> = cat.map(|c| c.id);
-
+    // No category: transfers aren't income or expense, so they belong to no
+    // spending/earning category (the description names the investment).
     let mut stmts = vec![
         stmt(
             db,
-            "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO transactions (wallet_id, kind, amount_cents, description, occurred_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
             jsv![
                 wallet_id,
                 tx_kind,
                 wallet_amount,
-                category_id,
                 description,
                 a.occurred_at
             ],
@@ -871,6 +860,260 @@ pub async fn add_investment_movement(
             db,
             "UPDATE investments SET params_json = ?1 WHERE id = ?2 AND user_id = ?3",
             jsv![params, a.investment_id, uid],
+        )?);
+    }
+    batch(db, stmts).await?;
+    Ok(())
+}
+
+/// Everything an edit needs: the movement as it stands plus the investment it
+/// belongs to and (when it has a wallet leg) that leg's wallet.
+#[derive(Deserialize)]
+struct EditableMovementRow {
+    id: i64,
+    investment_id: i64,
+    investment_name: String,
+    kind: String,
+    amount_cents: i64,
+    occurred_at: String,
+    linked_transaction_id: Option<i64>,
+    wallet_id: Option<i64>,
+    calculator: String,
+    params_json: String,
+    currency_code: String,
+    start_date: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MovementDetail {
+    pub id: i64,
+    pub investment_id: i64,
+    pub investment_name: String,
+    pub kind: String,
+    pub amount_cents: i64,
+    pub occurred_at: String,
+    /// Wallet of the linked transfer leg, or None for an external movement.
+    pub wallet_id: Option<i64>,
+    pub currency_code: String,
+    pub start_date: String,
+}
+
+/// One movement with everything the editor needs, found either by its own id or
+/// by the id of the wallet transaction it's linked to (how the transactions list
+/// knows it: a transfer leg with no group is an investment leg).
+async fn editable_movement(
+    db: &D1Database,
+    uid: i64,
+    by_transaction: bool,
+    id: i64,
+) -> AppResult<EditableMovementRow> {
+    let key = if by_transaction {
+        "m.linked_transaction_id"
+    } else {
+        "m.id"
+    };
+    let row: Option<EditableMovementRow> = first(
+        db,
+        &format!(
+            "SELECT m.id, m.investment_id, i.name AS investment_name, m.kind, m.amount_cents,
+                    m.occurred_at, m.linked_transaction_id, t.wallet_id,
+                    i.calculator, i.params_json, i.currency_code, i.start_date
+             FROM investment_movements m
+             JOIN investments i ON i.id = m.investment_id AND i.user_id = ?2
+             LEFT JOIN transactions t ON t.id = m.linked_transaction_id
+             WHERE {key} = ?1"
+        ),
+        jsv![id, uid],
+    )
+    .await?;
+    row.ok_or(AppError::NotFound("movimiento"))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MovementLookupArgs {
+    /// The movement's own id (how the investment page knows it)…
+    #[serde(default)]
+    pub id: Option<i64>,
+    /// …or the id of its wallet transaction (how the transactions list does).
+    #[serde(default)]
+    pub transaction_id: Option<i64>,
+}
+
+pub async fn get_investment_movement(
+    db: &D1Database,
+    uid: i64,
+    a: MovementLookupArgs,
+) -> AppResult<MovementDetail> {
+    let m = match (a.id, a.transaction_id) {
+        (Some(id), _) => editable_movement(db, uid, false, id).await?,
+        (None, Some(tx_id)) => editable_movement(db, uid, true, tx_id).await?,
+        (None, None) => return Err(AppError::InvalidInput("falta el id".into())),
+    };
+    Ok(MovementDetail {
+        id: m.id,
+        investment_id: m.investment_id,
+        investment_name: m.investment_name,
+        kind: m.kind,
+        amount_cents: m.amount_cents,
+        occurred_at: m.occurred_at,
+        wallet_id: m.wallet_id,
+        currency_code: m.currency_code,
+        start_date: m.start_date,
+    })
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateMovementArgs {
+    pub id: i64,
+    pub kind: String,
+    pub amount_cents: i64,
+    pub occurred_at: String,
+    /// Same meaning as on the insert: Some = wallet leg (transfer), None =
+    /// external movement. Changing it adds, moves or drops that leg.
+    pub wallet_id: Option<i64>,
+}
+
+/// Edits a contribution/withdrawal after the fact (wrong amount, wrong date,
+/// wrong wallet, or deposit vs withdrawal mixed up). The movement and its wallet
+/// leg always change together, in one batch, so the investment and the wallet
+/// balance can never disagree. For exact-mode BONDDIA the old cash is unwound at
+/// the current NAV and the new amount converted back — the same round trip a
+/// delete + re-add would do.
+pub async fn update_investment_movement(
+    db: &D1Database,
+    uid: i64,
+    a: UpdateMovementArgs,
+) -> AppResult<()> {
+    if a.kind != "deposit" && a.kind != "withdrawal" {
+        return Err(AppError::InvalidInput("tipo de movimiento inválido".into()));
+    }
+    if a.amount_cents <= 0 {
+        return Err(AppError::InvalidInput("el monto debe ser positivo".into()));
+    }
+    let date = parse_date(&a.occurred_at, "movimiento")?;
+    let old = editable_movement(db, uid, false, a.id).await?;
+    let start = parse_date(&old.start_date, "inicio")?;
+    if date < start {
+        return Err(AppError::InvalidInput(
+            "el movimiento no puede ser anterior a la fecha de inicio".into(),
+        ));
+    }
+
+    // Exact-mode BONDDIA: undo the old cash, then apply the new one. Either step
+    // yields None when this isn't an exact-mode investment (nothing to convert).
+    let price_micros = if old.calculator == "bonddia" {
+        bonddia_price_micros(db).await?
+    } else {
+        None
+    };
+    let undo_cents = if old.kind == "withdrawal" {
+        old.amount_cents
+    } else {
+        -old.amount_cents
+    };
+    let redo_cents = if a.kind == "withdrawal" {
+        -a.amount_cents
+    } else {
+        a.amount_cents
+    };
+    let undone = exact_mode_params(&old.calculator, &old.params_json, price_micros, undo_cents);
+    let base = undone.as_deref().unwrap_or(&old.params_json);
+    let new_params = exact_mode_params(&old.calculator, base, price_micros, redo_cents).or(undone);
+
+    let mut stmts = vec![stmt(
+        db,
+        "UPDATE investment_movements SET kind = ?2, amount_cents = ?3, occurred_at = ?4
+         WHERE id = ?1",
+        jsv![a.id, a.kind, a.amount_cents, a.occurred_at],
+    )?];
+
+    if let Some(wallet_id) = a.wallet_id {
+        // Wallet leg: same shape as a new movement's — a deposit leaves the
+        // wallet, a withdrawal returns to it, converted to the wallet's currency.
+        #[derive(Deserialize)]
+        struct CurrencyRow {
+            currency_code: String,
+        }
+        let wallet: CurrencyRow = first(
+            db,
+            "SELECT currency_code FROM wallets WHERE id = ?1 AND user_id = ?2",
+            jsv![wallet_id, uid],
+        )
+        .await?
+        .ok_or(AppError::NotFound("cartera"))?;
+        let rates = super::dashboard::load_rates(db, uid).await?;
+        let wallet_amount = super::dashboard::convert(
+            a.amount_cents,
+            &old.currency_code,
+            &wallet.currency_code,
+            &rates,
+        )?;
+        let (tx_kind, description) = if a.kind == "deposit" {
+            ("transfer_out", format!("Aporte a {}", old.investment_name))
+        } else {
+            ("transfer_in", format!("Retiro de {}", old.investment_name))
+        };
+
+        match old.linked_transaction_id {
+            Some(tx_id) => stmts.push(stmt(
+                db,
+                "UPDATE transactions
+                 SET wallet_id = ?2, kind = ?3, amount_cents = ?4, description = ?5,
+                     occurred_at = ?6
+                 WHERE id = ?1",
+                jsv![
+                    tx_id,
+                    wallet_id,
+                    tx_kind,
+                    wallet_amount,
+                    description,
+                    a.occurred_at
+                ],
+            )?),
+            // It was an external movement: create the leg and link it.
+            None => {
+                stmts.push(stmt(
+                    db,
+                    "INSERT INTO transactions (wallet_id, kind, amount_cents, description, occurred_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    jsv![wallet_id, tx_kind, wallet_amount, description, a.occurred_at],
+                )?);
+                stmts.push(stmt(
+                    db,
+                    "UPDATE investment_movements SET linked_transaction_id = last_insert_rowid()
+                     WHERE id = ?1",
+                    jsv![a.id],
+                )?);
+            }
+        }
+        stmts.push(stmt(
+            db,
+            "UPDATE investments SET linked_wallet_id = ?1 WHERE id = ?2 AND user_id = ?3",
+            jsv![wallet_id, old.investment_id, uid],
+        )?);
+    } else if let Some(tx_id) = old.linked_transaction_id {
+        // Now external: drop the wallet leg. Unlink FIRST — the row's
+        // ON DELETE CASCADE would take the movement down with it otherwise.
+        stmts.push(stmt(
+            db,
+            "UPDATE investment_movements SET linked_transaction_id = NULL WHERE id = ?1",
+            jsv![a.id],
+        )?);
+        stmts.push(stmt(
+            db,
+            "DELETE FROM transactions WHERE id = ?1",
+            jsv![tx_id],
+        )?);
+    }
+
+    if let Some(params) = &new_params {
+        stmts.push(stmt(
+            db,
+            "UPDATE investments SET params_json = ?1 WHERE id = ?2 AND user_id = ?3",
+            jsv![params, old.investment_id, uid],
         )?);
     }
     batch(db, stmts).await?;

@@ -12,6 +12,7 @@ import type {
   InvestmentDetail,
   InvestmentProjection,
   InvestmentWithValue,
+  MovementDetail,
   Portfolio,
   SimCadence,
   SimulateInput,
@@ -434,6 +435,19 @@ export const addInvestmentMovement = (
     occurredAt,
     walletId,
   });
+
+export const updateInvestmentMovement = (input: {
+  id: number;
+  kind: "deposit" | "withdrawal";
+  amountCents: number;
+  occurredAt: string;
+  walletId: number | null;
+}) => rpc<void>("update_investment_movement", { ...input });
+
+/** One movement with everything the editor needs, by its own id or by the id of
+ *  its wallet transfer leg (all the transactions list knows about it). */
+export const getInvestmentMovement = (key: { id?: number; transactionId?: number }) =>
+  rpc<MovementDetail>("get_investment_movement", { ...key });
 
 export const deleteInvestmentMovement = (id: number) =>
   rpc<void>("delete_investment_movement", { id });
