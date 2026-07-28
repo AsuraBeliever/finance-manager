@@ -43,6 +43,13 @@ const kindMeta: Record<
 
 const apartadoKinds = new Set<Transaction["kind"]>(["reserve", "release"]);
 
+/** A transfer leg with no group is the wallet side of an investment deposit or
+ *  withdrawal (the investment isn't a wallet, so it has no sibling leg). It's
+ *  edited from the investment, not here — its amount has to stay in sync with
+ *  the movement. */
+const isInvestmentLeg = (t: Transaction) =>
+  (t.kind === "transfer_in" || t.kind === "transfer_out") && t.transferGroupId === null;
+
 interface TransactionListProps {
   transactions: Transaction[];
   /** Currency for amounts; falls back to MXN per row if not provided. */
@@ -121,6 +128,7 @@ export function TransactionList({
         const Icon = meta.icon;
         const currency = currencyByWallet?.get(t.walletId) ?? "MXN";
         const isApartado = apartadoKinds.has(t.kind);
+        const canEdit = !isApartado && onEdit && !isInvestmentLeg(t);
         return (
           <li key={t.id} className="group flex items-center gap-3 px-4 py-3">
             <span
@@ -159,7 +167,7 @@ export function TransactionList({
             {/* Fixed-width action slot so amounts line up whether a row has 0, 1
                 or 2 buttons. */}
             <div className="flex w-16 shrink-0 items-center justify-end gap-1">
-              {(isApartado || onEdit) && (
+              {(isApartado || canEdit) && (
                 <button
                   onClick={() => (isApartado ? openApartadoEdit(t) : onEdit?.(t))}
                   aria-label={es.common.edit}
@@ -183,7 +191,16 @@ export function TransactionList({
     <ConfirmDialog
       open={toDelete !== null}
       title={es.transactions.deleteConfirmTitle}
-      message={es.transactions.deleteConfirm}
+      message={
+        // Deleting the wallet leg of an investment move also removes the
+        // contribution/withdrawal itself (they're one operation).
+        (() => {
+          const pending = transactions.find((t) => t.id === toDelete);
+          return pending && isInvestmentLeg(pending)
+            ? es.transactions.deleteInvestmentLegConfirm
+            : es.transactions.deleteConfirm;
+        })()
+      }
       onConfirm={() => {
         if (toDelete !== null) remove.mutate(toDelete);
       }}

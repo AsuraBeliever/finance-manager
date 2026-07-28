@@ -791,11 +791,16 @@ pub async fn add_investment_movement(
         return Ok(());
     };
 
-    // Wallet side: a deposit leaves the wallet (expense), a withdrawal returns to
-    // it (income), in the wallet's own currency. The transaction, the movement
-    // (linked to it) and the remembered default wallet all post in one batch so
-    // money never half-moves. last_insert_rowid() carries the just-inserted
-    // transaction id within the batch transaction.
+    // Wallet side: the money only changes place (wallet ↔ investment), it isn't
+    // earned or spent, so a deposit posts a 'transfer_out' and a withdrawal a
+    // 'transfer_in' on that wallet, in its own currency. Counting them as
+    // income/expense would inflate both totals every time the same money goes
+    // back and forth. The investment isn't a wallet, so this leg has no sibling:
+    // transfer_group_id stays NULL (the marker for an investment leg) and the
+    // link lives in investment_movements.linked_transaction_id. The transaction,
+    // the movement (linked to it) and the remembered default wallet all post in
+    // one batch so money never half-moves. last_insert_rowid() carries the
+    // just-inserted transaction id within the batch transaction.
     #[derive(Deserialize)]
     struct CurrencyRow {
         currency_code: String,
@@ -817,38 +822,22 @@ pub async fn add_investment_movement(
     )?;
 
     let (tx_kind, description) = if a.kind == "deposit" {
-        ("expense", format!("Aporte a {}", inv.name))
+        ("transfer_out", format!("Aporte a {}", inv.name))
     } else {
-        ("income", format!("Retiro de {}", inv.name))
+        ("transfer_in", format!("Retiro de {}", inv.name))
     };
 
-    // Both legs file under the seed 'Inversiones' category so neither is left
-    // uncategorized: a deposit posts an expense (seed 0033) and a withdrawal
-    // posts an income (seed 0034), each under the sibling of the matching kind.
-    // The lookup yields None if the seed is missing, which the column allows.
-    #[derive(Deserialize)]
-    struct CategoryIdRow {
-        id: i64,
-    }
-    let cat: Option<CategoryIdRow> = first(
-        db,
-        "SELECT id FROM transaction_categories
-         WHERE user_id IS NULL AND kind = ?1 AND name = 'Inversiones' LIMIT 1",
-        jsv![tx_kind],
-    )
-    .await?;
-    let category_id: Option<i64> = cat.map(|c| c.id);
-
+    // No category: transfers aren't income or expense, so they belong to no
+    // spending/earning category (the description names the investment).
     let mut stmts = vec![
         stmt(
             db,
-            "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO transactions (wallet_id, kind, amount_cents, description, occurred_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
             jsv![
                 wallet_id,
                 tx_kind,
                 wallet_amount,
-                category_id,
                 description,
                 a.occurred_at
             ],
