@@ -19,6 +19,7 @@ import {
   deleteTransaction,
   updateGoalContribution,
 } from "../../lib/api";
+import { MovementEditModal } from "../investments/MovementEditModal";
 import { formatCents, parseToCents } from "../../lib/money";
 import { transactionTime } from "../../lib/date";
 import { useTimezone } from "../../lib/timezone";
@@ -44,9 +45,9 @@ const kindMeta: Record<
 const apartadoKinds = new Set<Transaction["kind"]>(["reserve", "release"]);
 
 /** A transfer leg with no group is the wallet side of an investment deposit or
- *  withdrawal (the investment isn't a wallet, so it has no sibling leg). It's
- *  edited from the investment, not here — its amount has to stay in sync with
- *  the movement. */
+ *  withdrawal (the investment isn't a wallet, so it has no sibling leg). It gets
+ *  its own editor: amount and date have to move on the investment too, so the
+ *  ordinary transfer form can't handle it. */
 const isInvestmentLeg = (t: Transaction) =>
   (t.kind === "transfer_in" || t.kind === "transfer_out") && t.transferGroupId === null;
 
@@ -74,6 +75,8 @@ export function TransactionList({
   // or deleting them adjusts the goal's earmark, so they get their own flow.
   const [apartadoToDelete, setApartadoToDelete] = useState<Transaction | null>(null);
   const [apartadoToEdit, setApartadoToEdit] = useState<Transaction | null>(null);
+  // Investment legs open the movement editor, keyed by the transaction id.
+  const [movementTxToEdit, setMovementTxToEdit] = useState<number | null>(null);
   const [editAmount, setEditAmount] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
@@ -128,7 +131,10 @@ export function TransactionList({
         const Icon = meta.icon;
         const currency = currencyByWallet?.get(t.walletId) ?? "MXN";
         const isApartado = apartadoKinds.has(t.kind);
-        const canEdit = !isApartado && onEdit && !isInvestmentLeg(t);
+        const isInvestment = isInvestmentLeg(t);
+        // Investment legs always offer their own editor, even where the page
+        // passes no onEdit — a wrong amount has to be fixable from here too.
+        const canEdit = isApartado || isInvestment || onEdit !== undefined;
         return (
           <li key={t.id} className="group flex items-center gap-3 px-4 py-3">
             <span
@@ -167,9 +173,15 @@ export function TransactionList({
             {/* Fixed-width action slot so amounts line up whether a row has 0, 1
                 or 2 buttons. */}
             <div className="flex w-16 shrink-0 items-center justify-end gap-1">
-              {(isApartado || canEdit) && (
+              {canEdit && (
                 <button
-                  onClick={() => (isApartado ? openApartadoEdit(t) : onEdit?.(t))}
+                  onClick={() =>
+                    isApartado
+                      ? openApartadoEdit(t)
+                      : isInvestment
+                        ? setMovementTxToEdit(t.id)
+                        : onEdit?.(t)
+                  }
                   aria-label={es.common.edit}
                   className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-surface-overlay hover:text-fg"
                 >
@@ -214,6 +226,11 @@ export function TransactionList({
         if (apartadoToDelete !== null) removeApartado.mutate(apartadoToDelete);
       }}
       onClose={() => setApartadoToDelete(null)}
+    />
+    <MovementEditModal
+      open={movementTxToEdit !== null}
+      onClose={() => setMovementTxToEdit(null)}
+      transactionId={movementTxToEdit ?? undefined}
     />
     <Modal
       title={es.transactions.apartadoEditTitle}

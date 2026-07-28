@@ -519,6 +519,8 @@ export const esDict = {
       "El dinero entrará a esta cartera como transferencia (no cuenta como ingreso).",
     movementDeleteConfirm: "¿Eliminar este movimiento?",
     movementDeleteTitle: "Eliminar movimiento",
+    movementEditTitle: "Editar movimiento",
+    movementKind: "Tipo",
     cryptoSymbol: "Criptomoneda",
     cryptoQuantity: "Cantidad",
     cryptoPrincipalHint: "Lo que has gastado en comprarla (MXN), para calcular tu rendimiento.",

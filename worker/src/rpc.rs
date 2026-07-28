@@ -184,6 +184,12 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "add_investment_movement" => {
             out(investments::add_investment_movement(db, uid, args(body)?).await?)
         }
+        "update_investment_movement" => {
+            out(investments::update_investment_movement(db, uid, args(body)?).await?)
+        }
+        "get_investment_movement" => {
+            out(investments::get_investment_movement(db, uid, args(body)?).await?)
+        }
         "delete_investment_movement" => {
             out(investments::delete_investment_movement(db, uid, args(body)?).await?)
         }

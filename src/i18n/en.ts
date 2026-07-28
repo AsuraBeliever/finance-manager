@@ -510,6 +510,8 @@ export const en: Dict = {
       "The money will enter this wallet as a transfer (it won't count as income).",
     movementDeleteConfirm: "Delete this movement?",
     movementDeleteTitle: "Delete movement",
+    movementEditTitle: "Edit movement",
+    movementKind: "Type",
     cryptoSymbol: "Cryptocurrency",
     cryptoQuantity: "Quantity",
     cryptoPrincipalHint: "What you spent buying it (MXN), to compute your return.",
