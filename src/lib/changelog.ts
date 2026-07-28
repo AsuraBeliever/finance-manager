@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.28.0",
+    date: "2026-07-28",
+    es: [
+      "Aportar o retirar en una inversión ya no cuenta como gasto ni como ingreso: ahora se registra como transferencia entre tu cartera y la inversión, que es lo que realmente pasa (el dinero solo cambia de lugar). Así, aunque muevas el mismo dinero muchas veces, tus totales de ingresos y gastos, tus presupuestos y tus gráficas dejan de inflarse.",
+      "Tus aportes y retiros anteriores se reclasificaron solos a transferencia; los saldos de tus carteras no cambian.",
+      "Ya puedes corregir una aportación o un retiro ya registrado (monto, fecha, cartera, o si era aporte y no retiro), tanto desde la inversión como desde el historial de transacciones. La inversión y el movimiento de la cartera se corrigen juntos, así que nunca quedan en desacuerdo.",
+    ],
+    en: [
+      "Depositing into or withdrawing from an investment no longer counts as an expense or income: it's now recorded as a transfer between your wallet and the investment, which is what actually happens (the money just changes place). So even if you move the same money many times, your income and expense totals, budgets and charts stop being inflated.",
+      "Your previous deposits and withdrawals were reclassified as transfers automatically; your wallet balances are unchanged.",
+      "You can now fix a recorded deposit or withdrawal (amount, date, wallet, or deposit vs withdrawal), both from the investment and from the transactions history. The investment and the wallet move are corrected together, so they never disagree.",
+    ],
+  },
+  {
     version: "2.27.2",
     date: "2026-07-24",
     es: [
