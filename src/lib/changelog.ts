@@ -12,6 +12,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.28.1",
+    date: "2026-07-28",
+    es: [
+      "El valor de tu inversión de cetesdirecto (BONDDIA) ya no se queda un día atrás. La página oficial publica el precio del fondo durante la mañana, y la app lo consultaba a la 1 de la madrugada, cuando todavía estaba el del día anterior: por eso tu saldo aparecía un día de rendimiento abajo del que ves en cetesdirecto. Ahora el precio se consulta también a las 9 de la mañana y a las 2 de la tarde. Si abres la app de madrugada todavía verás el valor del día anterior, igual que en cetesdirecto antes de que publique.",
+    ],
+    en: [
+      "Your cetesdirecto (BONDDIA) investment value no longer lags a day behind. The official page publishes the fund price during the morning, and the app was reading it at 1 AM, when it still showed the previous day's: that left your balance one day of yield below what cetesdirecto shows. The price is now also fetched at 9 AM and 2 PM. Opening the app overnight still shows the previous day's value, just like cetesdirecto before it publishes.",
+    ],
+  },
+  {
     version: "2.28.0",
     date: "2026-07-28",
     es: [

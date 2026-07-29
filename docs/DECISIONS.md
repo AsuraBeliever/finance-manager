@@ -89,7 +89,7 @@ El usuario quiere ver la app en su iPhone «cuando y donde quiera» con sistema 
 - **D1 no tiene BEGIN/COMMIT interactivo**: toda escritura multi-statement (transferencias de 2 filas, borrado de cartera en cascada) usa `db.batch()`, que sí es transaccional/atómico.
 - **Multiusuario real con código de invitación**: `users` + `user_id` en wallets/investments/transaction_categories (NULL = seed del sistema); transactions/snapshots/movements se escopan por JOIN al padre. `settings` pasa a PK `(user_id, key)`; el usuario sistema (id 0) guarda cachés globales como `bonddia_price`. El registro exige el secret `INVITE_CODE` para que una URL pública no acumule cuentas ajenas.
 - **Contraseñas con PBKDF2-SHA256 vía SubtleCrypto nativo** (no crate Rust puro: quemaría los 10ms de CPU del free tier; workerd además limita PBKDF2 a 100k iteraciones). Formato PHC con iteraciones por hash, tunables sin invalidar hashes. Sesiones: cookie HttpOnly/Secure/SameSite=Lax; D1 guarda solo el SHA-256 del token; expiración deslizante de 30 días; check de Origin en mutaciones.
-- **Refresco de mercado por cron trigger diario** (07:00 UTC ≈ 01:00 CDMX) en lugar del fetch al arrancar; mismos proveedores, fallos silenciosos (`wrangler tail` los muestra).
+- **Refresco de mercado por cron trigger** (07:00 UTC ≈ 01:00 CDMX) en lugar del fetch al arrancar; mismos proveedores, fallos silenciosos (`wrangler tail` los muestra). Desde 2.28.1 corre además a las 15:00 y 20:00 UTC — ver la entrada de 2026-07-28.
 - **El escritorio queda como shell**: la ventana Tauri carga la URL desplegada; `finanzas.db` local se migró una sola vez (scripts/migrate_to_d1.py, checksums verificados) y se conserva como respaldo de solo lectura.
 
 ## 2026-06-12 — Cuenta: dispositivos con sesión y cambio de contraseña
@@ -115,3 +115,23 @@ Bug encontrado al integrar Google: tras el redirect de OAuth la app caía en log
 ## 2026-07-01 — Tarjetas de crédito: deuda = saldo negativo, MSI como cargos del cron
 
 El usuario pidió tarjetas de crédito «útiles» (no usa tarjetas, así que la mecánica MX se diseñó aquí: corte, ~20 días para pagar sin intereses, pago mínimo vs saldo al corte, utilización, MSI). Decisiones: (1) **sin tipo nuevo de cartera** — `credit_cut_day` es el discriminador; los gastos vuelven el saldo negativo (deuda = −saldo) y pagar la tarjeta es una transferencia normal, así el modelo de saldos calculados no cambia. (2) **Todo lo derivado es puro** en `finanzas-core::credit` (cortes con clamp a fin de mes, fecha límite, calendario MSI) y `get_credit_card_summary` solo ensambla. (3) **MSI no es una transacción**: el cron diario postea un gasto por mensualidad en cada corte (`client_id = msi:<plan>:<n>`, mismo esquema idempotente que wallet_yield; categoría reservada «Meses sin intereses» como la de Metas), de modo que la deuda refleja lo facturado —igual que el estado de cuenta— y lo no facturado resta crédito disponible y suma a la utilización, que es como lo miden los bancos. Al crear un plan con fecha pasada, las mensualidades ya vencidas se postean de inmediato. Verificado E2E local (números a mano + capturas claro/oscuro).
+
+## 2026-07-28 — BONDDIA: el precio del día llega tarde (cron 3× al día)
+
+El usuario reportó desfase otra vez: su app de cetesdirecto marcaba $9,877.07 y
+Finanzas $9,875.65 ($1.42 abajo ≈ exactamente un día de rendimiento). No era la
+conversión a títulos (4200 títulos + $1.75 de remanentes eran correctos): era el
+**NAV cacheado**. La página oficial (`bonddia.html`) publica «Precio día
+anterior» junto con la fecha del día en curso, y a la 01:00 CDMX —cuando corría
+el único cron— todavía muestra la fecha y el precio del día previo. Es decir,
+`titulos × NAV` valuaba siempre con el NAV de ayer y la app quedaba un día de
+rendimiento atrás, todos los días. Verificado contra la página del 28 Julio 2026
+(2.351269): 4200 × 2.351269 + 1.75 = $9,877.07, el número exacto del app.
+
+Descartado: acumular el rendimiento entre refrescos (aproximar con la tasa
+introduce su propia deriva y el objetivo es paridad exacta con cetesdirecto).
+Elegido: **más corridas del mismo cron idempotente** — 07:00 (fx/tasas temprano),
+15:00 y 20:00 UTC (09:00 y 14:00 CDMX) para alcanzar la página ya volteada, con
+una segunda pasada por si publica tarde. Límite del free plan: 5 crons por cuenta.
+Residuo conocido: entre 00:00 y ~09:00 CDMX la posición todavía muestra el valor
+del día anterior (igual que ver el estado de cuenta antes de que abra el fondo).
