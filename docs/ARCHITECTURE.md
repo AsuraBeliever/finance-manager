@@ -79,9 +79,13 @@ puente Tauri original), respuesta JSON o `{"error": "..."}` (400/401/404/500).
 | Inversiones | `list_investments`, `create_investment`, `update_investment`, `close_investment`, `delete_investment`, `get_investment_detail`, `add_snapshot`, `add_investment_movement`, `get_investment_movement` (por id o por su transacción), `update_investment_movement`, `delete_investment_movement`, `list_calculators`, `get_investment_catalog` |
 | Ajustes / mercado | `list_currencies`, `add_currency`, `get_exchange_rates`, `set_exchange_rate`, `fetch_exchange_rates`, `fetch_banxico_rate`, `refresh_market_data_cmd`, `get_setting`, `set_setting` |
 
-Datos de mercado: cron trigger diario (07:00 UTC ≈ 01:00 CDMX) refresca fx,
-historial de tasa objetivo, precio BONDDIA y precios cripto; también borra
-sesiones expiradas. Fallos silenciosos, visibles con `wrangler tail`.
+Datos de mercado: cron trigger 3× al día (07:00, 15:00 y 20:00 UTC = 01:00,
+09:00 y 14:00 CDMX) refresca fx, historial de tasa objetivo, precio BONDDIA y
+precios cripto; también borra sesiones expiradas. Fallos silenciosos, visibles
+con `wrangler tail`. Las corridas tardías existen por BONDDIA: a la 01:00 la
+página de cetesdirecto todavía muestra la fecha (y el «precio día anterior») del
+día previo, así que con una sola corrida la posición en títulos iba siempre un
+día de rendimiento atrás del app de cetesdirecto.
 
 ## Offline (PWA)
 

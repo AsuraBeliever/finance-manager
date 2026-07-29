@@ -28,8 +28,15 @@ database_id = "989837f1-f89f-4518-983e-616b08da9c02"
 migrations_dir = "migrations"
 
 [triggers]
-# Daily market-data refresh. Cron is UTC: 07:00 UTC ≈ 01:00 Mexico City.
-crons = ["0 7 * * *"]
+# Market-data refresh. Cron is UTC; Mexico City is UTC-6 year-round.
+#   07:00 UTC = 01:00 CDMX — fx + rate history, early so the day starts fresh.
+#   15:00 UTC = 09:00 CDMX — cetesdirecto's BONDDIA page still shows YESTERDAY's
+#   20:00 UTC = 14:00 CDMX   date at 01:00, so the 01:00 run always cached a NAV
+#                            one day old and the position read ~a day of yield
+#                            behind the cetesdirecto app. Two later passes catch
+#                            the page once it flips (a second one in case it
+#                            publishes late); the refresh is idempotent.
+crons = ["0 7 * * *", "0 15 * * *", "0 20 * * *"]
 
 [vars]
 # Secrets (GOOGLE_CLIENT_SECRET) via `wrangler secret put`. Registration is open
