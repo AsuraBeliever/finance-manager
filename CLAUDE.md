@@ -17,6 +17,9 @@ cargo clippy --workspace && cargo fmt --all
 # desarrollo local (app completa en http://localhost:8787)
 cd worker && npx wrangler d1 migrations apply finanzas --local
 cd worker && npx wrangler dev                # requiere npm run build previo; INVITE_CODE en worker/.dev.vars
+                                             # wrangler está clavado a 4.60.0 en package.json: en 4.118.0
+                                             # el dev local se arrastra (dashboard 8-16s) y workerd se muere
+                                             # al cargar la app. No subir la versión sin probar esto.
 npm run dev                                  # (opcional) Vite con HMR; /api se proxea a :8787
 
 # producción
