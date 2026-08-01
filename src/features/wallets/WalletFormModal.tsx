@@ -551,6 +551,9 @@ export function WalletFormModal({
                     value={yieldFrequency}
                     onChange={(e) => setYieldFrequency(e.target.value)}
                   >
+                    {/* Daily first: it's what the Nu cajitas do, and the
+                        cadence people reach for most. */}
+                    <option value="daily">{es.wallets.yieldDaily}</option>
                     <option value="weekly">{es.wallets.yieldWeekly}</option>
                     <option value="biweekly">{es.wallets.yieldBiweekly}</option>
                     <option value="monthly">{es.wallets.yieldMonthly}</option>

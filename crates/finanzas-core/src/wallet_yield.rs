@@ -9,8 +9,9 @@
 
 use chrono::{Duration, Months, NaiveDate};
 
-/// The payout cadences a yield-bearing wallet can use.
-pub const FREQUENCIES: &[&str] = &["weekly", "biweekly", "monthly"];
+/// The payout cadences a yield-bearing wallet can use. 'daily' is what the Nu
+/// cajitas do: the interest earned each day is credited that same day.
+pub const FREQUENCIES: &[&str] = &["daily", "weekly", "biweekly", "monthly"];
 
 /// True when `frequency` is one we know how to schedule.
 pub fn is_valid_frequency(frequency: &str) -> bool {
@@ -22,6 +23,7 @@ pub fn is_valid_frequency(frequency: &str) -> bool {
 /// only sets where the very first period starts.
 pub fn next_period_end(frequency: &str, last_paid: NaiveDate) -> Option<NaiveDate> {
     match frequency {
+        "daily" => Some(last_paid + Duration::days(1)),
         "weekly" => Some(last_paid + Duration::days(7)),
         "biweekly" => Some(last_paid + Duration::days(14)),
         "monthly" => last_paid.checked_add_months(Months::new(1)),
@@ -154,6 +156,10 @@ mod tests {
     #[test]
     fn period_schedule_advances_per_cadence() {
         assert_eq!(
+            next_period_end("daily", d("2026-01-01")),
+            Some(d("2026-01-02"))
+        );
+        assert_eq!(
             next_period_end("weekly", d("2026-01-01")),
             Some(d("2026-01-08"))
         );
@@ -165,6 +171,29 @@ mod tests {
             next_period_end("monthly", d("2026-01-31")),
             Some(d("2026-02-28"))
         );
-        assert_eq!(next_period_end("daily", d("2026-01-01")), None);
+        assert_eq!(next_period_end("yearly", d("2026-01-01")), None);
+    }
+
+    #[test]
+    fn daily_payout_matches_a_week_of_daily_ones() {
+        // A Nu cajita pays what it earned each day, that same day. Paying
+        // day by day must total the same as one weekly payout over the same
+        // stretch: both compound on the balance already credited.
+        // $10,000.00 at 3%: 82.19¢/day → 82¢ the first day, and the payout
+        // makes the next day's base a little bigger each time.
+        let mut balance = 1_000_000;
+        let mut day = d("2026-01-01");
+        let mut total = 0;
+        for _ in 0..7 {
+            let paid = accrued_interest(balance, &[], day, day + Duration::days(1), 300);
+            total += paid;
+            balance += paid;
+            day += Duration::days(1);
+        }
+        assert_eq!(total, 574);
+        assert_eq!(
+            total,
+            accrued_interest(1_000_000, &[], d("2026-01-01"), d("2026-01-08"), 300)
+        );
     }
 }

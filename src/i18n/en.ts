@@ -265,6 +265,7 @@ export const en: Dict = {
       "For accounts that grow on their own (Klar, Nu, Mercado Pago…). The app posts the interest automatically; it stays a wallet, not an investment.",
     yieldRate: "Annual rate",
     yieldFrequency: "Payout",
+    yieldDaily: "Daily",
     yieldWeekly: "Weekly",
     yieldBiweekly: "Biweekly",
     yieldMonthly: "Monthly",

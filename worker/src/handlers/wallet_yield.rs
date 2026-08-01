@@ -137,7 +137,8 @@ async fn accrue_one(
         NaiveDate::parse_from_str(&w.yield_last_paid_date, "%Y-%m-%d").unwrap_or(today);
 
     // Cap the catch-up so a long-dormant wallet can't run unbounded if a cron
-    // run was missed for a while; weekly over a year is still only ~53 periods.
+    // run was missed for a while; weekly over a year is still only ~53 periods,
+    // and a daily one caps at 400 days per run — the next run picks up the rest.
     for _ in 0..400 {
         let Some(period_end) = next_period_end(&w.yield_frequency, last_paid) else {
             break;
