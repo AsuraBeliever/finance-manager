@@ -525,10 +525,19 @@ pub async fn list_transactions(
     args: ListTransactionsArgs,
 ) -> AppResult<Vec<Transaction>> {
     let f = args.filter;
+    // Column 13 is the sort key, never read by the client: the time the row is
+    // SHOWN with. Rows written by flows that don't ask for a time (goal moves,
+    // investment legs) have occurred_time NULL and the list shows their
+    // created_at instead — sorting on the raw NULL sank them below movements
+    // recorded hours earlier. Falling back to created_at here puts every row
+    // where its own visible time says it belongs. created_at is UTC; -6h is
+    // CDMX wall clock, the same fixed offset the rest of the backend assumes.
     let mut sql = String::from(
         "SELECT t.id, t.wallet_id, w.name AS wallet_name, t.kind, t.amount_cents,
                 t.category_id, tc.name AS category_name, t.transfer_group_id,
-                t.description, t.occurred_at, t.occurred_time, t.created_at
+                t.description, t.occurred_at, t.occurred_time, t.created_at,
+                COALESCE(t.occurred_time,
+                         strftime('%H:%M', datetime(t.created_at, '-6 hours')))
          FROM transactions t
          JOIN wallets w ON w.id = t.wallet_id
          LEFT JOIN transaction_categories tc ON tc.id = t.category_id
@@ -570,7 +579,8 @@ pub async fn list_transactions(
             " UNION ALL
              SELECT -gc.id, g.linked_wallet_id, w2.name,
                     CASE WHEN gc.amount_cents >= 0 THEN 'reserve' ELSE 'release' END,
-                    ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, NULL, gc.created_at
+                    ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, NULL, gc.created_at,
+                    strftime('%H:%M', datetime(gc.created_at, '-6 hours'))
              FROM goal_contributions gc
              JOIN savings_goals g ON g.id = gc.goal_id
              JOIN wallets w2 ON w2.id = g.linked_wallet_id
@@ -591,11 +601,14 @@ pub async fn list_transactions(
         }
     }
 
-    // Order by column position (occurred_at = 10, occurred_time = 11, id = 1):
-    // names are ambiguous across a compound UNION in SQLite, positions are not.
-    // Within a day, timed rows sort by time; NULL times (legacy/apartado) sort
-    // last (SQLite ranks NULL below any value, so it trails in DESC).
-    sql.push_str(" ORDER BY 10 DESC, 11 DESC, 1 DESC LIMIT ? OFFSET ?");
+    // Order by column position (occurred_at = 10, shown-time = 13,
+    // created_at = 12, id = 1): names are ambiguous across a compound UNION in
+    // SQLite, positions are not. Within a day rows sort by the time the list
+    // shows for them; a row with no time anywhere (created_at missing) still
+    // trails, as NULL ranks last here. created_at breaks ties inside the same
+    // minute — the id can't: apartado rows carry a negated one, so ordering by
+    // it would flip them against every other row.
+    sql.push_str(" ORDER BY 10 DESC, 13 DESC, 12 DESC, 1 DESC LIMIT ? OFFSET ?");
     params.push(f.limit.unwrap_or(100).to_js());
     params.push(f.offset.unwrap_or(0).to_js());
 

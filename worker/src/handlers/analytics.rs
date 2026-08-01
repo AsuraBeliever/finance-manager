@@ -172,7 +172,10 @@ pub async fn get_category_transactions(
          WHERE w.user_id = ?1 AND t.kind = ?2
            AND t.occurred_at >= ?3 AND t.occurred_at < ?4
            AND {cat_clause}
-         ORDER BY t.occurred_at DESC, t.occurred_time DESC, t.id DESC"
+         ORDER BY t.occurred_at DESC,
+                  COALESCE(t.occurred_time,
+                           strftime('%H:%M', datetime(t.created_at, '-6 hours'))) DESC,
+                  t.id DESC"
     );
     let rows: Vec<CatTxRow> = all(db, &sql, params).await?;
     Ok(rows

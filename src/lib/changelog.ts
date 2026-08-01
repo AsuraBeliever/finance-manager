@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.29.0",
+    date: "2026-08-01",
+    es: [
+      "Una transferencia ya se ve como un solo movimiento. Antes salía en dos renglones (uno con el dinero saliendo y otro con el dinero entrando), como si fueran dos cosas distintas. Ahora es una sola línea que dice de dónde a dónde fue («A → Ahorros») y el monto una vez, sin signo: el dinero no salió, se movió. Dentro de una cartera sigue apareciendo con su signo, porque ahí sí salió de esa cuenta.",
+      "Al transferir, los apartados de la cartera de la que sale el dinero ahora encabezan la lista de destinos, en su propio grupo. Antes estaban revueltos entre todas las demás carteras y había que buscarlos. Si el origen es un apartado, arriba te salen su cartera y los apartados hermanos.",
+      "El historial ya se ordena por la hora que muestra. Los apartados de metas y los movimientos de inversión se guardan sin hora propia, y eso los mandaba hasta abajo del día: veías un movimiento de las 5:25 debajo de uno de las 5:13. Ahora todo el día queda en orden, de lo más reciente a lo más viejo.",
+    ],
+    en: [
+      "A transfer now reads as one movement. It used to take two rows (one for the money leaving, one for it arriving), as if they were two different things. It's now a single line naming where it went from and to (\"A → Savings\") with the amount once, unsigned: the money didn't leave, it moved. Inside a wallet it still shows its sign, because there it did leave that account.",
+      "When transferring, the pockets of the wallet the money comes from now lead the destination list, in their own group. They used to be mixed in with every other wallet, so you had to hunt for them. If the source is a pocket, its wallet and sibling pockets come first instead.",
+      "History now sorts by the time it shows. Goal pockets and investment moves are saved without a time of their own, and that sank them to the bottom of the day: you'd see a 5:25 movement below a 5:13 one. The whole day now reads newest to oldest.",
+    ],
+  },
+  {
     version: "2.28.2",
     date: "2026-08-01",
     es: [
