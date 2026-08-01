@@ -90,6 +90,9 @@ export function TransactionFormModal({
 
   useEffect(() => {
     if (!open) return;
+    // A wallet created moments ago (an apartado, typically) must be pickable
+    // here: the persisted cache can still be showing the list without it.
+    queryClient.refetchQueries({ queryKey: ["wallets"] });
     setError(null);
     setToWalletId(null);
     setAmountToText("");
@@ -138,6 +141,16 @@ export function TransactionFormModal({
   const walletList = wallets.data ?? [];
   const fromWallet = walletList.find((w) => w.id === (walletId ?? walletList[0]?.id));
   const toWallet = walletList.find((w) => w.id === (toWalletId ?? undefined));
+  // An apartado reads as "NU › Ahorros": a pocket and the wallet next to it in
+  // the list are otherwise easy to mix up, and picking the wrong one sends real
+  // money somewhere else.
+  const walletLabel = (w: (typeof walletList)[number]) => {
+    const parent =
+      w.parentWalletId != null
+        ? walletList.find((p) => p.id === w.parentWalletId)?.name
+        : undefined;
+    return `${parent ? `${parent} › ` : ""}${w.name} (${w.currencyCode})`;
+  };
   const crossCurrency =
     tab === "transfer" &&
     fromWallet &&
@@ -162,8 +175,7 @@ export function TransactionFormModal({
 
   // Transferring INTO a configured credit card is paying it: show how the
   // statement stands so the user knows how much clears it interest-free.
-  const effectiveToId =
-    toWalletId ?? walletList.find((w) => w.id !== (walletId ?? walletList[0]?.id))?.id;
+  const effectiveToId = toWalletId ?? undefined;
   const effectiveToWallet = walletList.find((w) => w.id === effectiveToId);
   const payingCard =
     !isEdit && tab === "transfer" && effectiveToWallet?.creditCutDay != null;
@@ -189,8 +201,10 @@ export function TransactionFormModal({
       };
       // Edits go straight to the server (online-only, like delete); no outbox.
       if (transaction && tab === "transfer") {
-        const toId = toWalletId ?? walletList.find((w) => w.id !== wid)?.id;
-        if (toId === undefined) throw new Error(es.transactions.toWallet);
+        // Never guess a destination: money that lands in the wrong wallet looks
+        // like it vanished. The user has to say where it goes.
+        const toId = toWalletId ?? undefined;
+        if (toId === undefined) throw new Error(es.transactions.pickToWallet);
         const toCents = crossCurrency ? parseToCents(amountToText) : cents;
         if (toCents === null || toCents <= 0)
           throw new Error(es.transactions.invalidAmount);
@@ -227,8 +241,9 @@ export function TransactionFormModal({
       if (tab === "income") return submitOrQueue("add_income", common);
       if (tab === "expense") return submitOrQueue("add_expense", common);
 
-      const toId = toWalletId ?? walletList.find((w) => w.id !== wid)?.id;
-      if (toId === undefined) throw new Error(es.transactions.toWallet);
+      const toId = toWalletId ?? undefined;
+      if (toId === undefined) throw new Error(es.transactions.pickToWallet);
+      if (toId === wid) throw new Error(es.transactions.pickToWallet);
       const toCents = crossCurrency ? parseToCents(amountToText) : cents;
       if (toCents === null || toCents <= 0)
         throw new Error(es.transactions.invalidAmount);
@@ -357,7 +372,7 @@ export function TransactionFormModal({
           >
             {walletList.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.name} ({w.currencyCode})
+                {walletLabel(w)}
               </option>
             ))}
           </select>
@@ -367,14 +382,19 @@ export function TransactionFormModal({
           <Field label={es.transactions.toWallet}>
             <select
               className={inputClass}
-              value={toWalletId ?? walletList.find((w) => w.id !== (walletId ?? walletList[0]?.id))?.id ?? ""}
-              onChange={(e) => setToWalletId(Number(e.target.value))}
+              value={toWalletId ?? ""}
+              onChange={(e) =>
+                setToWalletId(e.target.value === "" ? null : Number(e.target.value))
+              }
             >
+              {/* Starts empty on purpose: a pre-picked destination is a wrong
+                  destination waiting to happen. */}
+              <option value="">{es.transactions.pickToWalletHint}</option>
               {walletList
                 .filter((w) => w.id !== (walletId ?? walletList[0]?.id))
                 .map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.name} ({w.currencyCode})
+                    {walletLabel(w)}
                   </option>
                 ))}
             </select>
@@ -500,7 +520,8 @@ export function TransactionFormModal({
             disabled={
               mutation.isPending ||
               walletList.length === 0 ||
-              (isTransferEdit && !transferDetail.data)
+              (isTransferEdit && !transferDetail.data) ||
+              (tab === "transfer" && toWalletId === null)
             }
           >
             {es.common.save}

@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.28.2",
+    date: "2026-08-01",
+    es: [
+      "Al hacer una transferencia, el campo «Hacia» ya no viene con una cartera puesta de antemano. Antes traía preseleccionada la primera cartera de la lista, así que si guardabas sin abrir ese campo, el dinero se iba a una cartera que tú no elegiste. Ahora arranca vacío y el botón Guardar no se activa hasta que digas a dónde va.",
+      "Los apartados ahora se leen con su cartera («NU › Ahorros») en los dos selectores de la transferencia, para que no se confundan con la cartera de junto en la lista.",
+      "Un apartado que acabas de crear ya aparece de inmediato en la lista de destinos, sin tener que recargar la app.",
+    ],
+    en: [
+      "When making a transfer, the \"To\" field no longer comes with a wallet already filled in. It used to preselect the first wallet on the list, so saving without opening that field sent the money to a wallet you never chose. It now starts empty and Save stays disabled until you say where the money goes.",
+      "Pockets now read with their wallet (\"NU › Ahorros\") in both transfer pickers, so they aren't mistaken for the wallet next to them on the list.",
+      "A pocket you just created now shows up in the destination list right away, with no need to reload the app.",
+    ],
+  },
+  {
     version: "2.28.1",
     date: "2026-07-28",
     es: [
