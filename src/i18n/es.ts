@@ -424,6 +424,8 @@ export const esDict = {
     wallet: "Cartera",
     fromWallet: "Desde",
     toWallet: "Hacia",
+    pickToWallet: "Elige la cartera destino",
+    pickToWalletHint: "Elige a dónde va el dinero",
     amount: "Monto",
     amountReceived: "Monto recibido",
     category: "Categoría",
