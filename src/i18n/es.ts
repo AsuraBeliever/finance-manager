@@ -271,6 +271,7 @@ export const esDict = {
       "Para cuentas que crecen solas (Klar, Nu, Mercado Pago…). La app abona el interés automáticamente; sigue siendo cartera, no inversión.",
     yieldRate: "Tasa anual",
     yieldFrequency: "Abono",
+    yieldDaily: "Diario",
     yieldWeekly: "Semanal",
     yieldBiweekly: "Quincenal",
     yieldMonthly: "Mensual",

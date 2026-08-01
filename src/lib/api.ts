@@ -101,7 +101,7 @@ export interface WalletInput {
   notes: string | null;
   /** Annual yield rate in basis points; null/omitted turns yield off. */
   yieldRateBps: number | null;
-  /** Payout cadence ('weekly' | 'biweekly' | 'monthly'); used when yield is on. */
+  /** Payout cadence ('daily' | 'weekly' | 'biweekly' | 'monthly'); used when yield is on. */
   yieldFrequency: string | null;
   /** Parent wallet to nest under as an apartado, or null for standalone. */
   parentWalletId: number | null;
