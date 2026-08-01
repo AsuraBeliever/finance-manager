@@ -7,7 +7,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { DateInput } from "../../components/DateInput";
@@ -50,6 +50,44 @@ const apartadoKinds = new Set<Transaction["kind"]>(["reserve", "release"]);
  *  ordinary transfer form can't handle it. */
 const isInvestmentLeg = (t: Transaction) =>
   (t.kind === "transfer_in" || t.kind === "transfer_out") && t.transferGroupId === null;
+
+/** A row to render: an ordinary transaction, or — when both legs of a transfer
+ *  are in the list — the two legs folded into one line (origin → destination).
+ *  `tx` is the transfer_out leg, the canonical handle for edit and delete. */
+interface Row {
+  tx: Transaction;
+  /** The transfer_in leg, only on folded transfer rows. */
+  toLeg?: Transaction;
+}
+
+/** Folds each pair of transfer legs into a single row. A lone leg (the list is
+ *  filtered to one wallet, or the sibling fell off the page) stays as it is:
+ *  there its +/− is the whole story. */
+function foldTransfers(transactions: Transaction[]): Row[] {
+  const byGroup = new Map<string, Transaction[]>();
+  for (const t of transactions) {
+    if (t.transferGroupId === null) continue;
+    const legs = byGroup.get(t.transferGroupId);
+    if (legs) legs.push(t);
+    else byGroup.set(t.transferGroupId, [t]);
+  }
+  const folded = new Set<number>();
+  const rows: Row[] = [];
+  for (const t of transactions) {
+    if (folded.has(t.id)) continue;
+    const legs = t.transferGroupId === null ? undefined : byGroup.get(t.transferGroupId);
+    const outLeg = legs?.find((l) => l.kind === "transfer_out");
+    const inLeg = legs?.find((l) => l.kind === "transfer_in");
+    if (legs?.length === 2 && outLeg && inLeg) {
+      folded.add(outLeg.id);
+      folded.add(inLeg.id);
+      rows.push({ tx: outLeg, toLeg: inLeg });
+    } else {
+      rows.push({ tx: t });
+    }
+  }
+  return rows;
+}
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -123,13 +161,22 @@ export function TransactionList({
     setApartadoToEdit(t);
   };
 
+  const rows = useMemo(() => foldTransfers(transactions), [transactions]);
+
   return (
     <>
     <ul className="divide-y divide-border-muted rounded-xl border border-border-muted bg-surface-raised">
-      {transactions.map((t) => {
+      {rows.map(({ tx: t, toLeg }) => {
         const meta = kindMeta[t.kind];
         const Icon = meta.icon;
         const currency = currencyByWallet?.get(t.walletId) ?? "MXN";
+        const toCurrency = toLeg && (currencyByWallet?.get(toLeg.walletId) ?? "MXN");
+        // A folded transfer names both wallets and shows the amount once, with
+        // no sign: the money didn't leave, it moved. Across currencies (or if
+        // the legs differ for any reason) both amounts are shown.
+        const twoAmounts =
+          toLeg !== undefined &&
+          (toLeg.amountCents !== t.amountCents || toCurrency !== currency);
         const isApartado = apartadoKinds.has(t.kind);
         const isInvestment = isInvestmentLeg(t);
         // Investment legs always offer their own editor, even where the page
@@ -162,13 +209,28 @@ export function TransactionList({
                   const time = transactionTime(t.occurredTime, t.createdAt, tz, clock);
                   return time && <> · {time}</>;
                 })()}
-                {showWallet && <> · {t.walletName}</>}
+                {showWallet && (
+                  <> · {toLeg ? `${t.walletName} → ${toLeg.walletName}` : t.walletName}</>
+                )}
                 {t.categoryName && t.description && <> · {seedName(t.categoryName)}</>}
               </p>
             </div>
             <span className={`text-sm font-medium tabular-nums ${meta.color}`}>
-              {meta.sign}
-              {formatCents(t.amountCents, currency)}
+              {toLeg ? (
+                twoAmounts ? (
+                  <>
+                    {formatCents(t.amountCents, currency)} →{" "}
+                    {formatCents(toLeg.amountCents, toCurrency ?? currency)}
+                  </>
+                ) : (
+                  formatCents(t.amountCents, currency)
+                )
+              ) : (
+                <>
+                  {meta.sign}
+                  {formatCents(t.amountCents, currency)}
+                </>
+              )}
             </span>
             {/* Fixed-width action slot so amounts line up whether a row has 0, 1
                 or 2 buttons. */}
