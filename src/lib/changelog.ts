@@ -12,6 +12,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.30.0",
+    date: "2026-08-01",
+    es: [
+      "Las carteras que generan rendimiento ya pueden abonar diario, como las cajitas de ahorro de Nu: cada día se abona lo que ese día ganó. Antes solo había semanal, quincenal y mensual. El interés siempre se calculó compuesto día con día, así que el total no cambia — solo cambia cada cuándo se te deposita. Si ya tienes una cajita registrada, edítala y elige «Diario»; aplica de ahí en adelante y no toca lo ya abonado.",
+    ],
+    en: [
+      "Yield-bearing wallets can now pay out daily, like Nu's savings pockets: each day credits what that day earned. Before there was only weekly, biweekly and monthly. Interest was always compounded day by day, so the total is the same — only how often it lands changes. If you already have a pocket set up, edit it and pick \"Daily\"; it applies from then on and doesn't touch what was already paid.",
+    ],
+  },
+  {
     version: "2.29.0",
     date: "2026-08-01",
     es: [
