@@ -426,6 +426,9 @@ export const esDict = {
     toWallet: "Hacia",
     pickToWallet: "Elige la cartera destino",
     pickToWalletHint: "Elige a dónde va el dinero",
+    /** Grupos del selector «Hacia»: lo de la misma cartera va hasta arriba. */
+    toWalletSameFamily: "{wallet} y sus apartados",
+    toWalletOthers: "Otras carteras",
     amount: "Monto",
     amountReceived: "Monto recibido",
     category: "Categoría",

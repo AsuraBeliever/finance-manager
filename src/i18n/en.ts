@@ -418,6 +418,8 @@ export const en: Dict = {
     toWallet: "To",
     pickToWallet: "Pick the destination wallet",
     pickToWalletHint: "Choose where the money goes",
+    toWalletSameFamily: "{wallet} and its pockets",
+    toWalletOthers: "Other wallets",
     amount: "Amount",
     amountReceived: "Amount received",
     category: "Category",

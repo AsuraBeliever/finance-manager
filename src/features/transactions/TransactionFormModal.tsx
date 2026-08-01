@@ -157,6 +157,21 @@ export function TransactionFormModal({
     toWallet &&
     fromWallet.currencyCode !== toWallet.currencyCode;
 
+  // Destination list: money most often moves inside the same wallet, so its
+  // pockets go first, in their own group. Whichever wallet is picked as the
+  // source, the family is that wallet plus its pockets (a pocket's family is
+  // its parent's), minus the source itself — you can't transfer to yourself.
+  const fromRootId = fromWallet?.parentWalletId ?? fromWallet?.id;
+  const isSameFamily = (w: (typeof walletList)[number]) =>
+    fromRootId != null && (w.id === fromRootId || w.parentWalletId === fromRootId);
+  const destinations = walletList.filter((w) => w.id !== fromWallet?.id);
+  const familyDestinations = destinations.filter(isSameFamily);
+  const otherDestinations = destinations.filter((w) => !isSameFamily(w));
+  const familyLabel = es.transactions.toWalletSameFamily.replace(
+    "{wallet}",
+    walletList.find((w) => w.id === fromRootId)?.name ?? "",
+  );
+
   const visibleCategories = (categories.data ?? []).filter((c) => c.kind === tab);
 
   // New expenses on a configured credit card can be MSI purchases: instead of
@@ -390,12 +405,31 @@ export function TransactionFormModal({
               {/* Starts empty on purpose: a pre-picked destination is a wrong
                   destination waiting to happen. */}
               <option value="">{es.transactions.pickToWalletHint}</option>
-              {walletList
-                .filter((w) => w.id !== (walletId ?? walletList[0]?.id))
-                .map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {walletLabel(w)}
-                  </option>
+              {familyDestinations.length > 0 && (
+                <optgroup label={familyLabel}>
+                  {familyDestinations.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {walletLabel(w)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {otherDestinations.length > 0 &&
+                (familyDestinations.length > 0 ? (
+                  <optgroup label={es.transactions.toWalletOthers}>
+                    {otherDestinations.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {walletLabel(w)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  // No pockets to lift up: one flat list, as it always was.
+                  otherDestinations.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {walletLabel(w)}
+                    </option>
+                  ))
                 ))}
             </select>
             {payingCard && cardSummary.data && (
