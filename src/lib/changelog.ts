@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.31.0",
+    date: "2026-08-01",
+    es: [
+      "Una cartera con apartados ya muestra su dinero completo. El apartado de una meta se veía en la tarjeta («Disponible · Apartado»), pero el de un apartado-cartera no: ese dinero sale del saldo, así que una cartera con todo apartado se veía en $0.00 sin explicación. Ahora el número grande es todo lo que tiene la cuenta y la línea de abajo lo parte en disponible y apartado, contando los dos tipos.",
+      "La página de la cartera se lee igual que su tarjeta, así el número ya no cambia al abrirla.",
+    ],
+    en: [
+      "A wallet with pockets now shows all of its money. A goal's reserve appeared on the card (\"Available · Set aside\"), but pocket money didn't: that money leaves the balance, so a wallet with everything in pockets read $0.00 with no explanation. The big number is now everything the account holds, and the line under it splits it into available and set aside, counting both kinds.",
+      "The wallet page now reads like its card, so the number no longer changes when you open it.",
+    ],
+  },
+  {
     version: "2.30.0",
     date: "2026-08-01",
     es: [
