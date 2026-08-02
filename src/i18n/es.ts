@@ -288,7 +288,6 @@ export const esDict = {
     reorder: "Arrastra para reordenar",
     available: "Disponible",
     reserved: "Apartado",
-    totalWithReserved: "Total con apartados",
     emptyTitle: "Aún no tienes carteras",
     emptyDescription:
       "Crea tu primera cartera: efectivo, tarjeta, cuenta de ahorro o lo que necesites.",

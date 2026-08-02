@@ -136,17 +136,20 @@ export function WalletDetailPage() {
             {seedName(w.categoryName)} · {w.currencyCode}
           </span>
         </div>
-        {/* The big number is what's actually spendable: the balance minus goal
-            reserves. Pocket wallets already left the balance, so the real bank
-            total (below, small) adds them back. Both apartados — goals and
-            pockets — are listed further down the page. */}
+        {/* Same reading as the wallet card, so the number doesn't change when
+            you tap it: the big one is everything the account holds (pocket
+            money left the balance through a transfer, so it's added back), and
+            the line under it splits it into spendable and set aside. Both kinds
+            of apartado — goal reserves and pockets — are listed further down. */}
         <p className="text-3xl font-semibold tabular-nums">
-          {formatCents(w.balanceCents - w.reservedCents, w.currencyCode)}
+          {formatCents(w.balanceCents + apartadosCents, w.currencyCode)}
         </p>
         {(w.reservedCents > 0 || apartadosCents > 0) && (
           <p className="mt-1 text-xs text-fg-subtle tabular-nums">
-            {es.wallets.totalWithReserved}:{" "}
-            {formatCents(w.balanceCents + apartadosCents, w.currencyCode)}
+            {es.wallets.available}{" "}
+            {formatCents(w.balanceCents - w.reservedCents, w.currencyCode)} ·{" "}
+            {es.wallets.reserved}{" "}
+            {formatCents(w.reservedCents + apartadosCents, w.currencyCode)}
           </p>
         )}
         {/* On a credit card the initial balance is registered debt, so

@@ -10,14 +10,31 @@ const ART_ICON = { banknote: Banknote, wallet: WalletIcon, coins: Coins, piggy: 
 
 /** A wallet rendered as a crystalline card. The skin (explicit, or the default
  *  for its category) sets the look: card skins show a chip; cash/savings skins
- *  show a money illustration instead. */
-export function WalletCard({ wallet }: { wallet: Wallet }) {
+ *  show a money illustration instead.
+ *
+ *  `pockets` are the wallet's apartados (child wallets). Money in a pocket left
+ *  the parent's balance through a transfer, so it has to be added back for the
+ *  card to show what the bank shows — see the amounts below. */
+export function WalletCard({ wallet, pockets = [] }: { wallet: Wallet; pockets?: Wallet[] }) {
   // No explicit skin → use the category's default so each category is distinct.
   const skin = effectiveSkin(wallet.skin, wallet.categoryName);
   const { background, fg } = resolveSkin(skin, wallet.color);
   const img = isImageSkin(skin);
   const art = skinArt(skin);
   const Motif = ART_ICON[art as keyof typeof ART_ICON];
+
+  // Two things set money aside and both read as "apartado" on the card:
+  // a goal's reserve, which never leaves the balance, and a pocket, which is
+  // its own wallet the money was transferred into. Only same-currency pockets
+  // add up — a USD pocket can't be summed into an MXN total.
+  const pocketsCents = pockets
+    .filter((p) => p.currencyCode === wallet.currencyCode)
+    .reduce((sum, p) => sum + p.balanceCents, 0);
+  const reservedCents = wallet.reservedCents + pocketsCents;
+  // The headline is everything the account holds, apartados included (what the
+  // bank app shows); the line under it splits it into spendable and set aside.
+  const totalCents = wallet.balanceCents + pocketsCents;
+  const availableCents = wallet.balanceCents - wallet.reservedCents;
 
   return (
     <Link
@@ -90,13 +107,12 @@ export function WalletCard({ wallet }: { wallet: Wallet }) {
 
         <div>
           <p className="font-display text-2xl font-semibold tabular-nums [text-shadow:0_1px_4px_rgba(0,0,0,0.3)]">
-            {formatCents(wallet.balanceCents, wallet.currencyCode)}
+            {formatCents(totalCents, wallet.currencyCode)}
           </p>
-          {wallet.reservedCents > 0 ? (
+          {reservedCents > 0 ? (
             <p className="mt-0.5 text-xs tabular-nums opacity-80">
-              {es.wallets.available}{" "}
-              {formatCents(wallet.balanceCents - wallet.reservedCents, wallet.currencyCode)} ·{" "}
-              {es.wallets.reserved} {formatCents(wallet.reservedCents, wallet.currencyCode)}
+              {es.wallets.available} {formatCents(availableCents, wallet.currencyCode)} ·{" "}
+              {es.wallets.reserved} {formatCents(reservedCents, wallet.currencyCode)}
             </p>
           ) : (
             <p className="mt-0.5 text-xs opacity-80">{seedName(wallet.categoryName)}</p>

@@ -64,7 +64,7 @@ function SortableWalletCard({ wallet, apartados }: { wallet: Wallet; apartados: 
   return (
     <div ref={setNodeRef} style={style} className={isDragging ? "opacity-90" : undefined}>
       <div className="relative">
-        <WalletCard wallet={wallet} />
+        <WalletCard wallet={wallet} pockets={apartados} />
         <button
           type="button"
           {...attributes}

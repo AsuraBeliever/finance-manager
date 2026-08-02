@@ -282,7 +282,6 @@ export const en: Dict = {
     reorder: "Drag to reorder",
     available: "Available",
     reserved: "Reserved",
-    totalWithReserved: "Total with pockets",
     emptyTitle: "You don't have any wallets yet",
     emptyDescription: "Create your first wallet: cash, a card, a savings account, whatever you need.",
     invalidAmount: "Invalid amount",
