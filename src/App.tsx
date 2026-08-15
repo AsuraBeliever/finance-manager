@@ -127,7 +127,10 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
-      <UpdateBanner />
+      {/* On the phone the tab bar owns the thumb zone, so the update prompt sits
+          just above it (see bottomOnMobile) instead of pinned to the unreachable
+          top. Desktop keeps it at the top of the column. */}
+      <UpdateBanner bottomOnMobile />
       <WhatsNewAuto />
       {!online && (
         <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-500/15 px-4 py-1.5 text-xs text-amber-300">
@@ -230,7 +233,7 @@ export default function App() {
 
       {/* Mobile bottom navigation */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-border-muted bg-surface-raised/95 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex h-[var(--bottom-nav-h)] items-stretch justify-around border-t border-border-muted bg-surface-raised/95 backdrop-blur md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {navItems.map(({ to, label, icon: Icon, end }) => (

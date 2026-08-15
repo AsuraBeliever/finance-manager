@@ -66,14 +66,14 @@ function LocalDevNoServiceWorker() {
  *     update events reliably, so we also compare the build id compiled into
  *     this bundle against the deployed version.json and, when they differ,
  *     offer a hard reload. Runs independently of SW registration. */
-export function UpdateBanner() {
+export function UpdateBanner({ bottomOnMobile = false }: { bottomOnMobile?: boolean }) {
   // `useRegisterSW` (below) registers the SW on mount, so gate the whole
   // component out on localhost rather than calling the hook conditionally.
   if (isLocalDev) return <LocalDevNoServiceWorker />;
-  return <ProdUpdateBanner />;
+  return <ProdUpdateBanner bottomOnMobile={bottomOnMobile} />;
 }
 
-function ProdUpdateBanner() {
+function ProdUpdateBanner({ bottomOnMobile }: { bottomOnMobile: boolean }) {
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const {
     needRefresh: [needRefresh],
@@ -161,14 +161,22 @@ function ProdUpdateBanner() {
     if (registration.waiting) updateServiceWorker(true);
   };
 
+  // On the phone the bar floats just above the bottom tab bar (thumb zone); on
+  // desktop, and everywhere the tab bar is absent, it stays a top-of-column bar.
+  const barPosition = bottomOnMobile
+    ? "fixed inset-x-0 bottom-[var(--bottom-nav-h)] z-40 border-t border-border-muted md:static md:bottom-auto md:z-auto md:border-t-0"
+    : "shrink-0";
+
   return (
     <>
-      <div className="flex shrink-0 items-center justify-center gap-3 bg-accent-dim/15 px-4 py-1.5 text-xs text-accent">
+      <div
+        className={`${barPosition} flex items-center justify-center gap-3 bg-accent-dim/15 px-4 py-2.5 text-xs text-accent md:py-1.5`}
+      >
         <span>{es.update.available}</span>
         <button
           onClick={apply}
           disabled={applying}
-          className="inline-flex items-center gap-1.5 rounded-md bg-accent-dim px-2.5 py-1 font-medium text-surface transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-accent-dim"
+          className="inline-flex items-center gap-1.5 rounded-md bg-accent-dim px-3 py-1.5 font-medium text-surface transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-accent-dim md:px-2.5 md:py-1"
         >
           <RefreshCw size={13} className={applying ? "animate-spin" : undefined} />
           {applying ? es.update.updating : es.update.action}

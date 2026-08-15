@@ -32,6 +32,12 @@
   --shadow-card: var(--c-shadow-card);
 }
 
+/* Height of the mobile bottom tab bar (content + iPhone home-indicator inset).
+   The nav sizes itself to this and the update banner anchors just above it. */
+:root {
+  --bottom-nav-h: calc(3.25rem + env(safe-area-inset-bottom));
+}
+
 /* ── Dark: deep indigo glass, neon violet + cyan ───────────────────────── */
 :root,
 [data-theme="dark"] {
