@@ -20,7 +20,8 @@ import {
   updateGoalContribution,
 } from "../../lib/api";
 import { MovementEditModal } from "../investments/MovementEditModal";
-import { formatCents, parseToCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
+import { parseToCents } from "../../lib/money";
 import { transactionTime } from "../../lib/date";
 import { useTimezone } from "../../lib/timezone";
 import { useClock } from "../../lib/timeFormat";
@@ -108,6 +109,7 @@ export function TransactionList({
   const queryClient = useQueryClient();
   const tz = useTimezone();
   const clock = useClock();
+  const money = useMoney();
   const [toDelete, setToDelete] = useState<number | null>(null);
   // Apartado rows are goal_contributions surfaced with a negated id; editing
   // or deleting them adjusts the goal's earmark, so they get their own flow.
@@ -219,16 +221,16 @@ export function TransactionList({
               {toLeg ? (
                 twoAmounts ? (
                   <>
-                    {formatCents(t.amountCents, currency)} →{" "}
-                    {formatCents(toLeg.amountCents, toCurrency ?? currency)}
+                    {money(t.amountCents, currency)} →{" "}
+                    {money(toLeg.amountCents, toCurrency ?? currency)}
                   </>
                 ) : (
-                  formatCents(t.amountCents, currency)
+                  money(t.amountCents, currency)
                 )
               ) : (
                 <>
                   {meta.sign}
-                  {formatCents(t.amountCents, currency)}
+                  {money(t.amountCents, currency)}
                 </>
               )}
             </span>

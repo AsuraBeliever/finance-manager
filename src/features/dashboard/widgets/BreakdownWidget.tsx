@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { StatWidget } from "../../../components/StatWidget";
 import { getCategoryBreakdown } from "../../../lib/api";
-import { formatCents } from "../../../lib/money";
+import { useMoney } from "../../../lib/hideBalance";
 import { CHART_COLORS } from "../../../lib/palette";
 import type { Period } from "../../../lib/types";
 import { es } from "../../../i18n/es";
@@ -21,6 +21,7 @@ export function BreakdownWidget({
   period: Period;
 }) {
   const [detail, setDetail] = useState<CategoryDetailTarget | null>(null);
+  const money = useMoney();
   const q = useQuery({
     queryKey: ["breakdown", kind, period],
     queryFn: () => getCategoryBreakdown(kind, period),
@@ -71,7 +72,7 @@ export function BreakdownWidget({
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-[0.7rem] text-fg-subtle">{es.dashboard.total}</span>
             <span className="font-display text-sm font-semibold tabular-nums text-fg">
-              {formatCents(total, "MXN")}
+              {money(total)}
             </span>
           </div>
         </div>
@@ -94,7 +95,7 @@ export function BreakdownWidget({
                   />
                   <span className="truncate text-fg-muted">{seedName(s.name)}</span>
                   <span className="ml-auto tabular-nums text-fg">
-                    {formatCents(s.mxnCents, "MXN")}
+                    {money(s.mxnCents)}
                   </span>
                   <span className="w-9 shrink-0 text-right text-xs tabular-nums text-fg-subtle">
                     {pct}%

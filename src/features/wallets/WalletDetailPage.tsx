@@ -15,7 +15,7 @@ import {
   listWallets,
 } from "../../lib/api";
 import type { Transaction } from "../../lib/types";
-import { formatCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 import { WalletGoalsSection } from "../goals/WalletGoalsSection";
@@ -29,6 +29,7 @@ export function WalletDetailPage() {
   const walletId = Number(id);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const money = useMoney();
   const [editOpen, setEditOpen] = useState(false);
   const [txFormOpen, setTxFormOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -142,14 +143,14 @@ export function WalletDetailPage() {
             the line under it splits it into spendable and set aside. Both kinds
             of apartado — goal reserves and pockets — are listed further down. */}
         <p className="text-3xl font-semibold tabular-nums">
-          {formatCents(w.balanceCents + apartadosCents, w.currencyCode)}
+          {money(w.balanceCents + apartadosCents, w.currencyCode)}
         </p>
         {(w.reservedCents > 0 || apartadosCents > 0) && (
           <p className="mt-1 text-xs text-fg-subtle tabular-nums">
             {es.wallets.available}{" "}
-            {formatCents(w.balanceCents - w.reservedCents, w.currencyCode)} ·{" "}
+            {money(w.balanceCents - w.reservedCents, w.currencyCode)} ·{" "}
             {es.wallets.reserved}{" "}
-            {formatCents(w.reservedCents + apartadosCents, w.currencyCode)}
+            {money(w.reservedCents + apartadosCents, w.currencyCode)}
           </p>
         )}
         {/* On a credit card the initial balance is registered debt, so
@@ -158,13 +159,13 @@ export function WalletDetailPage() {
           w.initialBalanceCents < 0 && (
             <p className="mt-1 text-xs text-fg-subtle">
               {es.credit.initialDebtLine}:{" "}
-              {formatCents(-w.initialBalanceCents, w.currencyCode)}
+              {money(-w.initialBalanceCents, w.currencyCode)}
             </p>
           )
         ) : (
           <p className="mt-1 text-xs text-fg-subtle">
             {es.wallets.initialBalance}:{" "}
-            {formatCents(w.initialBalanceCents, w.currencyCode)}
+            {money(w.initialBalanceCents, w.currencyCode)}
           </p>
         )}
         {w.notes && <p className="mt-2 text-sm text-fg-muted">{w.notes}</p>}

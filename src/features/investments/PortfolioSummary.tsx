@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { getPortfolio } from "../../lib/api";
-import { formatCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
 import { CHART_COLORS, NEGATIVE, POSITIVE, useChartTokens } from "../../lib/palette";
 import { es } from "../../i18n/es";
 
 export function PortfolioSummary() {
   const chart = useChartTokens();
+  const money = useMoney();
   const q = useQuery({ queryKey: ["portfolio"], queryFn: getPortfolio });
   const p = q.data;
   if (!p || p.slices.length === 0) return null;
@@ -24,11 +25,11 @@ export function PortfolioSummary() {
   return (
     <section className="mb-6 grid gap-4 rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card lg:grid-cols-[1fr_auto]">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Metric label={es.investments.portfolioValue} value={formatCents(p.totalValueCents, "MXN")} accent />
-        <Metric label={es.investments.portfolioInvested} value={formatCents(p.totalInvestedCents, "MXN")} />
+        <Metric label={es.investments.portfolioValue} value={money(p.totalValueCents)} accent />
+        <Metric label={es.investments.portfolioInvested} value={money(p.totalInvestedCents)} />
         <Metric
           label={es.investments.portfolioGain}
-          value={formatCents(p.totalGainCents, "MXN")}
+          value={money(p.totalGainCents)}
           tone={gainPositive ? "pos" : "neg"}
         />
         <Metric
@@ -56,7 +57,7 @@ export function PortfolioSummary() {
               </Pie>
               <Tooltip
                 contentStyle={chart.tooltip}
-                formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
+                formatter={(v) => money(Math.round(Number(v) * 100))}
               />
             </PieChart>
           </ResponsiveContainer>

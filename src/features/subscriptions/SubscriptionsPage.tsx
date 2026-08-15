@@ -23,15 +23,18 @@ import {
   setSubscriptionActive,
   updateSubscription,
 } from "../../lib/api";
-import { formatCents, parseToCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
+import { parseToCents } from "../../lib/money";
 import { todayIso } from "../../lib/date";
 import { CHART_COLORS } from "../../lib/palette";
+import { PrivacyToggle } from "../../components/PrivacyToggle";
 import type { Subscription } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 
 export function SubscriptionsPage() {
   const qc = useQueryClient();
+  const money = useMoney();
   const subs = useQuery({ queryKey: ["subscriptions"], queryFn: () => listSubscriptions() });
   const [formSub, setFormSub] = useState<Subscription | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -58,16 +61,19 @@ export function SubscriptionsPage() {
       <PageHeader
         title={es.subscriptions.title}
         actions={
-          <Button
-            onClick={() => {
-              setFormSub(null);
-              setFormOpen(true);
-            }}
-          >
-            <span className="flex items-center gap-2">
-              <Plus size={16} /> {es.subscriptions.newSubscription}
-            </span>
-          </Button>
+          <div className="flex items-center gap-4">
+            <PrivacyToggle />
+            <Button
+              onClick={() => {
+                setFormSub(null);
+                setFormOpen(true);
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <Plus size={16} /> {es.subscriptions.newSubscription}
+              </span>
+            </Button>
+          </div>
         }
       />
 
@@ -75,7 +81,7 @@ export function SubscriptionsPage() {
         <p className="mb-4 text-sm text-fg-muted">
           {es.subscriptions.monthlyTotal}:{" "}
           <span className="font-display text-base font-semibold tabular-nums text-fg">
-            {formatCents(data.monthlyTotalMxnCents, "MXN")}
+            {money(data.monthlyTotalMxnCents)}
           </span>
         </p>
       )}
@@ -113,7 +119,7 @@ export function SubscriptionsPage() {
                 </p>
               </div>
               <span className="shrink-0 tabular-nums font-medium text-fg">
-                {formatCents(sub.amountCents, sub.currencyCode)}
+                {money(sub.amountCents, sub.currencyCode)}
               </span>
               <div className="flex shrink-0 gap-1">
                 <button

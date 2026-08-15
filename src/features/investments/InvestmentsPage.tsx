@@ -5,8 +5,9 @@ import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
+import { PrivacyToggle } from "../../components/PrivacyToggle";
 import { listInvestments } from "../../lib/api";
-import { formatCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
 import { PortfolioSummary } from "./PortfolioSummary";
@@ -22,6 +23,7 @@ function cryptoSub(paramsJson: string): string {
 }
 
 export function InvestmentsPage() {
+  const money = useMoney();
   const [showClosed, setShowClosed] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const investments = useQuery({
@@ -37,6 +39,7 @@ export function InvestmentsPage() {
         title={es.investments.title}
         actions={
           <div className="flex items-center gap-4">
+            <PrivacyToggle />
             <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
               <input
                 type="checkbox"
@@ -93,7 +96,7 @@ export function InvestmentsPage() {
                 )}
               </div>
               <p className="text-xl font-semibold tabular-nums">
-                {formatCents(inv.currentValueCents, inv.currencyCode)}
+                {money(inv.currentValueCents, inv.currencyCode)}
               </p>
               <p
                 className={`mt-1 flex items-center gap-1 text-sm tabular-nums ${
@@ -102,7 +105,7 @@ export function InvestmentsPage() {
               >
                 {gainPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                 {gainPositive ? "+" : ""}
-                {formatCents(inv.gainCents, inv.currencyCode)}
+                {money(inv.gainCents, inv.currencyCode)}
               </p>
               <p className="mt-2 text-xs text-fg-subtle">
                 {inv.calculator === "crypto"

@@ -5,7 +5,8 @@ import { Field } from "../../components/Field";
 import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import { contributeSavingsGoal, listWallets } from "../../lib/api";
-import { formatCents, parseToCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
+import { parseToCents } from "../../lib/money";
 import type { SavingsGoal } from "../../lib/types";
 import { es } from "../../i18n/es";
 
@@ -24,6 +25,7 @@ export function ContributeModal({
   const [mode, setMode] = useState<"reserve" | "release">("reserve");
   const [amount, setAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const money = useMoney();
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
 
   // Reset on every open (closing clears lastId), so reopening the same goal
@@ -49,7 +51,7 @@ export function ContributeModal({
           new Error(
             es.goals.releaseTooMuch.replace(
               "{amount}",
-              formatCents(goal.savedCents, goal.currencyCode),
+              money(goal.savedCents, goal.currencyCode),
             ),
           ),
         );
@@ -106,7 +108,7 @@ export function ContributeModal({
             {es.goals.apartadoOf} <span className="font-medium text-fg">{apartadoWallet.name}</span> ·{" "}
             {es.goals.available}{" "}
             <span className="font-medium tabular-nums text-fg">
-              {formatCents(available, apartadoWallet.currencyCode)}
+              {money(available, apartadoWallet.currencyCode)}
             </span>
           </p>
         )}
@@ -114,7 +116,7 @@ export function ContributeModal({
           <p className="rounded-lg bg-surface-overlay px-3 py-2 text-xs text-fg-muted">
             {es.goals.reservedLabel}{" "}
             <span className="font-medium tabular-nums text-fg">
-              {formatCents(goal.savedCents, currency)}
+              {money(goal.savedCents, currency)}
             </span>
           </p>
         )}
@@ -128,7 +130,7 @@ export function ContributeModal({
             onClick={() => setAmount((suggested / 100).toString())}
             className="-mt-2 self-start rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
           >
-            {es.goals.suggestedChip} {formatCents(suggested, currency)}
+            {es.goals.suggestedChip} {money(suggested, currency)}
           </button>
         )}
         <p className="-mt-1 text-xs text-fg-subtle">

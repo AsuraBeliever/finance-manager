@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Eye, EyeOff, LayoutDashboard, RotateCcw } from "lucide-react";
+import { ArrowRight, LayoutDashboard, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Button } from "../../components/Button";
 import { DashboardGrid, type GridItemSpec } from "../../components/DashboardGrid";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
+import { PrivacyToggle } from "../../components/PrivacyToggle";
 import { StatWidget } from "../../components/StatWidget";
 import { TrendBadge } from "../../components/TrendBadge";
 import {
@@ -30,7 +31,7 @@ import { SubscriptionsWidget } from "./widgets/SubscriptionsWidget";
 
 export function DashboardPage() {
   const chart = useChartTokens();
-  const [hidden, toggleHidden] = useHideBalance();
+  const [hidden] = useHideBalance();
   const [period, setPeriod] = usePeriod();
   // Keeping the previous period's data while the new one loads is what lets the
   // period picker stay open (and the page stay put) while you refine a month,
@@ -143,13 +144,7 @@ export function DashboardPage() {
 
       <div className="flex items-center gap-2">
         <p className="eyebrow">{es.dashboard.netWorth}</p>
-        <button
-          onClick={toggleHidden}
-          title={hidden ? es.dashboard.showBalance : es.dashboard.hideBalance}
-          className="rounded-md p-1 text-fg-subtle transition-colors hover:bg-surface-overlay hover:text-fg"
-        >
-          {hidden ? <EyeOff size={15} /> : <Eye size={15} />}
-        </button>
+        <PrivacyToggle />
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-3">
         <div>
@@ -302,7 +297,7 @@ export function DashboardPage() {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
+                formatter={(v) => money(Math.round(Number(v) * 100))}
                 contentStyle={chart.tooltip}
                 labelStyle={{ color: chart.tooltip.color }}
                 itemStyle={{ color: chart.tooltip.color }}
@@ -337,7 +332,7 @@ export function DashboardPage() {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
+                formatter={(v) => money(Math.round(Number(v) * 100))}
                 contentStyle={chart.tooltip}
                 labelStyle={{ color: chart.tooltip.color }}
                 itemStyle={{ color: chart.tooltip.color }}

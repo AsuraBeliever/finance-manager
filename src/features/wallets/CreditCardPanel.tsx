@@ -16,7 +16,8 @@ import {
   type MsiPlanInput,
 } from "../../lib/api";
 import { formatDayMonth, todayIso } from "../../lib/date";
-import { formatCents, parseToCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
+import { parseToCents } from "../../lib/money";
 import type { MsiPlan, MsiSchedulePreview, Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
@@ -41,6 +42,7 @@ function usageColor(fraction: number): string {
 
 export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
   const queryClient = useQueryClient();
+  const money = useMoney();
   const [msiFormOpen, setMsiFormOpen] = useState(false);
   const [deletingPlan, setDeletingPlan] = useState<MsiPlan | null>(null);
 
@@ -79,7 +81,7 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
           : st.daysToDue === 0
             ? es.credit.dueToday
             : es.credit.payBy
-                .replace("{amount}", formatCents(st.remainingCents, cur))
+                .replace("{amount}", money(st.remainingCents, cur))
                 .replace("{date}", formatDay(st.dueDate));
   const statementUrgent = st.remainingCents > 0 && st.daysToDue <= 3;
 
@@ -110,11 +112,11 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
               s.debtCents > 0 ? "text-danger" : ""
             }`}
           >
-            {formatCents(s.debtCents, cur)}
+            {money(s.debtCents, cur)}
           </p>
           {s.pendingMsiCents > 0 && (
             <p className="mt-0.5 text-xs text-fg-subtle">
-              {es.credit.msiPendingTotal}: {formatCents(s.pendingMsiCents, cur)}
+              {es.credit.msiPendingTotal}: {money(s.pendingMsiCents, cur)}
             </p>
           )}
         </div>
@@ -125,7 +127,7 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
               {es.credit.availableCredit}
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">
-              {formatCents(s.availableCreditCents, cur)}
+              {money(s.availableCreditCents, cur)}
             </p>
           </div>
         )}
@@ -141,12 +143,12 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
       >
         <p className="text-xs text-fg-subtle">
           {es.credit.statement} ({es.credit.statementOf.replace("{date}", formatDay(st.cutDate))}
-          ): <span className="tabular-nums">{formatCents(st.balanceCents, cur)}</span>
+          ): <span className="tabular-nums">{money(st.balanceCents, cur)}</span>
           {st.paidCents > 0 && st.balanceCents > 0 && (
             <>
               {" "}
               · {es.credit.paidSoFar}:{" "}
-              <span className="tabular-nums">{formatCents(st.paidCents, cur)}</span>
+              <span className="tabular-nums">{money(st.paidCents, cur)}</span>
             </>
           )}
         </p>
@@ -162,8 +164,8 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
             <span className="tabular-nums text-fg-muted">
               {Math.round(usage * 100)}% ·{" "}
               {es.credit.utilizationOf
-                .replace("{used}", formatCents(s.debtCents + s.pendingMsiCents, cur))
-                .replace("{limit}", formatCents(s.creditLimitCents!, cur))}
+                .replace("{used}", money(s.debtCents + s.pendingMsiCents, cur))
+                .replace("{limit}", money(s.creditLimitCents!, cur))}
             </span>
           </div>
           <ProgressBar value={usage} color={usageColor(usage)} />
@@ -205,7 +207,7 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
                       <span className="text-sm tabular-nums text-fg-muted">
                         {es.credit.msiMonthly.replace(
                           "{amount}",
-                          formatCents(p.monthlyCents, cur),
+                          money(p.monthlyCents, cur),
                         )}
                       </span>
                       <button
@@ -232,7 +234,7 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
                       ? es.credit.msiDone
                       : p.nextChargeDate &&
                         es.credit.msiNextCharge
-                          .replace("{amount}", formatCents(p.nextChargeCents ?? 0, cur))
+                          .replace("{amount}", money(p.nextChargeCents ?? 0, cur))
                           .replace("{date}", formatDay(p.nextChargeDate))}
                   </p>
                 </li>

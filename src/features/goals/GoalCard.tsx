@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode, Ref } from "react";
 import { Check, Pencil, PiggyBank, Trash2, Wallet } from "lucide-react";
 import { Button } from "../../components/Button";
 import { ProgressBar } from "../../components/ProgressBar";
-import { formatCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
 import type { GoalCadence, SavingsGoal } from "../../lib/types";
 import { es } from "../../i18n/es";
 
@@ -85,6 +85,7 @@ export function GoalCard({
   style?: CSSProperties;
   dragging?: boolean;
 }) {
+  const money = useMoney();
   const done = g.progressBps >= 10000;
   const remaining = Math.max(0, g.targetCents - g.savedCents);
   const color = g.color ?? "var(--color-accent)";
@@ -127,9 +128,9 @@ export function GoalCard({
       </div>
 
       <p className="font-display text-2xl font-semibold tabular-nums text-fg">
-        {formatCents(g.savedCents, g.currencyCode)}
+        {money(g.savedCents, g.currencyCode)}
         <span className="ml-1.5 text-sm font-normal text-fg-subtle">
-          {es.goals.of} {formatCents(g.targetCents, g.currencyCode)}
+          {es.goals.of} {money(g.targetCents, g.currencyCode)}
         </span>
       </p>
 
@@ -143,7 +144,7 @@ export function GoalCard({
           {!done && (
             <span className="text-fg-subtle">
               {" · "}
-              {es.goals.remaining} {formatCents(remaining, g.currencyCode)}
+              {es.goals.remaining} {money(remaining, g.currencyCode)}
             </span>
           )}
         </span>
@@ -175,7 +176,7 @@ export function GoalCard({
               <BadgeTag tone="danger">{es.goals.overdueBadge}</BadgeTag>{" "}
               {es.goals.overdueHint.replace(
                 "{amount}",
-                formatCents(remaining, g.currencyCode),
+                money(remaining, g.currencyCode),
               )}
             </p>
           ) : (
@@ -187,7 +188,7 @@ export function GoalCard({
                   ? es.goals.planReserve
                       .replace(
                         "{amount}",
-                        formatCents(g.plan.periodQuotaCents, g.currencyCode),
+                        money(g.plan.periodQuotaCents, g.currencyCode),
                       )
                       .replace("{cadence}", cadenceAdverb(g.cadence))
                       .replace("{date}", formatDate(g.targetDate ?? ""))
@@ -196,15 +197,15 @@ export function GoalCard({
                         .replace("{period}", periodNoun(g.cadence))
                         .replace(
                           "{done}",
-                          formatCents(g.plan.contributedThisPeriodCents, g.currencyCode),
+                          money(g.plan.contributedThisPeriodCents, g.currencyCode),
                         )
                         .replace(
                           "{quota}",
-                          formatCents(g.plan.periodQuotaCents, g.currencyCode),
+                          money(g.plan.periodQuotaCents, g.currencyCode),
                         )
                         .replace(
                           "{missing}",
-                          formatCents(g.plan.periodMissingCents, g.currencyCode),
+                          money(g.plan.periodMissingCents, g.currencyCode),
                         )
                     : es.goals.planCovered
                         .replace("{period}", periodNoun(g.cadence))
@@ -215,7 +216,7 @@ export function GoalCard({
                   <BadgeTag tone="warning">{es.goals.behindBadge}</BadgeTag>{" "}
                   {es.goals.behindHint.replace(
                     "{amount}",
-                    formatCents(g.plan.behindCents, g.currencyCode),
+                    money(g.plan.behindCents, g.currencyCode),
                   )}
                 </p>
               )}
