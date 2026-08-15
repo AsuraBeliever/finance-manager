@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.32.0",
+    date: "2026-08-15",
+    es: [
+      "El ojito de privacidad ahora oculta TODOS los números de dinero de la app, no solo el patrimonio. Al activarlo se enmascaran saldos, ingresos, gastos, movimientos, metas, presupuestos, inversiones y suscripciones — ideal para enseñar la app sin revelar cuánto tienes. Las gráficas se quedan (se ve la forma), pero sin las cifras de los ejes.",
+      "El ojito ahora está también en Carteras, Transacciones, Inversiones, Metas, Presupuestos y Suscripciones, para prender o apagar el modo desde donde estés. Es global: lo cambias en un lado y aplica en toda la app.",
+      "Donde escribes un monto (nueva transacción, editar cartera…) el número sí se ve, para que puedas capturar; solo se ocultan las cifras que ya tienes guardadas.",
+    ],
+    en: [
+      "The privacy eye now hides EVERY money figure in the app, not just net worth. Turning it on masks balances, income, expenses, movements, goals, budgets, investments and subscriptions — ideal for showing the app without revealing how much you have. Charts stay (you see the shape), just without the axis numbers.",
+      "The eye now also lives on Wallets, Transactions, Investments, Goals, Budgets and Subscriptions, so you can flip the mode from wherever you are. It's global: change it in one place and it applies everywhere.",
+      "Where you type an amount (new transaction, edit wallet…) the number stays visible so you can enter it; only your saved figures are hidden.",
+    ],
+  },
+  {
     version: "2.31.1",
     date: "2026-08-15",
     es: [
