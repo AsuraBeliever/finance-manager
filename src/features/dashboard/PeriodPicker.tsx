@@ -106,8 +106,11 @@ export function PeriodPicker({
         <ChevronDown size={14} className="text-fg-subtle" />
       </button>
 
+      {/* On phones the trigger sits at the left edge of the header, so a
+          right-anchored panel hangs off screen: anchor it left there and keep
+          the tidy right alignment only where the trigger sits on the right. */}
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border border-border-muted bg-surface-raised p-2 shadow-card">
+        <div className="absolute left-0 z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border-muted bg-surface-overlay p-2 shadow-2xl sm:left-auto sm:right-0">
           <ul className="space-y-0.5">
             {MODES.map((m) => {
               const active = value.kind === m;

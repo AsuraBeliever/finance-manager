@@ -221,7 +221,10 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto px-4 py-4 pb-24 md:px-8 md:py-6 md:pb-6">
+      {/* pt keeps the page clear of the iPhone status bar: the PWA runs
+          fullscreen (black-translucent + viewport-fit=cover), so without the
+          inset the page title renders under the clock. */}
+      <main className="flex-1 overflow-y-auto px-4 pb-24 pt-[calc(1rem+env(safe-area-inset-top))] md:px-8 md:pb-6 md:pt-[calc(1.5rem+env(safe-area-inset-top))]">
         <Outlet />
       </main>
 

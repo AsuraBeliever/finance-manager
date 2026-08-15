@@ -32,25 +32,70 @@ export function DashboardPage() {
   const chart = useChartTokens();
   const [hidden, toggleHidden] = useHideBalance();
   const [period, setPeriod] = usePeriod();
+  // Keeping the previous period's data while the new one loads is what lets the
+  // period picker stay open (and the page stay put) while you refine a month,
+  // a day or a custom range inside it.
   const summary = useQuery({
     queryKey: ["dashboard", period],
     queryFn: () => getDashboardSummary(period),
+    placeholderData: (p) => p,
   });
   const trends = useQuery({
     queryKey: ["spendingTrends", period],
     queryFn: () => getSpendingTrends(period),
+    placeholderData: (p) => p,
   });
   // Same keys the widgets use (deduped) — period-scoped, so a widget's cell only
   // exists when that widget actually has something to show for the period.
-  const budgets = useQuery({ queryKey: ["budgets", period], queryFn: () => listBudgets(period) });
-  const goals = useQuery({ queryKey: ["savingsGoals", period], queryFn: () => listSavingsGoals(period) });
-  const subs = useQuery({ queryKey: ["subscriptions", period], queryFn: () => listSubscriptions(period) });
+  const budgets = useQuery({
+    queryKey: ["budgets", period],
+    queryFn: () => listBudgets(period),
+    placeholderData: (p) => p,
+  });
+  const goals = useQuery({
+    queryKey: ["savingsGoals", period],
+    queryFn: () => listSavingsGoals(period),
+    placeholderData: (p) => p,
+  });
+  const subs = useQuery({
+    queryKey: ["subscriptions", period],
+    queryFn: () => listSubscriptions(period),
+    placeholderData: (p) => p,
+  });
   const [resetSignal, setResetSignal] = useState(0);
 
+  // The header (with the period picker) renders in every state: unmounting it
+  // while loading would close the picker mid-selection.
+  const header = (
+    <PageHeader
+      title={es.dashboard.title}
+      actions={
+        <div className="flex items-center gap-2">
+          <PeriodPicker value={period} onChange={setPeriod} />
+          <Button variant="ghost" onClick={() => setResetSignal((n) => n + 1)}>
+            <span className="flex items-center gap-2">
+              <RotateCcw size={15} /> {es.dashboard.resetLayout}
+            </span>
+          </Button>
+        </div>
+      }
+    />
+  );
+
   if (summary.isPending)
-    return <p className="text-sm text-fg-subtle">{es.common.loading}</p>;
+    return (
+      <>
+        {header}
+        <p className="text-sm text-fg-subtle">{es.common.loading}</p>
+      </>
+    );
   if (summary.isError)
-    return <p className="text-sm text-danger">{String(summary.error)}</p>;
+    return (
+      <>
+        {header}
+        <p className="text-sm text-danger">{String(summary.error)}</p>
+      </>
+    );
 
   const s = summary.data;
   const hasData = s.wallets.length > 0 || s.investmentsTotalMxnCents > 0;
@@ -80,7 +125,7 @@ export function DashboardPage() {
   if (!hasData) {
     return (
       <>
-        <PageHeader title={es.dashboard.title} />
+        {header}
         <EmptyState
           icon={LayoutDashboard}
           title={es.dashboard.emptyTitle}
@@ -312,19 +357,7 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader
-        title={es.dashboard.title}
-        actions={
-          <div className="flex items-center gap-2">
-            <PeriodPicker value={period} onChange={setPeriod} />
-            <Button variant="ghost" onClick={() => setResetSignal((n) => n + 1)}>
-              <span className="flex items-center gap-2">
-                <RotateCcw size={15} /> {es.dashboard.resetLayout}
-              </span>
-            </Button>
-          </div>
-        }
-      />
+      {header}
       <DashboardGrid items={items} resetSignal={resetSignal} />
     </>
   );
