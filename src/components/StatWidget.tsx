@@ -18,7 +18,8 @@ export function StatWidget({ title, action, className = "", children }: StatWidg
         <h3 className="font-display text-lg font-medium tracking-tight text-fg">{title}</h3>
         {action}
       </header>
-      <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+      {/* Vertical scroll only — a widget must never scroll sideways. */}
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">{children}</div>
     </section>
   );
 }

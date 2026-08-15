@@ -3,6 +3,7 @@ import { CalendarRange, Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DateInput } from "../../components/DateInput";
 import { inputClass } from "../../components/Field";
+import { Select } from "../../components/Select";
 import { es } from "../../i18n/es";
 import { getLocale } from "../../i18n/store";
 import type { Period } from "../../lib/types";
@@ -88,11 +89,10 @@ export function PeriodPicker({
     const onDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (rootRef.current?.contains(target)) return;
-      // The day/month/year calendar renders in a portal at <body>, so a tap
-      // inside it counts as "outside" this dropdown. Without this guard the
-      // dropdown (and the calendar with it) would close before the tap
-      // registers a date — so picking a day in a range did nothing.
-      if (target.closest?.("[data-calendar-portal]")) return;
+      // The calendar and the month/year dropdowns render in portals at <body>,
+      // so a tap inside them counts as "outside" this dropdown. Without this
+      // guard the whole picker would close before the tap registers a choice.
+      if (target.closest?.("[data-calendar-portal],[data-select-portal]")) return;
       setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
@@ -154,34 +154,29 @@ export function PeriodPicker({
 
                   {active && m === "month" && value.kind === "month" && (
                     <div className="flex gap-2 px-2.5 pb-2 pt-1">
-                      <select
-                        value={value.month}
-                        onChange={(e) =>
-                          onChange({ ...value, month: Number(e.target.value) })
-                        }
-                        className={inputClass}
-                      >
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map((mo) => (
-                          <option key={mo} value={mo}>
-                            {cap(
+                      <div className="min-w-0 flex-1">
+                        <Select
+                          aria-label={t.specificMonth}
+                          value={value.month}
+                          onChange={(month) => onChange({ ...value, month })}
+                          options={Array.from({ length: 12 }, (_, i) => i + 1).map((mo) => ({
+                            value: mo,
+                            label: cap(
                               new Intl.DateTimeFormat(intlLocale(), { month: "long" }).format(
                                 new Date(2020, mo - 1, 1),
                               ),
-                            )}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={value.year}
-                        onChange={(e) => onChange({ ...value, year: Number(e.target.value) })}
-                        className={inputClass}
-                      >
-                        {years.map((y) => (
-                          <option key={y} value={y}>
-                            {y}
-                          </option>
-                        ))}
-                      </select>
+                            ),
+                          }))}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Select
+                          aria-label="Año"
+                          value={value.year}
+                          onChange={(year) => onChange({ ...value, year })}
+                          options={years.map((y) => ({ value: y, label: String(y) }))}
+                        />
+                      </div>
                     </div>
                   )}
 

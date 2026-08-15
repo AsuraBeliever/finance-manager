@@ -26,6 +26,10 @@ export interface GridItemSpec {
   h: number;
   minW?: number;
   minH?: number;
+  /** Fixed pixel height for the phone stack. Needed by chart widgets (their
+   *  ResponsiveContainer needs a definite height) and by the one widget meant to
+   *  scroll (expense-by-category). Omit for content widgets, which grow to fit. */
+  mobileHeight?: number;
   node: ReactNode;
 }
 
@@ -188,6 +192,27 @@ export function DashboardGrid({
 
   if (layouts === null) {
     return <div ref={containerRef} className="min-h-24" />;
+  }
+
+  // On phones (narrow container) the draggable fixed-height grid forces widgets
+  // to scroll when their content doesn't match the cell. Instead, stack them at
+  // their natural height: content widgets grow to fit (no scroll, no drag) and
+  // only the ones with an explicit mobileHeight (charts, expense-by-category)
+  // get a set height.
+  const isMobile = width > 0 && width < BREAKPOINTS.sm;
+
+  if (isMobile) {
+    return (
+      <div ref={containerRef}>
+        <div className="flex flex-col gap-4">
+          {items.map((it) => (
+            <div key={it.key} style={it.mobileHeight ? { height: it.mobileHeight } : undefined}>
+              {it.node}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

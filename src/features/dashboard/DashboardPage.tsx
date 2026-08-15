@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, LayoutDashboard, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Button } from "../../components/Button";
 import { DashboardGrid, type GridItemSpec } from "../../components/DashboardGrid";
 import { EmptyState } from "../../components/EmptyState";
@@ -123,6 +123,56 @@ export function DashboardPage() {
 
   const t = trends.data;
 
+  // A donut whose legend is flowing HTML below the chart (not recharts' own
+  // legend, which lives inside the fixed chart area and gets clipped when there
+  // are many series). The chart keeps a fixed height; the card grows to fit
+  // every legend row, so nothing is cut off on the phone.
+  const donutNode = (
+    title: string,
+    data: { name: string; value: number; color: string }[],
+  ) => (
+    <StatWidget title={title}>
+      <div className="flex h-full flex-col items-center gap-3">
+        <div className="h-44 w-full shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={46}
+                outerRadius={74}
+                paddingAngle={2}
+                stroke="none"
+              >
+                {data.map((d) => (
+                  <Cell key={d.name} fill={d.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(v) => money(Math.round(Number(v) * 100))}
+                contentStyle={chart.tooltip}
+                labelStyle={{ color: chart.tooltip.color }}
+                itemStyle={{ color: chart.tooltip.color }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <ul className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs">
+          {data.map((d) => (
+            <li key={d.name} className="inline-flex items-center gap-1.5 text-fg-muted">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                style={{ backgroundColor: d.color }}
+              />
+              <span className="max-w-[9rem] truncate">{d.name}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </StatWidget>
+  );
+
   if (!hasData) {
     return (
       <>
@@ -138,7 +188,7 @@ export function DashboardPage() {
 
   // Net worth hero, as a fill-height card for the grid.
   const heroNode = (
-    <section className="relative flex h-full flex-col overflow-auto rounded-2xl border border-border-muted bg-surface-raised p-6 shadow-card md:p-7">
+    <section className="relative flex h-full flex-col overflow-y-auto overflow-x-hidden rounded-2xl border border-border-muted bg-surface-raised p-6 shadow-card md:p-7">
       <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
 
@@ -185,7 +235,7 @@ export function DashboardPage() {
 
       {t && (t.incomeMxnCents > 0 || t.expenseMxnCents > 0) && (
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-border-muted pt-4">
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <span className="text-fg-muted">{es.dashboard.incomes}</span>
             <span className="tabular-nums text-fg">{money(t.incomeMxnCents)}</span>
             {t.incomePrevMxnCents > 0 && (
@@ -195,7 +245,7 @@ export function DashboardPage() {
             )}
             <TrendBadge bps={t.incomeTrendBps} />
           </div>
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <span className="text-fg-muted">{es.dashboard.expenses}</span>
             <span className="tabular-nums text-fg">{money(t.expenseMxnCents)}</span>
             {t.expensePrevMxnCents > 0 && (
@@ -240,6 +290,7 @@ export function DashboardPage() {
       w: 12,
       h: 5,
       minH: 3,
+      mobileHeight: 300,
       node: (
         <StatWidget title={es.dashboard.flow}>
           <FlowChart trends={t} />
@@ -255,6 +306,9 @@ export function DashboardPage() {
       key: "breakdownExpense",
       w: 4,
       h: 5,
+      // The one widget allowed to scroll on the phone: the category list can be
+      // long, so cap its height and let it scroll instead of growing the page.
+      mobileHeight: 340,
       node: (
         <BreakdownWidget kind="expense" title={es.dashboard.expenseByCategory} period={period} />
       ),
@@ -279,34 +333,7 @@ export function DashboardPage() {
       key: "byWallet",
       w: 4,
       h: 5,
-      node: (
-        <StatWidget title={es.dashboard.byWallet}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={walletDonut}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={2}
-                stroke="none"
-              >
-                {walletDonut.map((d) => (
-                  <Cell key={d.name} fill={d.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(v) => money(Math.round(Number(v) * 100))}
-                contentStyle={chart.tooltip}
-                labelStyle={{ color: chart.tooltip.color }}
-                itemStyle={{ color: chart.tooltip.color }}
-              />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </StatWidget>
-      ),
+      node: donutNode(es.dashboard.byWallet, walletDonut),
     });
   }
   if (investmentsDonut.length > 0) {
@@ -314,40 +341,20 @@ export function DashboardPage() {
       key: "byInvestment",
       w: 4,
       h: 5,
-      node: (
-        <StatWidget title={es.dashboard.byInvestment}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={investmentsDonut}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={2}
-                stroke="none"
-              >
-                {investmentsDonut.map((d) => (
-                  <Cell key={d.name} fill={d.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(v) => money(Math.round(Number(v) * 100))}
-                contentStyle={chart.tooltip}
-                labelStyle={{ color: chart.tooltip.color }}
-                itemStyle={{ color: chart.tooltip.color }}
-              />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </StatWidget>
-      ),
+      node: donutNode(es.dashboard.byInvestment, investmentsDonut),
     });
   }
 
   // Income-vs-expense totals (two bars) for the same global period, at the bottom.
   if (t && (t.incomeMxnCents > 0 || t.expenseMxnCents > 0)) {
-    items.push({ key: "flowRange", w: 12, h: 5, minH: 3, node: <FlowRangeWidget period={period} /> });
+    items.push({
+      key: "flowRange",
+      w: 12,
+      h: 5,
+      minH: 3,
+      mobileHeight: 300,
+      node: <FlowRangeWidget period={period} />,
+    });
   }
 
   return (
