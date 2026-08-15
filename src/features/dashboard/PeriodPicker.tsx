@@ -86,7 +86,14 @@ export function PeriodPicker({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as HTMLElement;
+      if (rootRef.current?.contains(target)) return;
+      // The day/month/year calendar renders in a portal at <body>, so a tap
+      // inside it counts as "outside" this dropdown. Without this guard the
+      // dropdown (and the calendar with it) would close before the tap
+      // registers a date — so picking a day in a range did nothing.
+      if (target.closest?.("[data-calendar-portal]")) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);

@@ -139,6 +139,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
         createPortal(
           <div
             ref={popRef}
+            data-calendar-portal
             style={{ position: "fixed", top: pos.top, left: pos.left }}
             className="z-[60] w-72 rounded-xl border border-border-muted bg-surface-overlay p-3 shadow-2xl"
           >
