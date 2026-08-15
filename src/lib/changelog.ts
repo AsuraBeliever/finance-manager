@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.33.0",
+    date: "2026-08-15",
+    es: [
+      "El Resumen ya se ve bien en el celular. Antes los recuadros salían con barras para deslizar y no se acomodaban; ahora cada uno se ajusta a su contenido, se apilan uno debajo del otro y ninguno se desliza de lado. El único que se puede deslizar hacia abajo es «Gastos por categoría», porque su lista puede ser larga.",
+      "Las gráficas de dona («Por cartera» y «Por inversión») ahora muestran toda su lista de colores completa, sin cortarse: el recuadro crece para que quepa todo.",
+      "Al elegir un mes específico en el Resumen, la lista de meses ya abre dentro de la pantalla, en lugar de salirse por un lado.",
+    ],
+    en: [
+      "The Overview looks right on the phone now. Cards used to show scroll bars and not fit; each one now sizes to its content, they stack one under another, and none scroll sideways. The only one you can scroll down is \"Expenses by category\", since its list can be long.",
+      "The donut charts (\"By wallet\" and \"By investment\") now show their full color legend without cutting it off — the card grows to fit everything.",
+      "When picking a specific month in the Overview, the month list now opens on screen instead of running off the side.",
+    ],
+  },
+  {
     version: "2.32.1",
     date: "2026-08-15",
     es: [
