@@ -40,7 +40,8 @@ import {
   listWallets,
   projectInvestment,
 } from "../../lib/api";
-import { formatCents, parseToCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
+import { parseToCents } from "../../lib/money";
 import { todayIso } from "../../lib/date";
 import { POSITIVE, useChartTokens } from "../../lib/palette";
 import type { SimCadence } from "../../lib/types";
@@ -59,6 +60,7 @@ const clampYears = (n: number) => Math.min(MAX_YEARS, Math.max(MIN_YEARS, n));
 export function InvestmentDetailPage() {
   const { id } = useParams();
   const chart = useChartTokens();
+  const money = useMoney();
   const invId = Number(id);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -246,11 +248,11 @@ export function InvestmentDetailPage() {
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
           <p className="text-xs text-fg-subtle">{es.investments.currentValue}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums">
-            {formatCents(d.currentValueCents, d.currencyCode)}
+            {money(d.currentValueCents, d.currencyCode)}
           </p>
           {usdEquivalent !== null && (
             <p className="mt-0.5 text-xs tabular-nums text-fg-subtle">
-              ≈ {formatCents(usdEquivalent, "USD")}
+              ≈ {money(usdEquivalent, "USD")}
             </p>
           )}
         </div>
@@ -262,13 +264,13 @@ export function InvestmentDetailPage() {
             }`}
           >
             {gainPositive ? "+" : ""}
-            {formatCents(d.gainCents, d.currencyCode)}
+            {money(d.gainCents, d.currencyCode)}
           </p>
         </div>
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
           <p className="text-xs text-fg-subtle">{es.investments.netInvested}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums">
-            {formatCents(d.netInvestedCents, d.currencyCode)}
+            {money(d.netInvestedCents, d.currencyCode)}
           </p>
         </div>
         <div className="rounded-xl border border-border-muted bg-surface-raised p-4">
@@ -378,16 +380,16 @@ export function InvestmentDetailPage() {
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MiniStat
               label={es.investments.projectionFinal}
-              value={formatCents(projData.finalValueCents, d.currencyCode)}
+              value={money(projData.finalValueCents, d.currencyCode)}
               accent
             />
             <MiniStat
               label={es.investments.projectionContributed}
-              value={formatCents(projData.contributedCents, d.currencyCode)}
+              value={money(projData.contributedCents, d.currencyCode)}
             />
             <MiniStat
               label={es.investments.projectionInterest}
-              value={formatCents(projData.interestCents, d.currencyCode)}
+              value={money(projData.interestCents, d.currencyCode)}
               gold
             />
           </div>
@@ -405,7 +407,7 @@ export function InvestmentDetailPage() {
             />
             <Tooltip
               formatter={(v) =>
-                v == null ? [] : formatCents(Math.round(Number(v) * 100), d.currencyCode)
+                v == null ? [] : money(Math.round(Number(v) * 100), d.currencyCode)
               }
               contentStyle={chart.tooltip}
             />
@@ -495,7 +497,7 @@ export function InvestmentDetailPage() {
                     }`}
                   >
                     {m.kind === "deposit" ? "+" : "−"}
-                    {formatCents(m.amountCents, d.currencyCode)}
+                    {money(m.amountCents, d.currencyCode)}
                   </span>
                   <button
                     onClick={() => setMovementToEdit(m.id)}
@@ -533,7 +535,7 @@ export function InvestmentDetailPage() {
               <li key={s.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-fg-muted">{s.asOf}</span>
                 <span className="tabular-nums">
-                  {formatCents(s.valueCents, d.currencyCode)}
+                  {money(s.valueCents, d.currencyCode)}
                 </span>
               </li>
             ))}

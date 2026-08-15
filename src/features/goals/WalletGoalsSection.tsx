@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { deleteSavingsGoal, listSavingsGoals, listWallets, useSavingsGoal } from "../../lib/api";
-import { formatCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
 import type { SavingsGoal } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { WalletFormModal } from "../wallets/WalletFormModal";
@@ -15,6 +15,7 @@ import { GoalFormModal } from "./GoalFormModal";
  *  wallet has no linked goals. */
 export function WalletGoalsSection({ walletId }: { walletId: number }) {
   const qc = useQueryClient();
+  const money = useMoney();
   const goals = useQuery({ queryKey: ["savingsGoals"], queryFn: () => listSavingsGoals() });
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
   const [formGoal, setFormGoal] = useState<SavingsGoal | null>(null);
@@ -91,7 +92,7 @@ export function WalletGoalsSection({ walletId }: { walletId: number }) {
         message={
           useGoal?.linkedWalletId
             ? es.goals.useConfirmApartado
-                .replace("{amount}", formatCents(useGoal.savedCents, useGoal.currencyCode))
+                .replace("{amount}", money(useGoal.savedCents, useGoal.currencyCode))
                 .replace("{wallet}", walletName(useGoal.linkedWalletId) ?? "")
             : es.goals.useConfirmTrack
         }

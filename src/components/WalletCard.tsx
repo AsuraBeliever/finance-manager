@@ -1,6 +1,6 @@
 import { Banknote, Coins, PiggyBank, Wallet as WalletIcon } from "lucide-react";
 import { Link } from "react-router-dom";
-import { formatCents } from "../lib/money";
+import { useMoney } from "../lib/hideBalance";
 import { effectiveSkin, isImageSkin, resolveSkin, skinArt } from "../lib/skins";
 import type { Wallet } from "../lib/types";
 import { es } from "../i18n/es";
@@ -16,6 +16,7 @@ const ART_ICON = { banknote: Banknote, wallet: WalletIcon, coins: Coins, piggy: 
  *  the parent's balance through a transfer, so it has to be added back for the
  *  card to show what the bank shows — see the amounts below. */
 export function WalletCard({ wallet, pockets = [] }: { wallet: Wallet; pockets?: Wallet[] }) {
+  const money = useMoney();
   // No explicit skin → use the category's default so each category is distinct.
   const skin = effectiveSkin(wallet.skin, wallet.categoryName);
   const { background, fg } = resolveSkin(skin, wallet.color);
@@ -107,12 +108,12 @@ export function WalletCard({ wallet, pockets = [] }: { wallet: Wallet; pockets?:
 
         <div>
           <p className="font-display text-2xl font-semibold tabular-nums [text-shadow:0_1px_4px_rgba(0,0,0,0.3)]">
-            {formatCents(totalCents, wallet.currencyCode)}
+            {money(totalCents, wallet.currencyCode)}
           </p>
           {reservedCents > 0 ? (
             <p className="mt-0.5 text-xs tabular-nums opacity-80">
-              {es.wallets.available} {formatCents(availableCents, wallet.currencyCode)} ·{" "}
-              {es.wallets.reserved} {formatCents(reservedCents, wallet.currencyCode)}
+              {es.wallets.available} {money(availableCents, wallet.currencyCode)} ·{" "}
+              {es.wallets.reserved} {money(reservedCents, wallet.currencyCode)}
             </p>
           ) : (
             <p className="mt-0.5 text-xs opacity-80">{seedName(wallet.categoryName)}</p>

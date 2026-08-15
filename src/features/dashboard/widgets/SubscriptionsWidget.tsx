@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { BrandLogo } from "../../../components/BrandLogo";
 import { StatWidget } from "../../../components/StatWidget";
 import { listSubscriptions } from "../../../lib/api";
-import { formatCents } from "../../../lib/money";
+import { useMoney } from "../../../lib/hideBalance";
 import { CHART_COLORS } from "../../../lib/palette";
 import type { Period } from "../../../lib/types";
 import { es } from "../../../i18n/es";
 
 export function SubscriptionsWidget({ period }: { period: Period }) {
+  const money = useMoney();
   const q = useQuery({ queryKey: ["subscriptions", period], queryFn: () => listSubscriptions(period) });
   const data = q.data;
   if (!data) return null;
@@ -37,7 +38,7 @@ export function SubscriptionsWidget({ period }: { period: Period }) {
       <p className="mb-3 text-sm text-fg-muted">
         {es.subscriptions.chargedInPeriod}:{" "}
         <span className="font-display text-base font-semibold tabular-nums text-fg">
-          {formatCents(data.monthlyTotalMxnCents, "MXN")}
+          {money(data.monthlyTotalMxnCents)}
         </span>
       </p>
       <ul className="divide-y divide-border-muted">
@@ -58,7 +59,7 @@ export function SubscriptionsWidget({ period }: { period: Period }) {
                 <p className="text-xs text-fg-subtle">{s.nextChargeDate}</p>
               </div>
               <span className="shrink-0 tabular-nums text-sm font-medium text-fg">
-                {formatCents(s.amountCents, s.currencyCode)}
+                {money(s.amountCents, s.currencyCode)}
               </span>
             </li>
           );

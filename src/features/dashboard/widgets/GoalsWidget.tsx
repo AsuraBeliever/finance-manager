@@ -4,12 +4,13 @@ import { Gauge } from "../../../components/Gauge";
 import { ProgressBar } from "../../../components/ProgressBar";
 import { StatWidget } from "../../../components/StatWidget";
 import { listSavingsGoals } from "../../../lib/api";
-import { formatCents } from "../../../lib/money";
+import { useMoney } from "../../../lib/hideBalance";
 import { CHART_COLORS } from "../../../lib/palette";
 import type { Period } from "../../../lib/types";
 import { es } from "../../../i18n/es";
 
 export function GoalsWidget({ period }: { period: Period }) {
+  const money = useMoney();
   const q = useQuery({ queryKey: ["savingsGoals", period], queryFn: () => listSavingsGoals(period) });
   const goals = q.data;
   if (!goals) return null;
@@ -38,8 +39,8 @@ export function GoalsWidget({ period }: { period: Period }) {
       <Gauge
         value={featured.progressBps / 10000}
         color={featured.color ?? "var(--color-accent)"}
-        label={formatCents(featured.savedCents, featured.currencyCode)}
-        sublabel={`${es.goals.of} ${formatCents(featured.targetCents, featured.currencyCode)} · ${featured.name}`}
+        label={money(featured.savedCents, featured.currencyCode)}
+        sublabel={`${es.goals.of} ${money(featured.targetCents, featured.currencyCode)} · ${featured.name}`}
       />
       {rest.length > 0 && (
         <ul className="mt-4 space-y-3">
@@ -48,8 +49,8 @@ export function GoalsWidget({ period }: { period: Period }) {
               <div className="mb-1 flex items-center justify-between text-sm">
                 <span className="truncate text-fg-muted">{g.name}</span>
                 <span className="tabular-nums text-fg-subtle">
-                  {formatCents(g.savedCents, g.currencyCode)} {es.goals.of}{" "}
-                  {formatCents(g.targetCents, g.currencyCode)}
+                  {money(g.savedCents, g.currencyCode)} {es.goals.of}{" "}
+                  {money(g.targetCents, g.currencyCode)}
                 </span>
               </div>
               <ProgressBar

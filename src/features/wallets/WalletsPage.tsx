@@ -22,15 +22,17 @@ import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
+import { PrivacyToggle } from "../../components/PrivacyToggle";
 import { WalletCard } from "../../components/WalletCard";
 import { listWallets, reorderWallets } from "../../lib/api";
-import { formatCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
 import type { Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { WalletFormModal } from "./WalletFormModal";
 
 /** A compact row for an apartado (pocket) wallet, nested under its parent. */
 function ApartadoRow({ wallet }: { wallet: Wallet }) {
+  const money = useMoney();
   return (
     <Link
       to={`/carteras/${wallet.id}`}
@@ -43,7 +45,7 @@ function ApartadoRow({ wallet }: { wallet: Wallet }) {
       <PiggyBank size={15} className="shrink-0 text-fg-subtle" />
       <span className="min-w-0 flex-1 truncate text-sm text-fg">{wallet.name}</span>
       <span className="shrink-0 text-sm font-medium tabular-nums text-fg">
-        {formatCents(wallet.balanceCents, wallet.currencyCode)}
+        {money(wallet.balanceCents, wallet.currencyCode)}
       </span>
     </Link>
   );
@@ -165,6 +167,7 @@ export function WalletsPage() {
         title={es.wallets.title}
         actions={
           <div className="flex items-center gap-4">
+            <PrivacyToggle />
             <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
               <input
                 type="checkbox"

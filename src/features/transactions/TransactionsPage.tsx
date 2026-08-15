@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
+import { PrivacyToggle } from "../../components/PrivacyToggle";
 import { inputClass } from "../../components/Field";
 import {
   listFilterCategories,
@@ -76,11 +77,14 @@ export function TransactionsPage() {
       <PageHeader
         title={es.transactions.title}
         actions={
-          <Button onClick={() => setFormOpen(true)}>
-            <span className="flex items-center gap-2">
-              <Plus size={16} /> {es.transactions.newTransaction}
-            </span>
-          </Button>
+          <div className="flex items-center gap-4">
+            <PrivacyToggle />
+            <Button onClick={() => setFormOpen(true)}>
+              <span className="flex items-center gap-2">
+                <Plus size={16} /> {es.transactions.newTransaction}
+              </span>
+            </Button>
+          </div>
         }
       />
 

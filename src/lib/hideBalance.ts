@@ -1,6 +1,9 @@
-// "Hide balance" preference (the eye toggle on the dashboard). Local-only —
-// it's a per-device privacy convenience, not account state.
+// "Hide balance" / privacy mode (the eye toggle). Local-only — it's a
+// per-device privacy convenience, not account state. When on, every money
+// figure across the app is masked so you can show the screen to someone without
+// revealing balances, income or expenses (charts keep their shape).
 import { useSyncExternalStore } from "react";
+import { formatCents } from "./money";
 
 const KEY = "finanzas.hideBalance";
 const listeners = new Set<() => void>();
@@ -26,3 +29,13 @@ export function useHideBalance(): [boolean, () => void] {
 }
 
 export const MASK = "••••••";
+
+/** A money formatter that returns {@link MASK} while privacy mode is on and the
+ *  real amount otherwise. Prefer this over `formatCents` for anything that
+ *  DISPLAYS a stored figure; keep `formatCents` for live previews of what the
+ *  user is actively typing into a form. Subscribing re-renders on toggle. */
+export function useMoney(): (cents: number, currencyCode?: string) => string {
+  const [hidden] = useHideBalance();
+  return (cents: number, currencyCode = "MXN") =>
+    hidden ? MASK : formatCents(cents, currencyCode);
+}

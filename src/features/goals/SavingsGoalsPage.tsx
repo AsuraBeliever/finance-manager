@@ -22,6 +22,7 @@ import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
+import { PrivacyToggle } from "../../components/PrivacyToggle";
 import {
   deleteSavingsGoal,
   listSavingsGoals,
@@ -30,7 +31,7 @@ import {
   useSavingsGoal,
 } from "../../lib/api";
 import { WalletFormModal } from "../wallets/WalletFormModal";
-import { formatCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
 import type { SavingsGoal } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { ContributeModal } from "./ContributeModal";
@@ -85,6 +86,7 @@ function SortableGoalCard({
 
 export function SavingsGoalsPage() {
   const qc = useQueryClient();
+  const money = useMoney();
   const goals = useQuery({ queryKey: ["savingsGoals"], queryFn: () => listSavingsGoals() });
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
   const [formGoal, setFormGoal] = useState<SavingsGoal | null>(null);
@@ -139,16 +141,19 @@ export function SavingsGoalsPage() {
       <PageHeader
         title={es.goals.title}
         actions={
-          <Button
-            onClick={() => {
-              setFormGoal(null);
-              setFormOpen(true);
-            }}
-          >
-            <span className="flex items-center gap-2">
-              <Plus size={16} /> {es.goals.newGoal}
-            </span>
-          </Button>
+          <div className="flex items-center gap-4">
+            <PrivacyToggle />
+            <Button
+              onClick={() => {
+                setFormGoal(null);
+                setFormOpen(true);
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <Plus size={16} /> {es.goals.newGoal}
+              </span>
+            </Button>
+          </div>
         }
       />
 
@@ -211,7 +216,7 @@ export function SavingsGoalsPage() {
         message={
           useGoal?.linkedWalletId
             ? es.goals.useConfirmApartado
-                .replace("{amount}", formatCents(useGoal.savedCents, useGoal.currencyCode))
+                .replace("{amount}", money(useGoal.savedCents, useGoal.currencyCode))
                 .replace("{wallet}", walletName(useGoal.linkedWalletId) ?? "")
             : es.goals.useConfirmTrack
         }

@@ -1,5 +1,5 @@
 import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { formatCents } from "../../lib/money";
+import { useHideBalance, useMoney } from "../../lib/hideBalance";
 import { NEGATIVE, POSITIVE, useChartTokens } from "../../lib/palette";
 import type { BucketUnit, SpendingTrends } from "../../lib/types";
 import { es } from "../../i18n/es";
@@ -34,6 +34,8 @@ export function bucketLabel(key: string, unit: BucketUnit, long: boolean): strin
  *  range chart. */
 export function FlowChart({ trends }: { trends: SpendingTrends }) {
   const chart = useChartTokens();
+  const money = useMoney();
+  const [hidden] = useHideBalance();
   const unit = trends.bucketUnit;
 
   // Keep the widget the exact same size when the chosen period is empty: show a
@@ -61,10 +63,11 @@ export function FlowChart({ trends }: { trends: SpendingTrends }) {
           fontSize={11}
           tickFormatter={(k) => bucketLabel(String(k), unit, false)}
         />
-        <YAxis stroke={chart.axis} fontSize={11} width={40} />
+        {/* Privacy mode blanks the value axis (the bars keep their shape). */}
+        <YAxis stroke={chart.axis} fontSize={11} width={hidden ? 8 : 40} tick={!hidden} />
         <Tooltip
           labelFormatter={(label) => bucketLabel(String(label), unit, true)}
-          formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
+          formatter={(v) => money(Math.round(Number(v) * 100))}
           contentStyle={chart.tooltip}
           labelStyle={{ color: chart.tooltip.color }}
           cursor={{ fill: "color-mix(in oklab, var(--color-border-muted) 40%, transparent)" }}
@@ -82,6 +85,8 @@ export function FlowChart({ trends }: { trends: SpendingTrends }) {
  *  breakdown lives in the time-series FlowChart. */
 export function FlowTotalsChart({ trends }: { trends: SpendingTrends }) {
   const chart = useChartTokens();
+  const money = useMoney();
+  const [hidden] = useHideBalance();
 
   if (trends.incomeMxnCents === 0 && trends.expenseMxnCents === 0) {
     return (
@@ -105,9 +110,9 @@ export function FlowTotalsChart({ trends }: { trends: SpendingTrends }) {
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} barGap={0} barCategoryGap="22%">
         <XAxis dataKey="label" stroke={chart.axis} fontSize={12} tickLine={false} />
-        <YAxis stroke={chart.axis} fontSize={11} width={40} />
+        <YAxis stroke={chart.axis} fontSize={11} width={hidden ? 8 : 40} tick={!hidden} />
         <Tooltip
-          formatter={(v) => formatCents(Math.round(Number(v) * 100), "MXN")}
+          formatter={(v) => money(Math.round(Number(v) * 100))}
           contentStyle={chart.tooltip}
           labelStyle={{ color: chart.tooltip.color }}
           cursor={{ fill: "color-mix(in oklab, var(--color-border-muted) 40%, transparent)" }}

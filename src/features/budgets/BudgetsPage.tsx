@@ -8,6 +8,7 @@ import { Field, inputClass } from "../../components/Field";
 import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
+import { PrivacyToggle } from "../../components/PrivacyToggle";
 import { ProgressBar } from "../../components/ProgressBar";
 import {
   deleteBudget,
@@ -15,12 +16,14 @@ import {
   listTransactionCategories,
   setBudget,
 } from "../../lib/api";
-import { formatCents, parseToCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
+import { parseToCents } from "../../lib/money";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 
 export function BudgetsPage() {
   const qc = useQueryClient();
+  const money = useMoney();
   const budgets = useQuery({ queryKey: ["budgets"], queryFn: () => listBudgets() });
   const [formOpen, setFormOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -35,11 +38,14 @@ export function BudgetsPage() {
       <PageHeader
         title={es.budgets.title}
         actions={
-          <Button onClick={() => setFormOpen(true)}>
-            <span className="flex items-center gap-2">
-              <Plus size={16} /> {es.budgets.newBudget}
-            </span>
-          </Button>
+          <div className="flex items-center gap-4">
+            <PrivacyToggle />
+            <Button onClick={() => setFormOpen(true)}>
+              <span className="flex items-center gap-2">
+                <Plus size={16} /> {es.budgets.newBudget}
+              </span>
+            </Button>
+          </div>
         }
       />
 
@@ -80,12 +86,12 @@ export function BudgetsPage() {
               />
               <div className="mt-2 flex items-center justify-between text-sm tabular-nums">
                 <span className="text-fg-muted">
-                  {formatCents(b.spentMxnCents, "MXN")} {es.goals.of}{" "}
-                  {formatCents(b.limitCents, "MXN")}
+                  {money(b.spentMxnCents)} {es.goals.of}{" "}
+                  {money(b.limitCents)}
                 </span>
                 <span className={over ? "text-danger" : "text-accent"}>
                   {over ? es.budgets.over : es.budgets.remaining}:{" "}
-                  {formatCents(Math.abs(remaining), "MXN")}
+                  {money(Math.abs(remaining))}
                 </span>
               </div>
             </section>

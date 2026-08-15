@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CloudOff, RotateCw, Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { listWallets } from "../../lib/api";
-import { formatCents } from "../../lib/money";
+import { useMoney } from "../../lib/hideBalance";
 import {
   discard,
   flush,
@@ -20,12 +20,16 @@ const commandLabel: Record<OutboxItem["command"], string> = {
   add_transfer: es.transactions.transfer,
 };
 
-function itemSummary(item: OutboxItem, currencyByWallet: Map<number, string>): string {
+function itemSummary(
+  item: OutboxItem,
+  currencyByWallet: Map<number, string>,
+  money: (cents: number, code?: string) => string,
+): string {
   const a = item.args as Record<string, unknown>;
   const walletId = (a.walletId ?? a.fromWalletId) as number | undefined;
   const cents = (a.amountCents ?? a.amountFromCents) as number | undefined;
   const currency = (walletId !== undefined && currencyByWallet.get(walletId)) || "MXN";
-  const amount = cents !== undefined ? formatCents(cents, currency) : "";
+  const amount = cents !== undefined ? money(cents, currency) : "";
   const date = (a.occurredAt as string) ?? "";
   const desc = (a.description as string | null) ?? "";
   return [commandLabel[item.command], amount, date, desc].filter(Boolean).join(" · ");
@@ -35,6 +39,7 @@ function itemSummary(item: OutboxItem, currencyByWallet: Map<number, string>): s
  *  upload, so they render apart from the real transaction list. */
 export function OutboxPanel() {
   const queryClient = useQueryClient();
+  const money = useMoney();
   const items = useSyncExternalStore(subscribe, getItems);
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
 
@@ -62,7 +67,7 @@ export function OutboxPanel() {
           <li key={item.id} className="flex items-center gap-3 py-2 text-sm">
             <div className="min-w-0 flex-1">
               <p className="truncate text-fg">
-                {itemSummary(item, currencyByWallet)}
+                {itemSummary(item, currencyByWallet, money)}
               </p>
               {item.status === "error" && (
                 <p className="truncate text-xs text-danger">

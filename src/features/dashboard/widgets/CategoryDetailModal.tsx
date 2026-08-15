@@ -4,7 +4,7 @@ import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { Modal } from "../../../components/Modal";
 import { getCategoryTransactions, listWallets } from "../../../lib/api";
 import { transactionTime } from "../../../lib/date";
-import { formatCents } from "../../../lib/money";
+import { useMoney } from "../../../lib/hideBalance";
 import { useClock } from "../../../lib/timeFormat";
 import { useTimezone } from "../../../lib/timezone";
 import type { Period } from "../../../lib/types";
@@ -39,6 +39,7 @@ export function CategoryDetailModal({
 }) {
   const tz = useTimezone();
   const clock = useClock();
+  const money = useMoney();
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
   const currencyByWallet = useMemo(
     () => new Map((wallets.data ?? []).map((w) => [w.id, w.currencyCode])),
@@ -70,7 +71,7 @@ export function CategoryDetailModal({
           <div className="flex items-baseline justify-between border-b border-border-muted pb-3">
             <span className="text-sm text-fg-subtle">{countLabel}</span>
             <span className="font-display text-lg font-semibold tabular-nums text-fg">
-              {formatCents(target.mxnCents, "MXN")}
+              {money(target.mxnCents)}
             </span>
           </div>
 
@@ -102,7 +103,7 @@ export function CategoryDetailModal({
                     </div>
                     <span className={`text-sm font-medium tabular-nums ${color}`}>
                       {sign}
-                      {formatCents(t.amountCents, currencyByWallet.get(t.walletId) ?? "MXN")}
+                      {money(t.amountCents, currencyByWallet.get(t.walletId) ?? "MXN")}
                     </span>
                   </li>
                 );
