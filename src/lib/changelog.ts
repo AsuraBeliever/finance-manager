@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.32.1",
+    date: "2026-08-15",
+    es: [
+      "El calendario para elegir un rango en el Resumen ya funciona. Antes, al tocar un día se cerraba todo el menú sin registrar la fecha; ahora el menú se queda abierto para que puedas escoger el día de inicio y el de fin sin volver a abrirlo.",
+      "En el celular, el aviso de «Actualizar» ahora aparece como una barra abajo, justo encima de las pestañas, al alcance del pulgar. Antes estaba pegado hasta arriba y costaba alcanzarlo.",
+    ],
+    en: [
+      "The range calendar in the Overview works now. Tapping a day used to close the whole menu without registering the date; now the menu stays open so you can pick the start and end days without reopening it.",
+      "On the phone, the \"Update\" prompt now shows as a bar at the bottom, right above the tabs, within thumb's reach. It used to be pinned to the very top and was hard to reach.",
+    ],
+  },
+  {
     version: "2.32.0",
     date: "2026-08-15",
     es: [
