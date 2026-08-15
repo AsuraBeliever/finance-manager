@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.31.1",
+    date: "2026-08-15",
+    es: [
+      "El selector de periodo del Resumen ya se puede usar en el celular. El menú se abría anclado a la derecha del botón y se salía de la pantalla, así que solo veías un recuadro vacío; ahora abre completo y se lee bien sobre el fondo.",
+      "Elegir «Un mes», «Un día» o «Rango» ya no cierra el menú. Antes la página entera se reemplazaba por «Cargando…» al cambiar de periodo y el menú desaparecía antes de que pudieras escoger la fecha; ahora el Resumen se queda en pantalla mientras cargan los datos nuevos.",
+      "En el iPhone el título de cada página ya no queda debajo de la hora y la señal.",
+    ],
+    en: [
+      "The Overview period picker is usable on the phone again. The menu was anchored to the right of its button and ran off screen, so all you saw was an empty box; it now opens fully and reads clearly over the background.",
+      "Picking \"A month\", \"A day\" or \"Range\" no longer closes the menu. Changing the period used to replace the whole page with \"Loading…\", which took the menu away before you could pick a date; the Overview now stays on screen while the new data loads.",
+      "On iPhone, page titles no longer sit under the clock and signal bars.",
+    ],
+  },
+  {
     version: "2.31.0",
     date: "2026-08-01",
     es: [
