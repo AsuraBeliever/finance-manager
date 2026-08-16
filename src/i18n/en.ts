@@ -435,6 +435,8 @@ export const en: Dict = {
     released: "Released",
     emptyTitle: "No transactions",
     emptyDescription: "Log your first income, expense or transfer.",
+    noMatchTitle: "No results",
+    noMatchDescription: "No transaction matches the filters.",
     deleteConfirmTitle: "Delete transaction",
     deleteConfirm: "Delete this transaction? If it's a transfer, both legs are removed.",
     deleteInvestmentLegConfirm:

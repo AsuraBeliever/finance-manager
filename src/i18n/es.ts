@@ -444,6 +444,8 @@ export const esDict = {
     released: "Liberado",
     emptyTitle: "Sin transacciones",
     emptyDescription: "Registra tu primer ingreso, gasto o transferencia.",
+    noMatchTitle: "Sin resultados",
+    noMatchDescription: "Ninguna transacción coincide con los filtros.",
     deleteConfirmTitle: "Eliminar transacción",
     deleteConfirm:
       "¿Eliminar esta transacción? Si es una transferencia se eliminan ambas partes.",

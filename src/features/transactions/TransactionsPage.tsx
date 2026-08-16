@@ -5,21 +5,13 @@ import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { PrivacyToggle } from "../../components/PrivacyToggle";
-import { inputClass } from "../../components/Field";
-import {
-  listFilterCategories,
-  listTransactions,
-  listWallets,
-  type TxFilter,
-} from "../../lib/api";
-import { seedName } from "../../i18n/seed";
-import type { Transaction, TransactionKind } from "../../lib/types";
+import { listTransactions, listWallets, type TxFilter } from "../../lib/api";
+import type { Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
+import { TransactionFilters, type FilterKind } from "./TransactionFilters";
 import { TransactionFormModal } from "./TransactionFormModal";
 import { TransactionList } from "./TransactionList";
 import { OutboxPanel } from "./OutboxPanel";
-
-type FilterKind = TransactionKind | "transfer" | "";
 
 // The active filter survives tab switches and reloads.
 const FILTER_KEY = "finanzas.txFilter";
@@ -52,10 +44,6 @@ export function TransactionsPage() {
   }, [walletId, kind, categoryId]);
 
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
-  const categories = useQuery({
-    queryKey: ["filterCategories"],
-    queryFn: listFilterCategories,
-  });
 
   const filter: TxFilter = {
     ...(walletId !== "" && { walletId }),
@@ -66,6 +54,7 @@ export function TransactionsPage() {
     queryKey: ["transactions", filter],
     queryFn: () => listTransactions(filter),
   });
+  const filtered = walletId !== "" || kind !== "" || categoryId !== "";
 
   const currencyByWallet = useMemo(
     () => new Map((wallets.data ?? []).map((w) => [w.id, w.currencyCode])),
@@ -90,70 +79,16 @@ export function TransactionsPage() {
 
       <OutboxPanel />
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="w-full sm:w-56">
-          <select
-            className={inputClass}
-            value={walletId}
-            onChange={(e) =>
-              setWalletId(e.target.value === "" ? "" : Number(e.target.value))
-            }
-          >
-            <option value="">{es.transactions.allWallets}</option>
-            {wallets.data?.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        {/* Type as segmented buttons; picking a kind also resets the category. */}
-        <div className="flex gap-1 rounded-xl bg-surface-overlay p-1">
-          {(
-            [
-              ["", es.transactions.typeAll],
-              ["income", es.transactions.income],
-              ["expense", es.transactions.expense],
-              ["transfer", es.transactions.transfer],
-            ] as const
-          ).map(([val, label]) => (
-            <button
-              key={val || "all"}
-              type="button"
-              onClick={() => {
-                setKind(val);
-                setCategoryId("");
-              }}
-              className={`flex-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none ${
-                kind === val
-                  ? "bg-surface-raised text-fg shadow-sm"
-                  : "text-fg-subtle hover:text-fg"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {/* Category only applies to income/expense, scoped to the chosen kind. */}
-        {(kind === "income" || kind === "expense") && (
-          <div className="w-full sm:w-56">
-            <select
-              className={inputClass}
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
-            >
-              <option value="">{es.transactions.allCategories}</option>
-              {categories.data
-                ?.filter((c) => c.kind === kind)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {seedName(c.name, c.isSystem)}
-                  </option>
-                ))}
-            </select>
-          </div>
-        )}
-      </div>
+      <TransactionFilters
+        kind={kind}
+        categoryId={categoryId}
+        onChange={(next) => {
+          setKind(next.kind);
+          setCategoryId(next.categoryId);
+        }}
+        walletId={walletId}
+        onWalletChange={setWalletId}
+      />
 
       {transactions.isError && (
         <p className="text-sm text-danger">{String(transactions.error)}</p>
@@ -162,8 +97,10 @@ export function TransactionsPage() {
       {transactions.isSuccess && transactions.data.length === 0 ? (
         <EmptyState
           icon={ArrowLeftRight}
-          title={es.transactions.emptyTitle}
-          description={es.transactions.emptyDescription}
+          title={filtered ? es.transactions.noMatchTitle : es.transactions.emptyTitle}
+          description={
+            filtered ? es.transactions.noMatchDescription : es.transactions.emptyDescription
+          }
         />
       ) : (
         transactions.data && (
