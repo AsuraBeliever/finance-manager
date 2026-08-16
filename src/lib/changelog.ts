@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.35.0",
+    date: "2026-08-16",
+    es: [
+      "El Resumen ya tiene la opción «Todo el tiempo» en el selector de periodo: ves tu historia completa de un jalón — el patrimonio desde cero hasta hoy, todos tus ingresos y gastos acumulados, y la gráfica mes a mes desde tu primer movimiento.",
+      "Con «Todo el tiempo» se ocultan la comparación «antes» y la flechita de tendencia, porque no hay un periodo anterior contra el cual comparar.",
+    ],
+    en: [
+      "The Overview now has an \"All time\" option in the period picker: your whole history at once — net worth from zero to today, all your income and expenses added up, and the month-by-month chart from your very first transaction.",
+      "With \"All time\" the \"before\" comparison and the trend arrow are hidden, since there's no earlier period to compare against.",
+    ],
+  },
+  {
     version: "2.34.0",
     date: "2026-08-16",
     es: [
