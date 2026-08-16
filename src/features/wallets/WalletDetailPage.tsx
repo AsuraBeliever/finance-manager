@@ -13,14 +13,18 @@ import {
   getWallet,
   listTransactions,
   listWallets,
+  TX_LIST_LIMIT,
+  type TxFilter,
 } from "../../lib/api";
-import type { Transaction } from "../../lib/types";
+import type { Period, Transaction } from "../../lib/types";
 import { useMoney } from "../../lib/hideBalance";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 import { WalletGoalsSection } from "../goals/WalletGoalsSection";
+import { TransactionFilters, type FilterKind } from "../transactions/TransactionFilters";
 import { TransactionFormModal } from "../transactions/TransactionFormModal";
 import { TransactionList } from "../transactions/TransactionList";
+import { TransactionTotal } from "../transactions/TransactionTotal";
 import { CreditCardPanel } from "./CreditCardPanel";
 import { WalletFormModal } from "./WalletFormModal";
 
@@ -35,6 +39,10 @@ export function WalletDetailPage() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [addApartadoOpen, setAddApartadoOpen] = useState(false);
+  // Same filters as the transactions tab, minus the wallet (fixed here).
+  const [kind, setKind] = useState<FilterKind>("");
+  const [categoryId, setCategoryId] = useState<number | "">("");
+  const [period, setPeriod] = useState<Period | null>(null);
 
   const wallet = useQuery({
     queryKey: ["wallets", walletId],
@@ -52,11 +60,18 @@ export function WalletDetailPage() {
     .filter((a) => a.currencyCode === wallet.data?.currencyCode)
     .reduce((sum, a) => sum + a.balanceCents, 0);
 
+  const txFilter: TxFilter = {
+    walletId,
+    ...(kind !== "" && { kind }),
+    ...(categoryId !== "" && { categoryId }),
+    ...(period !== null && { period }),
+  };
   const transactions = useQuery({
-    queryKey: ["transactions", { walletId }],
-    queryFn: () => listTransactions({ walletId }),
+    queryKey: ["transactions", txFilter],
+    queryFn: () => listTransactions(txFilter),
     enabled: Number.isFinite(walletId),
   });
+  const txFiltered = kind !== "" || categoryId !== "" || period !== null;
 
   const currencyByWallet = useMemo(
     () =>
@@ -208,20 +223,42 @@ export function WalletDetailPage() {
         </Button>
       </div>
 
+      <TransactionFilters
+        kind={kind}
+        categoryId={categoryId}
+        onChange={(next) => {
+          setKind(next.kind);
+          setCategoryId(next.categoryId);
+        }}
+        period={period}
+        onPeriodChange={setPeriod}
+      />
+
+      <TransactionTotal filter={txFilter} />
+
       {transactions.data && transactions.data.length === 0 ? (
         <EmptyState
           icon={ArrowLeftRight}
-          title={es.transactions.emptyTitle}
-          description={es.transactions.emptyDescription}
+          title={txFiltered ? es.transactions.noMatchTitle : es.transactions.emptyTitle}
+          description={
+            txFiltered ? es.transactions.noMatchDescription : es.transactions.emptyDescription
+          }
         />
       ) : (
         transactions.data && (
-          <TransactionList
-            transactions={transactions.data}
-            currencyByWallet={currencyByWallet}
-            showWallet={false}
-            onEdit={setEditingTx}
-          />
+          <>
+            <TransactionList
+              transactions={transactions.data}
+              currencyByWallet={currencyByWallet}
+              showWallet={false}
+              onEdit={setEditingTx}
+            />
+            {transactions.data.length >= TX_LIST_LIMIT && (
+              <p className="mt-3 text-center text-xs text-fg-subtle">
+                {es.transactions.listCapped.replace("{n}", String(TX_LIST_LIMIT))}
+              </p>
+            )}
+          </>
         )
       )}
 

@@ -21,7 +21,7 @@ import { MASK, useHideBalance } from "../../lib/hideBalance";
 import { CHART_COLORS, useChartTokens } from "../../lib/palette";
 import { es } from "../../i18n/es";
 import { FlowChart } from "./FlowChart";
-import { PeriodPicker } from "./PeriodPicker";
+import { PeriodPicker } from "../../components/PeriodPicker";
 import { usePeriod } from "./usePeriod";
 import { BreakdownWidget } from "./widgets/BreakdownWidget";
 import { BudgetWidget } from "./widgets/BudgetWidget";
@@ -72,7 +72,7 @@ export function DashboardPage() {
       title={es.dashboard.title}
       actions={
         <div className="flex items-center gap-2">
-          <PeriodPicker value={period} onChange={setPeriod} />
+          <PeriodPicker value={period} onChange={(p) => setPeriod(p ?? { kind: "currentMonth" })} />
           <Button variant="ghost" onClick={() => setResetSignal((n) => n + 1)}>
             <span className="flex items-center gap-2">
               <RotateCcw size={15} /> {es.dashboard.resetLayout}

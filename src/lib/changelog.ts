@@ -12,6 +12,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.34.0",
+    date: "2026-08-16",
+    es: [
+      "Al entrar a una cartera ya puedes filtrar sus movimientos igual que en la pestaña de Transacciones: por tipo (ingresos, gastos, transferencias) y por categoría.",
+      "Al filtrar por ingresos o gastos aparece arriba de la lista cuánto suma lo que estás viendo y cuántos movimientos son. Por ejemplo: Ingresos + Intereses te dice cuánto llevas de intereses. Si el filtro mezcla monedas, el total se muestra en pesos y abajo se desglosa cada moneda.",
+      "Las dos listas (Transacciones y la de cada cartera) ahora tienen selector de fechas, el mismo del Resumen: todo el tiempo, mes actual, últimos meses, un mes, un día o un rango que tú eliges. El total respeta el periodo elegido.",
+      "La lista siempre muestra hasta 100 movimientos, pero el total considera todos los que cumplen el filtro; cuando hay más de 100 se avisa debajo de la lista.",
+    ],
+    en: [
+      "Opening a wallet now lets you filter its transactions just like the Transactions tab: by type (income, expense, transfer) and by category.",
+      "Filtering by income or expense shows what's on screen adds up to, and how many transactions it is. For example: Income + Interest tells you how much interest you've earned. If the filter mixes currencies, the total shows in pesos with each currency broken out underneath.",
+      "Both lists (Transactions and each wallet's) now have a date picker, the same one as the Overview: all time, this month, last months, a month, a day, or a range you choose. The total respects the selected window.",
+      "The list still shows up to 100 transactions, but the total counts every match; when there are more than 100 a note under the list says so.",
+    ],
+  },
+  {
     version: "2.33.0",
     date: "2026-08-15",
     es: [

@@ -332,6 +332,20 @@ export interface CategoryBreakdown {
   slices: CategorySlice[];
 }
 
+export interface CurrencyTotal {
+  currencyCode: string;
+  cents: number;
+}
+
+/** Totals for a filtered slice of the history. `byCurrency` holds the real
+ *  figures per wallet currency; `totalMxnCents` normalizes them (only worth
+ *  showing when more than one currency is in play). */
+export interface TxTotals {
+  count: number;
+  totalMxnCents: number;
+  byCurrency: CurrencyTotal[];
+}
+
 /** Dashboard flow window. Mirrors `finanzas_core::period::Period` (tagged by
  *  `kind`, camelCase). `month` is 1-12; dates are ISO `YYYY-MM-DD`. */
 export type Period =
