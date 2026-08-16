@@ -4,12 +4,14 @@
 
 use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::models::{Transaction, TransactionCategory};
+use finanzas_core::period::{resolve_period, Period};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 use worker::D1Database;
 
+use super::dashboard::{load_rates, to_mxn};
 use crate::db::{
-    all, batch, changes, exec, first, last_row_id, new_group_id, stmt, CountRow, ToJs,
+    all, batch, changes, exec, first, last_row_id, new_group_id, stmt, today_mx, CountRow, ToJs,
 };
 use crate::jsv;
 
@@ -395,7 +397,8 @@ pub async fn get_transfer(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<Tra
         jsv![group],
     )
     .await?;
-    row.map(Into::into).ok_or(AppError::NotFound("transferencia"))
+    row.map(Into::into)
+        .ok_or(AppError::NotFound("transferencia"))
 }
 
 #[derive(Deserialize)]
@@ -472,8 +475,60 @@ pub struct TxFilter {
     pub category_id: Option<i64>,
     pub from: Option<String>,
     pub to: Option<String>,
+    /// Date window picked in the UI, resolved here with the same rules the
+    /// dashboard uses so "este mes" means one thing across the app. Absent =
+    /// every date. Combines with `from`/`to`, though the UI sends only one.
+    pub period: Option<Period>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+}
+
+impl TxFilter {
+    /// Inclusive start / exclusive end of the selected period, as SQL date
+    /// literals. Bound as parameters, never interpolated.
+    fn period_bounds(&self) -> Option<(String, String)> {
+        self.period.as_ref().map(|p| {
+            let r = resolve_period(p, today_mx());
+            (r.start.to_string(), r.end.to_string())
+        })
+    }
+}
+
+/// The WHERE tail every filtered read of `transactions t` shares, so the list
+/// and its totals can never disagree about what the current filter selects.
+/// The caller has already opened the query with the `wallets w` join and the
+/// `w.user_id = ?` scope.
+fn push_tx_filter(sql: &mut String, params: &mut Vec<JsValue>, f: &TxFilter) {
+    if let Some(wid) = f.wallet_id {
+        sql.push_str(" AND t.wallet_id = ?");
+        params.push(wid.to_js());
+    }
+    if let Some(kind) = &f.kind {
+        if kind == "transfer" {
+            // A single "transfer" filter covers both directions.
+            sql.push_str(" AND t.kind IN ('transfer_in', 'transfer_out')");
+        } else {
+            sql.push_str(" AND t.kind = ?");
+            params.push(kind.to_js());
+        }
+    }
+    if let Some(cid) = f.category_id {
+        sql.push_str(" AND t.category_id = ?");
+        params.push(cid.to_js());
+    }
+    if let Some(from) = &f.from {
+        sql.push_str(" AND t.occurred_at >= ?");
+        params.push(from.to_js());
+    }
+    if let Some(to) = &f.to {
+        sql.push_str(" AND t.occurred_at <= ?");
+        params.push(to.to_js());
+    }
+    if let Some((start, end)) = f.period_bounds() {
+        sql.push_str(" AND t.occurred_at >= ? AND t.occurred_at < ?");
+        params.push(start.to_js());
+        params.push(end.to_js());
+    }
 }
 
 #[derive(Deserialize)]
@@ -544,31 +599,7 @@ pub async fn list_transactions(
          WHERE w.user_id = ?",
     );
     let mut params: Vec<JsValue> = vec![uid.to_js()];
-    if let Some(wid) = f.wallet_id {
-        sql.push_str(" AND t.wallet_id = ?");
-        params.push(wid.to_js());
-    }
-    if let Some(kind) = &f.kind {
-        if kind == "transfer" {
-            // A single "transfer" filter covers both directions.
-            sql.push_str(" AND t.kind IN ('transfer_in', 'transfer_out')");
-        } else {
-            sql.push_str(" AND t.kind = ?");
-            params.push(kind.to_js());
-        }
-    }
-    if let Some(cid) = f.category_id {
-        sql.push_str(" AND t.category_id = ?");
-        params.push(cid.to_js());
-    }
-    if let Some(from) = &f.from {
-        sql.push_str(" AND t.occurred_at >= ?");
-        params.push(from.to_js());
-    }
-    if let Some(to) = &f.to {
-        sql.push_str(" AND t.occurred_at <= ?");
-        params.push(to.to_js());
-    }
+    push_tx_filter(&mut sql, &mut params, &f);
 
     // Apartado moves to/from goals are shown as read-only informational rows so
     // the history tracks where money went (they live in goal_contributions and
@@ -599,6 +630,11 @@ pub async fn list_transactions(
             sql.push_str(" AND gc.occurred_at <= ?");
             params.push(to.to_js());
         }
+        if let Some((start, end)) = f.period_bounds() {
+            sql.push_str(" AND gc.occurred_at >= ? AND gc.occurred_at < ?");
+            params.push(start.to_js());
+            params.push(end.to_js());
+        }
     }
 
     // Order by column position (occurred_at = 10, shown-time = 13,
@@ -617,6 +653,89 @@ pub async fn list_transactions(
         .into_iter()
         .map(Into::into)
         .collect())
+}
+
+// ---- totals for the current filter ----
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrencyTotal {
+    pub currency_code: String,
+    pub cents: i64,
+}
+
+/// What the transactions currently on screen add up to. `by_currency` keeps the
+/// real figures (one entry per wallet currency in the selection, so a
+/// single-currency filter reads exactly what the rows say); `total_mxn_cents`
+/// normalizes them for the mixed case. Summing and converting both happen here
+/// — the frontend only formats.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TxTotals {
+    pub count: i64,
+    pub total_mxn_cents: i64,
+    pub by_currency: Vec<CurrencyTotal>,
+}
+
+#[derive(Deserialize)]
+struct TotalRow {
+    currency_code: String,
+    sum_cents: i64,
+    n: i64,
+}
+
+/// Totals for a filtered slice of the history. Only income and expense add up
+/// to something meaningful — transfers move money between the user's own
+/// wallets and apartado rows never touched a balance — so the filter must name
+/// one of those two kinds.
+pub async fn sum_transactions(
+    db: &D1Database,
+    uid: i64,
+    args: ListTransactionsArgs,
+) -> AppResult<TxTotals> {
+    let f = args.filter;
+    match f.kind.as_deref() {
+        Some("income") | Some("expense") => {}
+        _ => {
+            return Err(AppError::InvalidInput(
+                "el total sólo aplica a ingresos o gastos".into(),
+            ))
+        }
+    }
+    let mut sql = String::from(
+        "SELECT w.currency_code AS currency_code,
+                SUM(t.amount_cents) AS sum_cents,
+                COUNT(*) AS n
+         FROM transactions t
+         JOIN wallets w ON w.id = t.wallet_id
+         WHERE w.user_id = ?",
+    );
+    let mut params: Vec<JsValue> = vec![uid.to_js()];
+    push_tx_filter(&mut sql, &mut params, &f);
+    sql.push_str(" GROUP BY w.currency_code ORDER BY w.currency_code");
+
+    let rows: Vec<TotalRow> = all(db, &sql, params).await?;
+    let rates = load_rates(db, uid).await?;
+    let mut total_mxn_cents = 0i64;
+    let mut count = 0i64;
+    let mut by_currency = Vec::with_capacity(rows.len());
+    for r in rows {
+        // An unconfigured rate can't be guessed: leave it out of the MXN total
+        // rather than count it as zero pesos, the by-currency line still shows it.
+        if let Some(rate) = rates.get(&r.currency_code) {
+            total_mxn_cents += to_mxn(r.sum_cents, *rate);
+        }
+        count += r.n;
+        by_currency.push(CurrencyTotal {
+            currency_code: r.currency_code,
+            cents: r.sum_cents,
+        });
+    }
+    Ok(TxTotals {
+        count,
+        total_mxn_cents,
+        by_currency,
+    })
 }
 
 #[derive(Deserialize)]

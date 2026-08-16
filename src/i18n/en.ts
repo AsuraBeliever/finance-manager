@@ -221,6 +221,7 @@ export const en: Dict = {
     viewAll: "View all",
     period: {
       label: "Period",
+      allTime: "All time",
       currentMonth: "This month",
       lastMonths: "Last months",
       lastMonthsN: "Last {n} months",
@@ -437,6 +438,10 @@ export const en: Dict = {
     emptyDescription: "Log your first income, expense or transfer.",
     noMatchTitle: "No results",
     noMatchDescription: "No transaction matches the filters.",
+    totalIncome: "Total income",
+    totalExpense: "Total expense",
+    totalConverted: "Converted to MXN",
+    listCapped: "Showing the {n} most recent transactions; the total counts them all.",
     deleteConfirmTitle: "Delete transaction",
     deleteConfirm: "Delete this transaction? If it's a transfer, both legs are removed.",
     deleteInvestmentLegConfirm:

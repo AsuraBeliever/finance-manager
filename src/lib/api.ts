@@ -28,6 +28,7 @@ import type {
   Transaction,
   TransactionCategory,
   TransactionKind,
+  TxTotals,
   Wallet,
   WalletCategory,
 } from "./types";
@@ -200,6 +201,8 @@ export interface TxFilter {
   categoryId?: number;
   from?: string;
   to?: string;
+  /** Date window, resolved in Rust like the dashboard's. Absent = every date. */
+  period?: Period;
   limit?: number;
   offset?: number;
 }
@@ -221,8 +224,18 @@ export const getTransfer = (id: number) =>
 export const updateTransfer = (id: number, input: TransferInput) =>
   rpc<void>("update_transfer", { id, ...input });
 
+/** How many rows a list request returns when it doesn't ask for a limit —
+ *  mirrors the worker's default. A full page means there are probably more,
+ *  which is worth saying out loud next to a total that counts all of them. */
+export const TX_LIST_LIMIT = 100;
+
 export const listTransactions = (filter: TxFilter = {}) =>
   rpc<Transaction[]>("list_transactions", { filter });
+
+/** What the filtered transactions add up to. Income/expense only — the worker
+ *  rejects any other kind, since transfers and apartado moves don't total. */
+export const sumTransactions = (filter: TxFilter) =>
+  rpc<TxTotals>("sum_transactions", { filter });
 
 /** Edit an income/expense transaction. Transfers aren't editable (delete + recreate). */
 export const updateTransaction = (id: number, input: SimpleTxInput) =>

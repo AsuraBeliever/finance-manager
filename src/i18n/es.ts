@@ -227,6 +227,7 @@ export const esDict = {
     viewAll: "Ver todo",
     period: {
       label: "Periodo",
+      allTime: "Todo el tiempo",
       currentMonth: "Mes actual",
       lastMonths: "Últimos meses",
       lastMonthsN: "Últimos {n} meses",
@@ -446,6 +447,10 @@ export const esDict = {
     emptyDescription: "Registra tu primer ingreso, gasto o transferencia.",
     noMatchTitle: "Sin resultados",
     noMatchDescription: "Ninguna transacción coincide con los filtros.",
+    totalIncome: "Total de ingresos",
+    totalExpense: "Total de gastos",
+    totalConverted: "Convertido a MXN",
+    listCapped: "Se muestran los {n} movimientos más recientes; el total los considera todos.",
     deleteConfirmTitle: "Eliminar transacción",
     deleteConfirm:
       "¿Eliminar esta transacción? Si es una transferencia se eliminan ambas partes.",

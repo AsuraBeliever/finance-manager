@@ -13,9 +13,10 @@ import {
   getWallet,
   listTransactions,
   listWallets,
+  TX_LIST_LIMIT,
   type TxFilter,
 } from "../../lib/api";
-import type { Transaction } from "../../lib/types";
+import type { Period, Transaction } from "../../lib/types";
 import { useMoney } from "../../lib/hideBalance";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
@@ -23,6 +24,7 @@ import { WalletGoalsSection } from "../goals/WalletGoalsSection";
 import { TransactionFilters, type FilterKind } from "../transactions/TransactionFilters";
 import { TransactionFormModal } from "../transactions/TransactionFormModal";
 import { TransactionList } from "../transactions/TransactionList";
+import { TransactionTotal } from "../transactions/TransactionTotal";
 import { CreditCardPanel } from "./CreditCardPanel";
 import { WalletFormModal } from "./WalletFormModal";
 
@@ -40,6 +42,7 @@ export function WalletDetailPage() {
   // Same filters as the transactions tab, minus the wallet (fixed here).
   const [kind, setKind] = useState<FilterKind>("");
   const [categoryId, setCategoryId] = useState<number | "">("");
+  const [period, setPeriod] = useState<Period | null>(null);
 
   const wallet = useQuery({
     queryKey: ["wallets", walletId],
@@ -61,13 +64,14 @@ export function WalletDetailPage() {
     walletId,
     ...(kind !== "" && { kind }),
     ...(categoryId !== "" && { categoryId }),
+    ...(period !== null && { period }),
   };
   const transactions = useQuery({
     queryKey: ["transactions", txFilter],
     queryFn: () => listTransactions(txFilter),
     enabled: Number.isFinite(walletId),
   });
-  const txFiltered = kind !== "" || categoryId !== "";
+  const txFiltered = kind !== "" || categoryId !== "" || period !== null;
 
   const currencyByWallet = useMemo(
     () =>
@@ -226,7 +230,11 @@ export function WalletDetailPage() {
           setKind(next.kind);
           setCategoryId(next.categoryId);
         }}
+        period={period}
+        onPeriodChange={setPeriod}
       />
+
+      <TransactionTotal filter={txFilter} />
 
       {transactions.data && transactions.data.length === 0 ? (
         <EmptyState
@@ -238,12 +246,19 @@ export function WalletDetailPage() {
         />
       ) : (
         transactions.data && (
-          <TransactionList
-            transactions={transactions.data}
-            currencyByWallet={currencyByWallet}
-            showWallet={false}
-            onEdit={setEditingTx}
-          />
+          <>
+            <TransactionList
+              transactions={transactions.data}
+              currencyByWallet={currencyByWallet}
+              showWallet={false}
+              onEdit={setEditingTx}
+            />
+            {transactions.data.length >= TX_LIST_LIMIT && (
+              <p className="mt-3 text-center text-xs text-fg-subtle">
+                {es.transactions.listCapped.replace("{n}", String(TX_LIST_LIMIT))}
+              </p>
+            )}
+          </>
         )
       )}
 

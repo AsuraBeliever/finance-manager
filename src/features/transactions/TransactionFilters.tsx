@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { inputClass } from "../../components/Field";
+import { PeriodPicker } from "../../components/PeriodPicker";
 import { listFilterCategories, listWallets } from "../../lib/api";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
-import type { TransactionKind } from "../../lib/types";
+import type { Period, TransactionKind } from "../../lib/types";
 
 export type FilterKind = TransactionKind | "transfer" | "";
 
@@ -11,17 +12,22 @@ interface TransactionFiltersProps {
   kind: FilterKind;
   categoryId: number | "";
   onChange: (next: { kind: FilterKind; categoryId: number | "" }) => void;
+  /** Date window; null = every date, the default here. */
+  period: Period | null;
+  onPeriodChange: (p: Period | null) => void;
   /** Wallet picker — pass both to show it; omit when the wallet is fixed. */
   walletId?: number | "";
   onWalletChange?: (walletId: number | "") => void;
 }
 
 /** Filter bar shared by the transactions tab and the wallet detail: type,
- *  category (only for income/expense) and optionally the wallet. */
+ *  category (only for income/expense), date window and optionally the wallet. */
 export function TransactionFilters({
   kind,
   categoryId,
   onChange,
+  period,
+  onPeriodChange,
   walletId,
   onWalletChange,
 }: TransactionFiltersProps) {
@@ -103,6 +109,9 @@ export function TransactionFilters({
           </select>
         </div>
       )}
+      {/* Date window, same picker (and same resolved windows) as the dashboard,
+          plus "todo el tiempo" — the default for a history list. */}
+      <PeriodPicker value={period} onChange={onPeriodChange} allowAll />
     </div>
   );
 }

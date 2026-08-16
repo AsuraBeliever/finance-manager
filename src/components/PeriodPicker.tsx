@@ -1,12 +1,12 @@
 import { format } from "date-fns";
 import { CalendarRange, Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { DateInput } from "../../components/DateInput";
-import { inputClass } from "../../components/Field";
-import { Select } from "../../components/Select";
-import { es } from "../../i18n/es";
-import { getLocale } from "../../i18n/store";
-import type { Period } from "../../lib/types";
+import { DateInput } from "./DateInput";
+import { inputClass } from "./Field";
+import { Select } from "./Select";
+import { es } from "../i18n/es";
+import { getLocale } from "../i18n/store";
+import type { Period } from "../lib/types";
 
 const todayIso = () => format(new Date(), "yyyy-MM-dd");
 const startOfMonthIso = () => format(new Date(), "yyyy-MM-01");
@@ -24,9 +24,11 @@ const dayName = (iso: string) =>
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** Human label for the current selection, shown on the trigger button. */
-export function periodLabel(p: Period): string {
+/** Human label for the current selection, shown on the trigger button. `null`
+ *  is "every date" — only offered where the picker allows it. */
+export function periodLabel(p: Period | null): string {
   const t = es.dashboard.period;
+  if (p === null) return t.allTime;
   switch (p.kind) {
     case "currentMonth":
       return t.currentMonth;
@@ -76,9 +78,13 @@ function defaultFor(m: Mode): Period {
 export function PeriodPicker({
   value,
   onChange,
+  /** Offer "todo el tiempo" (no date filter) as the first choice. The dashboard
+   *  always needs a window; the transaction filters default to no window. */
+  allowAll = false,
 }: {
-  value: Period;
-  onChange: (p: Period) => void;
+  value: Period | null;
+  onChange: (p: Period | null) => void;
+  allowAll?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -119,8 +125,25 @@ export function PeriodPicker({
       {open && (
         <div className="absolute left-0 z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border-muted bg-surface-overlay p-2 shadow-2xl sm:left-auto sm:right-0">
           <ul className="space-y-0.5">
+            {allowAll && (
+              <li>
+                <button
+                  onClick={() => onChange(null)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors ${
+                    value === null
+                      ? "bg-surface-overlay text-fg"
+                      : "text-fg-muted hover:bg-surface-overlay"
+                  }`}
+                >
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                    {value === null && <Check size={14} className="text-accent" />}
+                  </span>
+                  {t.allTime}
+                </button>
+              </li>
+            )}
             {MODES.map((m) => {
-              const active = value.kind === m;
+              const active = value?.kind === m;
               return (
                 <li key={m}>
                   <button
