@@ -353,7 +353,9 @@ export type Period =
   | { kind: "lastMonths"; months: number }
   | { kind: "month"; year: number; month: number }
   | { kind: "day"; date: string }
-  | { kind: "range"; from: string; to: string };
+  | { kind: "range"; from: string; to: string }
+  /** Everything up to today. */
+  | { kind: "allTime" };
 
 export type BucketUnit = "day" | "month";
 

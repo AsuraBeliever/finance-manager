@@ -25,6 +25,8 @@ pub enum Period {
     Day { date: NaiveDate },
     /// An inclusive range `[from, to]` (`YYYY-MM-DD` each).
     Range { from: NaiveDate, to: NaiveDate },
+    /// Everything ever recorded, up to and including today.
+    AllTime,
 }
 
 /// How the flow chart groups the window into bars.
@@ -59,6 +61,13 @@ pub struct ResolvedPeriod {
 /// A range spanning at most this many days is charted by day; beyond it, by
 /// month. ~2 months keeps a single specific month (28–31 days) on daily bars.
 const DAILY_MAX_SPAN_DAYS: i64 = 62;
+
+/// Where `Period::AllTime` starts counting. Earlier than any movement anyone
+/// would record here, and it sorts correctly as a `YYYY-MM-DD` SQL literal.
+const ALL_TIME_START: NaiveDate = match NaiveDate::from_ymd_opt(1900, 1, 1) {
+    Some(d) => d,
+    None => unreachable!(),
+};
 
 fn first_of_month(d: NaiveDate) -> NaiveDate {
     NaiveDate::from_ymd_opt(d.year(), d.month(), 1).expect("day 1 always valid")
@@ -138,6 +147,22 @@ pub fn resolve_period(period: &Period, today: NaiveDate) -> ResolvedPeriod {
                 prev_start: lo - chrono::Duration::days(span_days),
                 prev_end: lo,
                 bucket,
+            }
+        }
+        Period::AllTime => {
+            // A floor no personal-finance record realistically precedes. Keeping
+            // it fixed keeps this function pure, and it costs nothing: the SQL
+            // only ever returns rows that exist, so empty years never show up as
+            // bars or as balance.
+            let start = ALL_TIME_START;
+            // Nothing came before "everything", so the previous window is empty:
+            // the totals it feeds are zero and the trend chip hides itself.
+            ResolvedPeriod {
+                start,
+                end: today.succ_opt().unwrap_or(today),
+                prev_start: start,
+                prev_end: start,
+                bucket: Bucket::Month,
             }
         }
     }
@@ -237,6 +262,17 @@ mod tests {
             },
             d(2026, 6, 19),
         );
+        assert_eq!(r.bucket, Bucket::Month);
+    }
+
+    #[test]
+    fn all_time_covers_today_and_has_no_previous_window() {
+        let r = resolve_period(&Period::AllTime, d(2026, 6, 19));
+        assert_eq!(r.start, d(1900, 1, 1));
+        // Exclusive end one day past today, so today's movements count.
+        assert_eq!(r.end, d(2026, 6, 20));
+        // Empty previous window: nothing precedes "everything".
+        assert_eq!(r.prev_start, r.prev_end);
         assert_eq!(r.bucket, Bucket::Month);
     }
 

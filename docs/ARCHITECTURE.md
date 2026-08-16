@@ -75,7 +75,7 @@ puente Tauri original), respuesta JSON o `{"error": "..."}` (400/401/404/500).
 | Tarjetas de crédito | `get_credit_card_summary` (deuda, saldo al corte, por pagar, fecha límite, utilización, crédito disponible, MSI), `preview_msi_plan` (calendario en vivo para el form), `create_msi_plan` (devuelve el mismo calendario para la confirmación), `delete_msi_plan` — lógica de calendario en `finanzas-core::credit`; el cron postea las mensualidades MSI |
 | Transacciones | `add_income`, `add_expense`, `add_transfer` (los tres aceptan `clientId` opcional para idempotencia del outbox offline), `list_transactions`, `sum_transactions` (total de lo filtrado: `count`, `totalMxnCents` y `byCurrency`; sólo con `kind` = `income` o `expense`), `delete_transaction`, `list_transaction_categories`, `create_transaction_category` — el `filter` de los dos primeros acepta `walletId`, `kind`, `categoryId`, `from`/`to` y `period` (misma ventana que analytics, resuelta en `finanzas-core::period`) |
 | Dashboard | `get_dashboard_summary` (foto del momento: saldos, donas, inversiones) |
-| Analytics | `get_spending_trends`, `get_category_breakdown` — ambos aceptan `period` (`{kind}`: `currentMonth` \| `lastMonths{months}` \| `month{year,month}` \| `day{date}` \| `range{from,to}`); la ventana se resuelve en `finanzas-core::period` |
+| Analytics | `get_spending_trends`, `get_category_breakdown` — ambos aceptan `period` (`{kind}`: `allTime` \| `currentMonth` \| `lastMonths{months}` \| `month{year,month}` \| `day{date}` \| `range{from,to}`); la ventana se resuelve en `finanzas-core::period` |
 | Inversiones | `list_investments`, `create_investment`, `update_investment`, `close_investment`, `delete_investment`, `get_investment_detail`, `add_snapshot`, `add_investment_movement`, `get_investment_movement` (por id o por su transacción), `update_investment_movement`, `delete_investment_movement`, `list_calculators`, `get_investment_catalog` |
 | Ajustes / mercado | `list_currencies`, `add_currency`, `get_exchange_rates`, `set_exchange_rate`, `fetch_exchange_rates`, `fetch_banxico_rate`, `refresh_market_data_cmd`, `get_setting`, `set_setting` |
 
@@ -162,7 +162,7 @@ npm run dev                          # (opcional) Vite con HMR; /api se proxea a
 | Ruta | Pantalla |
 |---|---|
 | (sin sesión) | Login / registro con código de invitación |
-| `/` | Resumen: patrimonio total MXN, desglose por moneda, dona por cartera, gráfica de flujo con selector de periodo (mes actual / últimos X meses / un mes / un día / rango), card de inversiones |
+| `/` | Resumen: patrimonio total MXN, desglose por moneda, dona por cartera, gráfica de flujo con selector de periodo (todo el tiempo / mes actual / últimos X meses / un mes / un día / rango), card de inversiones |
 | `/carteras`, `/carteras/:id` | Lista + detalle con historial de transacciones |
 | `/transacciones` | Lista con filtros; modal con tabs ingreso/gasto/transferencia |
 | `/inversiones`, `/inversiones/:id` | Lista + detalle con gráfica de proyección y vencimiento |
