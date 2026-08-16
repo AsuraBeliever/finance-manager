@@ -109,9 +109,15 @@ export function TransactionFilters({
           </select>
         </div>
       )}
-      {/* Date window, same picker (and same resolved windows) as the dashboard,
-          plus "todo el tiempo" — the default for a history list. */}
-      <PeriodPicker value={period} onChange={onPeriodChange} allowAll />
+      {/* Date window, same picker (and same resolved windows) as the dashboard.
+          "Todo el tiempo" here drops the date filter entirely rather than
+          asking for the allTime window: this is a ledger, so a movement dated
+          in the future has to stay visible. */}
+      <PeriodPicker
+        value={period ?? { kind: "allTime" }}
+        onChange={(p) => onPeriodChange(p.kind === "allTime" ? null : p)}
+        allowAll
+      />
     </div>
   );
 }
