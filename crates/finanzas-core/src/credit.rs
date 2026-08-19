@@ -62,14 +62,28 @@ pub fn due_date(cut: NaiveDate, due_days: i64) -> NaiveDate {
     cut + Duration::days(due_days.max(0))
 }
 
-/// Date of the `n`-th (1-based) MSI installment: the `n`-th cut date strictly
-/// after the purchase, which is when the bank bills each monthly charge.
+/// Cut date that BILLS the `n`-th (1-based) MSI installment: the `n`-th cut
+/// strictly after the purchase. That statement is the one you pay to keep the
+/// plan interest-free.
 pub fn msi_installment_date(purchased_at: NaiveDate, cut_day: u32, n: u32) -> NaiveDate {
     let mut date = purchased_at;
     for _ in 0..n.max(1) {
         date = next_cut_date(date, cut_day);
     }
     date
+}
+
+/// Date the `n`-th installment joins the card's balance — what banks show as
+/// "deuda actual" long before the statement closes. The first installment
+/// lands the moment you buy (the purchase is split right away); every later
+/// one lands when the cycle that will bill it opens, i.e. the day after the
+/// previous installment's cut.
+pub fn msi_charge_date(purchased_at: NaiveDate, cut_day: u32, n: u32) -> NaiveDate {
+    if n <= 1 {
+        purchased_at
+    } else {
+        msi_installment_date(purchased_at, cut_day, n - 1) + Duration::days(1)
+    }
 }
 
 /// Cents billed on the `n`-th (1-based) of `months` installments. Plain
@@ -87,23 +101,25 @@ pub fn msi_installment_cents(total_cents: i64, months: i64, n: i64) -> i64 {
     }
 }
 
-/// How many installments of an MSI plan have been billed on or before `today`.
-pub fn msi_installments_due(
+/// How many installments of an MSI plan are already part of the debt on
+/// `today` (see [`msi_charge_date`]): at least one from the day of the
+/// purchase, one more after every cut that goes by.
+pub fn msi_installments_charged(
     purchased_at: NaiveDate,
     cut_day: u32,
     months: u32,
     today: NaiveDate,
 ) -> u32 {
-    let mut due = 0;
-    let mut date = purchased_at;
-    while due < months {
-        date = next_cut_date(date, cut_day);
-        if date > today {
-            break;
-        }
-        due += 1;
+    if months == 0 || today < purchased_at {
+        return 0;
     }
-    due
+    let mut charged = 1;
+    let mut cut = next_cut_date(purchased_at, cut_day);
+    while charged < months && cut < today {
+        charged += 1;
+        cut = next_cut_date(cut, cut_day);
+    }
+    charged
 }
 
 /// Next occurrence of an `MM-DD` anniversary (annual fee) strictly after
@@ -207,22 +223,66 @@ mod tests {
     }
 
     #[test]
-    fn msi_installments_due_counts_billed_months() {
-        // Bought June 20, cut day 15, 6 months: by Aug 20 two cuts passed.
+    fn msi_charge_dates_open_each_cycle() {
+        // Bought June 20, cut day 15: mensualidad 1 is debt from the purchase
+        // day and is billed at the July 15 cut; mensualidad 2 joins the debt
+        // on July 16 (the day the next cycle opens) and is billed on Aug 15.
+        assert_eq!(msi_charge_date(d("2026-06-20"), 15, 1), d("2026-06-20"));
+        assert_eq!(msi_charge_date(d("2026-06-20"), 15, 2), d("2026-07-16"));
+        assert_eq!(msi_charge_date(d("2026-06-20"), 15, 3), d("2026-08-16"));
+        // Bought ON the cut day: that statement closes without the plan, so
+        // mensualidad 1 still enters today and bills at the next cut.
+        assert_eq!(msi_charge_date(d("2026-06-15"), 15, 1), d("2026-06-15"));
+        assert_eq!(msi_charge_date(d("2026-06-15"), 15, 2), d("2026-07-16"));
+    }
+
+    #[test]
+    fn msi_installments_charged_counts_the_debt_so_far() {
+        // Bought June 20, cut day 15, 6 months: by Aug 20 two cuts passed, so
+        // three mensualidades are already debt.
         assert_eq!(
-            msi_installments_due(d("2026-06-20"), 15, 6, d("2026-08-20")),
-            2
+            msi_installments_charged(d("2026-06-20"), 15, 6, d("2026-08-20")),
+            3
         );
-        // The day before the first cut nothing is billed yet.
+        // The day of the purchase the first one already counts (this is the
+        // number the bank app shows), and it stays alone until the cut.
         assert_eq!(
-            msi_installments_due(d("2026-06-20"), 15, 6, d("2026-07-14")),
-            0
+            msi_installments_charged(d("2026-06-20"), 15, 6, d("2026-06-20")),
+            1
+        );
+        assert_eq!(
+            msi_installments_charged(d("2026-06-20"), 15, 6, d("2026-07-15")),
+            1
+        );
+        assert_eq!(
+            msi_installments_charged(d("2026-06-20"), 15, 6, d("2026-07-16")),
+            2
         );
         // Far in the future it caps at the plan length.
         assert_eq!(
-            msi_installments_due(d("2026-06-20"), 15, 6, d("2027-12-31")),
+            msi_installments_charged(d("2026-06-20"), 15, 6, d("2027-12-31")),
             6
         );
+        // Nothing before the purchase.
+        assert_eq!(
+            msi_installments_charged(d("2026-06-20"), 15, 6, d("2026-06-19")),
+            0
+        );
+    }
+
+    #[test]
+    fn msi_first_installment_shows_up_like_the_bank_app() {
+        // Real case: $483.22 in 3 meses bought Aug 17 on a card that cuts on
+        // the 8th. The card app shows $161.08 owed the same day, and the
+        // statement that closes Sep 8 asks for exactly that.
+        let purchased = d("2026-08-17");
+        assert_eq!(
+            msi_installments_charged(purchased, 8, 3, d("2026-08-18")),
+            1
+        );
+        assert_eq!(msi_installment_cents(48_322, 3, 1), 16_108);
+        assert_eq!(msi_charge_date(purchased, 8, 1), purchased);
+        assert_eq!(msi_installment_date(purchased, 8, 1), d("2026-09-08"));
     }
 
     #[test]

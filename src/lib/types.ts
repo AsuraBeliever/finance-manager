@@ -55,9 +55,10 @@ export interface MsiPlan {
   months: number;
   /** The regular installment (the first also carries the cent remainder). */
   monthlyCents: number;
+  /** Installments already part of the debt. */
   billedMonths: number;
   pendingCents: number;
-  /** Null once the plan is fully billed. */
+  /** When the next installment joins the debt; null once all of them have. */
   nextChargeDate: string | null;
   nextChargeCents: number | null;
   purchasedAt: string;
@@ -71,10 +72,13 @@ export interface MsiSchedulePreview {
   /** The regular installment (the first also carries the cent remainder). */
   monthlyCents: number;
   firstChargeCents: number;
-  firstChargeDate: string;
+  /** Cut that bills the first installment — the statement that pays it. */
+  firstCutDate: string;
+  /** When the last installment joins the debt. */
   lastChargeDate: string;
   months: number;
-  /** Installments already due (back-dated purchase) that post immediately. */
+  /** Installments that join the debt right away: one for a purchase made
+   *  today, more when the purchase is back-dated past a cut. */
   alreadyBilledMonths: number;
   alreadyBilledCents: number;
 }

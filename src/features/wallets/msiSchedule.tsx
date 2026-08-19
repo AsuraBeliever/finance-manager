@@ -1,7 +1,7 @@
-// Shared MSI schedule UI: the live "≈ $X/mo · first charge on…" line while
-// typing and the save confirmation body. Used by the card panel's MSI form
-// and the generic transaction form, so both feel identical. The schedule is
-// always computed by the server (it owns the cut day) via preview_msi_plan.
+// Shared MSI schedule UI: the live "≈ $X/mo · the first one lands today" line
+// while typing and the save confirmation body. Used by the card panel's MSI
+// form and the generic transaction form, so both feel identical. The schedule
+// is always computed by the server (it owns the cut day) via preview_msi_plan.
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { previewMsiPlan } from "../../lib/api";
@@ -61,16 +61,19 @@ export function MsiPreviewLine({ preview, currency }: { preview?: MsiSchedulePre
       <p>
         {es.credit.msiPreviewLine
           .replace("{monthly}", formatCents(preview.monthlyCents, currency))
-          .replace("{amount}", formatCents(preview.firstChargeCents, currency))
-          .replace("{date}", formatDayMonth(preview.firstChargeDate))}
+          .replace("{months}", String(preview.months))}
       </p>
-      {preview.alreadyBilledMonths > 0 && (
-        <p className="mt-1">
-          {es.credit.msiPreviewBackdated
-            .replace("{n}", String(preview.alreadyBilledMonths))
-            .replace("{amount}", formatCents(preview.alreadyBilledCents, currency))}
-        </p>
-      )}
+      {/* A purchase always drops its first installment into the debt today; a
+          back-dated one drops every installment its cycles already ran. */}
+      <p className="mt-1">
+        {preview.alreadyBilledMonths > 1
+          ? es.credit.msiPreviewBackdated
+              .replace("{n}", String(preview.alreadyBilledMonths))
+              .replace("{amount}", formatCents(preview.alreadyBilledCents, currency))
+          : es.credit.msiPreviewFirst
+              .replace("{amount}", formatCents(preview.firstChargeCents, currency))
+              .replace("{cut}", formatDayMonth(preview.firstCutDate))}
+      </p>
     </div>
   );
 }
@@ -83,10 +86,10 @@ export function MsiSavedInfo({ preview, currency }: { preview: MsiSchedulePrevie
       <p>
         {es.credit.msiSavedBody
           .replace("{amount}", formatCents(preview.firstChargeCents, currency))
-          .replace("{first}", formatDayMonth(preview.firstChargeDate))
+          .replace("{cut}", formatDayMonth(preview.firstCutDate))
           .replace("{last}", formatDayMonth(preview.lastChargeDate))}
       </p>
-      {preview.alreadyBilledMonths > 0 && (
+      {preview.alreadyBilledMonths > 1 && (
         <p className="mt-1.5">
           {es.credit.msiSavedBackdated
             .replace("{n}", String(preview.alreadyBilledMonths))

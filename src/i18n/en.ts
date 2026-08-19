@@ -326,21 +326,21 @@ export const en: Dict = {
     msiTitle: "Installment purchases (MSI)",
     msiAdd: "MSI purchase",
     msiEmpty:
-      "Register an interest-free installment purchase and its monthly charges will post themselves on every cut-off.",
-    msiProgress: "{billed} of {months} installments",
+      "Register an interest-free installment purchase and its monthly charges will join your debt on their own, one per period.",
+    msiProgress: "{billed} of {months} installments in your debt",
     msiMonthly: "{amount}/mo",
-    msiNextCharge: "Next charge: {amount} on {date}",
+    msiNextCharge: "Next installment: {amount} on {date}",
     msiDone: "Paid off ✓",
     msiPendingTotal: "Unbilled MSI",
     msiToggle: "Interest-free installment purchase (MSI)",
     msiToggleHint:
-      "Instead of a single expense, each monthly charge will post itself to your history on every cut-off.",
+      "Instead of a single expense, each installment joins your debt on its own: the first one today, the rest on every period.",
     msiNeedsDescription: "Describe the purchase to name its installments",
     msiTotal: "Total amount",
     msiMonths: "Months",
     msiPurchasedAt: "Purchase date",
     msiBackdatedHint:
-      "If the purchase is months old, the already-due installments post immediately.",
+      "If the purchase is months old, every installment that already ran joins your debt immediately.",
     msiDeleteTitle: "Delete MSI purchase",
     msiDeleteMessage:
       "Its already-posted installments will be removed from the history too. This cannot be undone.",
@@ -351,20 +351,27 @@ export const en: Dict = {
     initialDebtHint:
       "What you already owe on this card today (leave it empty if it starts at zero).",
     // Live MSI schedule preview + save confirmation
-    msiPreviewLine: "≈ {monthly}/mo · first charge: {amount} on {date}",
+    msiPreviewLine: "≈ {monthly}/mo for {months} months.",
+    msiPreviewFirst:
+      "The 1st installment ({amount}) joins your debt right away and is paid on your {cut} cut-off.",
     msiPreviewBackdated:
-      "{n} already-due installments ({amount}) will post immediately.",
+      "{n} installments ({amount}) join your debt right away (months-old purchase).",
     msiSavedTitle: "Installment purchase registered",
     msiSavedBody:
-      "The first charge of {amount} will post on your {first} cut-off; the last one on {last}. Each installment will show up in your history on its own.",
+      "{amount} already counts towards your debt and is paid on your {cut} cut-off. The remaining installments join on their own, the last one on {last}.",
     msiSavedBackdated:
-      "{n} already-due installments were posted right away for {amount}.",
-    // Paying the card via a transfer
+      "Since the purchase is months old, {n} installments joined for {amount}.",
+    // Paying the card
+    payTitle: "Pay card",
+    payAction: "Pay / add payment",
     payContext: "You still owe {amount} from your last statement (pay it before {date}).",
     payContextPaid: "Statement paid off — this payment gets ahead of your next one.",
+    payContextDebt: "Statement paid off — this payment lowers your running debt of {debt}.",
     paySavedTitle: "Payment registered",
     paySavedRemaining: "You still need {amount} to pay off the statement before {date}.",
     paySavedDone: "Statement paid off: no interest will accrue. 🎉",
+    paySavedDebt:
+      "Statement paid off. You still carry a running debt of {debt}, due on your next statement.",
     understood: "Got it",
   },
   install: {
