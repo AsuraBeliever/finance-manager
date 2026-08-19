@@ -10,6 +10,7 @@ import { WalletCard } from "../../components/WalletCard";
 import {
   archiveWallet,
   deleteWallet,
+  getCreditCardSummary,
   getWallet,
   listTransactions,
   listWallets,
@@ -59,6 +60,16 @@ export function WalletDetailPage() {
   const apartadosCents = apartados
     .filter((a) => a.currencyCode === wallet.data?.currencyCode)
     .reduce((sum, a) => sum + a.balanceCents, 0);
+
+  // A credit card's headline number is what it can still spend, not its
+  // negative balance — the debt lives in the panel below and saying it twice
+  // (once in red, once in minus) just reads as two different numbers. Shares
+  // the panel's query key, so this costs no extra request.
+  const cardSummary = useQuery({
+    queryKey: ["creditCard", walletId],
+    queryFn: () => getCreditCardSummary(walletId),
+    enabled: Number.isFinite(walletId) && wallet.data?.creditCutDay != null,
+  });
 
   const txFilter: TxFilter = {
     walletId,
@@ -111,6 +122,12 @@ export function WalletDetailPage() {
   if (wallet.isError) return <p className="text-sm text-danger">{String(wallet.error)}</p>;
 
   const w = wallet.data;
+  // Only when the card tracks a limit; without one there is no available
+  // credit to show and the balance stays the headline.
+  const availableCredit =
+    w.creditCutDay != null && cardSummary.data?.creditLimitCents != null
+      ? cardSummary.data.availableCreditCents
+      : null;
 
   return (
     <>
@@ -158,8 +175,18 @@ export function WalletDetailPage() {
             the line under it splits it into spendable and set aside. Both kinds
             of apartado — goal reserves and pockets — are listed further down. */}
         <p className="text-3xl font-semibold tabular-nums">
-          {money(w.balanceCents + apartadosCents, w.currencyCode)}
+          {availableCredit != null
+            ? money(availableCredit, w.currencyCode)
+            : money(w.balanceCents + apartadosCents, w.currencyCode)}
         </p>
+        {availableCredit != null && (
+          <p className="mt-1 text-xs text-fg-subtle tabular-nums">
+            {es.credit.availableOfLimit.replace(
+              "{limit}",
+              money(cardSummary.data!.creditLimitCents!, w.currencyCode),
+            )}
+          </p>
+        )}
         {(w.reservedCents > 0 || apartadosCents > 0) && (
           <p className="mt-1 text-xs text-fg-subtle tabular-nums">
             {es.wallets.available}{" "}

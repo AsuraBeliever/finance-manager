@@ -328,6 +328,7 @@ export const esDict = {
     utilization: "Uso del crédito",
     utilizationOf: "{used} de {limit}",
     availableCredit: "Crédito disponible",
+    availableOfLimit: "Crédito disponible de {limit}",
     nextAnniversary: "Próxima anualidad",
     // MSI
     msiTitle: "Compras a meses (MSI)",

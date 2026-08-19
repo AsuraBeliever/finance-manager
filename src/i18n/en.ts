@@ -321,6 +321,7 @@ export const en: Dict = {
     utilization: "Credit usage",
     utilizationOf: "{used} of {limit}",
     availableCredit: "Available credit",
+    availableOfLimit: "Available credit of {limit}",
     nextAnniversary: "Next annual fee",
     // MSI
     msiTitle: "Installment purchases (MSI)",

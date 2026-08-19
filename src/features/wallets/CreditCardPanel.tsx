@@ -104,44 +104,33 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
         </span>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <p className="text-xs uppercase tracking-[0.12em] text-fg-subtle">
-            {es.credit.debt}
+      {/* Debt only: the available credit is the wallet's headline number
+          right above this panel, and repeating it here read as two figures. */}
+      <div>
+        <p className="text-xs uppercase tracking-[0.12em] text-fg-subtle">
+          {es.credit.debt}
+        </p>
+        <p
+          className={`mt-1 text-2xl font-semibold tabular-nums ${
+            s.debtCents > 0 ? "text-danger" : ""
+          }`}
+        >
+          {money(s.debtCents, cur)}
+        </p>
+        {s.pendingMsiCents > 0 && (
+          <p className="mt-0.5 text-xs text-fg-subtle">
+            {es.credit.msiPendingTotal}: {money(s.pendingMsiCents, cur)}
           </p>
-          <p
-            className={`mt-1 text-2xl font-semibold tabular-nums ${
-              s.debtCents > 0 ? "text-danger" : ""
-            }`}
-          >
-            {money(s.debtCents, cur)}
-          </p>
-          {s.pendingMsiCents > 0 && (
-            <p className="mt-0.5 text-xs text-fg-subtle">
-              {es.credit.msiPendingTotal}: {money(s.pendingMsiCents, cur)}
-            </p>
-          )}
-          {/* Paying is a transfer into the card; the amount that clears the
-              statement is prefilled, and any smaller abono is fine. */}
-          {s.debtCents > 0 && (
-            <Button className="mt-2 -ml-4" variant="ghost" onClick={() => setPayOpen(true)}>
-              <span className="flex items-center gap-2">
-                <ArrowDownToLine size={15} /> {es.credit.payAction}
-              </span>
-            </Button>
-          )}
-        </div>
-
-        {s.availableCreditCents != null && (
-          <div>
-            <p className="text-xs uppercase tracking-[0.12em] text-fg-subtle">
-              {es.credit.availableCredit}
-            </p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">
-              {money(s.availableCreditCents, cur)}
-            </p>
-          </div>
         )}
+        {/* Paying is a transfer into the card; the amount that clears the
+            statement is prefilled, and any smaller abono is fine. Always
+            here, even at zero debt — paying ahead of the next cut is a
+            perfectly good move. */}
+        <Button className="mt-2 -ml-4" variant="ghost" onClick={() => setPayOpen(true)}>
+          <span className="flex items-center gap-2">
+            <ArrowDownToLine size={15} /> {es.credit.payAction}
+          </span>
+        </Button>
       </div>
 
       {/* Last statement: what to pay and by when to stay interest-free. */}
@@ -269,9 +258,11 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
         onClose={() => setPayOpen(false)}
         defaultTab="transfer"
         defaultToWalletId={wallet.id}
-        defaultAmountText={(
-          (st.remainingCents > 0 ? st.remainingCents : s.debtCents) / 100
-        ).toFixed(2)}
+        defaultAmountText={
+          st.remainingCents > 0 || s.debtCents > 0
+            ? ((st.remainingCents > 0 ? st.remainingCents : s.debtCents) / 100).toFixed(2)
+            : ""
+        }
       />
       <ConfirmDialog
         open={deletingPlan !== null}
