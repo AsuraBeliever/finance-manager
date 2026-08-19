@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { DateInput } from "../../components/DateInput";
 import { TimeInput } from "../../components/TimeInput";
@@ -98,8 +98,17 @@ export function TransactionFormModal({
   >(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The defaults seed the form when it opens and must not touch it again:
+  // paying a card refetches the card summary, which changes the prefilled
+  // amount, and re-running the reset would wipe the confirmation screen and
+  // leave a form that looks stuck open.
+  const defaults = useRef({ defaultWalletId, defaultTab, defaultToWalletId, defaultAmountText });
+  defaults.current = { defaultWalletId, defaultTab, defaultToWalletId, defaultAmountText };
+
   useEffect(() => {
     if (!open) return;
+    const { defaultWalletId, defaultTab, defaultToWalletId, defaultAmountText } =
+      defaults.current;
     // A wallet created moments ago (an apartado, typically) must be pickable
     // here: the persisted cache can still be showing the list without it.
     queryClient.refetchQueries({ queryKey: ["wallets"] });
@@ -135,15 +144,7 @@ export function TransactionFormModal({
       setDate(todayIso());
       setTime(nowTime(getTimezone()));
     }
-  }, [
-    open,
-    defaultWalletId,
-    defaultTab,
-    defaultToWalletId,
-    defaultAmountText,
-    transaction,
-    isTransferEdit,
-  ]);
+  }, [open, transaction, isTransferEdit, queryClient]);
 
   // Fill the from/to wallets and both amounts once the transfer's legs load.
   useEffect(() => {
