@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CreditCard, Plus, Trash2 } from "lucide-react";
+import { ArrowDownToLine, CalendarClock, CreditCard, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
@@ -21,6 +21,7 @@ import { parseToCents } from "../../lib/money";
 import type { MsiPlan, MsiSchedulePreview, Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
+import { TransactionFormModal } from "../transactions/TransactionFormModal";
 import { MsiPreviewLine, MsiSavedInfo, useMsiPreview } from "./msiSchedule";
 
 const formatDay = formatDayMonth;
@@ -44,6 +45,7 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
   const queryClient = useQueryClient();
   const money = useMoney();
   const [msiFormOpen, setMsiFormOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const [deletingPlan, setDeletingPlan] = useState<MsiPlan | null>(null);
 
   const summary = useQuery({
@@ -118,6 +120,15 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
             <p className="mt-0.5 text-xs text-fg-subtle">
               {es.credit.msiPendingTotal}: {money(s.pendingMsiCents, cur)}
             </p>
+          )}
+          {/* Paying is a transfer into the card; the amount that clears the
+              statement is prefilled, and any smaller abono is fine. */}
+          {s.debtCents > 0 && (
+            <Button className="mt-2 -ml-4" variant="ghost" onClick={() => setPayOpen(true)}>
+              <span className="flex items-center gap-2">
+                <ArrowDownToLine size={15} /> {es.credit.payAction}
+              </span>
+            </Button>
           )}
         </div>
 
@@ -250,6 +261,17 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
         currency={cur}
         onClose={() => setMsiFormOpen(false)}
         onSaved={invalidate}
+      />
+      {/* Paying the card = a transfer into it, opened already pointing here
+          with what clears the statement (or the whole debt) prefilled. */}
+      <TransactionFormModal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        defaultTab="transfer"
+        defaultToWalletId={wallet.id}
+        defaultAmountText={(
+          (st.remainingCents > 0 ? st.remainingCents : s.debtCents) / 100
+        ).toFixed(2)}
       />
       <ConfirmDialog
         open={deletingPlan !== null}

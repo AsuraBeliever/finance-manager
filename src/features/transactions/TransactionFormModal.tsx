@@ -35,6 +35,13 @@ interface TransactionFormModalProps {
   onClose: () => void;
   /** Preselected wallet (e.g. when opened from a wallet detail page). */
   defaultWalletId?: number;
+  /** Tab the form opens on; income unless told otherwise. */
+  defaultTab?: Tab;
+  /** Preselected destination — paying a credit card opens the form already
+   *  pointing at it, the one case where a pre-picked destination is right. */
+  defaultToWalletId?: number;
+  /** Prefilled amount, e.g. what clears the card's statement. */
+  defaultAmountText?: string;
   /** When set, the modal edits this transaction instead of creating one.
    *  Only income/expense are editable (transfers are delete + recreate). */
   transaction?: Transaction;
@@ -44,6 +51,9 @@ export function TransactionFormModal({
   open,
   onClose,
   defaultWalletId,
+  defaultTab,
+  defaultToWalletId,
+  defaultAmountText,
   transaction,
 }: TransactionFormModalProps) {
   const isEdit = transaction !== undefined;
@@ -94,7 +104,7 @@ export function TransactionFormModal({
     // here: the persisted cache can still be showing the list without it.
     queryClient.refetchQueries({ queryKey: ["wallets"] });
     setError(null);
-    setToWalletId(null);
+    setToWalletId(defaultToWalletId ?? null);
     setAmountToText("");
     setMsiEnabled(false);
     setMsiMonthsText("12");
@@ -117,15 +127,23 @@ export function TransactionFormModal({
       setDate(transaction.occurredAt);
       setTime(timeInputValue(transaction.occurredTime, transaction.createdAt, getTimezone()));
     } else {
-      setTab("income");
+      setTab(defaultTab ?? "income");
       setWalletId(defaultWalletId ?? null);
-      setAmountText("");
+      setAmountText(defaultAmountText ?? "");
       setCategoryId(null);
       setDescription("");
       setDate(todayIso());
       setTime(nowTime(getTimezone()));
     }
-  }, [open, defaultWalletId, transaction, isTransferEdit]);
+  }, [
+    open,
+    defaultWalletId,
+    defaultTab,
+    defaultToWalletId,
+    defaultAmountText,
+    transaction,
+    isTransferEdit,
+  ]);
 
   // Fill the from/to wallets and both amounts once the transfer's legs load.
   useEffect(() => {
@@ -139,7 +157,10 @@ export function TransactionFormModal({
   }, [open, isTransferEdit, transferDetail.data]);
 
   const walletList = wallets.data ?? [];
-  const fromWallet = walletList.find((w) => w.id === (walletId ?? walletList[0]?.id));
+  // Source fallback skips the destination: paying a card opens with the card
+  // already picked as destination, and no wallet transfers to itself.
+  const defaultFromId = (walletList.find((w) => w.id !== toWalletId) ?? walletList[0])?.id;
+  const fromWallet = walletList.find((w) => w.id === (walletId ?? defaultFromId));
   const toWallet = walletList.find((w) => w.id === (toWalletId ?? undefined));
   // An apartado reads as "NU › Ahorros": a pocket and the wallet next to it in
   // the list are otherwise easy to mix up, and picking the wrong one sends real
@@ -204,7 +225,7 @@ export function TransactionFormModal({
     mutationFn: async () => {
       const cents = parseToCents(amountText);
       if (cents === null || cents <= 0) throw new Error(es.transactions.invalidAmount);
-      const wid = walletId ?? walletList[0]?.id;
+      const wid = walletId ?? defaultFromId;
       if (wid === undefined) throw new Error(es.transactions.wallet);
       const common = {
         walletId: wid,
@@ -319,7 +340,13 @@ export function TransactionFormModal({
                 formatCents(saved.summary.statement.remainingCents, saved.currency),
               )
               .replace("{date}", formatDayMonth(saved.summary.statement.dueDate))
-          : es.credit.paySavedDone
+          : saved.summary.debtCents > 0
+            ? // Nothing owed from the last cut, but the running cycle does.
+              es.credit.paySavedDebt.replace(
+                "{debt}",
+                formatCents(saved.summary.debtCents, saved.currency),
+              )
+            : es.credit.paySavedDone
         : null;
     return (
       <Modal
@@ -345,7 +372,13 @@ export function TransactionFormModal({
 
   return (
     <Modal
-      title={isEdit ? es.transactions.editTransaction : es.transactions.newTransaction}
+      title={
+        isEdit
+          ? es.transactions.editTransaction
+          : defaultToWalletId != null && payingCard
+            ? es.credit.payTitle
+            : es.transactions.newTransaction
+      }
       open={open}
       onClose={onClose}
     >
@@ -382,7 +415,7 @@ export function TransactionFormModal({
         <Field label={tab === "transfer" ? es.transactions.fromWallet : es.transactions.wallet}>
           <select
             className={inputClass}
-            value={walletId ?? walletList[0]?.id ?? ""}
+            value={walletId ?? defaultFromId ?? ""}
             onChange={(e) => setWalletId(Number(e.target.value))}
           >
             {walletList.map((w) => (
@@ -447,7 +480,17 @@ export function TransactionFormModal({
                         "{date}",
                         formatDayMonth(cardSummary.data.statement.dueDate),
                       )
-                  : es.credit.payContextPaid}
+                  : cardSummary.data.debtCents > 0
+                    ? // Statement clear but the running cycle already owes
+                      // (an MSI installment, a fresh purchase): say so.
+                      es.credit.payContextDebt.replace(
+                        "{debt}",
+                        formatCents(
+                          cardSummary.data.debtCents,
+                          effectiveToWallet?.currencyCode ?? "MXN",
+                        ),
+                      )
+                    : es.credit.payContextPaid}
               </span>
             )}
           </Field>
