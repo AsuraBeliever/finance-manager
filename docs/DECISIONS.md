@@ -135,3 +135,21 @@ Elegido: **más corridas del mismo cron idempotente** — 07:00 (fx/tasas tempra
 una segunda pasada por si publica tarde. Límite del free plan: 5 crons por cuenta.
 Residuo conocido: entre 00:00 y ~09:00 CDMX la posición todavía muestra el valor
 del día anterior (igual que ver el estado de cuenta antes de que abra el fondo).
+
+## 2026-08-18 — MSI: la mensualidad entra a la deuda al comprar, no en el corte
+
+Reporte del usuario: compró a 3 MSI en su NU (día de corte 8) y la app le
+mostraba «Deuda actual $0.00» mientras el banco ya le marcaba $161.08. La
+decisión original (2026-07-01) posteaba cada mensualidad **en su corte**, así
+que entre la compra y el corte la deuda no existía para la app. Los bancos
+parten el consumo al momento: la mensualidad del periodo en curso cuenta desde
+el día de la compra y se liquida en el corte que cierra ese periodo. Cambio:
+`msi_charge_date(n)` — la mensualidad 1 entra el día de la compra y cada
+siguiente el día en que abre el ciclo que la facturará (corte anterior + 1) —
+y `msi_installments_due` pasa a `msi_installments_charged`. El saldo al corte
+no cambia (la mensualidad sigue cayendo dentro del mismo estado de cuenta), el
+crédito disponible tampoco (deuda + pendiente = total del plan siempre). Además
+`get_credit_card_summary` postea las mensualidades vencidas de forma perezosa
+al leer, no solo en el cron: si no, la deuda correcta aparecería hasta la
+noche. Verificado local con el caso real ($483.22 a 3 meses = $161.08 + 2 ×
+$161.07) y capturas claro/oscuro.

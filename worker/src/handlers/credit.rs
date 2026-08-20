@@ -3,16 +3,18 @@
 //! pure in finanzas_core::credit; this module only loads rows and assembles.
 //!
 //! An MSI plan is NOT a transaction. Each installment becomes a real expense
-//! posted on its cut date — by the daily cron and eagerly on plan creation —
-//! with a deterministic `client_id` ("msi:<plan>:<n>") so re-runs are no-ops
-//! (same idempotency scheme as wallet_yield). The wallet's debt therefore
-//! matches what the bank has billed, while the unbilled remainder still
-//! subtracts from available credit.
+//! posted the day it joins the debt (the purchase day for the first one, the
+//! day each later cycle opens for the rest — see `msi_charge_date`), by the
+//! daily cron, eagerly on plan creation and lazily whenever the summary is
+//! read, with a deterministic `client_id` ("msi:<plan>:<n>") so re-runs are
+//! no-ops (same idempotency scheme as wallet_yield). The wallet's debt
+//! therefore matches what the card app shows today, while the installments
+//! that haven't landed yet still subtract from available credit.
 
 use chrono::NaiveDate;
 use finanzas_core::credit::{
-    due_date, last_cut_date, msi_installment_cents, msi_installment_date, msi_installments_due,
-    next_anniversary, next_cut_date,
+    due_date, last_cut_date, msi_charge_date, msi_installment_cents, msi_installment_date,
+    msi_installments_charged, next_anniversary, next_cut_date,
 };
 use finanzas_core::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
@@ -39,13 +41,13 @@ pub struct CreditCardSummary {
     pub credit_limit_cents: Option<i64>,
     /// limit − debt − unbilled MSI; None when the limit isn't tracked.
     pub available_credit_cents: Option<i64>,
-    /// (debt + unbilled MSI) ÷ limit in basis points; None without a limit.
+    /// (debt + pending MSI) ÷ limit in basis points; None without a limit.
     pub utilization_bps: Option<i64>,
     pub next_cut_date: String,
     pub days_to_cut: i64,
     pub statement: Statement,
     pub next_anniversary: Option<String>,
-    /// MSI amounts not yet billed — committed but not in the debt yet.
+    /// MSI installments that haven't landed yet — committed but not debt yet.
     pub pending_msi_cents: i64,
     pub msi_plans: Vec<MsiPlanView>,
 }
@@ -76,9 +78,10 @@ pub struct MsiPlanView {
     pub months: i64,
     /// The regular installment (the first one also carries the cent remainder).
     pub monthly_cents: i64,
+    /// Installments already in the debt.
     pub billed_months: i64,
     pub pending_cents: i64,
-    /// None once the plan is fully billed.
+    /// When the next installment joins the debt; None once all of them have.
     pub next_charge_date: Option<String>,
     pub next_charge_cents: Option<i64>,
     pub purchased_at: String,
@@ -132,12 +135,33 @@ pub async fn get_credit_card_summary(
     uid: i64,
     a: WalletIdArgs,
 ) -> AppResult<CreditCardSummary> {
-    let wallet = fetch_wallet(db, uid, a.wallet_id).await?;
+    let mut wallet = fetch_wallet(db, uid, a.wallet_id).await?;
     let cut_day = wallet
         .credit_cut_day
         .ok_or_else(|| AppError::InvalidInput("la cartera no es tarjeta de crédito".into()))?
         as u32;
     let today = today_mx();
+
+    let plans: Vec<MsiPlanRow> = all(
+        db,
+        "SELECT id, description, total_cents, months, purchased_at, category_id
+         FROM msi_plans WHERE wallet_id = ?1 ORDER BY created_at, id",
+        jsv![wallet.id],
+    )
+    .await?;
+
+    // Post whatever the plans owe the balance before reading it: waiting for
+    // tonight's cron would show a debt the card app already charges.
+    let mut posted = false;
+    if !plans.is_empty() {
+        let fallback = msi_category(db).await?;
+        for p in &plans {
+            posted |= post_plan_installments(db, p, wallet.id, cut_day, fallback, today).await?;
+        }
+        if posted {
+            wallet = fetch_wallet(db, uid, a.wallet_id).await?;
+        }
+    }
 
     let debt = (-wallet.balance_cents).max(0);
 
@@ -157,23 +181,16 @@ pub async fn get_credit_card_summary(
     .unwrap_or(0);
     let due = due_date(cut, wallet.credit_due_days.unwrap_or(DEFAULT_DUE_DAYS));
 
-    let plans: Vec<MsiPlanRow> = all(
-        db,
-        "SELECT id, description, total_cents, months, purchased_at, category_id
-         FROM msi_plans WHERE wallet_id = ?1 ORDER BY created_at, id",
-        jsv![wallet.id],
-    )
-    .await?;
     let mut pending_msi = 0_i64;
     let mut msi_plans = Vec::with_capacity(plans.len());
     for p in plans {
         let purchased = parse_date(&p.purchased_at, "fecha de compra")?;
-        let billed = msi_installments_due(purchased, cut_day, p.months as u32, today) as i64;
+        let billed = msi_installments_charged(purchased, cut_day, p.months as u32, today) as i64;
         let pending = p.total_cents - billed_cents(p.total_cents, p.months, billed);
         pending_msi += pending;
         let next = (billed < p.months).then(|| {
             (
-                msi_installment_date(purchased, cut_day, billed as u32 + 1).to_string(),
+                msi_charge_date(purchased, cut_day, billed as u32 + 1).to_string(),
                 msi_installment_cents(p.total_cents, p.months, billed + 1),
             )
         });
@@ -234,10 +251,13 @@ pub struct MsiSchedulePreview {
     /// The regular installment (the first also carries the cent remainder).
     pub monthly_cents: i64,
     pub first_charge_cents: i64,
-    pub first_charge_date: String,
+    /// Cut that bills the first installment — the statement that pays it.
+    pub first_cut_date: String,
+    /// When the last installment joins the debt.
     pub last_charge_date: String,
     pub months: i64,
-    /// Installments already due (back-dated purchase) that post immediately.
+    /// Installments that join the debt right away: one for a purchase made
+    /// today, more when the purchase is back-dated past a cut.
     pub already_billed_months: i64,
     pub already_billed_cents: i64,
 }
@@ -249,12 +269,12 @@ fn schedule_preview(
     cut_day: u32,
     today: NaiveDate,
 ) -> MsiSchedulePreview {
-    let billed = msi_installments_due(purchased, cut_day, months as u32, today) as i64;
+    let billed = msi_installments_charged(purchased, cut_day, months as u32, today) as i64;
     MsiSchedulePreview {
         monthly_cents: total_cents / months,
         first_charge_cents: msi_installment_cents(total_cents, months, 1),
-        first_charge_date: msi_installment_date(purchased, cut_day, 1).to_string(),
-        last_charge_date: msi_installment_date(purchased, cut_day, months as u32).to_string(),
+        first_cut_date: msi_installment_date(purchased, cut_day, 1).to_string(),
+        last_charge_date: msi_charge_date(purchased, cut_day, months as u32).to_string(),
         months,
         already_billed_months: billed,
         already_billed_cents: billed_cents(total_cents, months, billed),
@@ -486,9 +506,10 @@ pub async fn post_msi_installments(db: &D1Database) -> AppResult<()> {
     Ok(())
 }
 
-/// Posts the due installments of one plan owned by `wallet_id`. Installments
-/// file under the plan's own category; `fallback` (the reserved MSI one)
-/// covers plans created without one.
+/// Posts the installments of one plan that are already debt, owned by
+/// `wallet_id`. Installments file under the plan's own category; `fallback`
+/// (the reserved MSI one) covers plans created without one. Returns whether
+/// anything was written, so callers can re-read a balance that just moved.
 async fn post_plan_installments(
     db: &D1Database,
     plan: &MsiPlanRow,
@@ -496,12 +517,12 @@ async fn post_plan_installments(
     cut_day: u32,
     fallback: Option<i64>,
     today: NaiveDate,
-) -> AppResult<()> {
+) -> AppResult<bool> {
     let category = plan.category_id.or(fallback);
     let purchased = parse_date(&plan.purchased_at, "fecha de compra")?;
-    let due = msi_installments_due(purchased, cut_day, plan.months as u32, today) as i64;
+    let due = msi_installments_charged(purchased, cut_day, plan.months as u32, today) as i64;
     if due == 0 {
-        return Ok(());
+        return Ok(false);
     }
     // Cheap idempotency shortcut: if the newest due installment is already
     // posted, every earlier one is too (they only ever post in order).
@@ -514,7 +535,7 @@ async fn post_plan_installments(
     .await?
     .is_some()
     {
-        return Ok(());
+        return Ok(false);
     }
     let stmts = (1..=due)
         .map(|n| {
@@ -528,12 +549,12 @@ async fn post_plan_installments(
                     msi_installment_cents(plan.total_cents, plan.months, n),
                     category,
                     format!("{} ({}/{})", plan.description, n, plan.months),
-                    msi_installment_date(purchased, cut_day, n as u32).to_string(),
+                    msi_charge_date(purchased, cut_day, n as u32).to_string(),
                     format!("msi:{}:{}", plan.id, n)
                 ],
             )
         })
         .collect::<AppResult<Vec<_>>>()?;
     batch(db, stmts).await?;
-    Ok(())
+    Ok(true)
 }

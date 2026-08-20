@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { DateInput } from "../../components/DateInput";
 import { TimeInput } from "../../components/TimeInput";
@@ -19,11 +19,7 @@ import { submitOrQueue } from "../../lib/outbox";
 import { formatCents, parseToCents } from "../../lib/money";
 import { formatDayMonth, nowTime, timeInputValue, todayIso } from "../../lib/date";
 import { getTimezone } from "../../lib/timezone";
-import type {
-  CreditCardSummary,
-  MsiSchedulePreview,
-  Transaction,
-} from "../../lib/types";
+import type { MsiSchedulePreview, Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 import { MsiPreviewLine, MsiSavedInfo, useMsiPreview } from "../wallets/msiSchedule";
@@ -35,6 +31,13 @@ interface TransactionFormModalProps {
   onClose: () => void;
   /** Preselected wallet (e.g. when opened from a wallet detail page). */
   defaultWalletId?: number;
+  /** Tab the form opens on; income unless told otherwise. */
+  defaultTab?: Tab;
+  /** Preselected destination — paying a credit card opens the form already
+   *  pointing at it, the one case where a pre-picked destination is right. */
+  defaultToWalletId?: number;
+  /** Prefilled amount, e.g. what clears the card's statement. */
+  defaultAmountText?: string;
   /** When set, the modal edits this transaction instead of creating one.
    *  Only income/expense are editable (transfers are delete + recreate). */
   transaction?: Transaction;
@@ -44,6 +47,9 @@ export function TransactionFormModal({
   open,
   onClose,
   defaultWalletId,
+  defaultTab,
+  defaultToWalletId,
+  defaultAmountText,
   transaction,
 }: TransactionFormModalProps) {
   const isEdit = transaction !== undefined;
@@ -79,22 +85,32 @@ export function TransactionFormModal({
   const [time, setTime] = useState(nowTime(getTimezone()));
   const [msiEnabled, setMsiEnabled] = useState(false);
   const [msiMonthsText, setMsiMonthsText] = useState("12");
-  // Saving an MSI plan or a card payment ends on a confirmation screen (the
-  // consequences happen later, at the cut), instead of closing silently.
-  const [saved, setSaved] = useState<
-    | { kind: "msi"; schedule: MsiSchedulePreview; currency: string }
-    | { kind: "payment"; summary: CreditCardSummary; currency: string }
-    | null
-  >(null);
+  // Saving an MSI plan ends on a confirmation screen: nothing visible happens
+  // at save time, the installments land later, so closing silently would look
+  // like the plan was lost. Every other capture just closes.
+  const [saved, setSaved] = useState<{
+    kind: "msi";
+    schedule: MsiSchedulePreview;
+    currency: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // The defaults seed the form when it opens and must not touch it again:
+  // paying a card refetches the card summary, which changes the prefilled
+  // amount, and re-running the reset would wipe the confirmation screen and
+  // leave a form that looks stuck open.
+  const defaults = useRef({ defaultWalletId, defaultTab, defaultToWalletId, defaultAmountText });
+  defaults.current = { defaultWalletId, defaultTab, defaultToWalletId, defaultAmountText };
 
   useEffect(() => {
     if (!open) return;
+    const { defaultWalletId, defaultTab, defaultToWalletId, defaultAmountText } =
+      defaults.current;
     // A wallet created moments ago (an apartado, typically) must be pickable
     // here: the persisted cache can still be showing the list without it.
     queryClient.refetchQueries({ queryKey: ["wallets"] });
     setError(null);
-    setToWalletId(null);
+    setToWalletId(defaultToWalletId ?? null);
     setAmountToText("");
     setMsiEnabled(false);
     setMsiMonthsText("12");
@@ -117,15 +133,15 @@ export function TransactionFormModal({
       setDate(transaction.occurredAt);
       setTime(timeInputValue(transaction.occurredTime, transaction.createdAt, getTimezone()));
     } else {
-      setTab("income");
+      setTab(defaultTab ?? "income");
       setWalletId(defaultWalletId ?? null);
-      setAmountText("");
+      setAmountText(defaultAmountText ?? "");
       setCategoryId(null);
       setDescription("");
       setDate(todayIso());
       setTime(nowTime(getTimezone()));
     }
-  }, [open, defaultWalletId, transaction, isTransferEdit]);
+  }, [open, transaction, isTransferEdit, queryClient]);
 
   // Fill the from/to wallets and both amounts once the transfer's legs load.
   useEffect(() => {
@@ -139,7 +155,10 @@ export function TransactionFormModal({
   }, [open, isTransferEdit, transferDetail.data]);
 
   const walletList = wallets.data ?? [];
-  const fromWallet = walletList.find((w) => w.id === (walletId ?? walletList[0]?.id));
+  // Source fallback skips the destination: paying a card opens with the card
+  // already picked as destination, and no wallet transfers to itself.
+  const defaultFromId = (walletList.find((w) => w.id !== toWalletId) ?? walletList[0])?.id;
+  const fromWallet = walletList.find((w) => w.id === (walletId ?? defaultFromId));
   const toWallet = walletList.find((w) => w.id === (toWalletId ?? undefined));
   // An apartado reads as "NU › Ahorros": a pocket and the wallet next to it in
   // the list are otherwise easy to mix up, and picking the wrong one sends real
@@ -204,7 +223,7 @@ export function TransactionFormModal({
     mutationFn: async () => {
       const cents = parseToCents(amountText);
       if (cents === null || cents <= 0) throw new Error(es.transactions.invalidAmount);
-      const wid = walletId ?? walletList[0]?.id;
+      const wid = walletId ?? defaultFromId;
       if (wid === undefined) throw new Error(es.transactions.wallet);
       const common = {
         walletId: wid,
@@ -285,21 +304,9 @@ export function TransactionFormModal({
         });
         return;
       }
-      if (payingCard && effectiveToId !== undefined) {
-        // Re-read the statement AFTER the payment so the confirmation says
-        // where the card actually stands ("liquidado" / "te faltan $X").
-        try {
-          const summary = await getCreditCardSummary(effectiveToId);
-          setSaved({
-            kind: "payment",
-            summary,
-            currency: effectiveToWallet?.currencyCode ?? "MXN",
-          });
-          return;
-        } catch {
-          // Offline or transient failure: fall back to closing quietly.
-        }
-      }
+      // A card payment closes like any other capture: the panel behind it
+      // already shows the new debt, so a confirmation screen was just a click
+      // in the way.
       onClose();
     },
     onError: (e) => setError(e instanceof Error ? e.message : String(e)),
@@ -310,31 +317,10 @@ export function TransactionFormModal({
       setSaved(null);
       onClose();
     };
-    const paymentLine =
-      saved.kind === "payment"
-        ? saved.summary.statement.remainingCents > 0
-          ? es.credit.paySavedRemaining
-              .replace(
-                "{amount}",
-                formatCents(saved.summary.statement.remainingCents, saved.currency),
-              )
-              .replace("{date}", formatDayMonth(saved.summary.statement.dueDate))
-          : es.credit.paySavedDone
-        : null;
     return (
-      <Modal
-        title={saved.kind === "msi" ? es.credit.msiSavedTitle : es.credit.paySavedTitle}
-        open={open}
-        onClose={closeAll}
-      >
+      <Modal title={es.credit.msiSavedTitle} open={open} onClose={closeAll}>
         <div className="grid gap-4">
-          {saved.kind === "msi" ? (
-            <MsiSavedInfo preview={saved.schedule} currency={saved.currency} />
-          ) : (
-            <p className="rounded-lg bg-surface-overlay px-3 py-2.5 text-sm text-fg-muted">
-              {paymentLine}
-            </p>
-          )}
+          <MsiSavedInfo preview={saved.schedule} currency={saved.currency} />
           <div className="flex justify-end">
             <Button onClick={closeAll}>{es.credit.understood}</Button>
           </div>
@@ -345,7 +331,13 @@ export function TransactionFormModal({
 
   return (
     <Modal
-      title={isEdit ? es.transactions.editTransaction : es.transactions.newTransaction}
+      title={
+        isEdit
+          ? es.transactions.editTransaction
+          : defaultToWalletId != null && payingCard
+            ? es.credit.payTitle
+            : es.transactions.newTransaction
+      }
       open={open}
       onClose={onClose}
     >
@@ -382,7 +374,7 @@ export function TransactionFormModal({
         <Field label={tab === "transfer" ? es.transactions.fromWallet : es.transactions.wallet}>
           <select
             className={inputClass}
-            value={walletId ?? walletList[0]?.id ?? ""}
+            value={walletId ?? defaultFromId ?? ""}
             onChange={(e) => setWalletId(Number(e.target.value))}
           >
             {walletList.map((w) => (
@@ -447,7 +439,17 @@ export function TransactionFormModal({
                         "{date}",
                         formatDayMonth(cardSummary.data.statement.dueDate),
                       )
-                  : es.credit.payContextPaid}
+                  : cardSummary.data.debtCents > 0
+                    ? // Statement clear but the running cycle already owes
+                      // (an MSI installment, a fresh purchase): say so.
+                      es.credit.payContextDebt.replace(
+                        "{debt}",
+                        formatCents(
+                          cardSummary.data.debtCents,
+                          effectiveToWallet?.currencyCode ?? "MXN",
+                        ),
+                      )
+                    : es.credit.payContextPaid}
               </span>
             )}
           </Field>

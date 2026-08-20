@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CreditCard, Plus, Trash2 } from "lucide-react";
+import { ArrowDownToLine, CalendarClock, CreditCard, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
@@ -21,6 +21,7 @@ import { parseToCents } from "../../lib/money";
 import type { MsiPlan, MsiSchedulePreview, Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
+import { TransactionFormModal } from "../transactions/TransactionFormModal";
 import { MsiPreviewLine, MsiSavedInfo, useMsiPreview } from "./msiSchedule";
 
 const formatDay = formatDayMonth;
@@ -44,6 +45,7 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
   const queryClient = useQueryClient();
   const money = useMoney();
   const [msiFormOpen, setMsiFormOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const [deletingPlan, setDeletingPlan] = useState<MsiPlan | null>(null);
 
   const summary = useQuery({
@@ -102,35 +104,33 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
         </span>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <p className="text-xs uppercase tracking-[0.12em] text-fg-subtle">
-            {es.credit.debt}
+      {/* Debt only: the available credit is the wallet's headline number
+          right above this panel, and repeating it here read as two figures. */}
+      <div>
+        <p className="text-xs uppercase tracking-[0.12em] text-fg-subtle">
+          {es.credit.debt}
+        </p>
+        <p
+          className={`mt-1 text-2xl font-semibold tabular-nums ${
+            s.debtCents > 0 ? "text-danger" : ""
+          }`}
+        >
+          {money(s.debtCents, cur)}
+        </p>
+        {s.pendingMsiCents > 0 && (
+          <p className="mt-0.5 text-xs text-fg-subtle">
+            {es.credit.msiPendingTotal}: {money(s.pendingMsiCents, cur)}
           </p>
-          <p
-            className={`mt-1 text-2xl font-semibold tabular-nums ${
-              s.debtCents > 0 ? "text-danger" : ""
-            }`}
-          >
-            {money(s.debtCents, cur)}
-          </p>
-          {s.pendingMsiCents > 0 && (
-            <p className="mt-0.5 text-xs text-fg-subtle">
-              {es.credit.msiPendingTotal}: {money(s.pendingMsiCents, cur)}
-            </p>
-          )}
-        </div>
-
-        {s.availableCreditCents != null && (
-          <div>
-            <p className="text-xs uppercase tracking-[0.12em] text-fg-subtle">
-              {es.credit.availableCredit}
-            </p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">
-              {money(s.availableCreditCents, cur)}
-            </p>
-          </div>
         )}
+        {/* Paying is a transfer into the card; the amount that clears the
+            statement is prefilled, and any smaller abono is fine. Always
+            here, even at zero debt — paying ahead of the next cut is a
+            perfectly good move. */}
+        <Button className="mt-2 -ml-4" variant="ghost" onClick={() => setPayOpen(true)}>
+          <span className="flex items-center gap-2">
+            <ArrowDownToLine size={15} /> {es.credit.payAction}
+          </span>
+        </Button>
       </div>
 
       {/* Last statement: what to pay and by when to stay interest-free. */}
@@ -250,6 +250,19 @@ export function CreditCardPanel({ wallet }: { wallet: Wallet }) {
         currency={cur}
         onClose={() => setMsiFormOpen(false)}
         onSaved={invalidate}
+      />
+      {/* Paying the card = a transfer into it, opened already pointing here
+          with what clears the statement (or the whole debt) prefilled. */}
+      <TransactionFormModal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        defaultTab="transfer"
+        defaultToWalletId={wallet.id}
+        defaultAmountText={
+          st.remainingCents > 0 || s.debtCents > 0
+            ? ((st.remainingCents > 0 ? st.remainingCents : s.debtCents) / 100).toFixed(2)
+            : ""
+        }
       />
       <ConfirmDialog
         open={deletingPlan !== null}

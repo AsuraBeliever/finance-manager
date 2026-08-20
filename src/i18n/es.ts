@@ -328,26 +328,27 @@ export const esDict = {
     utilization: "Uso del crédito",
     utilizationOf: "{used} de {limit}",
     availableCredit: "Crédito disponible",
+    availableOfLimit: "Crédito disponible de {limit}",
     nextAnniversary: "Próxima anualidad",
     // MSI
     msiTitle: "Compras a meses (MSI)",
     msiAdd: "Compra a MSI",
     msiEmpty:
-      "Registra una compra a meses sin intereses y sus mensualidades se cargarán solas en cada corte.",
-    msiProgress: "{billed} de {months} mensualidades",
+      "Registra una compra a meses sin intereses y sus mensualidades se sumarán solas a tu deuda, una en cada periodo.",
+    msiProgress: "{billed} de {months} mensualidades en tu deuda",
     msiMonthly: "{amount}/mes",
-    msiNextCharge: "Próximo cargo: {amount} el {date}",
+    msiNextCharge: "Siguiente mensualidad: {amount} el {date}",
     msiDone: "Liquidado ✓",
     msiPendingTotal: "MSI por facturar",
     msiToggle: "Compra a meses sin intereses (MSI)",
     msiToggleHint:
-      "En lugar de un gasto único, cada mensualidad se cargará sola en tu historial en cada corte.",
+      "En lugar de un gasto único, cada mensualidad se sumará sola a tu deuda: la primera hoy y las demás en cada periodo.",
     msiNeedsDescription: "Describe la compra para nombrar sus mensualidades",
     msiTotal: "Monto total",
     msiMonths: "Meses",
     msiPurchasedAt: "Fecha de compra",
     msiBackdatedHint:
-      "Si la compra es de meses atrás, las mensualidades ya vencidas se cargan de inmediato.",
+      "Si la compra es de meses atrás, todas las mensualidades ya corridas se suman de inmediato.",
     msiDeleteTitle: "Eliminar compra a MSI",
     msiDeleteMessage:
       "También se eliminarán sus mensualidades ya cargadas en el historial. Esta acción no se puede deshacer.",
@@ -358,20 +359,22 @@ export const esDict = {
     initialDebtHint:
       "Lo que ya debes hoy en esta tarjeta (si la estrenas en ceros, déjalo vacío).",
     // Live MSI schedule preview + save confirmation
-    msiPreviewLine: "≈ {monthly} al mes · primer cargo: {amount} el {date}",
+    msiPreviewLine: "≈ {monthly} al mes durante {months} meses.",
+    msiPreviewFirst:
+      "La 1ª mensualidad ({amount}) entra a tu deuda de inmediato y la pagas en tu corte del {cut}.",
     msiPreviewBackdated:
-      "{n} mensualidades ya vencidas ({amount}) se cargarán de inmediato.",
+      "{n} mensualidades ({amount}) entran de inmediato a tu deuda (compra de meses atrás).",
     msiSavedTitle: "Compra a meses registrada",
     msiSavedBody:
-      "El primer cargo de {amount} se hará en tu corte del {first}; el último, el {last}. Cada mensualidad aparecerá sola en tu historial.",
+      "{amount} ya cuenta en tu deuda y se paga en tu corte del {cut}. Las demás mensualidades entrarán solas, la última el {last}.",
     msiSavedBackdated:
-      "Se cargaron de una vez {n} mensualidades ya vencidas por {amount}.",
-    // Paying the card via a transfer
+      "Como la compra es de meses atrás, entraron {n} mensualidades por {amount}.",
+    // Paying the card
+    payTitle: "Pagar tarjeta",
+    payAction: "Abonar / pagar",
     payContext: "De tu último corte te faltan {amount} (págalo antes del {date}).",
     payContextPaid: "Corte liquidado — este abono adelanta tu siguiente pago.",
-    paySavedTitle: "Pago registrado",
-    paySavedRemaining: "Te faltan {amount} para liquidar el corte antes del {date}.",
-    paySavedDone: "Corte liquidado: no se generarán intereses. 🎉",
+    payContextDebt: "Corte liquidado — este abono baja tu deuda en curso de {debt}.",
     understood: "Entendido",
   },
   install: {
