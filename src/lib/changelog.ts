@@ -12,6 +12,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.36.0",
+    date: "2026-08-18",
+    es: [
+      "Arreglado: al comprar a meses sin intereses, la mensualidad de este periodo ya cuenta en tu «Deuda actual» desde el día de la compra, igual que te la marca el banco. Antes aparecía en ceros hasta tu fecha de corte.",
+      "Cada mensualidad siguiente entra a tu deuda en cuanto empieza el periodo que la va a cobrar, y se paga en el corte de ese periodo. El «MSI por facturar» sigue mostrando lo que falta por caer.",
+      "Nuevo botón «Abonar / pagar» en el panel de tu tarjeta: registra el pago desde la cartera que quieras, con el monto que liquida tu corte ya puesto (puedes cambiarlo para abonar de a poco).",
+      "En la pantalla de la tarjeta, el número grande de arriba ahora es tu crédito disponible (con tu límite debajo) en vez del saldo en negativo: la deuda se ve una sola vez, en su panel.",
+    ],
+    en: [
+      "Fixed: when you buy in interest-free installments, this period's installment now counts towards your \"Current debt\" from the purchase day, just like your bank shows it. It used to read zero until your cut-off date.",
+      "Each following installment joins your debt as soon as the period that bills it starts, and is paid on that period's statement. \"Unbilled MSI\" still shows what's yet to land.",
+      "New \"Pay / add payment\" button on your card panel: register the payment from any wallet, with the amount that clears your statement already filled in (change it to pay a little at a time).",
+      "On the card screen, the big number up top is now your available credit (with your limit under it) instead of the negative balance: the debt shows once, in its own panel.",
+    ],
+  },
+  {
     version: "2.35.0",
     date: "2026-08-16",
     es: [
