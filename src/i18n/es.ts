@@ -375,11 +375,6 @@ export const esDict = {
     payContext: "De tu último corte te faltan {amount} (págalo antes del {date}).",
     payContextPaid: "Corte liquidado — este abono adelanta tu siguiente pago.",
     payContextDebt: "Corte liquidado — este abono baja tu deuda en curso de {debt}.",
-    paySavedTitle: "Pago registrado",
-    paySavedRemaining: "Te faltan {amount} para liquidar el corte antes del {date}.",
-    paySavedDone: "Corte liquidado: no se generarán intereses. 🎉",
-    paySavedDebt:
-      "Corte liquidado. Te queda una deuda en curso de {debt}, que se paga en tu próximo corte.",
     understood: "Entendido",
   },
   install: {

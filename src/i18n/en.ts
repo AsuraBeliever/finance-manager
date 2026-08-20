@@ -368,11 +368,6 @@ export const en: Dict = {
     payContext: "You still owe {amount} from your last statement (pay it before {date}).",
     payContextPaid: "Statement paid off — this payment gets ahead of your next one.",
     payContextDebt: "Statement paid off — this payment lowers your running debt of {debt}.",
-    paySavedTitle: "Payment registered",
-    paySavedRemaining: "You still need {amount} to pay off the statement before {date}.",
-    paySavedDone: "Statement paid off: no interest will accrue. 🎉",
-    paySavedDebt:
-      "Statement paid off. You still carry a running debt of {debt}, due on your next statement.",
     understood: "Got it",
   },
   install: {

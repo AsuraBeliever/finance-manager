@@ -19,11 +19,7 @@ import { submitOrQueue } from "../../lib/outbox";
 import { formatCents, parseToCents } from "../../lib/money";
 import { formatDayMonth, nowTime, timeInputValue, todayIso } from "../../lib/date";
 import { getTimezone } from "../../lib/timezone";
-import type {
-  CreditCardSummary,
-  MsiSchedulePreview,
-  Transaction,
-} from "../../lib/types";
+import type { MsiSchedulePreview, Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 import { MsiPreviewLine, MsiSavedInfo, useMsiPreview } from "../wallets/msiSchedule";
@@ -89,13 +85,14 @@ export function TransactionFormModal({
   const [time, setTime] = useState(nowTime(getTimezone()));
   const [msiEnabled, setMsiEnabled] = useState(false);
   const [msiMonthsText, setMsiMonthsText] = useState("12");
-  // Saving an MSI plan or a card payment ends on a confirmation screen (the
-  // consequences happen later, at the cut), instead of closing silently.
-  const [saved, setSaved] = useState<
-    | { kind: "msi"; schedule: MsiSchedulePreview; currency: string }
-    | { kind: "payment"; summary: CreditCardSummary; currency: string }
-    | null
-  >(null);
+  // Saving an MSI plan ends on a confirmation screen: nothing visible happens
+  // at save time, the installments land later, so closing silently would look
+  // like the plan was lost. Every other capture just closes.
+  const [saved, setSaved] = useState<{
+    kind: "msi";
+    schedule: MsiSchedulePreview;
+    currency: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // The defaults seed the form when it opens and must not touch it again:
@@ -307,21 +304,9 @@ export function TransactionFormModal({
         });
         return;
       }
-      if (payingCard && effectiveToId !== undefined) {
-        // Re-read the statement AFTER the payment so the confirmation says
-        // where the card actually stands ("liquidado" / "te faltan $X").
-        try {
-          const summary = await getCreditCardSummary(effectiveToId);
-          setSaved({
-            kind: "payment",
-            summary,
-            currency: effectiveToWallet?.currencyCode ?? "MXN",
-          });
-          return;
-        } catch {
-          // Offline or transient failure: fall back to closing quietly.
-        }
-      }
+      // A card payment closes like any other capture: the panel behind it
+      // already shows the new debt, so a confirmation screen was just a click
+      // in the way.
       onClose();
     },
     onError: (e) => setError(e instanceof Error ? e.message : String(e)),
@@ -332,37 +317,10 @@ export function TransactionFormModal({
       setSaved(null);
       onClose();
     };
-    const paymentLine =
-      saved.kind === "payment"
-        ? saved.summary.statement.remainingCents > 0
-          ? es.credit.paySavedRemaining
-              .replace(
-                "{amount}",
-                formatCents(saved.summary.statement.remainingCents, saved.currency),
-              )
-              .replace("{date}", formatDayMonth(saved.summary.statement.dueDate))
-          : saved.summary.debtCents > 0
-            ? // Nothing owed from the last cut, but the running cycle does.
-              es.credit.paySavedDebt.replace(
-                "{debt}",
-                formatCents(saved.summary.debtCents, saved.currency),
-              )
-            : es.credit.paySavedDone
-        : null;
     return (
-      <Modal
-        title={saved.kind === "msi" ? es.credit.msiSavedTitle : es.credit.paySavedTitle}
-        open={open}
-        onClose={closeAll}
-      >
+      <Modal title={es.credit.msiSavedTitle} open={open} onClose={closeAll}>
         <div className="grid gap-4">
-          {saved.kind === "msi" ? (
-            <MsiSavedInfo preview={saved.schedule} currency={saved.currency} />
-          ) : (
-            <p className="rounded-lg bg-surface-overlay px-3 py-2.5 text-sm text-fg-muted">
-              {paymentLine}
-            </p>
-          )}
+          <MsiSavedInfo preview={saved.schedule} currency={saved.currency} />
           <div className="flex justify-end">
             <Button onClick={closeAll}>{es.credit.understood}</Button>
           </div>
