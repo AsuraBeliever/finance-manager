@@ -153,3 +153,44 @@ crédito disponible tampoco (deuda + pendiente = total del plan siempre). Ademá
 al leer, no solo en el cron: si no, la deuda correcta aparecería hasta la
 noche. Verificado local con el caso real ($483.22 a 3 meses = $161.08 + 2 ×
 $161.07) y capturas claro/oscuro.
+
+## 2026-08-21 — Rendimiento diario sobre base 360, no 365
+
+Reporte del usuario: su cajita de Nu marcaba $6,768.79 y la app $6,768.56 —
+$0.23 abajo— y el desfase «aparecía» al meter dinero. Reconstruí sus 21 días de
+devengo (5 depósitos, del 31 Jul al 20 Ago, 6.50% anual) contra la base real:
+
+| convención                    | saldo al 21 Ago | vs Nu   |
+|-------------------------------|-----------------|---------|
+| ACT/365 (lo que hacíamos)     | 6,768.56        | −0.23   |
+| ACT/360, redondeo diario      | 6,768.83        | +0.04   |
+| ACT/360, fracciones exactas   | 6,768.78        | −0.01   |
+
+Nu —y la banca mexicana en general, por regulación— cotiza la tasa anual sobre
+un **año de 360 días**: el devengo diario es `saldo × tasa / 360`. Dividir entre
+365 subpaga 1.39% del interés *todos los días*. El error es proporcional al
+saldo, por eso era invisible con $200 en la cajita y saltó a la vista con
+$6,768: de 0.0001¢ diarios a 1.4¢ diarios. Eso explica la percepción de que «se
+desfasa al meter dinero» — no era el depósito, era el saldo más grande
+amplificando un error que ya estaba ahí.
+
+Lo demás del modelo ya coincidía con Nu y no se tocó: cálculo en la madrugada
+sobre el saldo de cierre del día anterior, capitalización diaria, y el depósito
+gana desde el mismo día en que entra.
+
+Se conservó el **redondeo al centavo cada día** (vs. arrastrar fracciones): la
+evidencia entre ambos es de 1 a 4 centavos sobre tres semanas, no discrimina, y
+arrastrar fracciones exigiría una columna de residuo en `wallets` más el abono
+como transacción entera de todos modos. El caso real de Klar ($334.73 al 3% →
+$0.21/semana) se mantiene idéntico en base 360, así que sigue anclando la regla
+de redondeo.
+
+`fixed_rate` con `compounding: "daily"` se queda en ACT/365 a propósito: es la
+calculadora genérica para una tasa que teclea el usuario, no un producto
+mexicano concreto.
+
+Residuo conocido: los $0.23 ya perdidos no se recalculan solos (el cron nunca
+vuelve sobre un periodo pagado), así que se emparejaron con un abono de ajuste
+único. Y sigue abierto que una transacción capturada con fecha atrasada —
+después de que el cron cerró ese día— nunca genera rendimiento; requiere
+historial de tasas para recalcular sin repintar el pasado con la tasa vigente.

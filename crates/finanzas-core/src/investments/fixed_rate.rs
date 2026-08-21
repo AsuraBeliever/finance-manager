@@ -3,6 +3,10 @@
 //! - daily:   principal * (1 + r/365)^days            (ACT/365)
 //! - monthly: principal * (1 + r/12)^full_months      (full calendar months)
 //! - simple:  principal * (1 + r * days/365)
+//!
+//! Deliberately ACT/365: this is the generic calculator for a rate the user
+//! types in. Mexican bank products (Nu cajitas, yield-bearing debit wallets)
+//! quote over a 360-day year — use `nu_cajita` for those, not this one.
 
 use chrono::{Datelike, NaiveDate};
 
@@ -107,7 +111,10 @@ mod tests {
     }
 
     #[test]
-    fn daily_matches_nu_formula() {
+    fn daily_compounding_uses_act_365() {
+        // $10,000.00 at 15.00% daily-compounded on a 365-day base, one year:
+        // 1_000_000 * (1 + 0.15/365)^365 = 1_161_798.4 -> $11,617.98.
+        // (nu_cajita deliberately differs: it uses the 360-day base.)
         let inv = test_investment(
             "fixed_rate",
             1_000_000,
