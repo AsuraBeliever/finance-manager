@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.37.0",
+    date: "2026-08-21",
+    es: [
+      "Arreglado: el rendimiento diario de tus carteras que ganan intereses (cajitas de Nu, Klar) se calculaba con un año de 365 días, pero los bancos en México lo calculan sobre 360. Nos quedábamos 1.39% cortos cada día, y el desfase crecía conforme tenías más dinero guardado.",
+      "Ahora tu saldo sigue al del banco al centavo. El rendimiento diario sube un poco: por ejemplo, $10,000 al 13% anual pasan de $3.56 a $3.61 diarios.",
+      "Los intereses que ya te habíamos quedado a deber se ajustaron con un abono único, para que arranques empatado con tu app del banco.",
+    ],
+    en: [
+      "Fixed: the daily yield on your interest-bearing wallets (Nu cajitas, Klar) used a 365-day year, but Mexican banks compute it over 360. We were 1.39% short every day, and the gap grew the more money you had saved.",
+      "Your balance now tracks the bank's to the cent. The daily yield goes up slightly: $10,000 at 13% a year moves from $3.56 to $3.61 per day.",
+      "The interest we already owed you was settled with a one-off adjustment, so you start out matching your bank's app.",
+    ],
+  },
+  {
     version: "2.36.0",
     date: "2026-08-18",
     es: [
