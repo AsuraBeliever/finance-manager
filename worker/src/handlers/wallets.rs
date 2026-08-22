@@ -268,7 +268,11 @@ pub async fn create_wallet(db: &D1Database, uid: i64, a: CreateWalletArgs) -> Ap
              a.parent_wallet_id, rate_bps, frequency, anchor, cut_day, due_days, limit_cents, anniversary],
     )
     .await?;
-    fetch_wallet(db, uid, last_row_id(&res)?).await
+    let id = last_row_id(&res)?;
+    if let Some(bps) = rate_bps {
+        crate::handlers::wallet_yield::record_yield_rate(db, id, bps).await?;
+    }
+    fetch_wallet(db, uid, id).await
 }
 
 #[derive(Deserialize)]
@@ -345,6 +349,12 @@ pub async fn update_wallet(db: &D1Database, uid: i64, a: UpdateWalletArgs) -> Ap
     .await?;
     if changes(&res) == 0 {
         return Err(AppError::NotFound("cartera"));
+    }
+    // Stamp the rate from today on. Turning yield OFF records nothing: the days
+    // already priced keep their history, and there is no rate to apply going
+    // forward.
+    if let Some((bps, _)) = yield_on {
+        crate::handlers::wallet_yield::record_yield_rate(db, a.id, bps).await?;
     }
     fetch_wallet(db, uid, a.id).await
 }
