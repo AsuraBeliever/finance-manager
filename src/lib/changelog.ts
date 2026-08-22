@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.38.0",
+    date: "2026-08-22",
+    es: [
+      "Si registras un movimiento con fecha atrasada en una cartera que gana intereses, ya no pierdes el rendimiento de esos días: la app lo detecta sola y te lo abona al día siguiente. Antes, si depositabas el sábado y lo anotabas el lunes, esos dos días de interés no te los pagaba nadie.",
+      "Funciona igual si corriges el monto de un movimiento o si lo borras: el rendimiento se recalcula y se ajusta.",
+      "El ajuste aparece en tu historial como un movimiento normal llamado «Ajuste de rendimiento», para que siempre puedas ver de dónde salió cada peso.",
+    ],
+    en: [
+      "If you register a back-dated movement in an interest-bearing wallet, you no longer lose those days' yield: the app notices on its own and credits it the next day. Before, depositing on Saturday and recording it on Monday meant nobody paid you those two days of interest.",
+      "It works the same if you correct a movement's amount or delete it: the yield is recomputed and adjusted.",
+      "The adjustment shows up in your history as a normal movement called \"Ajuste de rendimiento\", so you can always trace where every peso came from.",
+    ],
+  },
+  {
     version: "2.37.0",
     date: "2026-08-21",
     es: [

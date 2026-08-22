@@ -194,3 +194,44 @@ vuelve sobre un periodo pagado), así que se emparejaron con un abono de ajuste
 único. Y sigue abierto que una transacción capturada con fecha atrasada —
 después de que el cron cerró ese día— nunca genera rendimiento; requiere
 historial de tasas para recalcular sin repintar el pasado con la tasa vigente.
+
+## 2026-08-22 — El rendimiento se recalcula solo cuando un movimiento entra tarde
+
+Contexto: el usuario mete dinero a su cajita cada semana. El devengo avanza con
+`yield_last_paid_date` y ese cursor NUNCA retrocede, así que un depósito
+capturado después de que el cron cerró su día no generaba rendimiento de esos
+días — nunca, ni al día siguiente. El síntoma sería exactamente el que originó
+toda esta investigación: la app abajo del banco justo después de meter dinero.
+
+Sus 7 movimientos históricos entraron todos a tiempo (0 días tarde), pero uno
+pasó con 1h40 de margen. Con depósitos semanales es cuestión de tiempo.
+
+Elegido: **una pasada de reconciliación en el cron**, después del devengo hacia
+adelante. Recalcula los últimos 30 días desde las transacciones reales y postea
+la diferencia como un solo ajuste fechado hoy. Un solo lugar cubre las tres
+formas de romperlo (alta con fecha atrasada, edición de monto/fecha, borrado),
+en vez de enganchar cada handler de escritura. La aritmética vive en
+`finanzas_core::wallet_yield::reconciliation_delta`, con tests que fijan la
+alineación de ventana —lo único frágil aquí— porque el interés del día `d` se
+abona el día `d+1`: `posted` son los abonos en `(start, end]`, `start_balance`
+es el saldo AL `start`.
+
+Descartado: reescribir/borrar los abonos viejos y volver a correr el devengo
+(churn en el historial del usuario, y con el cron corriendo 3× al día invita a
+condiciones de carrera). El ajuste único se reescribe completo en cada corrida
+en vez de acumularse, así que las 3 corridas del día aterrizan en el mismo
+número.
+
+**Requiere historial de tasas** (`wallet_yield_rates`, migración 0036) y es la
+razón de que la migración exista: sin él, recalcular agosto habría repintado
+todo al 13% de la Cajita Turbo cuando esos días corrieron al 6.50%, inflando el
+saldo en vez de arreglarlo (test `reconciliation_prices_past_days_at_their_own_rate`:
+776¢ honestos vs 1164¢ repintados). La tabla se siembra con la tasa de HOY, no
+con `yield_anchor_date`: no hay registro de cuándo cambiaron las tasas pasadas y
+adivinar es justo lo que se quiere evitar. La reconciliación se recorta al
+primer día que sí puede cotizar, así que la cobertura arranca en la migración y
+crece hacia adelante.
+
+Residuo conocido: el paso hacia adelante sí usa la tasa vigente para días
+anteriores al primer registro (`forward_schedule`), porque negarse a cotizarlos
+dejaría sin pagar a una cartera semanal cuyo periodo abrió antes de la tabla.
