@@ -1,6 +1,6 @@
 //! Yield-bearing wallets: plain wallets (not investments) whose balance grows
 //! on its own, mirroring debit accounts like Klar or Nu that pay interest with
-//! daily accrual (ACT/365 compounding) and a periodic payout. The worker's
+//! daily accrual (ACT/360 compounding) and a periodic payout. The worker's
 //! daily cron calls these pure helpers, then posts one income transaction per
 //! due period so the wallet's computed balance keeps matching the bank.
 //!
@@ -31,12 +31,18 @@ pub fn next_period_end(frequency: &str, last_paid: NaiveDate) -> Option<NaiveDat
     }
 }
 
-/// Interest in cents accrued over `(start, end]`, daily-compounding ACT/365
+/// Interest in cents accrued over `(start, end]`, daily-compounding **ACT/360**
 /// with the interest **rounded to the cent each day** — exactly how debit
 /// accounts like Klar or Nu credit daily interest. Rounding once per day (not
 /// once per period) matters at small balances: e.g. $334.73 at 3% accrues
-/// 2.75¢/day, which the bank rounds up to 3¢ and pays 21¢/week, whereas a
-/// single end-of-week rounding would land at only 19¢.
+/// 2.79¢/day, which the bank rounds up to 3¢ and pays 21¢/week, whereas a
+/// single end-of-week rounding would land at only 20¢.
+///
+/// The 360-day base is not a rounding shortcut: Mexican banks quote the annual
+/// rate over a 360-day year by regulation, so the daily accrual is
+/// `saldo × tasa / 360`. Using 365 silently underpays by 1.39% of the interest
+/// every day — invisible on small balances, but it drifts away from the bank's
+/// own number as the balance grows (see docs/DECISIONS.md).
 ///
 /// `start_balance` is the wallet's closing balance at `start` (it already
 /// includes any previously paid interest, so payouts compound on themselves
@@ -55,7 +61,7 @@ pub fn accrued_interest(
     if end <= start || annual_rate_bps <= 0 {
         return 0;
     }
-    let daily_rate = annual_rate_bps as f64 / 10_000.0 / 365.0;
+    let daily_rate = annual_rate_bps as f64 / 10_000.0 / 360.0;
 
     // Walk each day in (start, end]: today's deposits/withdrawals land first,
     // then interest is computed on the running balance, rounded to the cent,
@@ -92,16 +98,17 @@ mod tests {
 
     #[test]
     fn one_day_simple_interest() {
-        // 36.50% annual is exactly 0.1%/day. $10,000.00 for one day → $10.00.
+        // On a 360-day base, 36.00% annual is exactly 0.1%/day.
+        // $10,000.00 for one day → 1000000 × 0.36/360 = 1000¢ = $10.00.
         assert_eq!(
-            accrued_interest(1_000_000, &[], d("2026-01-01"), d("2026-01-02"), 3650),
+            accrued_interest(1_000_000, &[], d("2026-01-01"), d("2026-01-02"), 3600),
             1_000
         );
     }
 
     #[test]
     fn deposit_accrues_from_its_own_date() {
-        // 0.1%/day, rounded to the cent daily.
+        // 0.1%/day (36.00% ACT/360), rounded to the cent daily.
         // Day Jan 1 on $10,000.00: round(1000000 * 0.001) = 1000¢ → bal 1_001_000.
         // Day Jan 2 the $10,000 deposit lands first (bal 2_001_000), then
         //   round(2001000 * 0.001) = 2001¢.
@@ -112,7 +119,7 @@ mod tests {
                 &[(d("2026-01-02"), 1_000_000)],
                 d("2026-01-01"),
                 d("2026-01-03"),
-                3650,
+                3600,
             ),
             3_001
         );
@@ -122,7 +129,7 @@ mod tests {
     fn no_interest_on_zero_or_negative_inputs() {
         // empty window
         assert_eq!(
-            accrued_interest(1_000_000, &[], d("2026-01-01"), d("2026-01-01"), 3650),
+            accrued_interest(1_000_000, &[], d("2026-01-01"), d("2026-01-01"), 3600),
             0
         );
         // no rate
@@ -132,25 +139,39 @@ mod tests {
         );
         // overdrawn balance never accrues a charge
         assert_eq!(
-            accrued_interest(-500_000, &[], d("2026-01-01"), d("2026-01-08"), 3650),
+            accrued_interest(-500_000, &[], d("2026-01-01"), d("2026-01-08"), 3600),
             0
         );
     }
 
     #[test]
     fn weekly_klar_payout_is_realistic() {
-        // Klar's 3% on $10,000 for one week, rounding 82.19¢/day down to 82¢
-        // each of the 7 days = 574 cents ($5.74).
+        // Klar's 3% on $10,000 for one week: 1000000 × 0.03/360 = 83.33¢/day,
+        // rounded to 83¢. Compounding is too small to bump any day to 84¢
+        // (day 7 base is only $10,004.98), so 7 × 83 = 581 cents ($5.81).
         let interest = accrued_interest(1_000_000, &[], d("2026-01-01"), d("2026-01-08"), 300);
-        assert_eq!(interest, 574);
+        assert_eq!(interest, 581);
     }
 
     #[test]
     fn small_balance_daily_rounding_matches_bank() {
         // Real Klar case: $334.73 at 3% pays 0.21/week because the bank rounds
-        // 2.75¢/day up to 3¢ (3 × 7 = 21), not 0.19 from a single weekly round.
+        // 2.79¢/day up to 3¢ (3 × 7 = 21), not 0.20 from a single weekly round.
+        // This observed value holds on either day-count base, so it stays a
+        // valid anchor for the daily-rounding rule itself.
         let interest = accrued_interest(33_473, &[], d("2026-06-17"), d("2026-06-24"), 300);
         assert_eq!(interest, 21);
+    }
+
+    #[test]
+    fn matches_nu_cajita_turbo_daily_payout() {
+        // Observed on a real Nu Cajita Turbo (13.00% annual): a $6,768.56
+        // balance pays $2.44 for one day.
+        //   676856 × 0.13/360 = 244.42¢ → 244¢
+        // Under the old ACT/365 base this returned 241¢ — the 1.39%/day
+        // shortfall that drifted the wallet away from Nu's own balance.
+        let interest = accrued_interest(676_856, &[], d("2026-08-21"), d("2026-08-22"), 1300);
+        assert_eq!(interest, 244);
     }
 
     #[test]
@@ -179,7 +200,7 @@ mod tests {
         // A Nu cajita pays what it earned each day, that same day. Paying
         // day by day must total the same as one weekly payout over the same
         // stretch: both compound on the balance already credited.
-        // $10,000.00 at 3%: 82.19¢/day → 82¢ the first day, and the payout
+        // $10,000.00 at 3%: 83.33¢/day → 83¢ the first day, and the payout
         // makes the next day's base a little bigger each time.
         let mut balance = 1_000_000;
         let mut day = d("2026-01-01");
@@ -190,7 +211,7 @@ mod tests {
             balance += paid;
             day += Duration::days(1);
         }
-        assert_eq!(total, 574);
+        assert_eq!(total, 581);
         assert_eq!(
             total,
             accrued_interest(1_000_000, &[], d("2026-01-01"), d("2026-01-08"), 300)
