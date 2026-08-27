@@ -92,10 +92,10 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 
 | Web | Android | Estado |
 |---|---|---|
-| Metas: lista + progreso | `ui/goals` | 🟡 solo lectura |
-| Presupuestos: lista + progreso | `ui/budgets` | 🟡 solo lectura |
-| Suscripciones: lista + total mensual | `ui/subscriptions` | 🟡 solo lectura |
-| Categorías: lista | `ui/categories` | 🟡 solo lectura |
+| Metas: lista, crear, editar, aportar/liberar, borrar | `ui/goals` | ✅ (falta reordenar y plan con fecha) |
+| Presupuestos: lista, fijar, editar, borrar | `ui/budgets` | ✅ |
+| Suscripciones: lista, crear, editar, pagar, pausar, borrar | `ui/subscriptions` | ✅ |
+| Categorías: lista, crear, renombrar, borrar/ocultar | `ui/categories` | ✅ (falta restaurar y reordenar) |
 
 ## Ajustes
 

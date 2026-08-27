@@ -54,6 +54,7 @@ import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
@@ -162,22 +163,6 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun DialogAction(
-    label: String,
-    color: androidx.compose.ui.graphics.Color? = null,
-    onClick: () -> Unit,
-) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.bodyLarge,
-        color = color ?: Broke.colors.fg,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-    )
-}
 
 @Composable
 private fun WalletList(

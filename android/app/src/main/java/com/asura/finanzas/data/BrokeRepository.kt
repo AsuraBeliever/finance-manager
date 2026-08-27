@@ -260,6 +260,143 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
+    // ---- planning ----
+
+    suspend fun saveGoal(
+        id: Long?,
+        name: String,
+        currencyCode: String,
+        targetCents: Long,
+        walletId: Long?,
+        color: String?,
+        targetDate: String?,
+        cadence: String?,
+        goalKind: String,
+    ) {
+        val body = buildJsonObject {
+            id?.let { put("id", it) }
+            put("name", name.trim())
+            put("currencyCode", currencyCode)
+            put("targetCents", targetCents)
+            walletId?.let { put("walletId", it) }
+            color?.let { put("color", it) }
+            targetDate?.let { put("targetDate", it) }
+            cadence?.let { put("cadence", it) }
+            put("goalKind", goalKind)
+        }
+        rpc.call(if (id == null) "create_savings_goal" else "update_savings_goal", body)
+        cache.invalidateReads()
+    }
+
+    /** Positive reserves more, negative releases. The server clamps at zero. */
+    suspend fun contributeToGoal(id: Long, amountCents: Long) {
+        rpc.call(
+            "contribute_savings_goal",
+            buildJsonObject { put("id", id); put("amountCents", amountCents) },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun deleteGoal(id: Long) {
+        rpc.call("delete_savings_goal", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    suspend fun setBudget(categoryId: Long?, limitCents: Long) {
+        rpc.call(
+            "set_budget",
+            buildJsonObject {
+                categoryId?.let { put("categoryId", it) }
+                put("limitCents", limitCents)
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun deleteBudget(id: Long) {
+        rpc.call("delete_budget", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    suspend fun saveSubscription(
+        id: Long?,
+        name: String,
+        amountCents: Long,
+        currencyCode: String,
+        cadence: String,
+        nextChargeDate: String,
+        walletId: Long?,
+        categoryId: Long?,
+        color: String?,
+    ) {
+        val body = buildJsonObject {
+            id?.let { put("id", it) }
+            put("name", name.trim())
+            put("amountCents", amountCents)
+            put("currencyCode", currencyCode)
+            put("cadence", cadence)
+            put("nextChargeDate", nextChargeDate)
+            walletId?.let { put("walletId", it) }
+            categoryId?.let { put("categoryId", it) }
+            color?.let { put("color", it) }
+        }
+        rpc.call(if (id == null) "create_subscription" else "update_subscription", body)
+        cache.invalidateReads()
+    }
+
+    suspend fun setSubscriptionActive(id: Long, active: Boolean) {
+        rpc.call(
+            "set_subscription_active",
+            buildJsonObject { put("id", id); put("active", active) },
+        )
+        cache.invalidateReads()
+    }
+
+    /** Posts the charge as a real expense from the subscription's wallet. */
+    suspend fun registerSubscriptionPayment(id: Long) {
+        rpc.call("register_subscription_payment", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    suspend fun deleteSubscription(id: Long) {
+        rpc.call("delete_subscription", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    suspend fun createCategory(name: String, kind: String, color: String?) {
+        rpc.call(
+            "create_transaction_category",
+            buildJsonObject {
+                put("name", name.trim())
+                put("kind", kind)
+                color?.let { put("color", it) }
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun updateCategory(id: Long, name: String, color: String?) {
+        rpc.call(
+            "update_transaction_category",
+            buildJsonObject {
+                put("id", id)
+                put("name", name.trim())
+                color?.let { put("color", it) }
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun deleteCategory(id: Long) {
+        rpc.call("delete_transaction_category", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    suspend fun restoreCategory(id: Long) {
+        rpc.call("restore_transaction_category", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
     private suspend fun <T> cached(
         key: String?,
         serializer: kotlinx.serialization.KSerializer<T>,
