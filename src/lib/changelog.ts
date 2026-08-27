@@ -12,6 +12,24 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.39.0",
+    date: "2026-08-25",
+    es: [
+      "Ya hay app nativa de Android: en la página de versiones de GitHub ahora sale un archivo .apk. Lo descargas, lo abres y se instala como cualquier otra app, con su ícono en tu pantalla de inicio — ya no hace falta el «Agregar a pantalla de inicio» del navegador.",
+      "Sus pantallas son de Android de verdad, no la página web metida en una ventana: se ve y se mueve como una app del sistema.",
+      "Abre con tus últimos números aunque no tengas señal. Por ahora eso aplica a consultar; para capturar movimientos todavía necesitas internet.",
+      "Esta primera versión trae el panel, tus carteras, tus movimientos y ajustes. Inversiones, metas, presupuestos, suscripciones y tarjetas siguen en la web mientras las vamos pasando.",
+      "Ojo: a diferencia de la web y la computadora, la app de Android sí necesita que descargues la versión nueva cuando salga.",
+    ],
+    en: [
+      "There's a native Android app now: the GitHub releases page includes an .apk file. Download it, open it, and it installs like any other app, with its own icon on your home screen — no more \"Add to Home Screen\" from the browser.",
+      "Its screens are real Android screens, not the web page inside a window: it looks and moves like a system app.",
+      "It opens with your last synced numbers even with no signal. For now that covers looking things up; recording movements still needs internet.",
+      "This first version has the dashboard, your wallets, your movements and settings. Investments, goals, budgets, subscriptions and cards stay on the web while we port them.",
+      "Note: unlike the web and desktop, the Android app does need you to download the new version when one ships.",
+    ],
+  },
+  {
     version: "2.38.0",
     date: "2026-08-22",
     es: [
