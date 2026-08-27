@@ -21,6 +21,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import com.asura.finanzas.R
+import com.asura.finanzas.data.AppPreferences
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.ui.dashboard.DashboardScreen
 import com.asura.finanzas.ui.settings.SettingsScreen
@@ -28,16 +31,17 @@ import com.asura.finanzas.ui.transactions.TransactionsScreen
 import com.asura.finanzas.ui.theme.Broke
 import com.asura.finanzas.ui.wallets.WalletsScreen
 
-private enum class Tab(val label: String, val icon: ImageVector) {
-    Dashboard("Panel", Icons.Outlined.PieChart),
-    Wallets("Carteras", Icons.Outlined.AccountBalanceWallet),
-    Transactions("Movimientos", Icons.AutoMirrored.Outlined.ReceiptLong),
-    Settings("Ajustes", Icons.Outlined.Settings),
+private enum class Tab(val labelRes: Int, val icon: ImageVector) {
+    Dashboard(R.string.nav_dashboard, Icons.Outlined.PieChart),
+    Wallets(R.string.nav_wallets, Icons.Outlined.AccountBalanceWallet),
+    Transactions(R.string.nav_transactions, Icons.AutoMirrored.Outlined.ReceiptLong),
+    Settings(R.string.nav_settings, Icons.Outlined.Settings),
 }
 
 @Composable
 fun HomeScaffold(
     repository: BrokeRepository,
+    preferences: AppPreferences,
     onSignedOut: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(Tab.Dashboard) }
@@ -48,11 +52,12 @@ fun HomeScaffold(
         bottomBar = {
             NavigationBar(containerColor = colors.surfaceOverlay) {
                 Tab.entries.forEach { entry ->
+                    val label = stringResource(entry.labelRes)
                     NavigationBarItem(
                         selected = tab == entry,
                         onClick = { tab = entry },
-                        icon = { Icon(entry.icon, contentDescription = entry.label) },
-                        label = { Text(entry.label) },
+                        icon = { Icon(entry.icon, contentDescription = label) },
+                        label = { Text(label) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = colors.accentBright,
                             selectedTextColor = colors.accentBright,
@@ -70,7 +75,7 @@ fun HomeScaffold(
             Tab.Dashboard -> DashboardScreen(repository, content)
             Tab.Wallets -> WalletsScreen(repository, content)
             Tab.Transactions -> TransactionsScreen(repository, content)
-            Tab.Settings -> SettingsScreen(repository, onSignedOut, content)
+            Tab.Settings -> SettingsScreen(repository, preferences, onSignedOut, content)
         }
     }
 }

@@ -73,6 +73,95 @@ class BrokeRepository(
             )
         }
 
+    suspend fun transactionCategories(kind: String): List<TransactionCategory> =
+        rpc.json.decodeFromJsonElement(
+            ListSerializer(TransactionCategory.serializer()),
+            rpc.call("list_transaction_categories", buildJsonObject { put("kind", kind) }),
+        )
+
+    // ---- writes ----
+    //
+    // The three capture commands accept a clientId the server uses for
+    // idempotency (unique index on transactions.client_id), so a retry after a
+    // lost response can never double-post. That is what an offline outbox will
+    // build on; today it already makes a flaky-network retry safe.
+
+    suspend fun addIncome(
+        walletId: Long,
+        amountCents: Long,
+        occurredAt: String,
+        categoryId: Long?,
+        description: String?,
+        occurredTime: String?,
+        clientId: String,
+    ) = addSimple("add_income", walletId, amountCents, occurredAt, categoryId, description, occurredTime, clientId)
+
+    suspend fun addExpense(
+        walletId: Long,
+        amountCents: Long,
+        occurredAt: String,
+        categoryId: Long?,
+        description: String?,
+        occurredTime: String?,
+        clientId: String,
+    ) = addSimple("add_expense", walletId, amountCents, occurredAt, categoryId, description, occurredTime, clientId)
+
+    private suspend fun addSimple(
+        command: String,
+        walletId: Long,
+        amountCents: Long,
+        occurredAt: String,
+        categoryId: Long?,
+        description: String?,
+        occurredTime: String?,
+        clientId: String,
+    ) {
+        rpc.call(
+            command,
+            buildJsonObject {
+                put("walletId", walletId)
+                put("amountCents", amountCents)
+                put("occurredAt", occurredAt)
+                categoryId?.let { put("categoryId", it) }
+                description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
+                occurredTime?.let { put("occurredTime", it) }
+                put("clientId", clientId)
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun addTransfer(
+        fromWalletId: Long,
+        toWalletId: Long,
+        amountFromCents: Long,
+        amountToCents: Long,
+        occurredAt: String,
+        description: String?,
+        occurredTime: String?,
+        clientId: String,
+    ) {
+        rpc.call(
+            "add_transfer",
+            buildJsonObject {
+                put("fromWalletId", fromWalletId)
+                put("toWalletId", toWalletId)
+                put("amountFromCents", amountFromCents)
+                put("amountToCents", amountToCents)
+                put("occurredAt", occurredAt)
+                description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
+                occurredTime?.let { put("occurredTime", it) }
+                put("clientId", clientId)
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun deleteTransaction(id: Long) {
+        rpc.call("delete_transaction", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
     private suspend fun <T> cached(
         key: String,
         serializer: kotlinx.serialization.KSerializer<T>,

@@ -58,10 +58,15 @@ cd android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
   `registerType: "prompt"` + `src/features/update/UpdateBanner.tsx`.
 - **Android es la excepción**: `android/` es una app NATIVA (Kotlin + Compose)
   que dibuja sus propias pantallas y consume el mismo `/api/rpc` con la misma
-  cookie de sesión. El backend NO tiene endpoints propios para Android. Costo
-  aceptado a sabiendas: cada feature de producto se construye dos veces (React y
-  Compose) y hay que sacar APK nuevo; la web es la implementación de referencia
-  cuando las dos difieren. Detalle en `android/README.md`.
+  cookie de sesión. El backend NO tiene endpoints propios para Android.
+  Detalle en `android/README.md`.
+- 🔴 **REGLA DE PARIDAD (no negociable, pedida por el usuario 2026-08-26):
+  web y Android son la MISMA app.** Todo lo que existe en la web existe en el
+  APK, y TODO cambio de producto de aquí en adelante se implementa en las dos
+  superficies **en el mismo commit/branch**. Nunca dejar Android atrás «para
+  después»: si una feature no se puede portar en el momento, no se mergea. Un
+  release sin su cambio de Android no está terminado. Checklist de paridad y
+  estado: `docs/ANDROID_PARITY.md` — actualizarlo en cada feature.
 - En Android el dinero tampoco se calcula en el cliente: `Money.kt` sólo formatea
   centavos. Si aparece aritmética de dinero en Kotlin, va mal — eso es de
   `finanzas-core`.
@@ -76,6 +81,8 @@ cd android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
 - Strings de UI SOLO en `src/i18n/` (bilingüe es/en); nada hardcodeado en componentes. `es.ts` es la forma canónica (`esDict`); al agregar una clave, agrégala también en `en.ts`. Los componentes importan `es` (un proxy al idioma activo) y usan `es.x`; el idioma se cambia en Ajustes (`src/i18n/store.ts`) y el router se remonta al cambiar. OJO: textos a nivel de módulo (fuera de un componente) quedan congelados al idioma inicial — defínelos dentro del componente.
 - **Cambios de esquema**: solo vía migración nueva en `worker/migrations/*.sql` + actualizar `docs/DATA_MODEL.md`.
 - **Calculadoras de inversión nuevas**: implementar `InvestmentCalculator` en finanzas-core + registry + tests + cargar su `CalcContext` en ambos loaders (worker y src-tauri) + form; guía en `docs/INVESTMENTS.md`.
+- **Toda feature nueva se entrega en web Y en Android**, en el mismo branch, con
+  su entrada en `docs/ANDROID_PARITY.md`. Ver la regla de paridad arriba.
 - Git: conventional commits. TODO cambio de producto (cualquier `feat`, o una serie
   de commits relacionados) se desarrolla en branch `feat/<nombre>` y llega a `main`
   SOLO vía release: commit `chore(release)` (bump en `package.json` + entrada en

@@ -25,6 +25,15 @@ class JsonCache(private val context: Context) {
         context.cacheDataStore.edit { it[stringPreferencesKey(key)] = value }
     }
 
+    /**
+     * Drop the cached reads after a write. Balances, totals and lists all move
+     * when a movement is captured, so keeping any of them would show stale money
+     * the next time the app opens offline.
+     */
+    suspend fun invalidateReads() {
+        context.cacheDataStore.edit { it.clear() }
+    }
+
     /** Wipe on logout: the next user must never see the previous one's numbers. */
     suspend fun clear() {
         context.cacheDataStore.edit { it.clear() }

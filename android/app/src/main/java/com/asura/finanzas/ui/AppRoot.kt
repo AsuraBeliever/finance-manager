@@ -3,7 +3,6 @@ package com.asura.finanzas.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,8 +11,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.asura.finanzas.data.AppPreferences
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.SessionCookieJar
+import com.asura.finanzas.data.UnauthorizedException
 import com.asura.finanzas.ui.auth.LoginScreen
 import com.asura.finanzas.ui.home.HomeScaffold
 import com.asura.finanzas.ui.theme.Broke
@@ -30,6 +31,7 @@ private enum class AuthState { Checking, SignedOut, SignedIn }
 fun AppRoot(
     repository: BrokeRepository,
     cookieJar: SessionCookieJar,
+    preferences: AppPreferences,
     onReady: () -> Unit,
 ) {
     var state by remember { mutableStateOf(AuthState.Checking) }
@@ -38,10 +40,9 @@ fun AppRoot(
         cookieJar.restore()
         state = if (repository.hasStoredSession()) AuthState.SignedIn else AuthState.SignedOut
         onReady()
-        // Revalidate in the background; a dead session drops to the login screen.
         if (state == AuthState.SignedIn) {
             runCatching { repository.me() }.onFailure {
-                if (it is com.asura.finanzas.data.UnauthorizedException) state = AuthState.SignedOut
+                if (it is UnauthorizedException) state = AuthState.SignedOut
             }
         }
     }
@@ -53,13 +54,14 @@ fun AppRoot(
         contentAlignment = Alignment.Center,
     ) {
         when (state) {
-            AuthState.Checking -> Text("", color = Broke.colors.fgMuted)
+            AuthState.Checking -> Unit
             AuthState.SignedOut -> LoginScreen(
                 repository = repository,
                 onSignedIn = { state = AuthState.SignedIn },
             )
             AuthState.SignedIn -> HomeScaffold(
                 repository = repository,
+                preferences = preferences,
                 onSignedOut = { state = AuthState.SignedOut },
             )
         }
