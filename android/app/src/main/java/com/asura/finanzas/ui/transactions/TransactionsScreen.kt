@@ -61,7 +61,9 @@ import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -246,8 +248,9 @@ private fun TransactionRow(tx: Transaction, hide: Boolean, onLongPress: (Transac
             )
             Text(
                 text = listOfNotNull(
-                    formatDay(tx.occurredAt),
-                    tx.occurredTime,
+                    // ISO date, same as the web's list.
+                    tx.occurredAt.take(10),
+                    transactionTime(tx),
                     tx.walletName.takeIf { it.isNotBlank() },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
@@ -271,10 +274,27 @@ private fun kindLabel(kind: String): String = when (kind) {
     else -> kind
 }
 
-/** `occurredAt` is a business date ('YYYY-MM-DD'), not an instant. */
+/**
+ * The time shown next to a movement: its own wall-clock time when it has one,
+ * otherwise the insert stamp converted to local time — the web's
+ * `transactionTime`. Honours the 12/24 h setting.
+ */
 @Composable
-private fun formatDay(occurredAt: String): String? {
-    val locale = Locale.forLanguageTag(LocalAppSettings.current.locale)
-    val formatter = remember(locale) { DateTimeFormatter.ofPattern("d MMM yyyy", locale) }
-    return runCatching { LocalDate.parse(occurredAt.take(10)).format(formatter) }.getOrNull()
+private fun transactionTime(tx: Transaction): String? {
+    val clock24 = LocalAppSettings.current.clock24
+    val pattern = if (clock24) "HH:mm" else "h:mm a"
+    val formatter = remember(pattern) { DateTimeFormatter.ofPattern(pattern, Locale.US) }
+
+    tx.occurredTime?.takeIf { it.isNotBlank() }?.let { own ->
+        return runCatching { LocalTime.parse(own).format(formatter) }.getOrNull() ?: own
+    }
+
+    val created = tx.createdAt ?: return null
+    return runCatching {
+        LocalDateTime
+            .parse(created.replace(" ", "T"))
+            .atZone(ZoneId.of("UTC"))
+            .withZoneSameInstant(ZoneId.systemDefault())
+            .format(formatter)
+    }.getOrNull()
 }

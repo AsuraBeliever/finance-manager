@@ -84,7 +84,8 @@ fun SettingsScreen(
         GlassCard(Modifier.fillMaxWidth()) {
             SettingRow(stringResource(R.string.theme_label)) {
                 SegmentedControl(
-                    options = ThemeChoice.entries,
+                    // Web order: Light, Dark, Auto.
+                    options = listOf(ThemeChoice.Light, ThemeChoice.Dark, ThemeChoice.System),
                     selected = settings.theme,
                     label = { themeLabel(it) },
                     icon = themeIcon,

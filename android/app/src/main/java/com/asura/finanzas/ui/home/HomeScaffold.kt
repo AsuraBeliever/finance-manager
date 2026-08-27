@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -71,7 +72,8 @@ fun HomeScaffold(
 
     MeshBackground {
         Column(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f)) {
+            // Edge-to-edge: keep content clear of the status bar.
+            Box(Modifier.weight(1f).statusBarsPadding()) {
                 when (tab) {
                     Tab.Dashboard -> DashboardScreen(repository)
                     Tab.Wallets -> WalletsScreen(repository)

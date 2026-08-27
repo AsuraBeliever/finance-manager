@@ -18,6 +18,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -116,7 +119,7 @@ private fun WalletList(wallets: List<Wallet>, fromCache: Boolean, modifier: Modi
 @Composable
 private fun WalletCard(wallet: Wallet, hide: Boolean) {
     val colors = Broke.colors
-    val skin = walletSkin(wallet.skin, wallet.color, colors.accent)
+    val skin = walletSkin(wallet.skin, wallet.color, wallet.categoryName)
     // Available is what the server already reports minus what it already
     // reports as reserved — a presentation pairing of two given figures.
     val available = wallet.balanceCents - wallet.reservedCents
@@ -130,7 +133,7 @@ private fun WalletCard(wallet: Wallet, hide: Boolean) {
             .border(1.dp, colors.borderMuted, RoundedCornerShape(26.dp)),
     ) {
         Icon(
-            Icons.Outlined.AccountBalanceWallet,
+            skinArtIcon(skin.art),
             contentDescription = null,
             tint = skin.fg.copy(alpha = 0.16f),
             modifier = Modifier
@@ -200,4 +203,13 @@ private fun PocketRow(pocket: Wallet, hide: Boolean) {
             )
         }
     }
+}
+
+/** The motif the web draws on each skin group. */
+@Composable
+private fun skinArtIcon(art: SkinArt) = when (art) {
+    SkinArt.Wallet -> Icons.Outlined.AccountBalanceWallet
+    SkinArt.Banknote -> Icons.Outlined.Payments
+    SkinArt.Coins, SkinArt.Piggy -> Icons.Outlined.Savings
+    else -> Icons.Outlined.CreditCard
 }
