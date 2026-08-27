@@ -85,6 +85,132 @@ data class DashboardSummary(
 )
 
 @Serializable
+data class SavingsGoal(
+    val id: Long,
+    val name: String,
+    val icon: String? = null,
+    val color: String? = null,
+    val currencyCode: String,
+    val targetCents: Long = 0,
+    val savedCents: Long = 0,
+    /** Progress in basis points, computed server-side. */
+    val progressBps: Long = 0,
+    val linkedWalletId: Long? = null,
+    val targetDate: String? = null,
+    val cadence: String? = null,
+    /** True when the goal has fallen below its steady pace. */
+    val isBehind: Boolean = false,
+    /** "purchase" (completing spends it) or "fund" (drawn down over time). */
+    val goalKind: String = "purchase",
+)
+
+@Serializable
+data class Budget(
+    val id: Long,
+    val categoryId: Long? = null,
+    val categoryName: String? = null,
+    val color: String? = null,
+    val limitCents: Long = 0,
+    val spentMxnCents: Long = 0,
+    val progressBps: Long = 0,
+)
+
+@Serializable
+data class Subscription(
+    val id: Long,
+    val name: String,
+    val icon: String? = null,
+    val color: String? = null,
+    val amountCents: Long = 0,
+    val currencyCode: String = "MXN",
+    /** "monthly" | "yearly". */
+    val cadence: String = "monthly",
+    val nextChargeDate: String = "",
+    val walletId: Long? = null,
+    val categoryId: Long? = null,
+    val isActive: Boolean = true,
+    val chargedInPeriod: Boolean = false,
+)
+
+@Serializable
+data class SubscriptionList(
+    val subscriptions: List<Subscription> = emptyList(),
+    val monthlyTotalMxnCents: Long = 0,
+)
+
+@Serializable
+data class Investment(
+    val id: Long,
+    val name: String,
+    val calculator: String,
+    val currencyCode: String,
+    val principalCents: Long = 0,
+    val startDate: String = "",
+    val linkedWalletId: Long? = null,
+    val isClosed: Boolean = false,
+    val currentValueCents: Long = 0,
+    /** principal + contributions − withdrawals, computed server-side. */
+    val netInvestedCents: Long = 0,
+    /** current value − net invested, computed server-side. */
+    val gainCents: Long = 0,
+    val maturityDate: String? = null,
+)
+
+@Serializable
+data class PortfolioSlice(
+    val id: Long,
+    val name: String,
+    val currentValueCents: Long = 0,
+    val gainCents: Long = 0,
+)
+
+@Serializable
+data class Portfolio(
+    val totalValueCents: Long = 0,
+    val totalInvestedCents: Long = 0,
+    val totalGainCents: Long = 0,
+    /** Annualised return in basis points; null when it cannot be computed. */
+    val annualizedReturnBps: Long? = null,
+    val slices: List<PortfolioSlice> = emptyList(),
+)
+
+@Serializable
+data class FlowBucket(
+    /** 'YYYY-MM-DD' when bucketUnit is 'day', 'YYYY-MM' when 'month'. */
+    val key: String,
+    val incomeMxnCents: Long = 0,
+    val expenseMxnCents: Long = 0,
+)
+
+@Serializable
+data class SpendingTrends(
+    val incomeMxnCents: Long = 0,
+    val expenseMxnCents: Long = 0,
+    val incomePrevMxnCents: Long = 0,
+    val expensePrevMxnCents: Long = 0,
+    /** Change vs the previous window, in basis points (server-computed). */
+    val incomeTrendBps: Long = 0,
+    val expenseTrendBps: Long = 0,
+    val bucketUnit: String = "day",
+    val buckets: List<FlowBucket> = emptyList(),
+)
+
+@Serializable
+data class CategorySlice(
+    val categoryId: Long? = null,
+    val name: String? = null,
+    val color: String? = null,
+    val totalMxnCents: Long = 0,
+    val count: Long = 0,
+)
+
+@Serializable
+data class CategoryBreakdown(
+    val totalMxnCents: Long = 0,
+    val slices: List<CategorySlice> = emptyList(),
+)
+
+@Serializable
 data class Transaction(
     val id: Long,
     val walletId: Long,

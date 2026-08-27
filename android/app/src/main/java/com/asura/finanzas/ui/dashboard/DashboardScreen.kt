@@ -4,102 +4,203 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.DashboardSummary
-import com.asura.finanzas.data.WalletBalance
+import com.asura.finanzas.data.SpendingTrends
+import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.components.ChipButton
+import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.GlassCard
+import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
+import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.OfflineNotice
-import com.asura.finanzas.ui.components.SectionTitle
+import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.PeriodChoice
+import com.asura.finanzas.ui.components.PeriodLabel
+import com.asura.finanzas.ui.components.PeriodPickerDialog
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
-import com.asura.finanzas.ui.formatDelta
 import com.asura.finanzas.ui.formatMoney
+import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
 
 @Composable
 fun DashboardScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     val (key, reload) = rememberReloadKey()
-    val state by loadSynced(key) { repository.dashboard() }
+    var period by remember { mutableStateOf(PeriodChoice.CurrentMonth) }
+    var showPeriod by remember { mutableStateOf(false) }
 
-    when (val current = state) {
+    val summaryState by loadSynced(key to period) { repository.dashboard() }
+    val trendsState by loadSynced(key to period) { repository.spendingTrends(period.toJson()) }
+
+    val trends = (trendsState as? Load.Ready)?.data
+
+    when (val current = summaryState) {
         is Load.Loading -> LoadingBox(modifier)
         is Load.Failed -> ErrorBox(current.message, reload, modifier)
-        is Load.Ready -> DashboardContent(current.data, current.fromCache, modifier)
+        is Load.Ready -> DashboardContent(
+            summary = current.data,
+            trends = trends,
+            fromCache = current.fromCache,
+            period = period,
+            onPickPeriod = { showPeriod = true },
+            modifier = modifier,
+        )
+    }
+
+    if (showPeriod) {
+        PeriodPickerDialog(
+            selected = period,
+            onSelect = { period = it; showPeriod = false },
+            onDismiss = { showPeriod = false },
+        )
     }
 }
 
 @Composable
 private fun DashboardContent(
     summary: DashboardSummary,
+    trends: SpendingTrends?,
     fromCache: Boolean,
+    period: PeriodChoice,
+    onPickPeriod: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
-    // Every figure below arrives already computed by the server. The only
-    // derivation here is the period delta, which is a subtraction of two totals
-    // the API itself returns as a matched pair.
-    val cashDelta = summary.totalEndMxnCents - summary.totalStartMxnCents
-    val netWorth = summary.totalEndMxnCents + summary.investmentsTotalMxnCents
+    val hide = LocalAppSettings.current.hideBalances
+
+    // Both figures come from the API as a matched pair; the app only puts them
+    // side by side. Nothing here recomputes a balance.
+    val netStart = summary.totalStartMxnCents + summary.investmentsStartMxnCents
+    val netEnd = summary.totalEndMxnCents + summary.investmentsTotalMxnCents
 
     LazyColumn(
-        modifier = modifier,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = 20.dp, end = 20.dp, top = 24.dp, bottom = 32.dp,
-        ),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        if (fromCache) {
-            item { OfflineNotice(Modifier.fillMaxWidth()) }
-        }
-
         item {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Patrimonio",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgMuted,
-                )
-                Spacer(Modifier.height(6.dp))
-                HeroAmount(formatMoney(netWorth))
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "${formatDelta(cashDelta)} en efectivo este periodo",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (cashDelta >= 0) colors.positive else colors.danger,
+            PageHeader(stringResource(R.string.dashboard_title)) {
+                ChipButton(
+                    text = PeriodLabel(period),
+                    onClick = onPickPeriod,
+                    leadingIcon = Icons.Outlined.CalendarMonth,
+                    trailingIcon = Icons.Outlined.ExpandMore,
                 )
             }
         }
 
+        if (fromCache) {
+            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
+        }
+
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                StatCard("Efectivo", formatMoney(summary.totalEndMxnCents), Modifier.weight(1f))
-                StatCard("Inversiones", formatMoney(summary.investmentsTotalMxnCents), Modifier.weight(1f))
+            GlassCard(Modifier.fillMaxWidth()) {
+                MicroLabel(stringResource(R.string.dashboard_net_worth))
+                Spacer(Modifier.height(14.dp))
+
+                MicroLabel(stringResource(R.string.dashboard_period_start), color = colors.fgSubtle)
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        maskIfHidden(formatMoney(netStart), hide),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = colors.fgMuted,
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = colors.fgSubtle,
+                        modifier = Modifier.padding(start = 12.dp).size(20.dp),
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+                MicroLabel(stringResource(R.string.dashboard_period_end), color = colors.fgSubtle)
+                Spacer(Modifier.height(2.dp))
+                HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 40.sp)
+
+                Spacer(Modifier.height(16.dp))
+                LegendRow(
+                    color = colors.accent,
+                    label = stringResource(R.string.nav_wallets),
+                    amount = maskIfHidden(formatMoney(summary.totalEndMxnCents), hide),
+                )
+                Spacer(Modifier.height(6.dp))
+                LegendRow(
+                    color = colors.cyan,
+                    label = stringResource(R.string.nav_investments),
+                    amount = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
+                )
+
+                if (trends != null) {
+                    Spacer(Modifier.height(16.dp))
+                    HairLine()
+                    Spacer(Modifier.height(14.dp))
+                    FlowRow(
+                        label = stringResource(R.string.dashboard_incomes),
+                        amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
+                        previous = maskIfHidden(formatMoney(trends.incomePrevMxnCents), hide),
+                        trendBps = trends.incomeTrendBps,
+                        upIsGood = true,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(
+                        label = stringResource(R.string.dashboard_expenses),
+                        amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
+                        previous = maskIfHidden(formatMoney(trends.expensePrevMxnCents), hide),
+                        trendBps = trends.expenseTrendBps,
+                        upIsGood = false,
+                    )
+                }
+            }
+        }
+
+        if (trends != null && trends.buckets.isNotEmpty()) {
+            item {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.dashboard_income_vs_expense),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colors.fg,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    FlowChart(trends)
+                }
             }
         }
 
@@ -107,8 +208,8 @@ private fun DashboardContent(
             item {
                 GlassCard(Modifier.fillMaxWidth()) {
                     Text(
-                        text = "Falta el tipo de cambio de ${summary.missingRates.joinToString(", ")}. " +
-                            "Esos saldos no están sumados en pesos.",
+                        "${stringResource(R.string.dashboard_missing_rates)}: " +
+                            summary.missingRates.joinToString(", "),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.fgMuted,
                     )
@@ -117,26 +218,33 @@ private fun DashboardContent(
         }
 
         if (summary.wallets.isNotEmpty()) {
-            item { SectionTitle("Carteras") }
-            items(summary.wallets, key = { it.walletId }) { wallet ->
-                WalletRow(wallet)
+            item {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    MicroLabel(stringResource(R.string.dashboard_by_wallet))
+                    Spacer(Modifier.height(12.dp))
+                    summary.wallets.forEachIndexed { index, wallet ->
+                        if (index > 0) Spacer(Modifier.height(10.dp))
+                        LegendRow(
+                            color = parseHexColor(wallet.color) ?: colors.accent,
+                            label = wallet.name,
+                            amount = maskIfHidden(formatMoney(wallet.balanceMxnCents), hide),
+                        )
+                    }
+                }
             }
         }
 
         if (summary.investments.isNotEmpty()) {
-            item { SectionTitle("Inversiones") }
-            items(summary.investments, key = { it.id }) { slice ->
+            item {
                 GlassCard(Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(slice.name, style = MaterialTheme.typography.bodyLarge, color = colors.fg)
-                        Text(
-                            formatMoney(slice.valueMxnCents),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = colors.fg,
+                    MicroLabel(stringResource(R.string.dashboard_by_investment))
+                    Spacer(Modifier.height(12.dp))
+                    summary.investments.forEachIndexed { index, slice ->
+                        if (index > 0) Spacer(Modifier.height(10.dp))
+                        LegendRow(
+                            color = colors.cyan,
+                            label = slice.name,
+                            amount = maskIfHidden(formatMoney(slice.valueMxnCents), hide),
                         )
                     }
                 }
@@ -146,45 +254,118 @@ private fun DashboardContent(
 }
 
 @Composable
-private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
+private fun LegendRow(color: androidx.compose.ui.graphics.Color, label: String, amount: String) {
     val colors = Broke.colors
-    GlassCard(modifier) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = colors.fgMuted)
-        Spacer(Modifier.height(6.dp))
-        Text(value, style = MaterialTheme.typography.titleMedium, color = colors.fg)
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Dot(color)
+        Spacer(Modifier.width(10.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.fgMuted,
+            modifier = Modifier.weight(1f),
+        )
+        Text(amount, style = MaterialTheme.typography.bodyLarge, color = colors.fg)
     }
 }
 
 @Composable
-private fun WalletRow(wallet: WalletBalance) {
+private fun FlowRow(
+    label: String,
+    amount: String,
+    previous: String,
+    trendBps: Long,
+    upIsGood: Boolean,
+) {
     val colors = Broke.colors
-    GlassCard(Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(parseHexColor(wallet.color) ?: colors.accent),
-            )
-            Spacer(Modifier.padding(horizontal = 6.dp))
-            Column(Modifier.weight(1f)) {
-                Text(wallet.name, style = MaterialTheme.typography.bodyLarge, color = colors.fg)
-                if (wallet.currencyCode != "MXN") {
-                    Text(
-                        formatMoney(wallet.balanceCents, wallet.currencyCode),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.fgSubtle,
-                    )
-                }
-            }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = colors.fgMuted)
+        Spacer(Modifier.width(10.dp))
+        Text(amount, style = MaterialTheme.typography.bodyLarge, color = colors.fg)
+        Spacer(Modifier.weight(1f))
+        if (trendBps != 0L) {
+            // Basis points to a percentage is presentation; the comparison
+            // itself was computed by the server.
+            val up = trendBps > 0
+            val good = up == upIsGood
+            val tint = if (good) colors.positive else colors.danger
             Text(
-                formatMoney(wallet.balanceMxnCents),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (wallet.balanceMxnCents < 0) colors.danger else colors.fg,
+                text = (if (up) "+" else "−") + "%.1f%%".format(kotlin.math.abs(trendBps) / 100.0),
+                style = MaterialTheme.typography.labelSmall,
+                color = tint,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(tint.copy(alpha = 0.14f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
     }
+    Text(
+        text = "${stringResource(R.string.dashboard_previously)} $previous",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.fgSubtle,
+    )
+}
+
+/** Income vs expense bars, the native counterpart of the web's `FlowChart`. */
+@Composable
+private fun FlowChart(trends: SpendingTrends) {
+    val colors = Broke.colors
+    val max = trends.buckets.maxOf { maxOf(it.incomeMxnCents, it.expenseMxnCents) }.coerceAtLeast(1)
+
+    Row(
+        modifier = Modifier.fillMaxWidth().height(150.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        trends.buckets.takeLast(24).forEach { bucket ->
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Bar(bucket.incomeMxnCents, max, colors.positive)
+                    Bar(bucket.expenseMxnCents, max, colors.danger)
+                }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Dot(colors.positive, 9.dp)
+            Text(
+                stringResource(R.string.dashboard_incomes),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgMuted,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Dot(colors.danger, 9.dp)
+            Text(
+                stringResource(R.string.dashboard_expenses),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgMuted,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun Bar(value: Long, max: Long, color: androidx.compose.ui.graphics.Color) {
+    val fraction = (value.toFloat() / max.toFloat()).coerceIn(0f, 1f)
+    Box(
+        Modifier
+            .width(5.dp)
+            .height((130 * fraction).dp.coerceAtLeast(if (value > 0) 3.dp else 0.dp))
+            .clip(RoundedCornerShape(3.dp))
+            .background(color),
+    )
 }

@@ -31,6 +31,10 @@ data class BrokeColors(
     val fg: Color,
     val fgMuted: Color,
     val fgSubtle: Color,
+    /** The three soft blobs of the gradient-mesh canvas (--mesh-1..3). */
+    val mesh1: Color,
+    val mesh2: Color,
+    val mesh3: Color,
     val isDark: Boolean,
 )
 
@@ -48,6 +52,9 @@ private val DarkTokens = BrokeColors(
     fg = Color(0xFFF2EFFF),
     fgMuted = Color(0xFFA8A2C8),
     fgSubtle = Color(0xFF6F6A8D),
+    mesh1 = Color(0x38A855F7),
+    mesh2 = Color(0x24EC4899),
+    mesh3 = Color(0x2422D3EE),
     isDark = true,
 )
 
@@ -65,6 +72,9 @@ private val LightTokens = BrokeColors(
     fg = Color(0xFF211A3A),
     fgMuted = Color(0xFF6B6488),
     fgSubtle = Color(0xFF9A93B5),
+    mesh1 = Color(0x338B5CF6),
+    mesh2 = Color(0x1FEC4899),
+    mesh3 = Color(0x1F06B6D4),
     isDark = false,
 )
 

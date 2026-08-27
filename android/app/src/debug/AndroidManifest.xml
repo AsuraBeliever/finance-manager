@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only overlay. A debug build points at `wrangler dev` on the LAN, which
+  serves plain HTTP, so cleartext has to be allowed — for this variant only.
+  The release APK keeps usesCleartextTraffic="false" and always talks HTTPS.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:usesCleartextTraffic="true"
+        tools:replace="android:usesCleartextTraffic" />
+</manifest>

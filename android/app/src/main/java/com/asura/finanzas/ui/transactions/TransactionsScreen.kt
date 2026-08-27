@@ -1,22 +1,28 @@
 package com.asura.finanzas.ui.transactions
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.outlined.CompareArrows
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CallMade
+import androidx.compose.material.icons.outlined.CallReceived
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,32 +35,48 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Transaction
 import com.asura.finanzas.data.Wallet
+import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
-import com.asura.finanzas.ui.components.GlassCard
+import com.asura.finanzas.ui.components.HairLine
+import com.asura.finanzas.ui.components.IconBadge
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.OfflineNotice
-import com.asura.finanzas.ui.components.SectionTitle
+import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.PrimaryButton
+import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatMoney
+import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val dayFormat = DateTimeFormatter.ofPattern("d 'de' MMMM", Locale.forLanguageTag("es-MX"))
+/** The kind filter tabs the web shows above the list. */
+private enum class KindFilter(val labelRes: Int, val wire: String?) {
+    All(R.string.transactions_type_all, null),
+    Income(R.string.transactions_income, "income"),
+    Expense(R.string.transactions_expense, "expense"),
+    Transfer(R.string.transactions_transfer, "transfer"),
+}
 
 @Composable
 fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     val (key, reload) = rememberReloadKey()
+    var filter by remember { mutableStateOf(KindFilter.All) }
     val state by loadSynced(key) { repository.transactions() }
     val wallets by produceState(initialValue = emptyList<Wallet>(), key) {
         value = runCatching { repository.wallets().value }.getOrDefault(emptyList())
@@ -70,19 +92,11 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
             is Load.Failed -> ErrorBox(current.message, reload)
             is Load.Ready -> TransactionList(
                 transactions = current.data,
+                filter = filter,
+                onFilter = { filter = it },
                 fromCache = current.fromCache,
+                onNew = { showForm = true },
                 onLongPress = { pendingDelete = it },
-            )
-        }
-
-        FloatingActionButton(
-            onClick = { showForm = true },
-            containerColor = Broke.colors.accent,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
-        ) {
-            Icon(
-                Icons.Filled.Add,
-                contentDescription = stringResource(R.string.transactions_new_transaction),
             )
         }
     }
@@ -92,16 +106,14 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
             repository = repository,
             wallets = wallets,
             onDismiss = { showForm = false },
-            onSaved = {
-                showForm = false
-                reload()
-            },
+            onSaved = { showForm = false; reload() },
         )
     }
 
     pendingDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
+            containerColor = Broke.colors.surfaceOverlay,
             title = { Text(stringResource(R.string.transactions_delete_confirm_title)) },
             text = { Text(stringResource(R.string.transactions_delete_confirm)) },
             confirmButton = {
@@ -125,76 +137,129 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
 @Composable
 private fun TransactionList(
     transactions: List<Transaction>,
+    filter: KindFilter,
+    onFilter: (KindFilter) -> Unit,
     fromCache: Boolean,
+    onNew: () -> Unit,
     onLongPress: (Transaction) -> Unit,
 ) {
+    val colors = Broke.colors
+    val hide = LocalAppSettings.current.hideBalances
+
+    // Filtering a list that is already on the device; the amounts themselves
+    // are untouched.
+    val shown = when (filter.wire) {
+        null -> transactions
+        "transfer" -> transactions.filter { it.kind.startsWith("transfer") }
+        else -> transactions.filter { it.kind == filter.wire }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        if (fromCache) item { OfflineNotice(Modifier.fillMaxWidth()) }
-        item { SectionTitle(stringResource(R.string.transactions_title)) }
-
-        if (transactions.isEmpty()) {
-            item {
-                Column {
-                    Text(
-                        stringResource(R.string.transactions_empty_title),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Broke.colors.fg,
-                    )
-                    Text(
-                        stringResource(R.string.transactions_empty_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Broke.colors.fgMuted,
-                    )
-                }
+        item {
+            PageHeader(stringResource(R.string.transactions_title)) {
+                PrimaryButton(
+                    text = stringResource(R.string.transactions_new_transaction),
+                    onClick = onNew,
+                    leadingIcon = Icons.Outlined.Add,
+                )
             }
         }
 
-        items(transactions, key = { it.id }) { tx ->
-            TransactionRow(tx, onLongPress)
+        if (fromCache) {
+            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
+        }
+
+        item {
+            SegmentedControl(
+                options = KindFilter.entries,
+                selected = filter,
+                label = { stringResource(it.labelRes) },
+                onSelect = onFilter,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        if (shown.isEmpty()) {
+            item {
+                EmptyState(
+                    stringResource(R.string.transactions_empty_title),
+                    stringResource(R.string.transactions_empty_description),
+                )
+            }
+        } else {
+            item {
+                // One card holding every row, split by hairlines — the web's list.
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(colors.surfaceRaised)
+                        .border(1.dp, colors.borderMuted, RoundedCornerShape(24.dp)),
+                ) {
+                    shown.forEachIndexed { index, tx ->
+                        if (index > 0) HairLine()
+                        TransactionRow(tx, hide, onLongPress)
+                    }
+                }
+            }
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TransactionRow(tx: Transaction, onLongPress: (Transaction) -> Unit) {
+private fun TransactionRow(tx: Transaction, hide: Boolean, onLongPress: (Transaction) -> Unit) {
     val colors = Broke.colors
-    // The sign is the server's: "income" and "transfer_in" add, the rest subtract.
-    val incoming = tx.kind == "income" || tx.kind == "transfer_in"
+    // The web colours by kind, not by sign: income violet, transfer cyan,
+    // expense rose.
+    val (icon: ImageVector, tint: Color) = when (tx.kind) {
+        "income" -> Icons.Outlined.CallReceived to colors.accent
+        "transfer_in", "transfer_out" -> Icons.AutoMirrored.Outlined.CompareArrows to colors.cyan
+        else -> Icons.Outlined.CallMade to colors.danger
+    }
+    val sign = when (tx.kind) {
+        "income", "transfer_in" -> "+"
+        "transfer_out" -> ""
+        else -> "−"
+    }
 
-    GlassCard(
-        Modifier
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = { onLongPress(tx) }),
+            .combinedClickable(onClick = {}, onLongClick = { onLongPress(tx) })
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = tx.description?.takeIf { it.isNotBlank() }
-                        ?: tx.categoryName
-                        ?: kindLabel(tx.kind),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colors.fg,
-                )
-                Text(
-                    text = listOfNotNull(
-                        tx.walletName.takeIf { it.isNotBlank() },
-                        formatDay(tx.occurredAt),
-                    ).joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgSubtle,
-                )
-            }
+        IconBadge(icon, tint)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
             Text(
-                text = (if (incoming) "+" else "−") + formatMoney(tx.amountCents),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (incoming) colors.positive else colors.fg,
+                text = tx.description?.takeIf { it.isNotBlank() }
+                    ?: tx.categoryName
+                    ?: kindLabel(tx.kind),
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.fg,
+            )
+            Text(
+                text = listOfNotNull(
+                    formatDay(tx.occurredAt),
+                    tx.occurredTime,
+                    tx.walletName.takeIf { it.isNotBlank() },
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
             )
         }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = sign + maskIfHidden(formatMoney(tx.amountCents), hide),
+            style = MaterialTheme.typography.labelLarge,
+            color = tint,
+        )
     }
 }
 
@@ -207,5 +272,9 @@ private fun kindLabel(kind: String): String = when (kind) {
 }
 
 /** `occurredAt` is a business date ('YYYY-MM-DD'), not an instant. */
-private fun formatDay(occurredAt: String): String? =
-    runCatching { LocalDate.parse(occurredAt.take(10)).format(dayFormat) }.getOrNull()
+@Composable
+private fun formatDay(occurredAt: String): String? {
+    val locale = Locale.forLanguageTag(LocalAppSettings.current.locale)
+    val formatter = remember(locale) { DateTimeFormatter.ofPattern("d MMM yyyy", locale) }
+    return runCatching { LocalDate.parse(occurredAt.take(10)).format(formatter) }.getOrNull()
+}

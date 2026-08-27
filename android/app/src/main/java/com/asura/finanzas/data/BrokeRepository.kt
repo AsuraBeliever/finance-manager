@@ -54,6 +54,35 @@ class BrokeRepository(
             rpc.call("get_dashboard_summary")
         }
 
+    suspend fun savingsGoals(): Synced<List<SavingsGoal>> =
+        cached("goals", ListSerializer(SavingsGoal.serializer())) {
+            rpc.call("list_savings_goals")
+        }
+
+    suspend fun budgets(): Synced<List<Budget>> =
+        cached("budgets", ListSerializer(Budget.serializer())) { rpc.call("list_budgets") }
+
+    suspend fun subscriptions(): Synced<SubscriptionList> =
+        cached("subscriptions", SubscriptionList.serializer()) { rpc.call("list_subscriptions") }
+
+    suspend fun manageCategories(): Synced<List<TransactionCategory>> =
+        cached("categories", ListSerializer(TransactionCategory.serializer())) {
+            rpc.call("list_manage_categories")
+        }
+
+    suspend fun investments(): Synced<List<Investment>> =
+        cached("investments", ListSerializer(Investment.serializer())) {
+            rpc.call("list_investments")
+        }
+
+    suspend fun portfolio(): Synced<Portfolio> =
+        cached("portfolio", Portfolio.serializer()) { rpc.call("get_portfolio") }
+
+    suspend fun spendingTrends(period: JsonObject): Synced<SpendingTrends> =
+        cached("trends", SpendingTrends.serializer()) {
+            rpc.call("get_spending_trends", buildJsonObject { put("period", period) })
+        }
+
     suspend fun wallets(): Synced<List<Wallet>> =
         cached("wallets", ListSerializer(Wallet.serializer())) {
             rpc.call("list_wallets")

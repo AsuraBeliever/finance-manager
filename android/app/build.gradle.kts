@@ -35,8 +35,9 @@ android {
         versionCode = appVersionCode
         versionName = appVersionName
 
-        // The deployed worker. Debug builds can point elsewhere via a local
-        // gradle.properties override without touching this file.
+        // The deployed worker. Override for a debug build with
+        // `-PbrokeApiBase=http://<lan-ip>:8787` to hit `wrangler dev` instead, so
+        // capture forms can be tested without writing to real finances.
         val apiBase = (project.findProperty("brokeApiBase") as String?)
             ?: "https://finanzas.aseth.workers.dev"
         buildConfigField("String", "API_BASE", "\"$apiBase\"")
@@ -58,7 +59,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Side by side with the real app: a different applicationId means the
+            // test build never replaces (or fails to install over) the signed one,
+            // and the launcher shows which is which.
+            applicationIdSuffix = ".debug"
+            manifestPlaceholders["appLabel"] = "Broke dev"
+        }
         release {
+            manifestPlaceholders["appLabel"] = "@string/app_name"
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

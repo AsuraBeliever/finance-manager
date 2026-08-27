@@ -36,3 +36,9 @@ fun formatDelta(cents: Long, currencyCode: String = "MXN"): String {
         else -> body
     }
 }
+
+/**
+ * The web's privacy toggle blanks the figures rather than removing them, so the
+ * layout does not jump when it is switched on.
+ */
+fun maskIfHidden(text: String, hidden: Boolean): String = if (hidden) "•".repeat(6) else text

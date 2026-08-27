@@ -33,16 +33,16 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Web | Android | Estado |
 |---|---|---|
 | Patrimonio + efectivo + inversiones | `ui/dashboard` | ✅ |
-| Selector de periodo (`PeriodPicker`) | — | ⬜ |
+| Selector de periodo (`PeriodPicker`) | `components/PeriodPicker` | 🟡 faltan mes/día/rango |
 | Lista de carteras con saldo | `ui/dashboard` | ✅ |
 | Rebanadas de inversiones | `ui/dashboard` | ✅ |
 | Aviso de tipos de cambio faltantes | `ui/dashboard` | ✅ |
-| Gráfica de flujo (`FlowChart`, `getSpendingTrends`) | — | ⬜ |
+| Gráfica de flujo (`FlowChart`, `getSpendingTrends`) | `ui/dashboard` | ✅ |
 | Widget desglose por categoría + modal de detalle | — | ⬜ |
 | Widget de presupuestos | — | ⬜ |
 | Widget de metas | — | ⬜ |
 | Widget de suscripciones | — | ⬜ |
-| Ocultar saldos (`PrivacyToggle`) | — | ⬜ |
+| Ocultar saldos (`PrivacyToggle`) | `ui/settings` + todas las cifras | ✅ |
 
 ## Carteras
 
@@ -56,14 +56,14 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Convertir meta en cartera | — | ⬜ |
 | Panel de tarjeta de crédito (corte, por pagar, utilización) | — | ⬜ |
 | Planes MSI: previsualizar, crear, borrar | — | ⬜ |
-| Skins / colores de cartera | 🟡 solo color | 🟡 |
+| Skins / colores de cartera | `ui/wallets/WalletSkins` | ✅ catálogo + `grad:` |
 
 ## Movimientos
 
 | Web | Android | Estado |
 |---|---|---|
 | Lista | `ui/transactions` | ✅ |
-| Filtros (cartera, tipo, categoría, periodo) | — | ⬜ |
+| Filtros (cartera, tipo, categoría, periodo) | `ui/transactions` | 🟡 solo tipo |
 | Total de lo filtrado (`sumTransactions`) | — | ⬜ |
 | Alta de ingreso | `TransactionFormSheet` | ✅ |
 | Alta de gasto | `TransactionFormSheet` | ✅ |
@@ -79,8 +79,8 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 
 | Web | Android | Estado |
 |---|---|---|
-| Lista + valuación | — | ⬜ |
-| Resumen de portafolio | — | ⬜ |
+| Lista + valuación | `ui/investments` | ✅ |
+| Resumen de portafolio | `ui/investments` | ✅ |
 | Detalle + proyección | — | ⬜ |
 | Crear / editar (catálogo, calculadoras, Banxico) | — | ⬜ |
 | Cerrar / eliminar | — | ⬜ |
@@ -92,10 +92,10 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 
 | Web | Android | Estado |
 |---|---|---|
-| Metas: lista, crear, editar, aportar, usar, borrar, reordenar | — | ⬜ |
-| Presupuestos: lista, fijar, borrar | — | ⬜ |
-| Suscripciones: lista, crear, editar, pagar, activar, borrar | — | ⬜ |
-| Categorías: lista, crear, editar, borrar, restaurar, reordenar | — | ⬜ |
+| Metas: lista + progreso | `ui/goals` | 🟡 solo lectura |
+| Presupuestos: lista + progreso | `ui/budgets` | 🟡 solo lectura |
+| Suscripciones: lista + total mensual | `ui/subscriptions` | 🟡 solo lectura |
+| Categorías: lista | `ui/categories` | 🟡 solo lectura |
 
 ## Ajustes
 
@@ -106,7 +106,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Tema claro / oscuro / auto | `ui/settings` | ✅ |
 | Apariencia: acento, fondo, tipografía, logo, ícono | — | ⬜ |
 | Zona horaria | — | ⬜ |
-| Formato de reloj 12/24 h | — | ⬜ |
+| Formato de reloj 12/24 h | `ui/settings` | 🟡 se guarda, falta aplicarlo |
 | Categorías de cartera | — | ⬜ |
 | Monedas y tipos de cambio | — | ⬜ |
 | Novedades (changelog in-app) | — | ⬜ |
@@ -117,7 +117,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Web | Android | Estado |
 |---|---|---|
 | i18n es/en (`src/i18n/`) | `strings_i18n.xml` **generado** | ✅ |
-| Ocultar saldos (preferencia) | `ui/settings` | 🟡 se guarda, falta aplicarla en pantalla |
+| Ocultar saldos (preferencia) | `ui/settings` | ✅ |
 | Caché offline de lectura | `JsonCache` | ✅ |
 | Banner «sin conexión» | `OfflineNotice` | ✅ |
 | Formato de dinero por moneda | `Money.kt` | ✅ |
