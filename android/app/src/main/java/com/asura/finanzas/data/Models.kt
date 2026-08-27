@@ -173,6 +173,51 @@ data class Investment(
 )
 
 @Serializable
+data class ProjectionPoint(
+    val date: String,
+    val valueCents: Long = 0,
+)
+
+@Serializable
+data class InvestmentSnapshot(
+    val id: Long,
+    val investmentId: Long,
+    val valueCents: Long = 0,
+    val asOf: String,
+    val source: String = "",
+)
+
+@Serializable
+data class InvestmentMovement(
+    val id: Long,
+    val investmentId: Long,
+    /** "deposit" | "withdrawal". */
+    val kind: String,
+    val amountCents: Long = 0,
+    val occurredAt: String,
+)
+
+/** `get_investment_detail`: the investment plus its history and projection. */
+@Serializable
+data class InvestmentDetail(
+    val id: Long,
+    val name: String,
+    val calculator: String,
+    val currencyCode: String,
+    val principalCents: Long = 0,
+    val startDate: String = "",
+    val linkedWalletId: Long? = null,
+    val isClosed: Boolean = false,
+    val currentValueCents: Long = 0,
+    val netInvestedCents: Long = 0,
+    val gainCents: Long = 0,
+    val maturityDate: String? = null,
+    val projection: List<ProjectionPoint> = emptyList(),
+    val snapshots: List<InvestmentSnapshot> = emptyList(),
+    val movements: List<InvestmentMovement> = emptyList(),
+)
+
+@Serializable
 data class PortfolioSlice(
     val id: Long,
     val name: String,

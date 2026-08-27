@@ -75,6 +75,54 @@ class BrokeRepository(
             rpc.call("list_investments")
         }
 
+    suspend fun investmentDetail(id: Long): InvestmentDetail =
+        rpc.json.decodeFromJsonElement(
+            InvestmentDetail.serializer(),
+            rpc.call("get_investment_detail", buildJsonObject { put("id", id) }),
+        )
+
+    suspend fun addInvestmentMovement(
+        investmentId: Long,
+        kind: String,
+        amountCents: Long,
+        occurredAt: String,
+        walletId: Long?,
+    ) {
+        rpc.call(
+            "add_investment_movement",
+            buildJsonObject {
+                put("investmentId", investmentId)
+                put("kind", kind)
+                put("amountCents", amountCents)
+                put("occurredAt", occurredAt)
+                walletId?.let { put("walletId", it) }
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun addInvestmentSnapshot(investmentId: Long, valueCents: Long, asOf: String) {
+        rpc.call(
+            "add_snapshot",
+            buildJsonObject {
+                put("investmentId", investmentId)
+                put("valueCents", valueCents)
+                put("asOf", asOf)
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun closeInvestment(id: Long) {
+        rpc.call("close_investment", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    suspend fun deleteInvestment(id: Long) {
+        rpc.call("delete_investment", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
     suspend fun portfolio(): Synced<Portfolio> =
         cached("portfolio", Portfolio.serializer()) { rpc.call("get_portfolio") }
 

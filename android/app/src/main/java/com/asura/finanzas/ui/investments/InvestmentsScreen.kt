@@ -1,5 +1,6 @@
 package com.asura.finanzas.ui.investments
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,6 +15,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,10 +54,29 @@ fun InvestmentsScreen(repository: BrokeRepository, modifier: Modifier = Modifier
         value = runCatching { repository.portfolio().value }.getOrNull()
     }
 
+    var openId by remember { mutableStateOf<Long?>(null) }
+
+    val id = openId
+    if (id != null) {
+        InvestmentDetailScreen(
+            repository = repository,
+            investmentId = id,
+            onBack = { openId = null; reload() },
+            modifier = modifier,
+        )
+        return
+    }
+
     when (val current = state) {
         is Load.Loading -> LoadingBox(modifier)
         is Load.Failed -> ErrorBox(current.message, reload, modifier)
-        is Load.Ready -> InvestmentList(current.data, portfolio, current.fromCache, modifier)
+        is Load.Ready -> InvestmentList(
+            investments = current.data,
+            portfolio = portfolio,
+            fromCache = current.fromCache,
+            onOpen = { openId = it.id },
+            modifier = modifier,
+        )
     }
 }
 
@@ -62,6 +85,7 @@ private fun InvestmentList(
     investments: List<Investment>,
     portfolio: Portfolio?,
     fromCache: Boolean,
+    onOpen: (Investment) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -123,15 +147,19 @@ private fun InvestmentList(
         }
 
         items(open, key = { it.id }) { investment ->
-            InvestmentCard(investment, hide)
+            InvestmentCard(investment, hide, onOpen)
         }
     }
 }
 
 @Composable
-private fun InvestmentCard(investment: Investment, hide: Boolean) {
+private fun InvestmentCard(
+    investment: Investment,
+    hide: Boolean,
+    onOpen: (Investment) -> Unit,
+) {
     val colors = Broke.colors
-    GlassCard(Modifier.fillMaxWidth()) {
+    GlassCard(Modifier.fillMaxWidth().clickable { onOpen(investment) }) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.weight(1f)) {
                 Text(

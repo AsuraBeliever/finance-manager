@@ -81,11 +81,11 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 |---|---|---|
 | Lista + valuación | `ui/investments` | ✅ |
 | Resumen de portafolio | `ui/investments` | ✅ |
-| Detalle + proyección | — | ⬜ |
+| Detalle + proyección | `ui/investments` | ✅ (proyección: sólo el valor final) |
 | Crear / editar (catálogo, calculadoras, Banxico) | — | ⬜ |
-| Cerrar / eliminar | — | ⬜ |
-| Movimientos: alta, edición, borrado | — | ⬜ |
-| Snapshots manuales | — | ⬜ |
+| Cerrar / eliminar | `ui/investments` | ✅ |
+| Movimientos: alta | `InvestmentSheets` | 🟡 falta editar/borrar |
+| Snapshots manuales | `InvestmentSheets` | ✅ |
 | Simulador + resolver aportación | — | ⬜ |
 
 ## Planeación
