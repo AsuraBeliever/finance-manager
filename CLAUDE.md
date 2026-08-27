@@ -26,6 +26,11 @@ npm run dev                                  # (opcional) Vite con HMR; /api se 
 cd worker && npx wrangler deploy             # publica worker + dist/
 cd worker && npx wrangler tail               # logs (cron, errores)
 npm run tauri dev                            # shell de escritorio
+
+# Android (app NATIVA Kotlin/Compose contra el mismo /api/rpc) — ver android/README.md
+cd android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
+                                             # JDK 17-21 (el 26 no le sirve a AGP 8.7);
+                                             # assembleRelease firma con $BROKE_KEYSTORE
 ```
 
 ## Arquitectura (resumen — detalle en docs/ARCHITECTURE.md)
@@ -51,6 +56,15 @@ npm run tauri dev                            # shell de escritorio
   actualiza web + iPhone + escritorio a la vez (no se recompila el binario salvo
   cambios nativos en `src-tauri/`). Aviso de versión nueva in-app vía
   `registerType: "prompt"` + `src/features/update/UpdateBanner.tsx`.
+- **Android es la excepción**: `android/` es una app NATIVA (Kotlin + Compose)
+  que dibuja sus propias pantallas y consume el mismo `/api/rpc` con la misma
+  cookie de sesión. El backend NO tiene endpoints propios para Android. Costo
+  aceptado a sabiendas: cada feature de producto se construye dos veces (React y
+  Compose) y hay que sacar APK nuevo; la web es la implementación de referencia
+  cuando las dos difieren. Detalle en `android/README.md`.
+- En Android el dinero tampoco se calcula en el cliente: `Money.kt` sólo formatea
+  centavos. Si aparece aritmética de dinero en Kotlin, va mal — eso es de
+  `finanzas-core`.
 - El service worker de la PWA JAMÁS cachea `/api/*`.
 - No multiplicar centavos×micros en SQL (números D1 → JS f64): esa aritmética
   va en Rust con i128 intermedio.
