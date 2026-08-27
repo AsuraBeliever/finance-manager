@@ -85,6 +85,22 @@ data class DashboardSummary(
 )
 
 @Serializable
+data class WalletCategory(
+    val id: Long,
+    val name: String,
+    val icon: String? = null,
+    val isSystem: Boolean = false,
+)
+
+@Serializable
+data class Currency(
+    val code: String,
+    val name: String = "",
+    val symbol: String = "",
+    val decimals: Int = 2,
+)
+
+@Serializable
 data class SavingsGoal(
     val id: Long,
     val name: String,

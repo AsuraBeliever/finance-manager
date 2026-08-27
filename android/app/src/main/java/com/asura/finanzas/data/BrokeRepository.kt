@@ -88,8 +88,16 @@ class BrokeRepository(
             rpc.call("list_wallets")
         }
 
-    suspend fun transactions(limit: Int = 50): Synced<List<Transaction>> =
-        cached("transactions", ListSerializer(Transaction.serializer())) {
+    suspend fun transactions(
+        limit: Int = 100,
+        walletId: Long? = null,
+        kind: String? = null,
+        period: JsonObject? = null,
+    ): Synced<List<Transaction>> {
+        // Only the unfiltered list is worth keeping for offline: a cache keyed
+        // by every filter combination would mostly be misses.
+        val key = if (walletId == null && kind == null && period == null) "transactions" else null
+        return cached(key, ListSerializer(Transaction.serializer())) {
             rpc.call(
                 "list_transactions",
                 buildJsonObject {
@@ -97,10 +105,14 @@ class BrokeRepository(
                     putJsonObject("filter") {
                         put("limit", limit)
                         put("offset", 0)
+                        walletId?.let { put("walletId", it) }
+                        kind?.let { put("kind", it) }
+                        period?.let { put("period", it) }
                     }
                 },
             )
         }
+    }
 
     suspend fun transactionCategories(kind: String): List<TransactionCategory> =
         rpc.json.decodeFromJsonElement(
@@ -191,16 +203,78 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
+    // ---- wallets ----
+
+    suspend fun walletCategories(): List<WalletCategory> =
+        rpc.json.decodeFromJsonElement(
+            ListSerializer(WalletCategory.serializer()),
+            rpc.call("list_wallet_categories"),
+        )
+
+    suspend fun currencies(): List<Currency> =
+        rpc.json.decodeFromJsonElement(
+            ListSerializer(Currency.serializer()),
+            rpc.call("list_currencies"),
+        )
+
+    suspend fun saveWallet(
+        id: Long?,
+        name: String,
+        categoryId: Long,
+        currencyCode: String,
+        initialBalanceCents: Long,
+        color: String?,
+        skin: String?,
+        notes: String?,
+        yieldRateBps: Long?,
+        yieldFrequency: String?,
+        parentWalletId: Long?,
+    ) {
+        val body = buildJsonObject {
+            id?.let { put("id", it) }
+            put("name", name.trim())
+            put("categoryId", categoryId)
+            put("currencyCode", currencyCode)
+            put("initialBalanceCents", initialBalanceCents)
+            color?.let { put("color", it) }
+            skin?.let { put("skin", it) }
+            notes?.takeIf { it.isNotBlank() }?.let { put("notes", it) }
+            yieldRateBps?.let { put("yieldRateBps", it) }
+            yieldFrequency?.let { put("yieldFrequency", it) }
+            parentWalletId?.let { put("parentWalletId", it) }
+        }
+        rpc.call(if (id == null) "create_wallet" else "update_wallet", body)
+        cache.invalidateReads()
+    }
+
+    suspend fun archiveWallet(id: Long, archived: Boolean) {
+        rpc.call(
+            "archive_wallet",
+            buildJsonObject { put("id", id); put("archived", archived) },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun deleteWallet(id: Long) {
+        rpc.call("delete_wallet", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
     private suspend fun <T> cached(
-        key: String,
+        key: String?,
         serializer: kotlinx.serialization.KSerializer<T>,
         fetch: suspend () -> kotlinx.serialization.json.JsonElement,
     ): Synced<T> = try {
         val element = fetch()
-        cache.write(key, rpc.json.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), element))
+        if (key != null) {
+            cache.write(
+                key,
+                rpc.json.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), element),
+            )
+        }
         Synced(rpc.json.decodeFromJsonElement(serializer, element), fromCache = false)
     } catch (offline: NetworkException) {
-        val stored = cache.read(key) ?: throw offline
+        val stored = key?.let { cache.read(it) } ?: throw offline
         Synced(rpc.json.decodeFromString(serializer, stored), fromCache = true)
     }
 }

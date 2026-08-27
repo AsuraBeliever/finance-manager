@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.CompareArrows
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.CallMade
 import androidx.compose.material.icons.outlined.CallReceived
 import androidx.compose.material3.AlertDialog
@@ -45,6 +47,7 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Transaction
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.components.ChipButton
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.HairLine
@@ -53,6 +56,10 @@ import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.PeriodChoice
+import com.asura.finanzas.ui.components.PeriodLabel
+import com.asura.finanzas.ui.components.PeriodPickerDialog
+import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.loadSynced
@@ -79,7 +86,17 @@ private enum class KindFilter(val labelRes: Int, val wire: String?) {
 fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     val (key, reload) = rememberReloadKey()
     var filter by remember { mutableStateOf(KindFilter.All) }
-    val state by loadSynced(key) { repository.transactions() }
+    var wallet by remember { mutableStateOf<Wallet?>(null) }
+    var period by remember { mutableStateOf(PeriodChoice.AllTime) }
+    var showPeriod by remember { mutableStateOf(false) }
+
+    val state by loadSynced(Triple(key, filter, wallet?.id) to period) {
+        repository.transactions(
+            walletId = wallet?.id,
+            kind = filter.wire,
+            period = period.toJson(),
+        )
+    }
     val wallets by produceState(initialValue = emptyList<Wallet>(), key) {
         value = runCatching { repository.wallets().value }.getOrDefault(emptyList())
     }
@@ -96,11 +113,24 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
                 transactions = current.data,
                 filter = filter,
                 onFilter = { filter = it },
+                wallets = wallets,
+                wallet = wallet,
+                onWallet = { wallet = it },
+                period = period,
+                onPickPeriod = { showPeriod = true },
                 fromCache = current.fromCache,
                 onNew = { showForm = true },
                 onLongPress = { pendingDelete = it },
             )
         }
+    }
+
+    if (showPeriod) {
+        PeriodPickerDialog(
+            selected = period,
+            onSelect = { period = it; showPeriod = false },
+            onDismiss = { showPeriod = false },
+        )
     }
 
     if (showForm) {
@@ -141,6 +171,11 @@ private fun TransactionList(
     transactions: List<Transaction>,
     filter: KindFilter,
     onFilter: (KindFilter) -> Unit,
+    wallets: List<Wallet>,
+    wallet: Wallet?,
+    onWallet: (Wallet?) -> Unit,
+    period: PeriodChoice,
+    onPickPeriod: () -> Unit,
     fromCache: Boolean,
     onNew: () -> Unit,
     onLongPress: (Transaction) -> Unit,
@@ -148,13 +183,8 @@ private fun TransactionList(
     val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
 
-    // Filtering a list that is already on the device; the amounts themselves
-    // are untouched.
-    val shown = when (filter.wire) {
-        null -> transactions
-        "transfer" -> transactions.filter { it.kind.startsWith("transfer") }
-        else -> transactions.filter { it.kind == filter.wire }
-    }
+    // The server applies the filters; the list arrives ready to render.
+    val shown = transactions
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -176,12 +206,33 @@ private fun TransactionList(
         }
 
         item {
+            PickerField(
+                label = stringResource(R.string.transactions_wallet),
+                options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
+                selected = wallet,
+                optionLabel = { it?.name ?: allWalletsLabel() },
+                onSelect = onWallet,
+                emptyLabel = stringResource(R.string.transactions_all_wallets),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        item {
             SegmentedControl(
                 options = KindFilter.entries,
                 selected = filter,
                 label = { stringResource(it.labelRes) },
                 onSelect = onFilter,
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        item {
+            ChipButton(
+                text = PeriodLabel(period),
+                onClick = onPickPeriod,
+                leadingIcon = Icons.Outlined.CalendarMonth,
+                trailingIcon = Icons.Outlined.ExpandMore,
             )
         }
 
@@ -298,3 +349,6 @@ private fun transactionTime(tx: Transaction): String? {
             .format(formatter)
     }.getOrNull()
 }
+
+@Composable
+private fun allWalletsLabel(): String = stringResource(R.string.transactions_all_wallets)

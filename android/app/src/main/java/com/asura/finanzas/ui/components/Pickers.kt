@@ -30,10 +30,13 @@ fun <T> PickerField(
     label: String,
     options: List<T>,
     selected: T?,
-    optionLabel: (T) -> String,
+    // @Composable so callers can label options from string resources.
+    optionLabel: @Composable (T) -> String,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** Shown when nothing is selected — e.g. "All wallets" for a filter. */
+    emptyLabel: String = "",
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -43,7 +46,7 @@ fun <T> PickerField(
         modifier = modifier,
     ) {
         OutlinedTextField(
-            value = selected?.let(optionLabel).orEmpty(),
+            value = if (selected != null) optionLabel(selected) else emptyLabel,
             onValueChange = {},
             readOnly = true,
             enabled = enabled,

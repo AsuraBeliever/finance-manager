@@ -1,6 +1,9 @@
 package com.asura.finanzas.ui.wallets
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,14 +21,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,26 +54,139 @@ import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.theme.Broke
+import kotlinx.coroutines.launch
 
 @Composable
 fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     val (key, reload) = rememberReloadKey()
     val state by loadSynced(key) { repository.wallets() }
+    val scope = rememberCoroutineScope()
+
+    var editing by remember { mutableStateOf<Wallet?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    var actionsFor by remember { mutableStateOf<Wallet?>(null) }
+    var confirmDelete by remember { mutableStateOf<Wallet?>(null) }
+
+    val all = (state as? Load.Ready)?.data.orEmpty()
 
     when (val current = state) {
         is Load.Loading -> LoadingBox(modifier)
         is Load.Failed -> ErrorBox(current.message, reload, modifier)
-        is Load.Ready -> WalletList(current.data, current.fromCache, modifier)
+        is Load.Ready -> WalletList(
+            wallets = current.data,
+            fromCache = current.fromCache,
+            onNew = { creating = true },
+            onLongPress = { actionsFor = it },
+            modifier = modifier,
+        )
+    }
+
+    if (creating || editing != null) {
+        WalletFormSheet(
+            repository = repository,
+            existing = editing,
+            wallets = all,
+            onDismiss = { creating = false; editing = null },
+            onSaved = { creating = false; editing = null; reload() },
+        )
+    }
+
+    // Long press opens the actions the web keeps behind the card's overflow.
+    actionsFor?.let { target ->
+        AlertDialog(
+            onDismissRequest = { actionsFor = null },
+            containerColor = Broke.colors.surfaceOverlay,
+            title = { Text(target.name, color = Broke.colors.fg) },
+            text = {
+                Column {
+                    DialogAction(stringResource(R.string.common_edit)) {
+                        actionsFor = null
+                        editing = target
+                    }
+                    DialogAction(
+                        stringResource(
+                            if (target.isArchived) R.string.wallets_unarchive
+                            else R.string.wallets_archive,
+                        ),
+                    ) {
+                        actionsFor = null
+                        scope.launch {
+                            runCatching { repository.archiveWallet(target.id, !target.isArchived) }
+                            reload()
+                        }
+                    }
+                    DialogAction(
+                        stringResource(R.string.wallets_delete_wallet),
+                        color = Broke.colors.danger,
+                    ) {
+                        actionsFor = null
+                        confirmDelete = target
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { actionsFor = null }) {
+                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
+                }
+            },
+        )
+    }
+
+    confirmDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            containerColor = Broke.colors.surfaceOverlay,
+            title = { Text(stringResource(R.string.wallets_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.wallets_delete_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = null
+                    scope.launch {
+                        runCatching { repository.deleteWallet(target.id) }
+                        reload()
+                    }
+                }) { Text(stringResource(R.string.common_delete), color = Broke.colors.danger) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 }
 
 @Composable
-private fun WalletList(wallets: List<Wallet>, fromCache: Boolean, modifier: Modifier = Modifier) {
+private fun DialogAction(
+    label: String,
+    color: androidx.compose.ui.graphics.Color? = null,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodyLarge,
+        color = color ?: Broke.colors.fg,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+    )
+}
+
+@Composable
+private fun WalletList(
+    wallets: List<Wallet>,
+    fromCache: Boolean,
+    onNew: () -> Unit,
+    onLongPress: (Wallet) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val hide = LocalAppSettings.current.hideBalances
 
     // Apartados hang off a parent wallet; listing them at the top level would
@@ -77,7 +200,15 @@ private fun WalletList(wallets: List<Wallet>, fromCache: Boolean, modifier: Modi
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { PageHeader(stringResource(R.string.wallets_title)) }
+        item {
+            PageHeader(stringResource(R.string.wallets_title)) {
+                PrimaryButton(
+                    text = stringResource(R.string.wallets_new_wallet),
+                    onClick = onNew,
+                    leadingIcon = Icons.Outlined.Add,
+                )
+            }
+        }
 
         if (fromCache) {
             item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
@@ -94,7 +225,7 @@ private fun WalletList(wallets: List<Wallet>, fromCache: Boolean, modifier: Modi
 
         items(roots, key = { it.id }) { wallet ->
             Column {
-                WalletCard(wallet, hide)
+                WalletCard(wallet, hide, onLongPress)
                 val children = pockets[wallet.id].orEmpty()
                 if (children.isNotEmpty()) {
                     Spacer(Modifier.height(10.dp))
@@ -116,8 +247,9 @@ private fun WalletList(wallets: List<Wallet>, fromCache: Boolean, modifier: Modi
  * The big gradient card from the web: name and currency on top, a watermark
  * wallet glyph, then the balance with available/reserved underneath.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun WalletCard(wallet: Wallet, hide: Boolean) {
+private fun WalletCard(wallet: Wallet, hide: Boolean, onLongPress: (Wallet) -> Unit) {
     val colors = Broke.colors
     val skin = walletSkin(wallet.skin, wallet.color, wallet.categoryName)
     // Available is what the server already reports minus what it already
@@ -130,7 +262,8 @@ private fun WalletCard(wallet: Wallet, hide: Boolean) {
             .height(196.dp)
             .clip(RoundedCornerShape(26.dp))
             .background(skin.brush())
-            .border(1.dp, colors.borderMuted, RoundedCornerShape(26.dp)),
+            .border(1.dp, colors.borderMuted, RoundedCornerShape(26.dp))
+            .combinedClickable(onClick = {}, onLongClick = { onLongPress(wallet) }),
     ) {
         Icon(
             skinArtIcon(skin.art),

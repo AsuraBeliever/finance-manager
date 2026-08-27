@@ -51,8 +51,8 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Lista con apartados anidados | `ui/wallets` | ✅ |
 | Reordenar (`reorderWallets`) | — | ⬜ |
 | Detalle de cartera + sus movimientos | — | ⬜ |
-| Crear / editar cartera | — | ⬜ |
-| Archivar / eliminar | — | ⬜ |
+| Crear / editar cartera | `WalletFormSheet` | ✅ |
+| Archivar / eliminar | mantener presionada la tarjeta | ✅ |
 | Convertir meta en cartera | — | ⬜ |
 | Panel de tarjeta de crédito (corte, por pagar, utilización) | — | ⬜ |
 | Planes MSI: previsualizar, crear, borrar | — | ⬜ |
@@ -63,7 +63,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Web | Android | Estado |
 |---|---|---|
 | Lista | `ui/transactions` | ✅ |
-| Filtros (cartera, tipo, categoría, periodo) | `ui/transactions` | 🟡 solo tipo |
+| Filtros (cartera, tipo, periodo) | `ui/transactions` | ✅ (falta por categoría) |
 | Total de lo filtrado (`sumTransactions`) | — | ⬜ |
 | Alta de ingreso | `TransactionFormSheet` | ✅ |
 | Alta de gasto | `TransactionFormSheet` | ✅ |
