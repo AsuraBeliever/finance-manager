@@ -167,6 +167,7 @@
     <string name="common_edit">Edit</string>
     <string name="common_close">Close</string>
     <string name="common_confirm">Confirm</string>
+    <string name="common_refresh">Refresh</string>
     <string name="common_color">Color</string>
     <string name="common_empty">No data yet</string>
     <string name="common_today">Today</string>

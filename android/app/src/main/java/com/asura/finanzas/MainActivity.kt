@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val settings by app.preferences.settings.collectAsState(initial = null)
-            val current = settings ?: AppSettings("es", ThemeChoice.System, false, true)
+            val current = settings ?: AppSettings("es", ThemeChoice.System, false, true, java.util.TimeZone.getDefault().id)
 
             val dark = when (current.theme) {
                 ThemeChoice.System -> isSystemInDarkTheme()

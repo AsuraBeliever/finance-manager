@@ -1,5 +1,6 @@
 package com.asura.finanzas.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,7 +21,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -34,6 +39,7 @@ import com.asura.finanzas.data.ThemeChoice
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.SettingRow
 import com.asura.finanzas.ui.theme.Broke
@@ -54,6 +60,26 @@ fun SettingsScreen(
     val colors = Broke.colors
     val settings = LocalAppSettings.current
     val scope = rememberCoroutineScope()
+    var showCurrencies by remember { mutableStateOf(false) }
+
+    // The device's zones, with the current pick first so it is always listable —
+    // the same guarantee `listTimezones()` makes on the web.
+    val timezones = remember(settings.timezone) {
+        (listOf(settings.timezone, java.util.TimeZone.getDefault().id) +
+            java.util.TimeZone.getAvailableIDs().filter { it.contains('/') }.sorted())
+            .distinct()
+    }
+
+    if (showCurrencies) {
+        CurrenciesScreen(
+            repository = repository,
+            onBack = { showCurrencies = false },
+            modifier = modifier,
+        )
+        return
+    }
+
+    val onOpenCurrencies = { showCurrencies = true }
 
     val themeIcon: (ThemeChoice) -> ImageVector = {
         when (it) {
@@ -106,6 +132,29 @@ fun SettingsScreen(
         }
 
         GlassCard(Modifier.fillMaxWidth()) {
+            Text(
+                stringResource(R.string.settings_timezone),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.settings_timezone_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+            )
+            Spacer(Modifier.height(12.dp))
+            PickerField(
+                label = stringResource(R.string.settings_timezone),
+                options = timezones,
+                selected = settings.timezone,
+                optionLabel = { it },
+                onSelect = { scope.launch { preferences.setTimezone(it) } },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        GlassCard(Modifier.fillMaxWidth()) {
             SettingRow(stringResource(R.string.settings_clock)) {
                 SegmentedControl(
                     options = listOf(false, true),
@@ -138,6 +187,20 @@ fun SettingsScreen(
                     ),
                 )
             }
+        }
+
+        GlassCard(Modifier.fillMaxWidth().clickable { onOpenCurrencies() }) {
+            Text(
+                stringResource(R.string.settings_currencies),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.settings_currencies_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+            )
         }
 
         GlassCard(Modifier.fillMaxWidth()) {

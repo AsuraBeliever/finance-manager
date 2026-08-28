@@ -183,6 +183,7 @@ export const en: Dict = {
     edit: "Edit",
     close: "Close",
     confirm: "Confirm",
+    refresh: "Refresh",
     color: "Color",
     empty: "No data yet",
     today: "Today",

@@ -16,7 +16,7 @@ import java.util.Locale
 
 /** Device-local settings (language, theme, privacy) available to every screen. */
 val LocalAppSettings: ProvidableCompositionLocal<AppSettings> =
-    staticCompositionLocalOf { AppSettings("es", ThemeChoice.System, false, true) }
+    staticCompositionLocalOf { AppSettings("es", ThemeChoice.System, false, true, java.util.TimeZone.getDefault().id) }
 
 /**
  * UI strings come from the `strings_i18n.xml` under each `res/values` folder,

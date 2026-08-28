@@ -259,6 +259,17 @@ class BrokeRepository(
             rpc.call("list_wallet_categories"),
         )
 
+    suspend fun exchangeRates(): Synced<List<ExchangeRate>> =
+        cached("rates", ListSerializer(ExchangeRate.serializer())) {
+            rpc.call("get_exchange_rates")
+        }
+
+    /** Ask the server to refresh rates from its market sources. */
+    suspend fun fetchExchangeRates() {
+        rpc.call("fetch_exchange_rates")
+        cache.invalidateReads()
+    }
+
     suspend fun currencies(): List<Currency> =
         rpc.json.decodeFromJsonElement(
             ListSerializer(Currency.serializer()),

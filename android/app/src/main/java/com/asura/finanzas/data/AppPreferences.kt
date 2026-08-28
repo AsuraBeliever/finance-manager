@@ -21,6 +21,8 @@ data class AppSettings(
     val hideBalances: Boolean,
     /** 24-hour clock; false shows 12-hour with am/pm. */
     val clock24: Boolean,
+    /** IANA zone movements are shown in. */
+    val timezone: String,
 )
 
 /** Device-local preferences. Account-level settings live in the backend. */
@@ -30,6 +32,7 @@ class AppPreferences(private val context: Context) {
     private val themeKey = stringPreferencesKey("theme")
     private val hideBalancesKey = booleanPreferencesKey("hide_balances")
     private val clock24Key = booleanPreferencesKey("clock_24")
+    private val timezoneKey = stringPreferencesKey("timezone")
 
     val settings: Flow<AppSettings> = context.prefsDataStore.data.map { prefs ->
         AppSettings(
@@ -38,6 +41,7 @@ class AppPreferences(private val context: Context) {
                 ?: ThemeChoice.System,
             hideBalances = prefs[hideBalancesKey] ?: false,
             clock24 = prefs[clock24Key] ?: true,
+            timezone = prefs[timezoneKey] ?: java.util.TimeZone.getDefault().id,
         )
     }
 
@@ -45,6 +49,7 @@ class AppPreferences(private val context: Context) {
     suspend fun setTheme(theme: ThemeChoice) = edit { it[themeKey] = theme.name }
     suspend fun setHideBalances(hide: Boolean) = edit { it[hideBalancesKey] = hide }
     suspend fun setClock24(value: Boolean) = edit { it[clock24Key] = value }
+    suspend fun setTimezone(zone: String) = edit { it[timezoneKey] = zone }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.prefsDataStore.edit(block)

@@ -105,10 +105,10 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Idioma (es/en) | `ui/settings` + `ProvideAppLocale` | ✅ |
 | Tema claro / oscuro / auto | `ui/settings` | ✅ |
 | Apariencia: acento, fondo, tipografía, logo, ícono | — | ⬜ |
-| Zona horaria | — | ⬜ |
+| Zona horaria | `ui/settings` | ✅ |
 | Formato de reloj 12/24 h | `ui/settings` | 🟡 se guarda, falta aplicarlo |
 | Categorías de cartera | — | ⬜ |
-| Monedas y tipos de cambio | — | ⬜ |
+| Monedas y tipos de cambio | `ui/settings/CurrenciesScreen` | 🟡 ver y refrescar; falta fijar a mano |
 | Novedades (changelog in-app) | — | ⬜ |
 | Aviso de versión nueva | — | ⬜ (ver plan de actualización) |
 

@@ -101,6 +101,15 @@ data class Currency(
 )
 
 @Serializable
+data class ExchangeRate(
+    val currencyCode: String,
+    /** Rate to MXN in micros — never multiplied here, only displayed. */
+    val rateToMxnMicros: Long = 0,
+    val asOf: String = "",
+    val source: String = "",
+)
+
+@Serializable
 data class SavingsGoal(
     val id: Long,
     val name: String,
