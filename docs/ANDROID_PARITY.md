@@ -65,12 +65,12 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 |---|---|---|
 | Lista | `ui/transactions` | ✅ |
 | Filtros (cartera, tipo, periodo) | `ui/transactions` | ✅ (falta por categoría) |
-| Total de lo filtrado (`sumTransactions`) | — | ⬜ |
+| Total de lo filtrado (`sumTransactions`) | `ui/transactions` | ✅ |
 | Alta de ingreso | `TransactionFormSheet` | ✅ |
 | Alta de gasto | `TransactionFormSheet` | ✅ |
 | Alta de transferencia (incl. multimoneda) | `TransactionFormSheet` | ✅ |
 | Hora del movimiento (`occurredTime`) | — | ⬜ |
-| Editar movimiento / transferencia | — | ⬜ |
+| Editar movimiento | `TransactionEditSheet` | 🟡 falta editar transferencias |
 | Borrar movimiento | mantener presionado | ✅ |
 | Compra a MSI desde el alta | — | ⬜ |
 | Aportación a meta desde la lista (editar / borrar) | — | ⬜ |

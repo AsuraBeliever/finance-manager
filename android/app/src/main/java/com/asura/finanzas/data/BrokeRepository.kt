@@ -279,6 +279,49 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
+    /** Totals for a filtered slice; only meaningful for income or expense. */
+    suspend fun transactionTotals(
+        kind: String,
+        walletId: Long?,
+        period: JsonObject?,
+    ): TxTotals = rpc.json.decodeFromJsonElement(
+        TxTotals.serializer(),
+        rpc.call(
+            "sum_transactions",
+            buildJsonObject {
+                putJsonObject("filter") {
+                    put("kind", kind)
+                    walletId?.let { put("walletId", it) }
+                    period?.let { put("period", it) }
+                }
+            },
+        ),
+    )
+
+    suspend fun updateTransaction(
+        id: Long,
+        walletId: Long,
+        amountCents: Long,
+        categoryId: Long?,
+        description: String?,
+        occurredAt: String,
+        occurredTime: String?,
+    ) {
+        rpc.call(
+            "update_transaction",
+            buildJsonObject {
+                put("id", id)
+                put("walletId", walletId)
+                put("amountCents", amountCents)
+                categoryId?.let { put("categoryId", it) }
+                description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
+                put("occurredAt", occurredAt)
+                occurredTime?.let { put("occurredTime", it) }
+            },
+        )
+        cache.invalidateReads()
+    }
+
     suspend fun deleteTransaction(id: Long) {
         rpc.call("delete_transaction", buildJsonObject { put("id", id) })
         cache.invalidateReads()

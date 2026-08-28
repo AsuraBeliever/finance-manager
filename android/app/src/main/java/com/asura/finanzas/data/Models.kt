@@ -85,6 +85,24 @@ data class DashboardSummary(
 )
 
 @Serializable
+data class CurrencyTotal(
+    val currencyCode: String,
+    val cents: Long = 0,
+)
+
+/**
+ * Totals for the filtered slice of history. `byCurrency` holds the real figures
+ * per wallet currency; `totalMxnCents` normalises them, and is only worth
+ * showing when more than one currency is in play.
+ */
+@Serializable
+data class TxTotals(
+    val count: Long = 0,
+    val totalMxnCents: Long = 0,
+    val byCurrency: List<CurrencyTotal> = emptyList(),
+)
+
+@Serializable
 data class MsiPlan(
     val id: Long,
     val description: String = "",

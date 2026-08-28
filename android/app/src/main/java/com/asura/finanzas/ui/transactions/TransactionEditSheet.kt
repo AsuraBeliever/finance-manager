@@ -1,0 +1,148 @@
+package com.asura.finanzas.ui.transactions
+
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import com.asura.finanzas.R
+import com.asura.finanzas.data.BrokeRepository
+import com.asura.finanzas.data.NetworkException
+import com.asura.finanzas.data.Transaction
+import com.asura.finanzas.data.TransactionCategory
+import com.asura.finanzas.data.Wallet
+import com.asura.finanzas.ui.components.DateField
+import com.asura.finanzas.ui.components.FormSheet
+import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.formatMoney
+import com.asura.finanzas.ui.parseAmountToCents
+import com.asura.finanzas.ui.theme.Broke
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+
+/**
+ * Edit an income or expense. Transfers are two rows sharing a group id and need
+ * `update_transfer`, which is not wired yet — the caller only opens this for
+ * single-sided movements.
+ */
+@Composable
+fun TransactionEditSheet(
+    repository: BrokeRepository,
+    transaction: Transaction,
+    wallets: List<Wallet>,
+    onDismiss: () -> Unit,
+    onSaved: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val colors = Broke.colors
+
+    var categories by remember { mutableStateOf<List<TransactionCategory>>(emptyList()) }
+    var wallet by remember {
+        mutableStateOf(wallets.firstOrNull { it.id == transaction.walletId })
+    }
+    var amount by remember {
+        mutableStateOf(formatMoney(transaction.amountCents, withSymbol = false))
+    }
+    var category by remember { mutableStateOf<TransactionCategory?>(null) }
+    var description by remember { mutableStateOf(transaction.description.orEmpty()) }
+    var date by remember {
+        mutableStateOf(
+            runCatching { LocalDate.parse(transaction.occurredAt.take(10)) }
+                .getOrDefault(LocalDate.now()),
+        )
+    }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val genericError = stringResource(R.string.common_error)
+    val offlineError = stringResource(R.string.offline_banner)
+    val noCategory = stringResource(R.string.transactions_no_category)
+
+    LaunchedEffect(Unit) {
+        categories = runCatching { repository.transactionCategories(transaction.kind) }
+            .getOrDefault(emptyList())
+        category = categories.firstOrNull { it.id == transaction.categoryId }
+    }
+
+    val cents = parseAmountToCents(amount)
+    val canSave = !busy && wallet != null && cents != null && cents > 0
+
+    FormSheet(
+        title = stringResource(R.string.transactions_edit_transaction),
+        busy = busy,
+        error = error,
+        canSave = canSave,
+        onDismiss = onDismiss,
+        onSave = {
+            val chosen = wallet ?: return@FormSheet
+            busy = true
+            error = null
+            scope.launch {
+                runCatching {
+                    repository.updateTransaction(
+                        id = transaction.id,
+                        walletId = chosen.id,
+                        amountCents = cents ?: 0,
+                        categoryId = category?.id,
+                        description = description,
+                        occurredAt = date.toString(),
+                        occurredTime = transaction.occurredTime,
+                    )
+                }
+                    .onSuccess { onSaved() }
+                    .onFailure {
+                        error = if (it is NetworkException) offlineError else it.message ?: genericError
+                        busy = false
+                    }
+            }
+        },
+    ) {
+        PickerField(
+            label = stringResource(R.string.transactions_wallet),
+            options = wallets.filter { !it.isArchived },
+            selected = wallet,
+            optionLabel = { "${it.name} · ${it.currencyCode}" },
+            onSelect = { wallet = it },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = amount,
+            onValueChange = { amount = it; error = null },
+            label = { Text(stringResource(R.string.transactions_amount)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            suffix = { wallet?.let { Text(it.currencyCode, color = colors.fgSubtle) } },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        PickerField(
+            label = stringResource(R.string.transactions_category),
+            options = listOf<TransactionCategory?>(null) + categories,
+            selected = category,
+            optionLabel = { it?.name ?: noCategory },
+            onSelect = { category = it },
+            emptyLabel = noCategory,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = description,
+            onValueChange = { description = it },
+            label = { Text(stringResource(R.string.transactions_description)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        DateField(
+            label = stringResource(R.string.transactions_date),
+            value = date,
+            onChange = { date = it },
+        )
+    }
+}

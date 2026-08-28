@@ -45,10 +45,13 @@ import androidx.compose.ui.unit.dp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Transaction
+import com.asura.finanzas.data.TxTotals
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.ChipButton
+import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.EmptyState
+import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.IconBadge
@@ -102,7 +105,16 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
     }
 
     var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<Transaction?>(null) }
+    var actionsFor by remember { mutableStateOf<Transaction?>(null) }
     var pendingDelete by remember { mutableStateOf<Transaction?>(null) }
+
+    // Totals only exist for a single-sided kind; the API rejects them otherwise.
+    val totals by produceState<TxTotals?>(null, key, filter, wallet?.id, period) {
+        value = filter.wire
+            ?.takeIf { it == "income" || it == "expense" }
+            ?.let { runCatching { repository.transactionTotals(it, wallet?.id, period.toJson()) }.getOrNull() }
+    }
     val scope = rememberCoroutineScope()
 
     Box(modifier.fillMaxSize()) {
@@ -120,7 +132,8 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
                 onPickPeriod = { showPeriod = true },
                 fromCache = current.fromCache,
                 onNew = { showForm = true },
-                onLongPress = { pendingDelete = it },
+                totals = totals,
+                onLongPress = { actionsFor = it },
             )
         }
     }
@@ -139,6 +152,51 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
             wallets = wallets,
             onDismiss = { showForm = false },
             onSaved = { showForm = false; reload() },
+        )
+    }
+
+    editing?.let { target ->
+        TransactionEditSheet(
+            repository = repository,
+            transaction = target,
+            wallets = wallets,
+            onDismiss = { editing = null },
+            onSaved = { editing = null; reload() },
+        )
+    }
+
+    actionsFor?.let { target ->
+        AlertDialog(
+            onDismissRequest = { actionsFor = null },
+            containerColor = Broke.colors.surfaceOverlay,
+            title = {
+                Text(
+                    target.description?.takeIf { it.isNotBlank() }
+                        ?: target.categoryName.orEmpty(),
+                    color = Broke.colors.fg,
+                )
+            },
+            text = {
+                Column {
+                    // A transfer is two rows sharing a group id and needs
+                    // update_transfer; editing one leg alone would unbalance it.
+                    if (!target.kind.startsWith("transfer")) {
+                        DialogAction(stringResource(R.string.common_edit)) {
+                            actionsFor = null
+                            editing = target
+                        }
+                    }
+                    DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
+                        actionsFor = null
+                        pendingDelete = target
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { actionsFor = null }) {
+                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
+                }
+            },
         )
     }
 
@@ -178,6 +236,7 @@ private fun TransactionList(
     onPickPeriod: () -> Unit,
     fromCache: Boolean,
     onNew: () -> Unit,
+    totals: TxTotals?,
     onLongPress: (Transaction) -> Unit,
 ) {
     val colors = Broke.colors
@@ -234,6 +293,42 @@ private fun TransactionList(
                 leadingIcon = Icons.Outlined.CalendarMonth,
                 trailingIcon = Icons.Outlined.ExpandMore,
             )
+        }
+
+        totals?.let { summary ->
+            item {
+                GlassCard(Modifier.fillMaxWidth(), padding = 16.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            stringResource(
+                                if (filter.wire == "income") R.string.transactions_total_income
+                                else R.string.transactions_total_expense,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.fgMuted,
+                        )
+                        Text(
+                            maskIfHidden(formatMoney(summary.totalMxnCents), hide),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.fg,
+                        )
+                    }
+                    if (summary.byCurrency.size > 1) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            summary.byCurrency.joinToString(" · ") {
+                                maskIfHidden(formatMoney(it.cents, it.currencyCode), hide)
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.fgSubtle,
+                        )
+                    }
+                }
+            }
         }
 
         if (shown.isEmpty()) {
