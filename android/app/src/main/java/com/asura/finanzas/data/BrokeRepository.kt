@@ -34,6 +34,15 @@ class BrokeRepository(
         return rpc.json.decodeFromJsonElement(User.serializer(), element)
     }
 
+    suspend fun register(email: String, password: String): User {
+        val body = buildJsonObject {
+            put("email", email.trim())
+            put("password", password)
+        }
+        val element = rpc.post("/api/auth/register", body)
+        return rpc.json.decodeFromJsonElement(User.serializer(), element)
+    }
+
     suspend fun me(): User {
         val element = rpc.get("/api/auth/me")
         return rpc.json.decodeFromJsonElement(User.serializer(), element)

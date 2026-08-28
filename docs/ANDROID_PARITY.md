@@ -22,8 +22,8 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Web | Android | Estado |
 |---|---|---|
 | Login correo + contraseña | `ui/auth/LoginScreen` | ✅ |
-| Registro (alta de cuenta) | — | ⬜ |
-| Login con Google (OAuth redirect) | — | ⬜ |
+| Registro (alta de cuenta) | `ui/auth/LoginScreen` | ✅ |
+| Login con Google (OAuth redirect) | — | ⬜ **bloqueado**: requiere cambio de backend (ver abajo) |
 | Sesión persistente (cookie 30 días) | `SessionCookieJar` | ✅ |
 | Cerrar sesión | `ui/settings` | ✅ |
 | Cambiar contraseña | `ui/settings/ChangePasswordScreen` | ✅ |
@@ -123,3 +123,21 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Banner «sin conexión» | `OfflineNotice` | ✅ |
 | Formato de dinero por moneda | `Money.kt` | ✅ |
 | Paleta y tipografía «neon glass» | `ui/theme` | ✅ |
+
+## Nota: login con Google en Android
+
+El flujo web es un redirect: `/api/auth/google/start` → Google → callback, que
+deja la cookie de sesión **en el navegador**. En Android eso no sirve: si se abre
+en Custom Tabs la cookie queda en el navegador, no en el cliente HTTP de la app;
+y si se abre en un WebView embebido, Google lo rechaza
+(`disallowed_useragent`).
+
+Para tenerlo hacen falta **cambios en el worker**, que hasta ahora se han evitado
+a propósito. Las dos salidas razonables:
+
+1. Un endpoint que canjee el ID token de Google (obtenido con Credential Manager
+   en el teléfono) por una sesión, devolviendo la cookie a la app.
+2. Un redirect final a un deep link `broke://` con un código de un solo uso que
+   la app canjea por la sesión.
+
+Es decisión de producto, no algo que se pueda resolver solo del lado Android.

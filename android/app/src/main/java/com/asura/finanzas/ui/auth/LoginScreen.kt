@@ -1,5 +1,6 @@
 package com.asura.finanzas.ui.auth
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -27,10 +28,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.ui.components.HeroAmount
@@ -46,20 +49,26 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var registering by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val colors = Broke.colors
+    val genericError = stringResource(R.string.common_error)
+    val offlineError = stringResource(R.string.offline_banner)
 
     fun submit() {
         if (busy || email.isBlank() || password.isBlank()) return
         busy = true
         error = null
         scope.launch {
-            runCatching { repository.login(email, password) }
+            runCatching {
+                if (registering) repository.register(email, password)
+                else repository.login(email, password)
+            }
                 .onSuccess { onSignedIn() }
                 .onFailure {
                     error = when (it) {
-                        is NetworkException -> "Sin conexión. Revisa tu internet e inténtalo de nuevo."
-                        else -> it.message ?: "No se pudo iniciar sesión"
+                        is NetworkException -> offlineError
+                        else -> it.message ?: genericError
                     }
                     busy = false
                 }
@@ -76,10 +85,12 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        HeroAmount("Broke")
+        HeroAmount(stringResource(R.string.app_name))
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Tus finanzas, en tu bolsillo",
+            text = stringResource(
+                if (registering) R.string.auth_register_title else R.string.auth_login_title,
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = colors.fgMuted,
         )
@@ -88,7 +99,7 @@ fun LoginScreen(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it; error = null },
-            label = { Text("Correo") },
+            label = { Text(stringResource(R.string.auth_email)) },
             singleLine = true,
             enabled = !busy,
             keyboardOptions = KeyboardOptions(
@@ -102,7 +113,7 @@ fun LoginScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it; error = null },
-            label = { Text("Contraseña") },
+            label = { Text(stringResource(R.string.auth_password)) },
             singleLine = true,
             enabled = !busy,
             visualTransformation = PasswordVisualTransformation(),
@@ -133,8 +144,27 @@ fun LoginScreen(
             if (busy) {
                 CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.height(20.dp))
             } else {
-                Text("Entrar", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    stringResource(
+                        if (registering) R.string.auth_register else R.string.auth_login,
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                )
             }
         }
+
+        Spacer(Modifier.height(18.dp))
+        Text(
+            text = stringResource(
+                if (registering) R.string.auth_switch_to_login
+                else R.string.auth_switch_to_register,
+            ),
+            style = MaterialTheme.typography.labelLarge,
+            color = colors.accentBright,
+            modifier = Modifier.clickable {
+                registering = !registering
+                error = null
+            },
+        )
     }
 }
