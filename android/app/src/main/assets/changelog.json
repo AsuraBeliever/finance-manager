@@ -1,0 +1,476 @@
+[
+  {
+    "version": "2.39.0",
+    "date": "2026-08-25",
+    "es": [
+      "Ya hay app nativa de Android: en la página de versiones de GitHub ahora sale un archivo .apk. Lo descargas, lo abres y se instala como cualquier otra app, con su ícono en tu pantalla de inicio — ya no hace falta el «Agregar a pantalla de inicio» del navegador.",
+      "Sus pantallas son de Android de verdad, no la página web metida en una ventana: se ve y se mueve como una app del sistema.",
+      "Abre con tus últimos números aunque no tengas señal. Por ahora eso aplica a consultar; para capturar movimientos todavía necesitas internet.",
+      "Esta primera versión trae el panel, tus carteras, tus movimientos y ajustes. Inversiones, metas, presupuestos, suscripciones y tarjetas siguen en la web mientras las vamos pasando.",
+      "Ojo: a diferencia de la web y la computadora, la app de Android sí necesita que descargues la versión nueva cuando salga."
+    ],
+    "en": [
+      "There's a native Android app now: the GitHub releases page includes an .apk file. Download it, open it, and it installs like any other app, with its own icon on your home screen — no more \"Add to Home Screen\" from the browser.",
+      "Its screens are real Android screens, not the web page inside a window: it looks and moves like a system app.",
+      "It opens with your last synced numbers even with no signal. For now that covers looking things up; recording movements still needs internet.",
+      "This first version has the dashboard, your wallets, your movements and settings. Investments, goals, budgets, subscriptions and cards stay on the web while we port them.",
+      "Note: unlike the web and desktop, the Android app does need you to download the new version when one ships."
+    ]
+  },
+  {
+    "version": "2.38.0",
+    "date": "2026-08-22",
+    "es": [
+      "Si registras un movimiento con fecha atrasada en una cartera que gana intereses, ya no pierdes el rendimiento de esos días: la app lo detecta sola y te lo abona al día siguiente. Antes, si depositabas el sábado y lo anotabas el lunes, esos dos días de interés no te los pagaba nadie.",
+      "Funciona igual si corriges el monto de un movimiento o si lo borras: el rendimiento se recalcula y se ajusta.",
+      "El ajuste aparece en tu historial como un movimiento normal llamado «Ajuste de rendimiento», para que siempre puedas ver de dónde salió cada peso."
+    ],
+    "en": [
+      "If you register a back-dated movement in an interest-bearing wallet, you no longer lose those days' yield: the app notices on its own and credits it the next day. Before, depositing on Saturday and recording it on Monday meant nobody paid you those two days of interest.",
+      "It works the same if you correct a movement's amount or delete it: the yield is recomputed and adjusted.",
+      "The adjustment shows up in your history as a normal movement called \"Ajuste de rendimiento\", so you can always trace where every peso came from."
+    ]
+  },
+  {
+    "version": "2.37.0",
+    "date": "2026-08-21",
+    "es": [
+      "Arreglado: el rendimiento diario de tus carteras que ganan intereses (cajitas de Nu, Klar) se calculaba con un año de 365 días, pero los bancos en México lo calculan sobre 360. Nos quedábamos 1.39% cortos cada día, y el desfase crecía conforme tenías más dinero guardado.",
+      "Ahora tu saldo sigue al del banco al centavo. El rendimiento diario sube un poco: por ejemplo, $10,000 al 13% anual pasan de $3.56 a $3.61 diarios.",
+      "Los intereses que ya te habíamos quedado a deber se ajustaron con un abono único, para que arranques empatado con tu app del banco."
+    ],
+    "en": [
+      "Fixed: the daily yield on your interest-bearing wallets (Nu cajitas, Klar) used a 365-day year, but Mexican banks compute it over 360. We were 1.39% short every day, and the gap grew the more money you had saved.",
+      "Your balance now tracks the bank's to the cent. The daily yield goes up slightly: $10,000 at 13% a year moves from $3.56 to $3.61 per day.",
+      "The interest we already owed you was settled with a one-off adjustment, so you start out matching your bank's app."
+    ]
+  },
+  {
+    "version": "2.36.0",
+    "date": "2026-08-18",
+    "es": [
+      "Arreglado: al comprar a meses sin intereses, la mensualidad de este periodo ya cuenta en tu «Deuda actual» desde el día de la compra, igual que te la marca el banco. Antes aparecía en ceros hasta tu fecha de corte.",
+      "Cada mensualidad siguiente entra a tu deuda en cuanto empieza el periodo que la va a cobrar, y se paga en el corte de ese periodo. El «MSI por facturar» sigue mostrando lo que falta por caer.",
+      "Nuevo botón «Abonar / pagar» en el panel de tu tarjeta: registra el pago desde la cartera que quieras, con el monto que liquida tu corte ya puesto (puedes cambiarlo para abonar de a poco).",
+      "En la pantalla de la tarjeta, el número grande de arriba ahora es tu crédito disponible (con tu límite debajo) en vez del saldo en negativo: la deuda se ve una sola vez, en su panel."
+    ],
+    "en": [
+      "Fixed: when you buy in interest-free installments, this period's installment now counts towards your \"Current debt\" from the purchase day, just like your bank shows it. It used to read zero until your cut-off date.",
+      "Each following installment joins your debt as soon as the period that bills it starts, and is paid on that period's statement. \"Unbilled MSI\" still shows what's yet to land.",
+      "New \"Pay / add payment\" button on your card panel: register the payment from any wallet, with the amount that clears your statement already filled in (change it to pay a little at a time).",
+      "On the card screen, the big number up top is now your available credit (with your limit under it) instead of the negative balance: the debt shows once, in its own panel."
+    ]
+  },
+  {
+    "version": "2.35.0",
+    "date": "2026-08-16",
+    "es": [
+      "El Resumen ya tiene la opción «Todo el tiempo» en el selector de periodo: ves tu historia completa de un jalón — el patrimonio desde cero hasta hoy, todos tus ingresos y gastos acumulados, y la gráfica mes a mes desde tu primer movimiento.",
+      "Con «Todo el tiempo» se ocultan la comparación «antes» y la flechita de tendencia, porque no hay un periodo anterior contra el cual comparar."
+    ],
+    "en": [
+      "The Overview now has an \"All time\" option in the period picker: your whole history at once — net worth from zero to today, all your income and expenses added up, and the month-by-month chart from your very first transaction.",
+      "With \"All time\" the \"before\" comparison and the trend arrow are hidden, since there's no earlier period to compare against."
+    ]
+  },
+  {
+    "version": "2.34.0",
+    "date": "2026-08-16",
+    "es": [
+      "Al entrar a una cartera ya puedes filtrar sus movimientos igual que en la pestaña de Transacciones: por tipo (ingresos, gastos, transferencias) y por categoría.",
+      "Al filtrar por ingresos o gastos aparece arriba de la lista cuánto suma lo que estás viendo y cuántos movimientos son. Por ejemplo: Ingresos + Intereses te dice cuánto llevas de intereses. Si el filtro mezcla monedas, el total se muestra en pesos y abajo se desglosa cada moneda.",
+      "Las dos listas (Transacciones y la de cada cartera) ahora tienen selector de fechas, el mismo del Resumen: todo el tiempo, mes actual, últimos meses, un mes, un día o un rango que tú eliges. El total respeta el periodo elegido.",
+      "La lista siempre muestra hasta 100 movimientos, pero el total considera todos los que cumplen el filtro; cuando hay más de 100 se avisa debajo de la lista."
+    ],
+    "en": [
+      "Opening a wallet now lets you filter its transactions just like the Transactions tab: by type (income, expense, transfer) and by category.",
+      "Filtering by income or expense shows what's on screen adds up to, and how many transactions it is. For example: Income + Interest tells you how much interest you've earned. If the filter mixes currencies, the total shows in pesos with each currency broken out underneath.",
+      "Both lists (Transactions and each wallet's) now have a date picker, the same one as the Overview: all time, this month, last months, a month, a day, or a range you choose. The total respects the selected window.",
+      "The list still shows up to 100 transactions, but the total counts every match; when there are more than 100 a note under the list says so."
+    ]
+  },
+  {
+    "version": "2.33.0",
+    "date": "2026-08-15",
+    "es": [
+      "El Resumen ya se ve bien en el celular. Antes los recuadros salían con barras para deslizar y no se acomodaban; ahora cada uno se ajusta a su contenido, se apilan uno debajo del otro y ninguno se desliza de lado. El único que se puede deslizar hacia abajo es «Gastos por categoría», porque su lista puede ser larga.",
+      "Las gráficas de dona («Por cartera» y «Por inversión») ahora muestran toda su lista de colores completa, sin cortarse: el recuadro crece para que quepa todo.",
+      "Al elegir un mes específico en el Resumen, la lista de meses ya abre dentro de la pantalla, en lugar de salirse por un lado."
+    ],
+    "en": [
+      "The Overview looks right on the phone now. Cards used to show scroll bars and not fit; each one now sizes to its content, they stack one under another, and none scroll sideways. The only one you can scroll down is \"Expenses by category\", since its list can be long.",
+      "The donut charts (\"By wallet\" and \"By investment\") now show their full color legend without cutting it off — the card grows to fit everything.",
+      "When picking a specific month in the Overview, the month list now opens on screen instead of running off the side."
+    ]
+  },
+  {
+    "version": "2.32.1",
+    "date": "2026-08-15",
+    "es": [
+      "El calendario para elegir un rango en el Resumen ya funciona. Antes, al tocar un día se cerraba todo el menú sin registrar la fecha; ahora el menú se queda abierto para que puedas escoger el día de inicio y el de fin sin volver a abrirlo.",
+      "En el celular, el aviso de «Actualizar» ahora aparece como una barra abajo, justo encima de las pestañas, al alcance del pulgar. Antes estaba pegado hasta arriba y costaba alcanzarlo."
+    ],
+    "en": [
+      "The range calendar in the Overview works now. Tapping a day used to close the whole menu without registering the date; now the menu stays open so you can pick the start and end days without reopening it.",
+      "On the phone, the \"Update\" prompt now shows as a bar at the bottom, right above the tabs, within thumb's reach. It used to be pinned to the very top and was hard to reach."
+    ]
+  },
+  {
+    "version": "2.32.0",
+    "date": "2026-08-15",
+    "es": [
+      "El ojito de privacidad ahora oculta TODOS los números de dinero de la app, no solo el patrimonio. Al activarlo se enmascaran saldos, ingresos, gastos, movimientos, metas, presupuestos, inversiones y suscripciones — ideal para enseñar la app sin revelar cuánto tienes. Las gráficas se quedan (se ve la forma), pero sin las cifras de los ejes.",
+      "El ojito ahora está también en Carteras, Transacciones, Inversiones, Metas, Presupuestos y Suscripciones, para prender o apagar el modo desde donde estés. Es global: lo cambias en un lado y aplica en toda la app.",
+      "Donde escribes un monto (nueva transacción, editar cartera…) el número sí se ve, para que puedas capturar; solo se ocultan las cifras que ya tienes guardadas."
+    ],
+    "en": [
+      "The privacy eye now hides EVERY money figure in the app, not just net worth. Turning it on masks balances, income, expenses, movements, goals, budgets, investments and subscriptions — ideal for showing the app without revealing how much you have. Charts stay (you see the shape), just without the axis numbers.",
+      "The eye now also lives on Wallets, Transactions, Investments, Goals, Budgets and Subscriptions, so you can flip the mode from wherever you are. It's global: change it in one place and it applies everywhere.",
+      "Where you type an amount (new transaction, edit wallet…) the number stays visible so you can enter it; only your saved figures are hidden."
+    ]
+  },
+  {
+    "version": "2.31.1",
+    "date": "2026-08-15",
+    "es": [
+      "El selector de periodo del Resumen ya se puede usar en el celular. El menú se abría anclado a la derecha del botón y se salía de la pantalla, así que solo veías un recuadro vacío; ahora abre completo y se lee bien sobre el fondo.",
+      "Elegir «Un mes», «Un día» o «Rango» ya no cierra el menú. Antes la página entera se reemplazaba por «Cargando…» al cambiar de periodo y el menú desaparecía antes de que pudieras escoger la fecha; ahora el Resumen se queda en pantalla mientras cargan los datos nuevos.",
+      "En el iPhone el título de cada página ya no queda debajo de la hora y la señal."
+    ],
+    "en": [
+      "The Overview period picker is usable on the phone again. The menu was anchored to the right of its button and ran off screen, so all you saw was an empty box; it now opens fully and reads clearly over the background.",
+      "Picking \"A month\", \"A day\" or \"Range\" no longer closes the menu. Changing the period used to replace the whole page with \"Loading…\", which took the menu away before you could pick a date; the Overview now stays on screen while the new data loads.",
+      "On iPhone, page titles no longer sit under the clock and signal bars."
+    ]
+  },
+  {
+    "version": "2.31.0",
+    "date": "2026-08-01",
+    "es": [
+      "Una cartera con apartados ya muestra su dinero completo. El apartado de una meta se veía en la tarjeta («Disponible · Apartado»), pero el de un apartado-cartera no: ese dinero sale del saldo, así que una cartera con todo apartado se veía en $0.00 sin explicación. Ahora el número grande es todo lo que tiene la cuenta y la línea de abajo lo parte en disponible y apartado, contando los dos tipos.",
+      "La página de la cartera se lee igual que su tarjeta, así el número ya no cambia al abrirla."
+    ],
+    "en": [
+      "A wallet with pockets now shows all of its money. A goal's reserve appeared on the card (\"Available · Set aside\"), but pocket money didn't: that money leaves the balance, so a wallet with everything in pockets read $0.00 with no explanation. The big number is now everything the account holds, and the line under it splits it into available and set aside, counting both kinds.",
+      "The wallet page now reads like its card, so the number no longer changes when you open it."
+    ]
+  },
+  {
+    "version": "2.30.0",
+    "date": "2026-08-01",
+    "es": [
+      "Las carteras que generan rendimiento ya pueden abonar diario, como las cajitas de ahorro de Nu: cada día se abona lo que ese día ganó. Antes solo había semanal, quincenal y mensual. El interés siempre se calculó compuesto día con día, así que el total no cambia — solo cambia cada cuándo se te deposita. Si ya tienes una cajita registrada, edítala y elige «Diario»; aplica de ahí en adelante y no toca lo ya abonado."
+    ],
+    "en": [
+      "Yield-bearing wallets can now pay out daily, like Nu's savings pockets: each day credits what that day earned. Before there was only weekly, biweekly and monthly. Interest was always compounded day by day, so the total is the same — only how often it lands changes. If you already have a pocket set up, edit it and pick \"Daily\"; it applies from then on and doesn't touch what was already paid."
+    ]
+  },
+  {
+    "version": "2.29.0",
+    "date": "2026-08-01",
+    "es": [
+      "Una transferencia ya se ve como un solo movimiento. Antes salía en dos renglones (uno con el dinero saliendo y otro con el dinero entrando), como si fueran dos cosas distintas. Ahora es una sola línea que dice de dónde a dónde fue («A → Ahorros») y el monto una vez, sin signo: el dinero no salió, se movió. Dentro de una cartera sigue apareciendo con su signo, porque ahí sí salió de esa cuenta.",
+      "Al transferir, los apartados de la cartera de la que sale el dinero ahora encabezan la lista de destinos, en su propio grupo. Antes estaban revueltos entre todas las demás carteras y había que buscarlos. Si el origen es un apartado, arriba te salen su cartera y los apartados hermanos.",
+      "El historial ya se ordena por la hora que muestra. Los apartados de metas y los movimientos de inversión se guardan sin hora propia, y eso los mandaba hasta abajo del día: veías un movimiento de las 5:25 debajo de uno de las 5:13. Ahora todo el día queda en orden, de lo más reciente a lo más viejo."
+    ],
+    "en": [
+      "A transfer now reads as one movement. It used to take two rows (one for the money leaving, one for it arriving), as if they were two different things. It's now a single line naming where it went from and to (\"A → Savings\") with the amount once, unsigned: the money didn't leave, it moved. Inside a wallet it still shows its sign, because there it did leave that account.",
+      "When transferring, the pockets of the wallet the money comes from now lead the destination list, in their own group. They used to be mixed in with every other wallet, so you had to hunt for them. If the source is a pocket, its wallet and sibling pockets come first instead.",
+      "History now sorts by the time it shows. Goal pockets and investment moves are saved without a time of their own, and that sank them to the bottom of the day: you'd see a 5:25 movement below a 5:13 one. The whole day now reads newest to oldest."
+    ]
+  },
+  {
+    "version": "2.28.2",
+    "date": "2026-08-01",
+    "es": [
+      "Al hacer una transferencia, el campo «Hacia» ya no viene con una cartera puesta de antemano. Antes traía preseleccionada la primera cartera de la lista, así que si guardabas sin abrir ese campo, el dinero se iba a una cartera que tú no elegiste. Ahora arranca vacío y el botón Guardar no se activa hasta que digas a dónde va.",
+      "Los apartados ahora se leen con su cartera («NU › Ahorros») en los dos selectores de la transferencia, para que no se confundan con la cartera de junto en la lista.",
+      "Un apartado que acabas de crear ya aparece de inmediato en la lista de destinos, sin tener que recargar la app."
+    ],
+    "en": [
+      "When making a transfer, the \"To\" field no longer comes with a wallet already filled in. It used to preselect the first wallet on the list, so saving without opening that field sent the money to a wallet you never chose. It now starts empty and Save stays disabled until you say where the money goes.",
+      "Pockets now read with their wallet (\"NU › Ahorros\") in both transfer pickers, so they aren't mistaken for the wallet next to them on the list.",
+      "A pocket you just created now shows up in the destination list right away, with no need to reload the app."
+    ]
+  },
+  {
+    "version": "2.28.1",
+    "date": "2026-07-28",
+    "es": [
+      "El valor de tu inversión de cetesdirecto (BONDDIA) ya no se queda un día atrás. La página oficial publica el precio del fondo durante la mañana, y la app lo consultaba a la 1 de la madrugada, cuando todavía estaba el del día anterior: por eso tu saldo aparecía un día de rendimiento abajo del que ves en cetesdirecto. Ahora el precio se consulta también a las 9 de la mañana y a las 2 de la tarde. Si abres la app de madrugada todavía verás el valor del día anterior, igual que en cetesdirecto antes de que publique."
+    ],
+    "en": [
+      "Your cetesdirecto (BONDDIA) investment value no longer lags a day behind. The official page publishes the fund price during the morning, and the app was reading it at 1 AM, when it still showed the previous day's: that left your balance one day of yield below what cetesdirecto shows. The price is now also fetched at 9 AM and 2 PM. Opening the app overnight still shows the previous day's value, just like cetesdirecto before it publishes."
+    ]
+  },
+  {
+    "version": "2.28.0",
+    "date": "2026-07-28",
+    "es": [
+      "Aportar o retirar en una inversión ya no cuenta como gasto ni como ingreso: ahora se registra como transferencia entre tu cartera y la inversión, que es lo que realmente pasa (el dinero solo cambia de lugar). Así, aunque muevas el mismo dinero muchas veces, tus totales de ingresos y gastos, tus presupuestos y tus gráficas dejan de inflarse.",
+      "Tus aportes y retiros anteriores se reclasificaron solos a transferencia; los saldos de tus carteras no cambian.",
+      "Ya puedes corregir una aportación o un retiro ya registrado (monto, fecha, cartera, o si era aporte y no retiro), tanto desde la inversión como desde el historial de transacciones. La inversión y el movimiento de la cartera se corrigen juntos, así que nunca quedan en desacuerdo."
+    ],
+    "en": [
+      "Depositing into or withdrawing from an investment no longer counts as an expense or income: it's now recorded as a transfer between your wallet and the investment, which is what actually happens (the money just changes place). So even if you move the same money many times, your income and expense totals, budgets and charts stop being inflated.",
+      "Your previous deposits and withdrawals were reclassified as transfers automatically; your wallet balances are unchanged.",
+      "You can now fix a recorded deposit or withdrawal (amount, date, wallet, or deposit vs withdrawal), both from the investment and from the transactions history. The investment and the wallet move are corrected together, so they never disagree."
+    ]
+  },
+  {
+    "version": "2.27.2",
+    "date": "2026-07-24",
+    "es": [
+      "Los aportes y retiros a una inversión BONDDIA por títulos ahora calculan el número de títulos igual que cetesdirecto: se toma todo el efectivo disponible (el que dejó suelto la operación anterior más el aporte) y se compran los títulos enteros que alcancen. Así el conteo de títulos coincide con cetesdirecto por sí solo, sin tener que ajustarlo a mano."
+    ],
+    "en": [
+      "Deposits and withdrawals to a títulos-based BONDDIA investment now compute the share count the same way cetesdirecto does: it takes all available cash (whatever the previous operation left over, plus the new amount) and buys as many whole shares as it covers. So the títulos count matches cetesdirecto on its own, with no manual adjusting."
+    ]
+  },
+  {
+    "version": "2.27.1",
+    "date": "2026-07-24",
+    "es": [
+      "Al aportar o retirar en una inversión BONDDIA por títulos (la de cetesdirecto), el dinero ahora se convierte a títulos al precio del día, así que además de reflejarse al instante sigue creciendo con el fondo. Antes se quedaba como efectivo que no crecía y se desviaba unos centavos cada día de tu saldo real de cetesdirecto."
+    ],
+    "en": [
+      "When you deposit into or withdraw from a títulos-based BONDDIA investment (cetesdirecto's), the money is now converted to fund shares at that day's price, so on top of showing up immediately it keeps growing with the fund. Before, it stayed as cash that didn't grow and drifted a few cents a day from your real cetesdirecto balance."
+    ]
+  },
+  {
+    "version": "2.27.0",
+    "date": "2026-07-24",
+    "es": [
+      "Al aportar o retirar en una inversión BONDDIA (la de cetesdirecto por títulos), el total ahora sube o baja al instante por el monto del movimiento, tal como en tu app de cetesdirecto. Antes el aporte salía de tu cartera pero no se reflejaba en la inversión.",
+      "Los aportes y retiros que haces desde una cartera hacia una inversión ahora quedan clasificados en la categoría «Inversiones» (antes salían sin categoría en tus gastos e ingresos).",
+      "La proyección «¿cuánto crecería?» ahora considera bien una aportación única (sin repetición): antes la ignoraba y no mostraba el crecimiento.",
+      "En el detalle de una cartera, el número grande ahora es lo realmente disponible (saldo menos lo apartado en metas), con una línea de «Total con apartados» debajo."
+    ],
+    "en": [
+      "Depositing into or withdrawing from a BONDDIA investment (cetesdirecto's títulos-based fund) now moves the total by the movement amount immediately, just like in your cetesdirecto app. Before, the deposit left your wallet but didn't show up in the investment.",
+      "Contributions and withdrawals you make from a wallet into an investment are now filed under the “Investments” category (they used to be uncategorized in your expenses and income).",
+      "The “how much would it grow?” projection now handles a one-time contribution (no repetition) correctly: it used to ignore it and show no growth.",
+      "On a wallet's detail, the big number is now what's actually available (balance minus what's reserved in goals), with a “Total with pockets” line below."
+    ]
+  },
+  {
+    "version": "2.26.0",
+    "date": "2026-07-12",
+    "es": [
+      "En el resumen del inicio, cuando eliges un periodo sin movimientos ya no aparecen tarjetas vacías con «sin actividad»: solo se muestra lo que sí tiene datos (y el patrimonio en ceros).",
+      "El patrimonio de fechas anteriores a que existiera una cartera ya no incluye su saldo inicial: los meses previos a abrirla se ven en ceros, como corresponde.",
+      "Los presupuestos ya no aparecen en periodos anteriores a haberlos creado."
+    ],
+    "en": [
+      "On the home overview, choosing a period with no activity no longer shows empty “no activity” cards: only widgets with data appear (with net worth at zero).",
+      "Net worth for dates before a wallet existed no longer includes its opening balance: months prior to opening it now show zero, as they should.",
+      "Budgets no longer show up in periods before you created them."
+    ]
+  },
+  {
+    "version": "2.25.0",
+    "date": "2026-07-12",
+    "es": [
+      "En el resumen del inicio, toca una categoría de «Gasto por categoría» o «Ingreso por categoría» para ver el desglose de todas las transacciones que la componen en el periodo elegido.",
+      "Ya puedes mostrar u ocultar la contraseña al iniciar sesión o registrarte, con el ícono de ojo."
+    ],
+    "en": [
+      "On the home overview, tap a category in “Expenses by category” or “Income by category” to see the breakdown of every transaction behind it for the selected period.",
+      "You can now show or hide your password when signing in or registering, using the eye icon."
+    ]
+  },
+  {
+    "version": "2.24.1",
+    "date": "2026-07-08",
+    "es": [
+      "Las carteras con rendimiento ahora calculan los intereses igual que tu banco (redondeando cada día), así el abono coincide al centavo y ya no tienes que corregirlo a mano."
+    ],
+    "en": [
+      "Yield-bearing wallets now calculate interest the same way your bank does (rounding each day), so the credit matches to the cent and you no longer have to fix it by hand."
+    ]
+  },
+  {
+    "version": "2.24.0",
+    "date": "2026-07-08",
+    "es": [
+      "Tus metas y apartados ahora aparecen dentro de la cartera a la que pertenecen: ves su avance y puedes aportarles sin salir de la cartera."
+    ],
+    "en": [
+      "Your goals and set-asides now appear inside the wallet they belong to: see their progress and contribute without leaving the wallet."
+    ]
+  },
+  {
+    "version": "2.23.0",
+    "date": "2026-07-08",
+    "es": [
+      "Cada movimiento ahora guarda su hora, no solo la fecha: se registra al momento y puedes editarla escribiéndola a mano (sin menús).",
+      "Elige el formato de hora en Ajustes: 12 h (a. m./p. m.) o 24 h.",
+      "Define tu zona horaria en Ajustes para que las horas se muestren correctas.",
+      "Las transferencias entre carteras ya se pueden editar.",
+      "Tus movimientos anteriores ahora muestran la hora en que los registraste."
+    ],
+    "en": [
+      "Every movement now records its time, not just the date: captured as you enter it, and editable by typing it in (no dropdowns).",
+      "Pick your time format in Settings: 12 h (a.m./p.m.) or 24 h.",
+      "Set your timezone in Settings so times display correctly.",
+      "Transfers between wallets can now be edited.",
+      "Your past movements now show the time you recorded them."
+    ]
+  },
+  {
+    "version": "2.22.2",
+    "date": "2026-07-03",
+    "es": [
+      "El plan de una meta empieza cuando le pones la fecha límite: ya no aparece «Atrasada» de la nada al ponerle plazo a una meta que ya existía.",
+      "La cuota del periodo se mantiene fija: si te tocan $2,400 este mes y aportas $2,000, ahora dice «llevas $2,000 de $2,400: te faltan $400» en vez de rehacer el plan.",
+      "Al cubrir la cuota del periodo te lo confirma: «Este mes ya está cubierto».",
+      "El sugerido del botón Aportar es lo que falta del periodo, no la cuota completa.",
+      "Ya no puedes liberar más dinero del que tiene apartado la meta: sale un aviso claro en lugar de vaciarla en silencio.",
+      "El formulario Aportar/Liberar abre limpio cada vez; ya no se queda pegado en «Liberar»."
+    ],
+    "en": [
+      "A goal's plan starts when you set its deadline: no more phantom \"Behind\" the moment you add a date to an existing goal.",
+      "The period quota stays fixed: if this month asks for $2,400 and you put in $2,000, it now says \"you've put in $2,000 of $2,400: $400 to go\" instead of re-spreading the plan.",
+      "Covering the period's quota gets confirmed: \"This month is covered\".",
+      "The Contribute button's suggestion is what's left for the period, not the full quota.",
+      "You can no longer release more money than the goal holds: a clear error shows instead of silently draining it.",
+      "The Contribute/Release form opens fresh every time; it no longer sticks on \"Release\"."
+    ]
+  },
+  {
+    "version": "2.22.1",
+    "date": "2026-07-03",
+    "es": [
+      "Los movimientos de apartados (Apartado/Liberado) en el historial ahora tienen lápiz y bote: edita su monto o fecha, o bórralos, y lo apartado en la meta se ajusta solo."
+    ],
+    "en": [
+      "Pocket moves (Reserved/Released) in the history now have pencil and trash: edit their amount or date, or delete them, and the goal's reserved amount adjusts itself."
+    ]
+  },
+  {
+    "version": "2.22.0",
+    "date": "2026-07-02",
+    "es": [
+      "Compra a MSI desde el formulario normal de gasto: si la cartera elegida es una tarjeta con corte, marca «Compra a meses sin intereses» y listo.",
+      "Cada compra a MSI lleva su categoría de gasto, así las mensualidades cuentan en tus presupuestos y análisis.",
+      "Al capturar un MSI ves en vivo «≈ $X al mes · primer cargo el día D», y al guardar una confirmación con el primer y último cargo.",
+      "Pagar la tarjeta con más contexto: al transferirle ves cuánto falta del corte y su fecha límite, y al guardar te dice si quedó liquidado o cuánto falta.",
+      "Al dar de alta una tarjeta puedes registrar la deuda que ya traías («Deuda actual»).",
+      "Configurar una tarjeta es más directo: elegir la categoría «Tarjeta de crédito» muestra sus campos, sin interruptor aparte."
+    ],
+    "en": [
+      "MSI purchases from the regular expense form: if the chosen wallet is a card with a cut-off, tick \"Interest-free installments\" and you're done.",
+      "Each MSI purchase carries its expense category, so the monthly charges count in your budgets and analytics.",
+      "While entering an MSI you see live \"≈ $X per month · first charge on day D\", and a confirmation with the first and last charge on save.",
+      "Paying the card with more context: when transferring to it you see what's left of the statement and its due date, and on save it tells you whether it's settled or how much is missing.",
+      "When creating a card you can register the debt you already carried (\"Current debt\").",
+      "Setting up a card is more direct: picking the \"Credit card\" category reveals its fields, no separate toggle."
+    ]
+  },
+  {
+    "version": "2.21.0",
+    "date": "2026-07-02",
+    "es": [
+      "Tarjetas de crédito de verdad: marca una cartera como tarjeta y registra su día de corte, días para pagar, límite de crédito y anualidad.",
+      "El detalle de la tarjeta muestra tu deuda, el saldo al corte y cuánto pagar antes de la fecha límite para no generar intereses.",
+      "Barra de uso del crédito (verde/ámbar/rojo) y crédito disponible, contando también lo comprometido a meses.",
+      "Compras a meses sin intereses (MSI): regístralas una vez y cada mensualidad se carga sola en tu historial en cada corte.",
+      "Pagar la tarjeta es tan simple como siempre: una transferencia desde tu cartera de débito."
+    ],
+    "en": [
+      "Real credit cards: mark a wallet as a card and track its cut-off day, days to pay, credit limit and annual fee.",
+      "The card's detail shows your debt, the statement balance and how much to pay before the deadline to avoid interest.",
+      "Credit usage bar (green/amber/red) and available credit, also counting what's committed to installments.",
+      "Interest-free installment purchases (MSI): register them once and each monthly charge posts itself on every cut-off.",
+      "Paying the card stays as simple as ever: a transfer from your debit wallet."
+    ]
+  },
+  {
+    "version": "2.20.0",
+    "date": "2026-07-02",
+    "es": [
+      "Metas con fecha límite: pones para cuándo la quieres y te dice cuánto apartar por periodo; te avisa si vas atrasado o si venció.",
+      "Tipos de meta: «comprar algo» (al completarla se registra el gasto) o «juntar un fondo» (que puedes pasar a su propia cartera, con estilo).",
+      "Apartar a una meta ya no usa montos negativos: ahora hay botones claros de Apartar y Liberar, con aporte sugerido.",
+      "Toda caja de dinero muestra el signo $ y el formato con comas y centavos mientras escribes.",
+      "Apartados de cartera: una cartera puede tener bolsillos (p. ej. BBVA con un apartado «Viaje a Japón»), que se muestran anidados y se despliegan al tocarlos.",
+      "Transacciones: filtro por tipo con botones y por categoría según el tipo; el filtro se recuerda. Los movimientos de apartados aparecen en el historial.",
+      "Calendario mejorado: año editable con flechas, ya no se recorta dentro de las ventanas."
+    ],
+    "en": [
+      "Goals with a deadline: set when you want it and it tells you how much to set aside each period; it flags if you're behind or overdue.",
+      "Goal types: \"buy something\" (completing it books the expense) or \"build a fund\" (which you can turn into its own wallet, with style).",
+      "Adding to a goal no longer uses negative amounts: clear Reserve and Release buttons now, with a suggested contribution.",
+      "Every money field shows the $ sign and comma/cents formatting as you type.",
+      "Wallet pockets: a wallet can hold pockets (e.g. BBVA with a \"Japan trip\" pocket), shown nested and expandable on tap.",
+      "Transactions: filter by type with buttons and by category per type; the filter is remembered. Pocket moves show up in the history.",
+      "Better calendar: editable year with arrows, no longer clipped inside dialogs."
+    ]
+  },
+  {
+    "version": "2.19.3",
+    "date": "2026-06-28",
+    "es": [
+      "Corregido: al cambiar el tamaño de cualquier contenedor del tablero (Metas de ahorro, etc.), el nuevo tamaño ahora se guarda y se mantiene al recargar."
+    ],
+    "en": [
+      "Fixed: resizing any dashboard card (Savings goals, etc.) now saves the new size and keeps it after reload."
+    ]
+  },
+  {
+    "version": "2.19.1",
+    "date": "2026-06-28",
+    "es": [
+      "Cambiar contraseña ahora tiene su propia página dedicada, más clara y enfocada.",
+      "Botón para volver a Ajustes en las páginas de Apariencia, Categorías y Cambiar contraseña."
+    ],
+    "en": [
+      "Change password now has its own dedicated page, cleaner and more focused.",
+      "Back-to-Settings button on the Appearance, Categories and Change password pages."
+    ]
+  },
+  {
+    "version": "2.19.0",
+    "date": "2026-06-27",
+    "es": [
+      "Simulador de inversiones: mira cuánto crecería tu dinero aportando cada mes durante el tiempo que quieras.",
+      "Proyección mejorada en cada inversión: ya no sale plana; ves cómo crece a futuro, con zoom para alargar o acortar los años (también a mano).",
+      "Simula aportaciones directo en la gráfica de tu inversión («si le meto X al mes…») y mira el resultado al instante.",
+      "Metas de inversión: calcula cuánto aportar al mes para llegar a una cantidad.",
+      "Comparador: Nu vs CETES vs BONDDIA lado a lado con tasas reales.",
+      "Resumen de portafolio con tu retorno anual real (TIR) y distribución por inversión.",
+      "Acceso a Metas, Presupuestos y Suscripciones desde el móvil.",
+      "Novedades: este mismo aviso de cambios. Puedes apagarlo en Ajustes."
+    ],
+    "en": [
+      "Investment simulator: see how much your money would grow contributing every month for as long as you like.",
+      "Better projection on each investment: no longer flat; see it grow into the future, with zoom to stretch or shrink the years (manual too).",
+      "Simulate contributions right on your investment's chart (\"if I add X per month…\") and see the result instantly.",
+      "Investment goals: work out how much to contribute monthly to reach an amount.",
+      "Comparator: Nu vs CETES vs BONDDIA side by side with real rates.",
+      "Portfolio summary with your real annual return (XIRR) and breakdown by investment.",
+      "Access Goals, Budgets and Subscriptions from mobile.",
+      "What's new: this very changelog popup. You can turn it off in Settings."
+    ]
+  },
+  {
+    "version": "2.18.0",
+    "date": "2026-06-26",
+    "es": [
+      "El resumen de suscripciones ahora cuenta solo lo que de verdad pagaste, no el calendario estimado."
+    ],
+    "en": [
+      "The subscriptions summary now counts only what you actually paid, not the estimated calendar."
+    ]
+  },
+  {
+    "version": "2.17.0",
+    "date": "2026-06-25",
+    "es": [
+      "Economía histórica, apartados y selector de periodo en el resumen."
+    ],
+    "en": [
+      "Historical overview, earmarks and a period selector on the dashboard."
+    ]
+  }
+]

@@ -20,6 +20,10 @@ const OUT = {
   en: "android/app/src/main/res/values-en/strings_i18n.xml",
 };
 
+// The in-app changelog is the same content in both apps, so it ships to Android
+// as a generated asset rather than a second hand-kept copy.
+const CHANGELOG_OUT = "android/app/src/main/assets/changelog.json";
+
 // `default`, `object`, … are Java keywords; R.string.default would not compile.
 const JAVA_KEYWORDS = new Set([
   "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char",
@@ -107,11 +111,18 @@ async function loadDictionaries() {
   return {
     es: await load("src/i18n/es.ts", "esDict"),
     en: await load("src/i18n/en.ts", "en"),
+    changelog: await load("src/lib/changelog.ts", "changelog"),
   };
 }
 
 async function main() {
-  const { es, en } = await loadDictionaries();
+  const { es, en, changelog } = await loadDictionaries();
+
+  if (changelog) {
+    await mkdir(CHANGELOG_OUT.slice(0, CHANGELOG_OUT.lastIndexOf("/")), { recursive: true });
+    await writeFile(CHANGELOG_OUT, JSON.stringify(changelog, null, 2) + "\n", "utf8");
+    console.log(`${CHANGELOG_OUT} — ${changelog.length} versiones`);
+  }
   if (!es) throw new Error("src/i18n/es.ts no exportó esDict");
 
   const dictionaries = { es, en };

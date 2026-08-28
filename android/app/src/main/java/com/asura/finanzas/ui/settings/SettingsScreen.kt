@@ -61,6 +61,8 @@ fun SettingsScreen(
     val settings = LocalAppSettings.current
     val scope = rememberCoroutineScope()
     var showCurrencies by remember { mutableStateOf(false) }
+    var showWhatsNew by remember { mutableStateOf(false) }
+    var showPassword by remember { mutableStateOf(false) }
 
     // The device's zones, with the current pick first so it is always listable —
     // the same guarantee `listTimezones()` makes on the web.
@@ -74,6 +76,20 @@ fun SettingsScreen(
         CurrenciesScreen(
             repository = repository,
             onBack = { showCurrencies = false },
+            modifier = modifier,
+        )
+        return
+    }
+
+    if (showWhatsNew) {
+        WhatsNewScreen(onBack = { showWhatsNew = false }, modifier = modifier)
+        return
+    }
+
+    if (showPassword) {
+        ChangePasswordScreen(
+            repository = repository,
+            onBack = { showPassword = false },
             modifier = modifier,
         )
         return
@@ -198,6 +214,34 @@ fun SettingsScreen(
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.settings_currencies_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+            )
+        }
+
+        GlassCard(Modifier.fillMaxWidth().clickable { showWhatsNew = true }) {
+            Text(
+                stringResource(R.string.whats_new_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.whats_new_settings_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+            )
+        }
+
+        GlassCard(Modifier.fillMaxWidth().clickable { showPassword = true }) {
+            Text(
+                stringResource(R.string.account_change_password),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.account_password_settings_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.fgSubtle,
             )

@@ -45,6 +45,17 @@ class BrokeRepository(
         cache.clear()
     }
 
+    /** Revokes every other session server-side; this device keeps its own. */
+    suspend fun changePassword(currentPassword: String, newPassword: String) {
+        rpc.post(
+            "/api/auth/change_password",
+            buildJsonObject {
+                put("currentPassword", currentPassword)
+                put("newPassword", newPassword)
+            },
+        )
+    }
+
     fun hasStoredSession(): Boolean = cookieJar.hasSession()
 
     // ---- reads ----

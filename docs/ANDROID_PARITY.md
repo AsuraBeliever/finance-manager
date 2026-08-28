@@ -9,7 +9,8 @@ Cuando las dos difieren en un detalle no especificado, **la web es la
 implementación de referencia**.
 
 Los textos de Android **se generan** desde `src/i18n/` con
-`npm run gen:android-strings` → `android/app/src/main/res/values*/strings_i18n.xml`.
+`npm run gen:android-strings` → `android/app/src/main/res/values*/strings_i18n.xml`,
+y el changelog desde `src/lib/changelog.ts` → `android/app/src/main/assets/changelog.json`.
 Nunca escribas una cadena a mano en un composable: agrégala en `es.ts` + `en.ts`,
 regenera y commitea. El generador falla si las dos lenguas no tienen las mismas
 llaves.
@@ -25,7 +26,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Login con Google (OAuth redirect) | — | ⬜ |
 | Sesión persistente (cookie 30 días) | `SessionCookieJar` | ✅ |
 | Cerrar sesión | `ui/settings` | ✅ |
-| Cambiar contraseña | — | ⬜ |
+| Cambiar contraseña | `ui/settings/ChangePasswordScreen` | ✅ |
 | Dispositivos / revocar sesiones | — | ⬜ |
 
 ## Panel (dashboard)
@@ -106,10 +107,10 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Tema claro / oscuro / auto | `ui/settings` | ✅ |
 | Apariencia: acento, fondo, tipografía, logo, ícono | — | ⬜ |
 | Zona horaria | `ui/settings` | ✅ |
-| Formato de reloj 12/24 h | `ui/settings` | 🟡 se guarda, falta aplicarlo |
+| Formato de reloj 12/24 h | `ui/settings` + lista de movimientos | ✅ |
 | Categorías de cartera | — | ⬜ |
 | Monedas y tipos de cambio | `ui/settings/CurrenciesScreen` | 🟡 ver y refrescar; falta fijar a mano |
-| Novedades (changelog in-app) | — | ⬜ |
+| Novedades (changelog in-app) | `WhatsNewScreen` (asset **generado**) | ✅ |
 | Aviso de versión nueva | — | ⬜ (ver plan de actualización) |
 
 ## Transversal
