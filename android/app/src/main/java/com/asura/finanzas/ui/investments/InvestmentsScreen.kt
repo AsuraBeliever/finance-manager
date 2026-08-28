@@ -11,14 +11,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -29,16 +32,16 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Investment
 import com.asura.finanzas.data.Portfolio
 import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.components.DonutChart
+import com.asura.finanzas.ui.components.DonutSlice
+import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.GlassCard
-import com.asura.finanzas.ui.components.HairLine
-import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
-import com.asura.finanzas.ui.components.EmptyState
+import com.asura.finanzas.ui.components.chartColor
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatDelta
@@ -55,6 +58,7 @@ fun InvestmentsScreen(repository: BrokeRepository, modifier: Modifier = Modifier
     }
 
     var openId by remember { mutableStateOf<Long?>(null) }
+    var showClosed by remember { mutableStateOf(false) }
 
     val id = openId
     if (id != null) {
@@ -74,6 +78,8 @@ fun InvestmentsScreen(repository: BrokeRepository, modifier: Modifier = Modifier
             investments = current.data,
             portfolio = portfolio,
             fromCache = current.fromCache,
+            showClosed = showClosed,
+            onToggleClosed = { showClosed = !showClosed },
             onOpen = { openId = it.id },
             modifier = modifier,
         )
@@ -85,59 +91,40 @@ private fun InvestmentList(
     investments: List<Investment>,
     portfolio: Portfolio?,
     fromCache: Boolean,
+    showClosed: Boolean,
+    onToggleClosed: () -> Unit,
     onOpen: (Investment) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
-    val open = investments.filter { !it.isClosed }
+    val shown = if (showClosed) investments else investments.filter { !it.isClosed }
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { PageHeader(stringResource(R.string.investments_title)) }
+        item {
+            PageHeader(stringResource(R.string.investments_title)) {
+                Text(
+                    stringResource(R.string.investments_show_closed),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (showClosed) colors.accent else colors.fgMuted,
+                    modifier = Modifier.clickable { onToggleClosed() },
+                )
+            }
+        }
 
         if (fromCache) {
             item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
         }
 
         if (portfolio != null) {
-            item {
-                GlassCard(Modifier.fillMaxWidth()) {
-                    MicroLabel(stringResource(R.string.investments_portfolio_value))
-                    Spacer(Modifier.height(4.dp))
-                    HeroAmount(
-                        maskIfHidden(formatMoney(portfolio.totalValueCents), hide),
-                        fontSize = 34.sp,
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    HairLine()
-                    Spacer(Modifier.height(12.dp))
-                    StatLine(
-                        stringResource(R.string.investments_portfolio_invested),
-                        maskIfHidden(formatMoney(portfolio.totalInvestedCents), hide),
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    StatLine(
-                        stringResource(R.string.investments_gain),
-                        maskIfHidden(formatDelta(portfolio.totalGainCents), hide),
-                        valueColor = if (portfolio.totalGainCents >= 0) colors.positive else colors.danger,
-                    )
-                    portfolio.annualizedReturnBps?.let { bps ->
-                        Spacer(Modifier.height(6.dp))
-                        StatLine(
-                            stringResource(R.string.investments_annualized_return),
-                            // Basis points to percent is presentation only.
-                            "%.2f%%".format(bps / 100.0),
-                        )
-                    }
-                }
-            }
+            item { PortfolioCard(portfolio, hide) }
         }
 
-        if (open.isEmpty()) {
+        if (shown.isEmpty()) {
             item {
                 EmptyState(
                     stringResource(R.string.investments_empty_title),
@@ -146,64 +133,144 @@ private fun InvestmentList(
             }
         }
 
-        items(open, key = { it.id }) { investment ->
-            InvestmentCard(investment, hide, onOpen)
-        }
+        items(shown, key = { it.id }) { investment -> InvestmentCard(investment, hide, onOpen) }
     }
 }
 
+/**
+ * The web's portfolio summary: four figures in a 2×2 grid over a donut of the
+ * open positions. Every number is the server's; the annualised return in
+ * particular is finanzas-core's XIRR, never recomputed here.
+ */
 @Composable
-private fun InvestmentCard(
-    investment: Investment,
-    hide: Boolean,
-    onOpen: (Investment) -> Unit,
-) {
+private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
     val colors = Broke.colors
-    GlassCard(Modifier.fillMaxWidth().clickable { onOpen(investment) }) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    investment.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.fg,
-                )
-                Text(
-                    investment.currencyCode,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgSubtle,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    maskIfHidden(formatMoney(investment.currentValueCents, investment.currencyCode), hide),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.fg,
-                )
-                Text(
-                    maskIfHidden(formatDelta(investment.gainCents, investment.currencyCode), hide),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (investment.gainCents >= 0) colors.positive else colors.danger,
-                )
-            }
+
+    GlassCard(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth()) {
+            Stat(
+                stringResource(R.string.investments_portfolio_value),
+                maskIfHidden(formatMoney(portfolio.totalValueCents), hide),
+                colors.accent,
+                Modifier.weight(1f),
+            )
+            Stat(
+                stringResource(R.string.investments_portfolio_invested),
+                maskIfHidden(formatMoney(portfolio.totalInvestedCents), hide),
+                colors.fg,
+                Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth()) {
+            Stat(
+                stringResource(R.string.investments_portfolio_gain),
+                maskIfHidden(formatDelta(portfolio.totalGainCents), hide),
+                if (portfolio.totalGainCents >= 0) colors.positive else colors.danger,
+                Modifier.weight(1f),
+            )
+            Stat(
+                stringResource(R.string.investments_annualized_return),
+                portfolio.annualizedReturnBps
+                    // Basis points to a percentage is presentation only.
+                    ?.let { (if (it >= 0) "+" else "") + "%.1f%%".format(it / 100.0) }
+                    ?: "—",
+                if ((portfolio.annualizedReturnBps ?: 0) >= 0) colors.positive else colors.danger,
+                Modifier.weight(1f),
+            )
+        }
+
+        if (portfolio.slices.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            DonutChart(
+                slices = portfolio.slices.mapIndexed { index, slice ->
+                    DonutSlice(
+                        label = slice.name,
+                        valueCents = slice.currentValueCents,
+                        color = chartColor(index),
+                        formatted = maskIfHidden(formatMoney(slice.currentValueCents), hide),
+                    )
+                },
+                centerLabel = stringResource(R.string.dashboard_total),
+                centerValue = maskIfHidden(formatMoney(portfolio.totalValueCents), hide),
+            )
         }
     }
 }
 
 @Composable
-private fun StatLine(
+private fun Stat(
     label: String,
     value: String,
-    valueColor: androidx.compose.ui.graphics.Color? = null,
+    valueColor: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
 ) {
-    val colors = Broke.colors
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = Broke.colors.fgMuted)
+        Spacer(Modifier.height(2.dp))
         Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.fgMuted,
-            modifier = Modifier.weight(1f),
+            value,
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp),
+            color = valueColor,
         )
-        Text(value, style = MaterialTheme.typography.bodyLarge, color = valueColor ?: colors.fg)
     }
 }
+
+/**
+ * Name, value, gain, then the calculator and maturity as a caption — the web's
+ * card, which leads with the money rather than the currency code.
+ */
+@Composable
+private fun InvestmentCard(investment: Investment, hide: Boolean, onOpen: (Investment) -> Unit) {
+    val colors = Broke.colors
+
+    GlassCard(Modifier.fillMaxWidth().clickable { onOpen(investment) }) {
+        Text(investment.name, style = MaterialTheme.typography.titleMedium, color = colors.fg)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            maskIfHidden(formatMoney(investment.currentValueCents, investment.currencyCode), hide),
+            style = MaterialTheme.typography.headlineMedium,
+            color = colors.fg,
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.AutoMirrored.Outlined.TrendingUp,
+                contentDescription = null,
+                tint = if (investment.gainCents >= 0) colors.accent else colors.danger,
+                modifier = Modifier.width(18.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                maskIfHidden(formatDelta(investment.gainCents, investment.currencyCode), hide),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (investment.gainCents >= 0) colors.accent else colors.danger,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            listOfNotNull(
+                calculatorLabel(investment.calculator),
+                investment.maturityDate?.let {
+                    "${stringResource(R.string.investments_maturity)}: $it"
+                },
+                if (investment.isClosed) stringResource(R.string.investments_closed) else null,
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.fgSubtle,
+        )
+    }
+}
+
+/** The calculator's display name, from the shared dictionary. */
+@Composable
+private fun calculatorLabel(calculator: String): String = stringResource(
+    when (calculator) {
+        "nu_cajita" -> R.string.investments_calculators_nu_cajita
+        "cetes" -> R.string.investments_calculators_cetes
+        "bonddia" -> R.string.investments_calculators_bonddia
+        "crypto" -> R.string.investments_calculators_crypto
+        "fixed_rate" -> R.string.investments_calculators_fixed_rate
+        else -> R.string.investments_calculators_manual
+    },
+)

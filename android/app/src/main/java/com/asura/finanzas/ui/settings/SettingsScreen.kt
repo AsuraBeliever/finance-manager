@@ -1,7 +1,10 @@
 package com.asura.finanzas.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DarkMode
@@ -22,12 +26,14 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,7 +41,10 @@ import com.asura.finanzas.BuildConfig
 import com.asura.finanzas.R
 import com.asura.finanzas.data.AppPreferences
 import com.asura.finanzas.data.BrokeRepository
+import com.asura.finanzas.data.SessionInfo
 import com.asura.finanzas.data.ThemeChoice
+import com.asura.finanzas.data.User
+import com.asura.finanzas.data.WalletCategory
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.PageHeader
@@ -50,6 +59,7 @@ private enum class Locale(val label: String, val tag: String) {
     English("English", "en"),
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     repository: BrokeRepository,
@@ -63,6 +73,15 @@ fun SettingsScreen(
     var showCurrencies by remember { mutableStateOf(false) }
     var showWhatsNew by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
+    var reloadSessions by remember { mutableStateOf(0) }
+
+    val user by produceState<User?>(null) { value = runCatching { repository.me() }.getOrNull() }
+    val walletCategories by produceState<List<WalletCategory>>(emptyList()) {
+        value = runCatching { repository.walletCategories() }.getOrDefault(emptyList())
+    }
+    val sessions by produceState<List<SessionInfo>>(emptyList(), reloadSessions) {
+        value = runCatching { repository.sessions() }.getOrDefault(emptyList())
+    }
 
     // The device's zones, with the current pick first so it is always listable —
     // the same guarantee `listTimezones()` makes on the web.
@@ -219,6 +238,67 @@ fun SettingsScreen(
             )
         }
 
+        if (walletCategories.isNotEmpty()) {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(R.string.settings_wallet_categories),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.fg,
+                )
+                Spacer(Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    walletCategories.forEach { category ->
+                        Text(
+                            category.name,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.fgMuted,
+                            modifier = Modifier
+                                .padding(bottom = 8.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(colors.surfaceOverlay)
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        if (sessions.isNotEmpty()) {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(R.string.account_devices),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.fg,
+                )
+                Spacer(Modifier.height(6.dp))
+                sessions.forEach { session ->
+                    SessionRow(
+                        session = session,
+                        onRevoke = {
+                            scope.launch {
+                                runCatching { repository.revokeSession(session.id) }
+                                reloadSessions++
+                            }
+                        },
+                    )
+                }
+                if (sessions.count { !it.current } > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.account_revoke_others),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.danger,
+                        modifier = Modifier.clickable {
+                            scope.launch {
+                                runCatching { repository.revokeOtherSessions() }
+                                reloadSessions++
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
         GlassCard(Modifier.fillMaxWidth().clickable { showWhatsNew = true }) {
             Text(
                 stringResource(R.string.whats_new_title),
@@ -266,11 +346,72 @@ fun SettingsScreen(
             )
         }
 
-        OutlinedButton(
-            onClick = { scope.launch { repository.logout(); onSignedOut() } },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.auth_logout), color = colors.danger)
+        GlassCard(Modifier.fillMaxWidth()) {
+            Text(
+                stringResource(R.string.settings_session),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    user?.email.orEmpty(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colors.fgMuted,
+                )
+                Text(
+                    stringResource(R.string.auth_logout),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.danger,
+                    modifier = Modifier.clickable {
+                        scope.launch { repository.logout(); onSignedOut() }
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** One signed-in device, with its own sign-out unless it is this one. */
+@Composable
+private fun SessionRow(session: SessionInfo, onRevoke: () -> Unit) {
+    val colors = Broke.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                session.userAgent?.takeIf { it.isNotBlank() }
+                    ?: stringResource(R.string.account_unknown_device),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.fg,
+            )
+            Text(
+                session.lastSeenAt?.let {
+                    "${stringResource(R.string.account_last_seen)} $it"
+                } ?: session.createdAt,
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+            )
+        }
+        if (session.current) {
+            Text(
+                stringResource(R.string.account_this_device),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.accent,
+            )
+        } else {
+            Text(
+                stringResource(R.string.account_revoke),
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.danger,
+                modifier = Modifier.clickable(onClick = onRevoke),
+            )
         }
     }
 }

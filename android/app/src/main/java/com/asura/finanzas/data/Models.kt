@@ -85,6 +85,16 @@ data class DashboardSummary(
 )
 
 @Serializable
+data class SessionInfo(
+    val id: Long,
+    val createdAt: String = "",
+    val lastSeenAt: String? = null,
+    val userAgent: String? = null,
+    /** True for the session this device is using; the UI never offers to revoke it. */
+    val current: Boolean = false,
+)
+
+@Serializable
 data class WalletCategory(
     val id: Long,
     val name: String,

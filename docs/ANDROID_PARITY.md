@@ -27,7 +27,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Sesión persistente (cookie 30 días) | `SessionCookieJar` | ✅ |
 | Cerrar sesión | `ui/settings` | ✅ |
 | Cambiar contraseña | `ui/settings/ChangePasswordScreen` | ✅ |
-| Dispositivos / revocar sesiones | — | ⬜ |
+| Dispositivos / revocar sesiones | `ui/settings` | ✅ |
 
 ## Panel (dashboard)
 
@@ -81,7 +81,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Web | Android | Estado |
 |---|---|---|
 | Lista + valuación | `ui/investments` | ✅ |
-| Resumen de portafolio | `ui/investments` | ✅ |
+| Resumen de portafolio (2×2 + dona) | `ui/investments` | ✅ |
 | Detalle + proyección | `ui/investments` | ✅ (proyección: sólo el valor final) |
 | Crear / editar (catálogo, calculadoras, Banxico) | — | ⬜ |
 | Cerrar / eliminar | `ui/investments` | ✅ |
@@ -108,7 +108,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Apariencia: acento, fondo, tipografía, logo, ícono | — | ⬜ |
 | Zona horaria | `ui/settings` | ✅ |
 | Formato de reloj 12/24 h | `ui/settings` + lista de movimientos | ✅ |
-| Categorías de cartera | — | ⬜ |
+| Categorías de cartera | `ui/settings` | ✅ (solo lectura, igual que la web) |
 | Monedas y tipos de cambio | `ui/settings/CurrenciesScreen` | 🟡 ver y refrescar; falta fijar a mano |
 | Novedades (changelog in-app) | `WhatsNewScreen` (asset **generado**) | ✅ |
 | Aviso de versión nueva | — | ⬜ (ver plan de actualización) |

@@ -56,6 +56,20 @@ class BrokeRepository(
         )
     }
 
+    suspend fun sessions(): List<SessionInfo> =
+        rpc.json.decodeFromJsonElement(
+            ListSerializer(SessionInfo.serializer()),
+            rpc.get("/api/auth/sessions"),
+        )
+
+    suspend fun revokeSession(id: Long) {
+        rpc.post("/api/auth/revoke_session", buildJsonObject { put("id", id) })
+    }
+
+    suspend fun revokeOtherSessions() {
+        rpc.post("/api/auth/revoke_other_sessions", JsonObject(emptyMap()))
+    }
+
     fun hasStoredSession(): Boolean = cookieJar.hasSession()
 
     // ---- reads ----
