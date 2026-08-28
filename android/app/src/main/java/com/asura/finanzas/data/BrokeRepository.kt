@@ -95,10 +95,45 @@ class BrokeRepository(
             rpc.call("list_manage_categories")
         }
 
-    suspend fun investments(): Synced<List<Investment>> =
-        cached("investments", ListSerializer(Investment.serializer())) {
-            rpc.call("list_investments")
+    suspend fun investments(includeClosed: Boolean = false): Synced<List<Investment>> =
+        cached(if (includeClosed) null else "investments", ListSerializer(Investment.serializer())) {
+            rpc.call(
+                "list_investments",
+                buildJsonObject { put("includeClosed", includeClosed) },
+            )
         }
+
+    suspend fun investmentCatalog(): List<CatalogItem> =
+        rpc.json.decodeFromJsonElement(
+            ListSerializer(CatalogItem.serializer()),
+            rpc.call("get_investment_catalog"),
+        )
+
+    suspend fun createInvestment(
+        calculator: String,
+        name: String,
+        currencyCode: String,
+        principalCents: Long,
+        startDate: String,
+        paramsJson: String,
+        linkedWalletId: Long?,
+        notes: String?,
+    ) {
+        rpc.call(
+            "create_investment",
+            buildJsonObject {
+                put("calculator", calculator)
+                put("name", name.trim())
+                put("currencyCode", currencyCode)
+                put("principalCents", principalCents)
+                put("startDate", startDate)
+                put("paramsJson", paramsJson)
+                linkedWalletId?.let { put("linkedWalletId", it) }
+                notes?.takeIf { it.isNotBlank() }?.let { put("notes", it) }
+            },
+        )
+        cache.invalidateReads()
+    }
 
     suspend fun investmentDetail(id: Long): InvestmentDetail =
         rpc.json.decodeFromJsonElement(
@@ -138,8 +173,11 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
-    suspend fun closeInvestment(id: Long) {
-        rpc.call("close_investment", buildJsonObject { put("id", id) })
+    suspend fun closeInvestment(id: Long, closed: Boolean) {
+        rpc.call(
+            "close_investment",
+            buildJsonObject { put("id", id); put("closed", closed) },
+        )
         cache.invalidateReads()
     }
 

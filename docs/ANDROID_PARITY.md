@@ -83,7 +83,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Lista + valuación | `ui/investments` | ✅ |
 | Resumen de portafolio (2×2 + dona) | `ui/investments` | ✅ |
 | Detalle + proyección | `ui/investments` | ✅ (proyección: sólo el valor final) |
-| Crear / editar (catálogo, calculadoras, Banxico) | — | ⬜ |
+| Crear desde el catálogo (con tasa Banxico en vivo) | `NewInvestmentSheet` | 🟡 falta editar |
 | Cerrar / eliminar | `ui/investments` | ✅ |
 | Movimientos: alta | `InvestmentSheets` | 🟡 falta editar/borrar |
 | Snapshots manuales | `InvestmentSheets` | ✅ |

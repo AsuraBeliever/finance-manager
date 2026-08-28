@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,6 +42,7 @@ import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.chartColor
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
@@ -52,13 +54,14 @@ import com.asura.finanzas.ui.theme.Broke
 @Composable
 fun InvestmentsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     val (key, reload) = rememberReloadKey()
-    val state by loadSynced(key) { repository.investments() }
+    var showClosed by remember { mutableStateOf(false) }
+    val state by loadSynced(key to showClosed) { repository.investments(includeClosed = showClosed) }
     val portfolio by produceState<Portfolio?>(initialValue = null, key) {
         value = runCatching { repository.portfolio().value }.getOrNull()
     }
 
     var openId by remember { mutableStateOf<Long?>(null) }
-    var showClosed by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf(false) }
 
     val id = openId
     if (id != null) {
@@ -80,8 +83,17 @@ fun InvestmentsScreen(repository: BrokeRepository, modifier: Modifier = Modifier
             fromCache = current.fromCache,
             showClosed = showClosed,
             onToggleClosed = { showClosed = !showClosed },
+            onNew = { creating = true },
             onOpen = { openId = it.id },
             modifier = modifier,
+        )
+    }
+
+    if (creating) {
+        NewInvestmentSheet(
+            repository = repository,
+            onDismiss = { creating = false },
+            onSaved = { creating = false; reload() },
         )
     }
 }
@@ -93,6 +105,7 @@ private fun InvestmentList(
     fromCache: Boolean,
     showClosed: Boolean,
     onToggleClosed: () -> Unit,
+    onNew: () -> Unit,
     onOpen: (Investment) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -107,6 +120,11 @@ private fun InvestmentList(
     ) {
         item {
             PageHeader(stringResource(R.string.investments_title)) {
+                PrimaryButton(
+                    text = stringResource(R.string.investments_new_investment),
+                    onClick = onNew,
+                    leadingIcon = Icons.Outlined.Add,
+                )
                 Text(
                     stringResource(R.string.investments_show_closed),
                     style = MaterialTheme.typography.labelLarge,

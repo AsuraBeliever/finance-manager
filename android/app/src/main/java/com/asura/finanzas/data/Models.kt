@@ -300,6 +300,21 @@ data class InvestmentDetail(
     val movements: List<InvestmentMovement> = emptyList(),
 )
 
+/**
+ * A ready-made investment the web offers in its catalog (CETES 28/91/…, Nu
+ * cajita, BONDDIA…). `paramsJson` is the calculator's own configuration and is
+ * passed through untouched — the app never authors or edits those parameters.
+ */
+@Serializable
+data class CatalogItem(
+    val id: String,
+    val calculator: String,
+    val paramsJson: String = "{}",
+    /** The live rate the server found, in basis points; null when unknown. */
+    val rateBps: Long? = null,
+    val rateDate: String? = null,
+)
+
 @Serializable
 data class PortfolioSlice(
     val id: Long,

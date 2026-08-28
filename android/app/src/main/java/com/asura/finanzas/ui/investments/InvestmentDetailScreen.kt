@@ -113,7 +113,7 @@ fun InvestmentDetailScreen(
                         DialogAction(stringResource(R.string.investments_close)) {
                             actions = false
                             scope.launch {
-                                runCatching { repository.closeInvestment(current.id) }
+                                runCatching { repository.closeInvestment(current.id, !current.isClosed) }
                                 reloadKey++
                             }
                         }
