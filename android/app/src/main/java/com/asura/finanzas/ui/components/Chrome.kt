@@ -247,7 +247,13 @@ fun EmptyState(title: String, description: String, modifier: Modifier = Modifier
 
 /** Page header with a back affordance, for the screens reached from "More". */
 @Composable
-fun BackHeader(title: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun BackHeader(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Defaults to a plain "Back"; settings passes its own wording. */
+    backLabel: String? = null,
+) {
     val colors = Broke.colors
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -264,7 +270,7 @@ fun BackHeader(title: String, onBack: () -> Unit, modifier: Modifier = Modifier)
                 modifier = Modifier.size(20.dp),
             )
             Text(
-                text = stringResource(R.string.settings_back),
+                text = backLabel ?: stringResource(R.string.common_back),
                 style = MaterialTheme.typography.labelLarge,
                 color = colors.fgMuted,
                 modifier = Modifier.padding(start = 6.dp),

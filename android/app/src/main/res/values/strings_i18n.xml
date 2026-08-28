@@ -168,6 +168,7 @@
     <string name="common_close">Cerrar</string>
     <string name="common_confirm">Confirmar</string>
     <string name="common_refresh">Actualizar</string>
+    <string name="common_back">Atrás</string>
     <string name="common_color">Color</string>
     <string name="common_empty">No hay datos todavía</string>
     <string name="common_today">Hoy</string>

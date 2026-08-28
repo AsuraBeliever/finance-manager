@@ -51,12 +51,12 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 |---|---|---|
 | Lista con apartados anidados | `ui/wallets` | ✅ |
 | Reordenar (`reorderWallets`) | — | ⬜ |
-| Detalle de cartera + sus movimientos | — | ⬜ |
+| Detalle de cartera + sus movimientos | `WalletDetailScreen` | ✅ |
 | Crear / editar cartera | `WalletFormSheet` | ✅ |
 | Archivar / eliminar | mantener presionada la tarjeta | ✅ |
 | Convertir meta en cartera | — | ⬜ |
-| Panel de tarjeta de crédito (corte, por pagar, utilización) | — | ⬜ |
-| Planes MSI: previsualizar, crear, borrar | — | ⬜ |
+| Panel de tarjeta de crédito (corte, por pagar, utilización) | `WalletDetailScreen` | ✅ |
+| Planes MSI | `WalletDetailScreen` | 🟡 ver y borrar; falta crear |
 | Skins / colores de cartera | `ui/wallets/WalletSkins` | ✅ catálogo + `grad:` |
 
 ## Movimientos

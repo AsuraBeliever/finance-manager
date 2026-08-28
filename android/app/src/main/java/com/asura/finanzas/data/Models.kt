@@ -85,6 +85,52 @@ data class DashboardSummary(
 )
 
 @Serializable
+data class MsiPlan(
+    val id: Long,
+    val description: String = "",
+    val totalCents: Long = 0,
+    val months: Int = 0,
+    /** The regular installment (the first also carries the cent remainder). */
+    val monthlyCents: Long = 0,
+    /** Installments already part of the debt. */
+    val billedMonths: Int = 0,
+    val pendingCents: Long = 0,
+    val nextChargeDate: String? = null,
+    val nextChargeCents: Long? = null,
+    val purchasedAt: String = "",
+    val categoryId: Long? = null,
+)
+
+@Serializable
+data class CreditStatement(
+    val cutDate: String = "",
+    /** Pay this in full by dueDate and no interest accrues. */
+    val balanceCents: Long = 0,
+    val paidCents: Long = 0,
+    val remainingCents: Long = 0,
+    val dueDate: String = "",
+    /** Negative = past due. */
+    val daysToDue: Int = 0,
+)
+
+@Serializable
+data class CreditCardSummary(
+    val debtCents: Long = 0,
+    val creditLimitCents: Long? = null,
+    /** limit − debt − unbilled MSI; null when the limit is untracked. */
+    val availableCreditCents: Long? = null,
+    /** (debt + unbilled MSI) ÷ limit in basis points; null without a limit. */
+    val utilizationBps: Long? = null,
+    val nextCutDate: String = "",
+    val daysToCut: Int = 0,
+    val statement: CreditStatement = CreditStatement(),
+    val nextAnniversary: String? = null,
+    /** MSI amounts committed but not billed yet. */
+    val pendingMsiCents: Long = 0,
+    val msiPlans: List<MsiPlan> = emptyList(),
+)
+
+@Serializable
 data class SessionInfo(
     val id: Long,
     val createdAt: String = "",

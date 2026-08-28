@@ -339,6 +339,23 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
+    suspend fun wallet(id: Long): Wallet =
+        rpc.json.decodeFromJsonElement(
+            Wallet.serializer(),
+            rpc.call("get_wallet", buildJsonObject { put("id", id) }),
+        )
+
+    suspend fun creditCardSummary(walletId: Long): CreditCardSummary =
+        rpc.json.decodeFromJsonElement(
+            CreditCardSummary.serializer(),
+            rpc.call("get_credit_card_summary", buildJsonObject { put("walletId", walletId) }),
+        )
+
+    suspend fun deleteMsiPlan(id: Long) {
+        rpc.call("delete_msi_plan", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
     suspend fun archiveWallet(id: Long, archived: Boolean) {
         rpc.call(
             "archive_wallet",

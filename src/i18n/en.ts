@@ -184,6 +184,7 @@ export const en: Dict = {
     close: "Close",
     confirm: "Confirm",
     refresh: "Refresh",
+    back: "Back",
     color: "Color",
     empty: "No data yet",
     today: "Today",

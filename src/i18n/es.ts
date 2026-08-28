@@ -190,6 +190,7 @@ export const esDict = {
     close: "Cerrar",
     confirm: "Confirmar",
     refresh: "Actualizar",
+    back: "Atrás",
     color: "Color",
     empty: "No hay datos todavía",
     today: "Hoy",

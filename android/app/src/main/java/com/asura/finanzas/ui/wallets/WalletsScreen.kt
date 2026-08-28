@@ -72,9 +72,31 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     var editing by remember { mutableStateOf<Wallet?>(null) }
     var creating by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<Wallet?>(null) }
+    var openId by remember { mutableStateOf<Long?>(null) }
     var confirmDelete by remember { mutableStateOf<Wallet?>(null) }
 
     val all = (state as? Load.Ready)?.data.orEmpty()
+
+    val detailId = openId
+    if (detailId != null) {
+        WalletDetailScreen(
+            repository = repository,
+            walletId = detailId,
+            onBack = { openId = null; reload() },
+            onEdit = { editing = it },
+            modifier = modifier,
+        )
+        if (editing != null) {
+            WalletFormSheet(
+                repository = repository,
+                existing = editing,
+                wallets = all,
+                onDismiss = { editing = null },
+                onSaved = { editing = null; reload() },
+            )
+        }
+        return
+    }
 
     when (val current = state) {
         is Load.Loading -> LoadingBox(modifier)
@@ -83,6 +105,7 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
             wallets = current.data,
             fromCache = current.fromCache,
             onNew = { creating = true },
+            onOpen = { openId = it.id },
             onLongPress = { actionsFor = it },
             modifier = modifier,
         )
@@ -169,6 +192,7 @@ private fun WalletList(
     wallets: List<Wallet>,
     fromCache: Boolean,
     onNew: () -> Unit,
+    onOpen: (Wallet) -> Unit,
     onLongPress: (Wallet) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -210,7 +234,7 @@ private fun WalletList(
 
         items(roots, key = { it.id }) { wallet ->
             Column {
-                WalletCard(wallet, hide, onLongPress)
+                WalletCard(wallet, hide, onOpen, onLongPress)
                 val children = pockets[wallet.id].orEmpty()
                 if (children.isNotEmpty()) {
                     Spacer(Modifier.height(10.dp))
@@ -234,7 +258,12 @@ private fun WalletList(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun WalletCard(wallet: Wallet, hide: Boolean, onLongPress: (Wallet) -> Unit) {
+private fun WalletCard(
+    wallet: Wallet,
+    hide: Boolean,
+    onOpen: (Wallet) -> Unit,
+    onLongPress: (Wallet) -> Unit,
+) {
     val colors = Broke.colors
     val skin = walletSkin(wallet.skin, wallet.color, wallet.categoryName)
     // Available is what the server already reports minus what it already
@@ -248,7 +277,7 @@ private fun WalletCard(wallet: Wallet, hide: Boolean, onLongPress: (Wallet) -> U
             .clip(RoundedCornerShape(26.dp))
             .background(skin.brush())
             .border(1.dp, colors.borderMuted, RoundedCornerShape(26.dp))
-            .combinedClickable(onClick = {}, onLongClick = { onLongPress(wallet) }),
+            .combinedClickable(onClick = { onOpen(wallet) }, onLongClick = { onLongPress(wallet) }),
     ) {
         Icon(
             skinArtIcon(skin.art),
