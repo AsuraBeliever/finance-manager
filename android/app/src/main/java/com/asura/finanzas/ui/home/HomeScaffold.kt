@@ -45,7 +45,9 @@ import com.asura.finanzas.data.AppPreferences
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.ui.components.MeshBackground
 import com.asura.finanzas.ui.dashboard.DashboardScreen
+import com.asura.finanzas.ui.dashboard.DashboardTarget
 import com.asura.finanzas.ui.investments.InvestmentsScreen
+import com.asura.finanzas.ui.more.MoreDestination
 import com.asura.finanzas.ui.more.MoreScreen
 import com.asura.finanzas.ui.settings.SettingsScreen
 import com.asura.finanzas.ui.theme.Broke
@@ -69,21 +71,32 @@ fun HomeScaffold(
     onSignedOut: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(Tab.Dashboard) }
+    var moreTarget by remember { mutableStateOf<MoreDestination?>(null) }
 
     MeshBackground {
         Column(Modifier.fillMaxSize()) {
             // Edge-to-edge: keep content clear of the status bar.
             Box(Modifier.weight(1f).statusBarsPadding()) {
                 when (tab) {
-                    Tab.Dashboard -> DashboardScreen(repository)
+                    Tab.Dashboard -> DashboardScreen(
+                        repository = repository,
+                        onViewAll = { target ->
+                            moreTarget = when (target) {
+                                DashboardTarget.Budgets -> MoreDestination.Budgets
+                                DashboardTarget.Goals -> MoreDestination.Goals
+                                DashboardTarget.Subscriptions -> MoreDestination.Subscriptions
+                            }
+                            tab = Tab.More
+                        },
+                    )
                     Tab.Wallets -> WalletsScreen(repository)
                     Tab.Transactions -> TransactionsScreen(repository)
                     Tab.Investments -> InvestmentsScreen(repository)
                     Tab.Settings -> SettingsScreen(repository, preferences, onSignedOut)
-                    Tab.More -> MoreScreen(repository)
+                    Tab.More -> MoreScreen(repository, moreTarget)
                 }
             }
-            BottomBar(selected = tab, onSelect = { tab = it })
+            BottomBar(selected = tab, onSelect = { moreTarget = null; tab = it })
         }
     }
 }

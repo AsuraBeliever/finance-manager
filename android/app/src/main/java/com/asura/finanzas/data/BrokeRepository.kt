@@ -142,6 +142,14 @@ class BrokeRepository(
             rpc.call("get_spending_trends", buildJsonObject { put("period", period) })
         }
 
+    suspend fun categoryBreakdown(kind: String, period: JsonObject): Synced<CategoryBreakdown> =
+        cached("breakdown-$kind", CategoryBreakdown.serializer()) {
+            rpc.call(
+                "get_category_breakdown",
+                buildJsonObject { put("kind", kind); put("period", period) },
+            )
+        }
+
     suspend fun wallets(): Synced<List<Wallet>> =
         cached("wallets", ListSerializer(Wallet.serializer())) {
             rpc.call("list_wallets")

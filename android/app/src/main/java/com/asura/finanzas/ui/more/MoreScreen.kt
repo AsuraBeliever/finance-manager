@@ -44,7 +44,7 @@ import com.asura.finanzas.ui.theme.Broke
  * Same split here, so someone moving between the two apps finds things in the
  * place they already learned.
  */
-private enum class MoreDestination(val labelRes: Int, val icon: ImageVector) {
+enum class MoreDestination(val labelRes: Int, val icon: ImageVector) {
     Goals(R.string.nav_goals, Icons.Outlined.Savings),
     Budgets(R.string.nav_budgets, Icons.Outlined.TrackChanges),
     Subscriptions(R.string.nav_subscriptions, Icons.Outlined.Repeat),
@@ -52,8 +52,12 @@ private enum class MoreDestination(val labelRes: Int, val icon: ImageVector) {
 }
 
 @Composable
-fun MoreScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
-    var destination by remember { mutableStateOf<MoreDestination?>(null) }
+fun MoreScreen(
+    repository: BrokeRepository,
+    initial: MoreDestination? = null,
+    modifier: Modifier = Modifier,
+) {
+    var destination by remember(initial) { mutableStateOf(initial) }
 
     when (destination) {
         null -> MoreMenu(modifier) { destination = it }

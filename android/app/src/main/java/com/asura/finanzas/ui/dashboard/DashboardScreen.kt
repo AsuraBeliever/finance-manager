@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,7 +35,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
+import com.asura.finanzas.data.Budget
+import com.asura.finanzas.data.CategoryBreakdown
 import com.asura.finanzas.data.DashboardSummary
+import com.asura.finanzas.data.SavingsGoal
+import com.asura.finanzas.data.SubscriptionList
 import com.asura.finanzas.data.SpendingTrends
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.ChipButton
@@ -58,16 +63,43 @@ import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
 
+/** Where a widget's "View all" sends you. */
+enum class DashboardTarget { Budgets, Goals, Subscriptions }
+
 @Composable
-fun DashboardScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
+fun DashboardScreen(
+    repository: BrokeRepository,
+    onViewAll: (DashboardTarget) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val (key, reload) = rememberReloadKey()
     var period by remember { mutableStateOf(PeriodChoice.CurrentMonth) }
     var showPeriod by remember { mutableStateOf(false) }
 
     val summaryState by loadSynced(key to period) { repository.dashboard() }
     val trendsState by loadSynced(key to period) { repository.spendingTrends(period.toJson()) }
+    val expenseState by loadSynced(key to period) {
+        repository.categoryBreakdown("expense", period.toJson())
+    }
+    val incomeState by loadSynced(key to period) {
+        repository.categoryBreakdown("income", period.toJson())
+    }
 
     val trends = (trendsState as? Load.Ready)?.data
+    val expenseBreakdown = (expenseState as? Load.Ready)?.data
+    val incomeBreakdown = (incomeState as? Load.Ready)?.data
+
+    // The planning widgets are extras on this screen: if one fails to load the
+    // dashboard still renders without it, same as the web.
+    val budgets by produceState<List<Budget>>(emptyList(), key, period) {
+        value = runCatching { repository.budgets().value }.getOrDefault(emptyList())
+    }
+    val goals by produceState<List<SavingsGoal>>(emptyList(), key, period) {
+        value = runCatching { repository.savingsGoals().value }.getOrDefault(emptyList())
+    }
+    val subscriptions by produceState<SubscriptionList?>(null, key, period) {
+        value = runCatching { repository.subscriptions().value }.getOrNull()
+    }
 
     when (val current = summaryState) {
         is Load.Loading -> LoadingBox(modifier)
@@ -75,9 +107,15 @@ fun DashboardScreen(repository: BrokeRepository, modifier: Modifier = Modifier) 
         is Load.Ready -> DashboardContent(
             summary = current.data,
             trends = trends,
+            expenseBreakdown = expenseBreakdown,
+            incomeBreakdown = incomeBreakdown,
+            budgets = budgets,
+            goals = goals,
+            subscriptions = subscriptions,
             fromCache = current.fromCache,
             period = period,
             onPickPeriod = { showPeriod = true },
+            onViewAll = onViewAll,
             modifier = modifier,
         )
     }
@@ -95,9 +133,15 @@ fun DashboardScreen(repository: BrokeRepository, modifier: Modifier = Modifier) 
 private fun DashboardContent(
     summary: DashboardSummary,
     trends: SpendingTrends?,
+    expenseBreakdown: CategoryBreakdown?,
+    incomeBreakdown: CategoryBreakdown?,
+    budgets: List<Budget>,
+    goals: List<SavingsGoal>,
+    subscriptions: SubscriptionList?,
     fromCache: Boolean,
     period: PeriodChoice,
     onPickPeriod: () -> Unit,
+    onViewAll: (DashboardTarget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -217,36 +261,46 @@ private fun DashboardContent(
             }
         }
 
-        if (summary.wallets.isNotEmpty()) {
+        if (budgets.isNotEmpty()) {
+            item { BudgetWidget(budgets, hide) { onViewAll(DashboardTarget.Budgets) } }
+        }
+
+        expenseBreakdown?.takeIf { it.slices.isNotEmpty() }?.let { breakdown ->
             item {
-                GlassCard(Modifier.fillMaxWidth()) {
-                    MicroLabel(stringResource(R.string.dashboard_by_wallet))
-                    Spacer(Modifier.height(12.dp))
-                    summary.wallets.forEachIndexed { index, wallet ->
-                        if (index > 0) Spacer(Modifier.height(10.dp))
-                        LegendRow(
-                            color = parseHexColor(wallet.color) ?: colors.accent,
-                            label = wallet.name,
-                            amount = maskIfHidden(formatMoney(wallet.balanceMxnCents), hide),
-                        )
-                    }
-                }
+                BreakdownWidget(
+                    stringResource(R.string.dashboard_expense_by_category),
+                    breakdown,
+                    hide,
+                )
             }
         }
 
-        if (summary.investments.isNotEmpty()) {
+        incomeBreakdown?.takeIf { it.slices.isNotEmpty() }?.let { breakdown ->
             item {
-                GlassCard(Modifier.fillMaxWidth()) {
-                    MicroLabel(stringResource(R.string.dashboard_by_investment))
-                    Spacer(Modifier.height(12.dp))
-                    summary.investments.forEachIndexed { index, slice ->
-                        if (index > 0) Spacer(Modifier.height(10.dp))
-                        LegendRow(
-                            color = colors.cyan,
-                            label = slice.name,
-                            amount = maskIfHidden(formatMoney(slice.valueMxnCents), hide),
-                        )
-                    }
+                BreakdownWidget(
+                    stringResource(R.string.dashboard_income_by_category),
+                    breakdown,
+                    hide,
+                )
+            }
+        }
+
+        if (goals.isNotEmpty()) {
+            item { GoalsWidget(goals, hide) { onViewAll(DashboardTarget.Goals) } }
+        }
+
+        if (summary.wallets.isNotEmpty()) {
+            item { ByWalletWidget(summary, hide) }
+        }
+
+        if (summary.investments.isNotEmpty()) {
+            item { ByInvestmentWidget(summary, hide) }
+        }
+
+        subscriptions?.let {
+            item {
+                SubscriptionsWidget(it.subscriptions, it.monthlyTotalMxnCents, hide) {
+                    onViewAll(DashboardTarget.Subscriptions)
                 }
             }
         }

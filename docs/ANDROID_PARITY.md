@@ -36,13 +36,13 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Patrimonio + efectivo + inversiones | `ui/dashboard` | ✅ |
 | Selector de periodo (`PeriodPicker`) | `components/PeriodPicker` | 🟡 faltan mes/día/rango |
 | Lista de carteras con saldo | `ui/dashboard` | ✅ |
-| Rebanadas de inversiones | `ui/dashboard` | ✅ |
+| Donas «por cartera» y «por inversión» | `ui/dashboard/Widgets` | ✅ |
 | Aviso de tipos de cambio faltantes | `ui/dashboard` | ✅ |
 | Gráfica de flujo (`FlowChart`, `getSpendingTrends`) | `ui/dashboard` | ✅ |
-| Widget desglose por categoría + modal de detalle | — | ⬜ |
-| Widget de presupuestos | — | ⬜ |
-| Widget de metas | — | ⬜ |
-| Widget de suscripciones | — | ⬜ |
+| Widget desglose por categoría (dona gasto + ingreso) | `ui/dashboard/Widgets` | 🟡 falta el modal de detalle |
+| Widget de presupuestos («límite de gasto») | `ui/dashboard/Widgets` | ✅ |
+| Widget de metas (anillo + barras) | `ui/dashboard/Widgets` | ✅ |
+| Widget de suscripciones | `ui/dashboard/Widgets` | ✅ |
 | Ocultar saldos (`PrivacyToggle`) | `ui/settings` + todas las cifras | ✅ |
 
 ## Carteras

@@ -268,10 +268,10 @@ data class SpendingTrends(
 @Serializable
 data class CategorySlice(
     val categoryId: Long? = null,
-    val name: String? = null,
+    val name: String = "",
     val color: String? = null,
-    val totalMxnCents: Long = 0,
-    val count: Long = 0,
+    val icon: String? = null,
+    val mxnCents: Long = 0,
 )
 
 @Serializable
