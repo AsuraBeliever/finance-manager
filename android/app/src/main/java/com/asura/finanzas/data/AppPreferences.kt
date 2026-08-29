@@ -28,6 +28,10 @@ data class AppSettings(
     val timezone: String,
     /** Colours, type and branding — synced with the web through the account. */
     val appearance: Appearance = Appearance(),
+    /** Show the changelog by itself after an update (the web's default too). */
+    val changelogEnabled: Boolean = true,
+    /** Newest release whose notes were already shown, or null on a fresh install. */
+    val changelogSeen: String? = null,
 )
 
 /** Device-local preferences. Account-level settings live in the backend. */
@@ -39,6 +43,8 @@ class AppPreferences(private val context: Context) {
     private val clock24Key = booleanPreferencesKey("clock_24")
     private val timezoneKey = stringPreferencesKey("timezone")
     private val appearanceKey = stringPreferencesKey("appearance")
+    private val changelogEnabledKey = booleanPreferencesKey("changelog_enabled")
+    private val changelogSeenKey = stringPreferencesKey("changelog_seen")
     private val appearanceStampKey = androidx.datastore.preferences.core.longPreferencesKey(
         "appearance_updated_at",
     )
@@ -51,6 +57,8 @@ class AppPreferences(private val context: Context) {
             hideBalances = prefs[hideBalancesKey] ?: false,
             clock24 = prefs[clock24Key] ?: true,
             timezone = prefs[timezoneKey] ?: java.util.TimeZone.getDefault().id,
+            changelogEnabled = prefs[changelogEnabledKey] ?: true,
+            changelogSeen = prefs[changelogSeenKey],
             appearance = prefs[appearanceKey]
                 ?.let { runCatching { json.decodeFromString(Appearance.serializer(), it) }.getOrNull() }
                 ?.normalized()
@@ -67,6 +75,10 @@ class AppPreferences(private val context: Context) {
     suspend fun setHideBalances(hide: Boolean) = edit { it[hideBalancesKey] = hide }
     suspend fun setClock24(value: Boolean) = edit { it[clock24Key] = value }
     suspend fun setTimezone(zone: String) = edit { it[timezoneKey] = zone }
+
+    suspend fun setChangelogEnabled(on: Boolean) = edit { it[changelogEnabledKey] = on }
+
+    suspend fun markChangelogSeen(version: String) = edit { it[changelogSeenKey] = version }
 
     /**
      * Store the appearance and stamp it. [stamp] is the edit's own time; when

@@ -369,9 +369,16 @@ class BrokeRepository(
             )
         }
 
-    suspend fun wallets(): Synced<List<Wallet>> =
-        cached("wallets", ListSerializer(Wallet.serializer())) {
-            rpc.call("list_wallets")
+    /**
+     * Archived wallets are excluded by default. Without asking for them there
+     * is no way back: archiving one would put it out of reach for good.
+     */
+    suspend fun wallets(includeArchived: Boolean = false): Synced<List<Wallet>> =
+        cached(if (includeArchived) null else "wallets", ListSerializer(Wallet.serializer())) {
+            rpc.call(
+                "list_wallets",
+                buildJsonObject { put("includeArchived", includeArchived) },
+            )
         }
 
     suspend fun transactions(

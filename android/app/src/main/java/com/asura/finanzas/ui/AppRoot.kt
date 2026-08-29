@@ -45,15 +45,23 @@ fun AppRoot(
         state = if (repository.hasStoredSession()) AuthState.SignedIn else AuthState.SignedOut
         onReady()
         if (state == AuthState.SignedIn) {
-            // Adopt the account's appearance when it is newer than this
-            // device's, so a colour picked on the web shows up here.
-            runCatching { appearanceSync.pull() }
-            // Anything captured without signal goes out as soon as we are back.
-            runCatching { repository.flushOutbox() }
             runCatching { repository.me() }.onFailure {
                 if (it is UnauthorizedException) state = AuthState.SignedOut
             }
         }
+    }
+
+    // Keyed on the state, not on Unit: this has to run both when the app opens
+    // with a session already stored and right after someone signs in. Keying it
+    // to first composition only meant a fresh sign-in kept the device's
+    // defaults until the next launch.
+    LaunchedEffect(state) {
+        if (state != AuthState.SignedIn) return@LaunchedEffect
+        // Adopt the account's appearance when it is newer than this device's,
+        // so a colour picked on the web shows up here.
+        runCatching { appearanceSync.pull() }
+        // Anything captured without signal goes out as soon as we are back.
+        runCatching { repository.flushOutbox() }
     }
 
     Box(

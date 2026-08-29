@@ -55,6 +55,7 @@ import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.PeriodPickerDialog
@@ -188,6 +189,7 @@ private fun DashboardContent(
     ) {
         item {
             PageHeader(stringResource(R.string.dashboard_title)) {
+                PrivacyToggle()
                 ChipButton(
                     text = PeriodLabel(period),
                     onClick = onPickPeriod,

@@ -42,6 +42,7 @@ import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.chartColor
 import com.asura.finanzas.ui.components.loadSynced
@@ -132,6 +133,7 @@ private fun InvestmentList(
     ) {
         item {
             PageHeader(stringResource(R.string.investments_title)) {
+                PrivacyToggle()
                 PrimaryButton(
                     text = stringResource(R.string.investments_new_investment),
                     onClick = onNew,

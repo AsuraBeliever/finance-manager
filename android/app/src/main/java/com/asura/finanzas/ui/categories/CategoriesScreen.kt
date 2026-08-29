@@ -176,9 +176,10 @@ private fun CategoryList(
 
     // Where each draggable block starts, given the header rows above it.
     val headerRows = 1 + (if (fromCache) 1 else 0) + (if (categories.isEmpty()) 1 else 0)
-    val expenseStart = headerRows + 1
-    val expenseSection = if (expense.isEmpty()) 0 else 1 + expense.size
-    val incomeStart = headerRows + expenseSection + 1
+    // Income first, then expenses — the order the web lists them in.
+    val incomeStart = headerRows + 1
+    val incomeSection = if (income.isEmpty()) 0 else 1 + income.size
+    val expenseStart = headerRows + incomeSection + 1
 
     val expenseReorder = rememberReorderState(
         listState = listState,
@@ -224,6 +225,18 @@ private fun CategoryList(
             }
         }
 
+        if (income.isNotEmpty()) {
+            item { MicroLabel(stringResource(R.string.transactions_income), Modifier.padding(top = 8.dp)) }
+            itemsIndexed(income, key = { _, it -> "i-${it.id}" }) { index, category ->
+                CategoryRow(
+                    category = category,
+                    onLongPress = onLongPress,
+                    reorderState = incomeReorder,
+                    lazyIndex = incomeStart + index,
+                    currentIndex = { incomeStart + income.indexOfFirst { c -> c.id == category.id } },
+                )
+            }
+        }
         if (expense.isNotEmpty()) {
             item { MicroLabel(stringResource(R.string.transactions_expense)) }
             itemsIndexed(expense, key = { _, it -> "e-${it.id}" }) { index, category ->
@@ -237,18 +250,6 @@ private fun CategoryList(
             }
         }
 
-        if (income.isNotEmpty()) {
-            item { MicroLabel(stringResource(R.string.transactions_income), Modifier.padding(top = 8.dp)) }
-            itemsIndexed(income, key = { _, it -> "i-${it.id}" }) { index, category ->
-                CategoryRow(
-                    category = category,
-                    onLongPress = onLongPress,
-                    reorderState = incomeReorder,
-                    lazyIndex = incomeStart + index,
-                    currentIndex = { incomeStart + income.indexOfFirst { c -> c.id == category.id } },
-                )
-            }
-        }
     }
 }
 

@@ -1,6 +1,10 @@
 package com.asura.finanzas.ui.goals
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -315,6 +319,14 @@ private fun GoalList(
                 onClick = onNew,
                 leadingIcon = Icons.Outlined.Add,
             )
+            if (goals.size > 1) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.goals_reorder_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Broke.colors.fgSubtle,
+                )
+            }
         }
 
         if (fromCache) {
@@ -341,14 +353,6 @@ private fun GoalList(
             )
         }
 
-        if (ordered.size > 1) {
-            item {
-                MicroLabel(
-                    stringResource(R.string.goals_reorder_hint),
-                    Modifier.padding(top = 4.dp),
-                )
-            }
-        }
     }
 }
 
@@ -374,20 +378,14 @@ private fun GoalCard(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Dot(parseHexColor(goal.color) ?: colors.accent, 12.dp)
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(goal.name, style = MaterialTheme.typography.titleMedium, color = colors.fg)
-                goal.targetDate?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (goal.isBehind) colors.danger else colors.fgSubtle,
-                    )
-                }
-            }
+            // Neither the deadline nor the percentage repeats here: the plan
+            // sentence already carries the date, and the progress line below
+            // carries the percentage — the same split the web makes.
             Text(
-                formatBps(goal.progressBps),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.fgMuted,
+                goal.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+                modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(8.dp))
             ReorderHandle(state = reorderState, key = goal.id, index = currentIndex)
@@ -404,11 +402,26 @@ private fun GoalCard(
                 color = colors.fg,
             )
             Text(
-                "  /  " + maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
+                "  " + stringResource(R.string.goals_of) + "  " +
+                    maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.fgSubtle,
             )
         }
+
+        Spacer(Modifier.height(6.dp))
+        val remaining = (goal.targetCents - goal.savedCents).coerceAtLeast(0)
+        Text(
+            if (remaining == 0L) {
+                stringResource(R.string.goals_completed)
+            } else {
+                "${formatBps(goal.progressBps)} · " +
+                    stringResource(R.string.goals_remaining) + " " +
+                    maskIfHidden(formatMoney(remaining, goal.currencyCode), hide)
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = if (remaining == 0L) colors.positive else colors.fgMuted,
+        )
 
         // The deadline plan, only once the goal actually has one and is unmet.
         val plan = goal.plan
@@ -456,11 +469,15 @@ private fun GoalPlanLines(goal: SavingsGoal, plan: ContributionPlan, hide: Boole
     fun money(cents: Long) = maskIfHidden(formatMoney(cents, goal.currencyCode), hide)
 
     if (plan.overdue) {
-        Text(
-            text(R.string.goals_overdue_hint, "amount" to money(remaining)),
-            style = MaterialTheme.typography.labelSmall,
-            color = colors.danger,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Badge(stringResource(R.string.goals_overdue_badge), colors.danger)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text(R.string.goals_overdue_hint, "amount" to money(remaining)),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+            )
+        }
     } else {
         val line = when {
             plan.contributedThisPeriodCents <= 0 -> text(
@@ -485,12 +502,30 @@ private fun GoalPlanLines(goal: SavingsGoal, plan: ContributionPlan, hide: Boole
         Text(line, style = MaterialTheme.typography.labelSmall, color = colors.fgMuted)
 
         if (goal.isBehind) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text(R.string.goals_behind_hint, "amount" to money(plan.behindCents)),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
-            )
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Badge(stringResource(R.string.goals_behind_badge), colors.warning)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text(R.string.goals_behind_hint, "amount" to money(plan.behindCents)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.fgSubtle,
+                )
+            }
         }
     }
+}
+
+/** The small status pill the web puts before a behind/overdue explanation. */
+@Composable
+private fun Badge(label: String, tint: Color) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = tint,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(tint.copy(alpha = 0.15f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
 }

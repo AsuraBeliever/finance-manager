@@ -27,7 +27,7 @@ import com.asura.finanzas.ui.theme.Broke
  * Compare two dotted release versions. Missing or non-numeric parts count as 0,
  * so a malformed value can never claim to be newer.
  */
-internal fun isNewerVersion(deployed: String, installed: String): Boolean {
+fun isNewerVersion(deployed: String, installed: String): Boolean {
     fun parts(v: String) = v.trim().split(".").map { it.toIntOrNull() ?: 0 }
     val a = parts(deployed)
     val b = parts(installed)

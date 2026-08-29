@@ -326,18 +326,38 @@ fun SettingsScreen(
             }
         }
 
-        GlassCard(Modifier.fillMaxWidth().clickable { showWhatsNew = true }) {
+        GlassCard(Modifier.fillMaxWidth()) {
             Text(
                 stringResource(R.string.whats_new_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = colors.fg,
+                modifier = Modifier.clickable { showWhatsNew = true },
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.whats_new_settings_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.fgSubtle,
+                modifier = Modifier.clickable { showWhatsNew = true },
             )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.whats_new_notify_on_update),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.fgMuted,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = settings.changelogEnabled,
+                    onCheckedChange = {
+                        scope.launch { preferences.setChangelogEnabled(it) }
+                    },
+                )
+            }
         }
 
         GlassCard(Modifier.fillMaxWidth().clickable { showPassword = true }) {

@@ -4,7 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,11 +16,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.Icon
+import com.asura.finanzas.ui.components.GlassCard
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,10 +43,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
@@ -59,6 +71,7 @@ fun LoginScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var registering by remember { mutableStateOf(false) }
+    var showPassword by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val colors = Broke.colors
     val genericError = stringResource(R.string.common_error)
@@ -120,19 +133,39 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // The brand the user configured, falling back to the app's own name.
+        // Tile beside the name, the same header the web draws above the card.
         val appearance = LocalAppSettings.current.appearance
-        BrandMark(appearance, size = 40.dp)
-        Spacer(Modifier.height(8.dp))
-        HeroAmount(appearance.appName.ifBlank { stringResource(R.string.app_name) })
-        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        Brush.linearGradient(listOf(colors.accent, colors.accentDim)),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                BrandMark(appearance, size = 22.dp, tint = Color.White)
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                appearance.appName.ifBlank { stringResource(R.string.app_name) },
+                style = MaterialTheme.typography.titleLarge,
+                color = colors.fg,
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // The form lives in a card, heading included — same as the web.
+        GlassCard(Modifier.fillMaxWidth(), padding = 22.dp) {
         Text(
             text = stringResource(
                 if (registering) R.string.auth_register_title else R.string.auth_login_title,
             ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.fgMuted,
+            style = MaterialTheme.typography.titleMedium,
+            color = colors.fg,
         )
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(16.dp))
 
         // Same order as the web: Google first, then the email form.
         GoogleButton(enabled = !busy, onClick = { signInWithGoogle() })
@@ -154,6 +187,7 @@ fun LoginScreen(
             value = email,
             onValueChange = { email = it; error = null },
             label = { Text(stringResource(R.string.auth_email)) },
+            placeholder = { Text(stringResource(R.string.auth_email_placeholder)) },
             singleLine = true,
             enabled = !busy,
             keyboardOptions = KeyboardOptions(
@@ -170,7 +204,29 @@ fun LoginScreen(
             label = { Text(stringResource(R.string.auth_password)) },
             singleLine = true,
             enabled = !busy,
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (showPassword) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            trailingIcon = {
+                val label = stringResource(
+                    if (showPassword) R.string.auth_hide_password
+                    else R.string.auth_show_password,
+                )
+                Icon(
+                    imageVector = if (showPassword) {
+                        Icons.Outlined.VisibilityOff
+                    } else {
+                        Icons.Outlined.Visibility
+                    },
+                    contentDescription = label,
+                    tint = colors.fgSubtle,
+                    modifier = Modifier
+                        .clickable { showPassword = !showPassword }
+                        .padding(horizontal = 12.dp),
+                )
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Go,
@@ -178,6 +234,16 @@ fun LoginScreen(
             keyboardActions = KeyboardActions(onGo = { submit() }),
             modifier = Modifier.fillMaxWidth(),
         )
+
+        if (registering) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.auth_password_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         if (error != null) {
             Spacer(Modifier.height(14.dp))
@@ -215,11 +281,15 @@ fun LoginScreen(
             ),
             style = MaterialTheme.typography.labelLarge,
             color = colors.accentBright,
-            modifier = Modifier.clickable {
-                registering = !registering
-                error = null
-            },
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    registering = !registering
+                    error = null
+                },
         )
+        }
     }
 }
 
@@ -240,6 +310,14 @@ private fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_google),
+            contentDescription = null,
+            // Untinted on purpose: it is Google's mark, not ours to recolour.
+            tint = Color.Unspecified,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(12.dp))
         Text(
             text = stringResource(R.string.auth_continue_with_google),
             style = MaterialTheme.typography.labelLarge,

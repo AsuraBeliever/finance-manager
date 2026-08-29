@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -43,7 +44,7 @@ private const val MAX_LOGO_PX = 128
  * icon — the same precedence the web uses.
  */
 @Composable
-fun BrandMark(appearance: Appearance, size: Dp) {
+fun BrandMark(appearance: Appearance, size: Dp, tint: Color? = null) {
     val bitmap = decodeLogo(appearance.logo)
     if (bitmap != null) {
         Image(
@@ -55,7 +56,9 @@ fun BrandMark(appearance: Appearance, size: Dp) {
         Icon(
             appearanceIcon(appearance.icon),
             contentDescription = null,
-            tint = Broke.colors.accent,
+            // On the login tile the glyph sits on the accent gradient, so the
+            // caller passes white; elsewhere it is the accent itself.
+            tint = tint ?: Broke.colors.accent,
             modifier = Modifier.size(size),
         )
     }

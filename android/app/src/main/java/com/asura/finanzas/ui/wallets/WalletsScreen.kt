@@ -60,6 +60,7 @@ import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.PrimaryButton
+import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.ReorderHandle
 import com.asura.finanzas.ui.components.rememberReorderState
 import com.asura.finanzas.ui.components.loadSynced
@@ -72,7 +73,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     val (key, reload) = rememberReloadKey()
-    val state by loadSynced(key) { repository.wallets() }
+    var showArchived by remember { mutableStateOf(false) }
+    val state by loadSynced(key to showArchived) { repository.wallets(showArchived) }
     val scope = rememberCoroutineScope()
 
     var editing by remember { mutableStateOf<Wallet?>(null) }
@@ -113,6 +115,8 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
             onNew = { creating = true },
             onOpen = { openId = it.id },
             onLongPress = { actionsFor = it },
+            showArchived = showArchived,
+            onToggleArchived = { showArchived = !showArchived },
             // Only top-level wallets reorder; apartados follow their parent.
             onReorder = { ids -> scope.launch { runCatching { repository.reorderWallets(ids) } } },
             modifier = modifier,
@@ -202,14 +206,17 @@ private fun WalletList(
     onNew: () -> Unit,
     onOpen: (Wallet) -> Unit,
     onLongPress: (Wallet) -> Unit,
+    showArchived: Boolean,
+    onToggleArchived: () -> Unit,
     onReorder: (List<Long>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val hide = LocalAppSettings.current.hideBalances
 
     // Apartados hang off a parent wallet; listing them at the top level would
-    // double-count what the user sees, so they nest under their parent.
-    val visible = wallets.filter { !it.isArchived }
+    // double-count what the user sees, so they nest under their parent. The
+    // server already filters archived ones unless they were asked for.
+    val visible = wallets
     val pockets = visible.filter { it.parentWalletId != null }.groupBy { it.parentWalletId }
 
     // Dragging rewrites this list as the finger moves so the rows shuffle live;
@@ -240,6 +247,13 @@ private fun WalletList(
     ) {
         item {
             PageHeader(stringResource(R.string.wallets_title)) {
+                PrivacyToggle()
+                Text(
+                    stringResource(R.string.wallets_show_archived),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (showArchived) Broke.colors.accent else Broke.colors.fgMuted,
+                    modifier = Modifier.clickable { onToggleArchived() },
+                )
                 PrimaryButton(
                     text = stringResource(R.string.wallets_new_wallet),
                     onClick = onNew,

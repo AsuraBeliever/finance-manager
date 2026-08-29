@@ -49,6 +49,7 @@ import com.asura.finanzas.ui.components.MeshBackground
 import com.asura.finanzas.ui.dashboard.DashboardScreen
 import com.asura.finanzas.ui.dashboard.DashboardTarget
 import com.asura.finanzas.ui.components.UpdateNotice
+import com.asura.finanzas.ui.settings.WhatsNewAuto
 import com.asura.finanzas.ui.investments.InvestmentsScreen
 import com.asura.finanzas.ui.more.MoreDestination
 import com.asura.finanzas.ui.more.MoreScreen
@@ -82,6 +83,8 @@ fun HomeScaffold(
         Column(Modifier.fillMaxSize()) {
             // Sits above every tab, like the web banner does above the router.
             Box(Modifier.statusBarsPadding()) { UpdateNotice(repository) }
+            // Pops once after an update, like the web's WhatsNewAuto.
+            WhatsNewAuto(preferences)
             Box(Modifier.weight(1f)) {
                 when (tab) {
                     Tab.Dashboard -> DashboardScreen(

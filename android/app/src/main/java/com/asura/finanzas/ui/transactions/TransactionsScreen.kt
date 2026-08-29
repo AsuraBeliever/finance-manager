@@ -73,6 +73,7 @@ import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.PeriodPickerDialog
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.PrimaryButton
+import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
@@ -373,6 +374,7 @@ private fun TransactionList(
     ) {
         item {
             PageHeader(stringResource(R.string.transactions_title)) {
+                PrivacyToggle()
                 PrimaryButton(
                     text = stringResource(R.string.transactions_new_transaction),
                     onClick = onNew,
@@ -572,6 +574,12 @@ private fun TransactionRow(
                     } else {
                         tx.walletName.takeIf { it.isNotBlank() }
                     },
+                    // The title already shows the category when there is no
+                    // description; with one, the category moves down here so
+                    // neither is lost.
+                    tx.categoryName
+                        ?.takeIf { !tx.description.isNullOrBlank() && !tx.isApartado }
+                        ?.let { seedName(it) },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.fgSubtle,
