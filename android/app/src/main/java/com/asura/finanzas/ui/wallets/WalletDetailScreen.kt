@@ -19,9 +19,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,6 +42,7 @@ import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.CreditCardSummary
 import com.asura.finanzas.data.MsiPlan
+import com.asura.finanzas.data.MsiSchedulePreview
 import com.asura.finanzas.data.Transaction
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
@@ -79,6 +82,10 @@ fun WalletDetailScreen(
     var credit by remember { mutableStateOf<CreditCardSummary?>(null) }
     var movements by remember { mutableStateOf<List<Transaction>>(emptyList()) }
     var reloadKey by remember { mutableStateOf(0) }
+    var addingMsi by remember { mutableStateOf(false) }
+    // The schedule the server confirmed, shown once after saving: nothing
+    // visible happens at save time otherwise, since instalments post later.
+    var savedMsi by remember { mutableStateOf<MsiSchedulePreview?>(null) }
 
     LaunchedEffect(walletId, reloadKey) {
         wallet = runCatching { repository.wallet(walletId) }.getOrNull()
@@ -136,6 +143,7 @@ fun WalletDetailScreen(
                 CreditPanel(
                     summary = summary,
                     hide = hide,
+                    onAddPlan = { addingMsi = true },
                     onDeletePlan = { plan ->
                         scope.launch {
                             runCatching { repository.deleteMsiPlan(plan.id) }
@@ -150,6 +158,39 @@ fun WalletDetailScreen(
             item { MicroLabel(stringResource(R.string.transactions_title)) }
             items(movements, key = { it.id }) { tx -> MovementRow(tx, hide) }
         }
+    }
+
+    if (addingMsi) {
+        wallet?.let { card ->
+            MsiPlanSheet(
+                repository = repository,
+                wallet = card,
+                onDismiss = { addingMsi = false },
+                onSaved = { schedule ->
+                    addingMsi = false
+                    savedMsi = schedule
+                    reloadKey++
+                },
+            )
+        }
+    }
+
+    savedMsi?.let { schedule ->
+        AlertDialog(
+            onDismissRequest = { savedMsi = null },
+            containerColor = Broke.colors.surfaceOverlay,
+            title = { Text(stringResource(R.string.credit_msi_saved_title), color = Broke.colors.fg) },
+            text = {
+                Column {
+                    MsiSavedInfo(schedule, wallet?.currencyCode ?: "MXN")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { savedMsi = null }) {
+                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
+                }
+            },
+        )
     }
 }
 
@@ -222,6 +263,7 @@ private fun BalanceCard(wallet: Wallet, credit: CreditCardSummary?, hide: Boolea
 private fun CreditPanel(
     summary: CreditCardSummary,
     hide: Boolean,
+    onAddPlan: () -> Unit,
     onDeletePlan: (MsiPlan) -> Unit,
 ) {
     val colors = Broke.colors
@@ -307,15 +349,33 @@ private fun CreditPanel(
             ProgressBar(bps, over = bps > 8000)
         }
 
-        if (summary.msiPlans.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            HairLine()
-            Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
+        HairLine()
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             MicroLabel(stringResource(R.string.credit_msi_title))
-            summary.msiPlans.forEach { plan ->
-                Spacer(Modifier.height(10.dp))
-                MsiRow(plan, hide) { onDeletePlan(plan) }
-            }
+            Text(
+                stringResource(R.string.credit_msi_add),
+                style = MaterialTheme.typography.labelLarge,
+                color = Broke.colors.accent,
+                modifier = Modifier.clickable { onAddPlan() },
+            )
+        }
+        if (summary.msiPlans.isEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.credit_msi_empty),
+                style = MaterialTheme.typography.labelSmall,
+                color = Broke.colors.fgSubtle,
+            )
+        }
+        summary.msiPlans.forEach { plan ->
+            Spacer(Modifier.height(10.dp))
+            MsiRow(plan, hide) { onDeletePlan(plan) }
         }
     }
 }

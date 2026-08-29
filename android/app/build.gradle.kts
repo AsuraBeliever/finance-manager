@@ -41,6 +41,15 @@ android {
         val apiBase = (project.findProperty("brokeApiBase") as String?)
             ?: "https://finanzas.aseth.workers.dev"
         buildConfigField("String", "API_BASE", "\"$apiBase\"")
+
+        // The *web* client id, on purpose: Google issues the ID token with this
+        // as its audience, which is exactly what the worker checks. Public by
+        // design — it identifies the project, it is not a secret.
+        buildConfigField(
+            "String",
+            "GOOGLE_SERVER_CLIENT_ID",
+            "\"736484669055-ub19ovg5t6ccrmbjd5vlpi65pu0j8stn.apps.googleusercontent.com\"",
+        )
     }
 
     signingConfigs {
@@ -119,10 +128,20 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    // Downloadable fonts: the appearance settings offer the same type pairings
+    // as the web, which loads them from Google Fonts. Fetching them at runtime
+    // keeps the APK from carrying eight more families it may never use.
+    implementation("androidx.compose.ui:ui-text-google-fonts:1.7.5")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    // Sign in with Google. The redirect flow the web uses cannot work here (the
+    // cookie would land in the browser), so the app gets an ID token natively
+    // and trades it for a session at /api/auth/google/token.
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     testImplementation("junit:junit:4.13.2")
 }

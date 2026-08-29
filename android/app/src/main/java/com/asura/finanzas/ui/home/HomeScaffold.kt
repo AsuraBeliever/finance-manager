@@ -42,10 +42,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.AppPreferences
+import com.asura.finanzas.data.AppearanceSync
+import com.asura.finanzas.data.Outbox
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.ui.components.MeshBackground
 import com.asura.finanzas.ui.dashboard.DashboardScreen
 import com.asura.finanzas.ui.dashboard.DashboardTarget
+import com.asura.finanzas.ui.components.UpdateNotice
 import com.asura.finanzas.ui.investments.InvestmentsScreen
 import com.asura.finanzas.ui.more.MoreDestination
 import com.asura.finanzas.ui.more.MoreScreen
@@ -68,6 +71,8 @@ enum class Tab(val labelRes: Int, val icon: ImageVector) {
 fun HomeScaffold(
     repository: BrokeRepository,
     preferences: AppPreferences,
+    appearanceSync: AppearanceSync,
+    outbox: Outbox,
     onSignedOut: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(Tab.Dashboard) }
@@ -75,8 +80,9 @@ fun HomeScaffold(
 
     MeshBackground {
         Column(Modifier.fillMaxSize()) {
-            // Edge-to-edge: keep content clear of the status bar.
-            Box(Modifier.weight(1f).statusBarsPadding()) {
+            // Sits above every tab, like the web banner does above the router.
+            Box(Modifier.statusBarsPadding()) { UpdateNotice(repository) }
+            Box(Modifier.weight(1f)) {
                 when (tab) {
                     Tab.Dashboard -> DashboardScreen(
                         repository = repository,
@@ -90,9 +96,11 @@ fun HomeScaffold(
                         },
                     )
                     Tab.Wallets -> WalletsScreen(repository)
-                    Tab.Transactions -> TransactionsScreen(repository)
+                    Tab.Transactions -> TransactionsScreen(repository, outbox)
                     Tab.Investments -> InvestmentsScreen(repository)
-                    Tab.Settings -> SettingsScreen(repository, preferences, onSignedOut)
+                    Tab.Settings -> SettingsScreen(
+                        repository, preferences, appearanceSync, onSignedOut,
+                    )
                     Tab.More -> MoreScreen(repository, moreTarget)
                 }
             }

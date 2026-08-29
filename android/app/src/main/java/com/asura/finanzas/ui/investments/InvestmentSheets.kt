@@ -17,12 +17,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.InvestmentDetail
+import com.asura.finanzas.data.InvestmentMovement
 import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.SegmentedControl
+import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
@@ -39,12 +41,23 @@ fun InvestmentMovementSheet(
     investment: InvestmentDetail,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
+    /** Null adds a movement; non-null edits that one in place. */
+    existing: InvestmentMovement? = null,
 ) {
     val scope = rememberCoroutineScope()
     var wallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
-    var kind by remember { mutableStateOf("deposit") }
-    var amount by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf(LocalDate.now()) }
+    var kind by remember { mutableStateOf(existing?.kind ?: "deposit") }
+    var amount by remember {
+        mutableStateOf(
+            existing?.amountCents?.let { formatMoney(it, withSymbol = false) }.orEmpty(),
+        )
+    }
+    var date by remember {
+        mutableStateOf(
+            existing?.occurredAt?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                ?: LocalDate.now(),
+        )
+    }
     var wallet by remember { mutableStateOf<Wallet?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -55,7 +68,14 @@ fun InvestmentMovementSheet(
 
     LaunchedEffect(Unit) {
         wallets = runCatching { repository.wallets().value }.getOrDefault(emptyList())
-        wallet = wallets.firstOrNull { it.id == investment.linkedWalletId }
+        // The list shape carries no walletId, so an edit reads the wallet from
+        // get_investment_movement; a new movement defaults to the linked one.
+        val linked = if (existing == null) {
+            investment.linkedWalletId
+        } else {
+            runCatching { repository.investmentMovement(existing.id).walletId }.getOrNull()
+        }
+        wallet = wallets.firstOrNull { it.id == linked }
     }
 
     val cents = parseAmountToCents(amount)
@@ -72,13 +92,23 @@ fun InvestmentMovementSheet(
             error = null
             scope.launch {
                 runCatching {
-                    repository.addInvestmentMovement(
-                        investmentId = investment.id,
-                        kind = kind,
-                        amountCents = cents ?: 0,
-                        occurredAt = date.toString(),
-                        walletId = wallet?.id,
-                    )
+                    if (existing != null) {
+                        repository.updateInvestmentMovement(
+                            id = existing.id,
+                            kind = kind,
+                            amountCents = cents ?: 0,
+                            occurredAt = date.toString(),
+                            walletId = wallet?.id,
+                        )
+                    } else {
+                        repository.addInvestmentMovement(
+                            investmentId = investment.id,
+                            kind = kind,
+                            amountCents = cents ?: 0,
+                            occurredAt = date.toString(),
+                            walletId = wallet?.id,
+                        )
+                    }
                 }
                     .onSuccess { onSaved() }
                     .onFailure {

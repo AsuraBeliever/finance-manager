@@ -12,6 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.asura.finanzas.data.AppPreferences
+import com.asura.finanzas.data.AppearanceSync
+import com.asura.finanzas.data.Outbox
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.SessionCookieJar
 import com.asura.finanzas.data.UnauthorizedException
@@ -32,6 +34,8 @@ fun AppRoot(
     repository: BrokeRepository,
     cookieJar: SessionCookieJar,
     preferences: AppPreferences,
+    appearanceSync: AppearanceSync,
+    outbox: Outbox,
     onReady: () -> Unit,
 ) {
     var state by remember { mutableStateOf(AuthState.Checking) }
@@ -41,6 +45,11 @@ fun AppRoot(
         state = if (repository.hasStoredSession()) AuthState.SignedIn else AuthState.SignedOut
         onReady()
         if (state == AuthState.SignedIn) {
+            // Adopt the account's appearance when it is newer than this
+            // device's, so a colour picked on the web shows up here.
+            runCatching { appearanceSync.pull() }
+            // Anything captured without signal goes out as soon as we are back.
+            runCatching { repository.flushOutbox() }
             runCatching { repository.me() }.onFailure {
                 if (it is UnauthorizedException) state = AuthState.SignedOut
             }
@@ -62,6 +71,8 @@ fun AppRoot(
             AuthState.SignedIn -> HomeScaffold(
                 repository = repository,
                 preferences = preferences,
+                appearanceSync = appearanceSync,
+                outbox = outbox,
                 onSignedOut = { state = AuthState.SignedOut },
             )
         }

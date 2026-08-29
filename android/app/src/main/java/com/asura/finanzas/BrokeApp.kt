@@ -2,8 +2,10 @@ package com.asura.finanzas
 
 import android.app.Application
 import com.asura.finanzas.data.AppPreferences
+import com.asura.finanzas.data.AppearanceSync
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.JsonCache
+import com.asura.finanzas.data.Outbox
 import com.asura.finanzas.data.RpcClient
 import com.asura.finanzas.data.SessionCookieJar
 
@@ -19,12 +21,18 @@ class BrokeApp : Application() {
         private set
     lateinit var preferences: AppPreferences
         private set
+    lateinit var appearanceSync: AppearanceSync
+        private set
+    lateinit var outbox: Outbox
+        private set
 
     override fun onCreate() {
         super.onCreate()
         cookieJar = SessionCookieJar(this)
         val rpc = RpcClient(cookieJar)
-        repository = BrokeRepository(rpc, JsonCache(this), cookieJar)
+        outbox = Outbox(this, rpc)
+        repository = BrokeRepository(rpc, JsonCache(this), cookieJar, outbox)
         preferences = AppPreferences(this)
+        appearanceSync = AppearanceSync(repository, preferences)
     }
 }

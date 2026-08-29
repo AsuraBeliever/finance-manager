@@ -62,6 +62,16 @@ fun InvestmentsScreen(repository: BrokeRepository, modifier: Modifier = Modifier
 
     var openId by remember { mutableStateOf<Long?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var simulating by remember { mutableStateOf(false) }
+
+    if (simulating) {
+        SimulatorScreen(
+            repository = repository,
+            onBack = { simulating = false },
+            modifier = modifier,
+        )
+        return
+    }
 
     val id = openId
     if (id != null) {
@@ -85,6 +95,7 @@ fun InvestmentsScreen(repository: BrokeRepository, modifier: Modifier = Modifier
             onToggleClosed = { showClosed = !showClosed },
             onNew = { creating = true },
             onOpen = { openId = it.id },
+            onSimulator = { simulating = true },
             modifier = modifier,
         )
     }
@@ -107,6 +118,7 @@ private fun InvestmentList(
     onToggleClosed: () -> Unit,
     onNew: () -> Unit,
     onOpen: (Investment) -> Unit,
+    onSimulator: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -124,6 +136,12 @@ private fun InvestmentList(
                     text = stringResource(R.string.investments_new_investment),
                     onClick = onNew,
                     leadingIcon = Icons.Outlined.Add,
+                )
+                Text(
+                    stringResource(R.string.simulator_open),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.accent,
+                    modifier = Modifier.clickable { onSimulator() },
                 )
                 Text(
                     stringResource(R.string.investments_show_closed),

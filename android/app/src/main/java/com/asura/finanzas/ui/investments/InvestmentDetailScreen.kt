@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.investments
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +41,7 @@ import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.LoadingBox
+import com.asura.finanzas.ui.components.LineChart
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.formatDelta
@@ -59,6 +62,9 @@ fun InvestmentDetailScreen(
     var addingMovement by remember { mutableStateOf(false) }
     var addingSnapshot by remember { mutableStateOf(false) }
     var actions by remember { mutableStateOf(false) }
+    var movementActions by remember { mutableStateOf<InvestmentMovement?>(null) }
+    var editingMovement by remember { mutableStateOf<InvestmentMovement?>(null) }
+    var editingInvestment by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(investmentId, reloadKey) {
@@ -77,6 +83,7 @@ fun InvestmentDetailScreen(
         onAddMovement = { addingMovement = true },
         onAddSnapshot = { addingSnapshot = true },
         onActions = { actions = true },
+        onMovementLongPress = { movementActions = it },
         modifier = modifier,
     )
 
@@ -86,6 +93,55 @@ fun InvestmentDetailScreen(
             investment = current,
             onDismiss = { addingMovement = false },
             onSaved = { addingMovement = false; reloadKey++ },
+        )
+    }
+
+    editingMovement?.let { movement ->
+        InvestmentMovementSheet(
+            repository = repository,
+            investment = current,
+            existing = movement,
+            onDismiss = { editingMovement = null },
+            onSaved = { editingMovement = null; reloadKey++ },
+        )
+    }
+
+    // Long press on a movement offers the same edit/delete the web keeps behind
+    // the row's own controls.
+    movementActions?.let { movement ->
+        AlertDialog(
+            onDismissRequest = { movementActions = null },
+            containerColor = Broke.colors.surfaceOverlay,
+            title = { Text(movement.occurredAt, color = Broke.colors.fg) },
+            text = {
+                Column {
+                    DialogAction(stringResource(R.string.common_edit)) {
+                        movementActions = null
+                        editingMovement = movement
+                    }
+                    DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
+                        movementActions = null
+                        scope.launch {
+                            runCatching { repository.deleteInvestmentMovement(movement.id) }
+                            reloadKey++
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { movementActions = null }) {
+                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
+                }
+            },
+        )
+    }
+
+    if (editingInvestment) {
+        NewInvestmentSheet(
+            repository = repository,
+            existing = current,
+            onDismiss = { editingInvestment = false },
+            onSaved = { editingInvestment = false; reloadKey++ },
         )
     }
 
@@ -105,6 +161,10 @@ fun InvestmentDetailScreen(
             title = { Text(current.name, color = Broke.colors.fg) },
             text = {
                 Column {
+                    DialogAction(stringResource(R.string.common_edit)) {
+                        actions = false
+                        editingInvestment = true
+                    }
                     DialogAction(stringResource(R.string.investments_add_snapshot)) {
                         actions = false
                         addingSnapshot = true
@@ -143,6 +203,7 @@ private fun DetailContent(
     onAddMovement: () -> Unit,
     onAddSnapshot: () -> Unit,
     onActions: () -> Unit,
+    onMovementLongPress: (InvestmentMovement) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -202,14 +263,30 @@ private fun DetailContent(
                 GlassCard(Modifier.fillMaxWidth()) {
                     MicroLabel(stringResource(R.string.investments_projection))
                     Spacer(Modifier.height(10.dp))
-                    // The projection is computed by finanzas-core; the app only
-                    // shows its last point.
-                    detail.projection.lastOrNull()?.let { point ->
-                        Line(
-                            point.date,
-                            maskIfHidden(formatMoney(point.valueCents, detail.currencyCode), hide),
-                        )
-                    }
+                    // Every point comes from finanzas-core; the chart only maps
+                    // the given cents onto pixels.
+                    val points = detail.projection
+                    LineChart(
+                        values = points.map { it.valueCents },
+                        startLabel = points.first().date,
+                        endLabel = points.last().date,
+                        minLabel = maskIfHidden(
+                            formatMoney(points.minOf { it.valueCents }, detail.currencyCode),
+                            hide,
+                        ),
+                        maxLabel = maskIfHidden(
+                            formatMoney(points.maxOf { it.valueCents }, detail.currencyCode),
+                            hide,
+                        ),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Line(
+                        points.last().date,
+                        maskIfHidden(
+                            formatMoney(points.last().valueCents, detail.currencyCode),
+                            hide,
+                        ),
+                    )
                 }
             }
         }
@@ -217,7 +294,7 @@ private fun DetailContent(
         if (detail.movements.isNotEmpty()) {
             item { MicroLabel(stringResource(R.string.investments_movements)) }
             items(detail.movements, key = { it.id }) { movement ->
-                MovementRow(movement, detail.currencyCode, hide)
+                MovementRow(movement, detail.currencyCode, hide, onMovementLongPress)
             }
         }
 
@@ -238,11 +315,22 @@ private fun DetailContent(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MovementRow(movement: InvestmentMovement, currencyCode: String, hide: Boolean) {
+private fun MovementRow(
+    movement: InvestmentMovement,
+    currencyCode: String,
+    hide: Boolean,
+    onLongPress: (InvestmentMovement) -> Unit,
+) {
     val colors = Broke.colors
     val deposit = movement.kind == "deposit"
-    GlassCard(Modifier.fillMaxWidth(), padding = 14.dp) {
+    GlassCard(
+        Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = {}, onLongClick = { onLongPress(movement) }),
+        padding = 14.dp,
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.weight(1f)) {
                 Text(

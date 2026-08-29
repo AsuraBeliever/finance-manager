@@ -119,6 +119,23 @@ data class MsiPlan(
     val categoryId: Long? = null,
 )
 
+/**
+ * What an MSI plan will bill and when. Computed by the worker for the live form
+ * preview and echoed back on save, so the phone never works out an instalment.
+ */
+@Serializable
+data class MsiSchedulePreview(
+    val monthlyCents: Long = 0,
+    val firstChargeCents: Long = 0,
+    /** Cut that bills the first instalment — the statement that pays it. */
+    val firstCutDate: String = "",
+    val lastChargeDate: String = "",
+    val months: Int = 0,
+    /** Instalments that join the debt at once, when the purchase is back-dated. */
+    val alreadyBilledMonths: Int = 0,
+    val alreadyBilledCents: Long = 0,
+)
+
 @Serializable
 data class CreditStatement(
     val cutDate: String = "",
@@ -197,10 +214,36 @@ data class SavingsGoal(
     val linkedWalletId: Long? = null,
     val targetDate: String? = null,
     val cadence: String? = null,
+    /** Present only when both a deadline and a cadence are set. */
+    val plan: ContributionPlan? = null,
     /** True when the goal has fallen below its steady pace. */
     val isBehind: Boolean = false,
     /** "purchase" (completing spends it) or "fund" (drawn down over time). */
     val goalKind: String = "purchase",
+)
+
+/**
+ * What to set aside each period to arrive on time. Computed in Rust — the app
+ * only picks which sentence to show.
+ */
+@Serializable
+data class ContributionPlan(
+    /** Cadence periods left until the deadline (0 when met or overdue). */
+    val periodsLeft: Long = 0,
+    val perPeriodCents: Long = 0,
+    /**
+     * This period's quota, frozen at the period start: it does not shrink as
+     * you contribute, so partial progress reads "2,000 of 2,400".
+     */
+    val periodQuotaCents: Long = 0,
+    /** Still missing to cover this period's quota (0 = covered). */
+    val periodMissingCents: Long = 0,
+    val contributedThisPeriodCents: Long = 0,
+    /** Whole days to the deadline; negative once it has passed. */
+    val daysLeft: Long = 0,
+    val overdue: Boolean = false,
+    /** How far below the steady pace the saved amount is (0 = on/ahead). */
+    val behindCents: Long = 0,
 )
 
 @Serializable
@@ -245,8 +288,11 @@ data class Investment(
     val currencyCode: String,
     val principalCents: Long = 0,
     val startDate: String = "",
+    /** Calculator inputs (rate, term, …) as stored JSON; edited, never computed. */
+    val paramsJson: String = "{}",
     val linkedWalletId: Long? = null,
     val isClosed: Boolean = false,
+    val notes: String? = null,
     val currentValueCents: Long = 0,
     /** principal + contributions − withdrawals, computed server-side. */
     val netInvestedCents: Long = 0,
@@ -280,6 +326,24 @@ data class InvestmentMovement(
     val occurredAt: String,
 )
 
+/**
+ * One movement with everything the editor needs (`get_investment_movement`).
+ * The list shape does not carry `walletId`, so editing reads it from here.
+ */
+@Serializable
+data class MovementDetail(
+    val id: Long,
+    val investmentId: Long,
+    val investmentName: String = "",
+    /** "deposit" | "withdrawal". */
+    val kind: String,
+    val amountCents: Long = 0,
+    val occurredAt: String,
+    val walletId: Long? = null,
+    val currencyCode: String = "MXN",
+    val startDate: String = "",
+)
+
 /** `get_investment_detail`: the investment plus its history and projection. */
 @Serializable
 data class InvestmentDetail(
@@ -289,8 +353,10 @@ data class InvestmentDetail(
     val currencyCode: String,
     val principalCents: Long = 0,
     val startDate: String = "",
+    val paramsJson: String = "{}",
     val linkedWalletId: Long? = null,
     val isClosed: Boolean = false,
+    val notes: String? = null,
     val currentValueCents: Long = 0,
     val netInvestedCents: Long = 0,
     val gainCents: Long = 0,
@@ -387,6 +453,24 @@ data class Transaction(
     val createdAt: String? = null,
 )
 
+/**
+ * Both legs of a transfer read as one thing (worker: `get_transfer`), so the
+ * edit form can prefill from/to wallets and amounts. The legs always share
+ * group, note, date and time.
+ */
+@Serializable
+data class TransferDetail(
+    /** The `transfer_out` leg's id. */
+    val id: Long,
+    val fromWalletId: Long,
+    val toWalletId: Long,
+    val amountFromCents: Long,
+    val amountToCents: Long,
+    val description: String? = null,
+    val occurredAt: String,
+    val occurredTime: String? = null,
+)
+
 @Serializable
 data class TransactionCategory(
     val id: Long,
@@ -397,4 +481,30 @@ data class TransactionCategory(
     val color: String? = null,
     val isSystem: Boolean = false,
     val isHidden: Boolean = false,
+)
+
+// ---- simulator ----
+//
+// Pure projections: no account data involved, and every figure below is
+// computed by finanzas-core on the server. The phone only supplies the inputs.
+
+@Serializable
+data class SimPoint(
+    val month: Int = 0,
+    val contributedCents: Long = 0,
+    val valueCents: Long = 0,
+)
+
+@Serializable
+data class SimResult(
+    val points: List<SimPoint> = emptyList(),
+    val finalValueCents: Long = 0,
+    val totalContributedCents: Long = 0,
+    val totalInterestCents: Long = 0,
+)
+
+@Serializable
+data class SolveResult(
+    /** What you would have to put in monthly to hit the target on time. */
+    val monthlyContributionCents: Long = 0,
 )

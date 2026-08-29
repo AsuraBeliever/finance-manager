@@ -1,10 +1,13 @@
 package com.asura.finanzas.ui.goals
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -21,6 +25,7 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.SavingsGoal
 import com.asura.finanzas.data.Wallet
+import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.SegmentedControl
@@ -28,6 +33,7 @@ import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 /** Create or edit a savings goal. */
 @Composable
@@ -45,6 +51,16 @@ fun GoalFormSheet(
     }
     var wallet by remember { mutableStateOf<Wallet?>(null) }
     var kind by remember { mutableStateOf(existing?.goalKind ?: "purchase") }
+    // A deadline is optional; turning it on defaults to a monthly cadence and a
+    // year out, the same defaults the web form starts from.
+    var hasDeadline by remember { mutableStateOf(existing?.targetDate != null) }
+    var targetDate by remember {
+        mutableStateOf(
+            existing?.targetDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                ?: LocalDate.now().plusYears(1),
+        )
+    }
+    var cadence by remember { mutableStateOf(existing?.cadence ?: "monthly") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -80,8 +96,10 @@ fun GoalFormSheet(
                         targetCents = cents ?: 0,
                         walletId = wallet?.id,
                         color = existing?.color,
-                        targetDate = existing?.targetDate,
-                        cadence = existing?.cadence,
+                        // Clearing the deadline clears the cadence with it: the
+                        // server only computes a plan when both are present.
+                        targetDate = if (hasDeadline) targetDate.toString() else null,
+                        cadence = if (hasDeadline) cadence else null,
                         goalKind = kind,
                     )
                 }
@@ -130,6 +148,52 @@ fun GoalFormSheet(
                     )
                 },
                 onSelect = { kind = it },
+            )
+        }
+
+        // Deadline + cadence: with both set the server returns a contribution
+        // plan and the card starts telling you what to set aside each period.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.goals_enable_deadline),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Broke.colors.fg,
+                )
+                Text(
+                    stringResource(R.string.goals_deadline_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Broke.colors.fgSubtle,
+                )
+            }
+            Switch(checked = hasDeadline, onCheckedChange = { hasDeadline = it })
+        }
+
+        if (hasDeadline) {
+            DateField(
+                label = stringResource(R.string.goals_deadline_date_label),
+                value = targetDate,
+                onChange = { targetDate = it },
+            )
+            PickerField(
+                label = stringResource(R.string.goals_cadence_label),
+                options = listOf("daily", "weekly", "monthly", "yearly"),
+                selected = cadence,
+                optionLabel = {
+                    stringResource(
+                        when (it) {
+                            "daily" -> R.string.goals_cadence_daily
+                            "weekly" -> R.string.goals_cadence_weekly
+                            "yearly" -> R.string.goals_cadence_yearly
+                            else -> R.string.goals_cadence_monthly
+                        },
+                    )
+                },
+                onSelect = { cadence = it },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

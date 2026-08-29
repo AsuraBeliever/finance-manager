@@ -41,11 +41,13 @@ class MainActivity : ComponentActivity() {
 
             ProvideAppLocale(current.locale) {
                 CompositionLocalProvider(LocalAppSettings provides current) {
-                    BrokeTheme(darkTheme = dark) {
+                    BrokeTheme(darkTheme = dark, appearance = current.appearance) {
                         AppRoot(
                             repository = app.repository,
                             cookieJar = app.cookieJar,
                             preferences = app.preferences,
+                            appearanceSync = app.appearanceSync,
+                            outbox = app.outbox,
                             onReady = { ready = true },
                         )
                     }

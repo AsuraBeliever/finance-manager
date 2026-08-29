@@ -1,12 +1,16 @@
 package com.asura.finanzas.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 
@@ -80,3 +84,58 @@ val BrokeTypography = Typography(
         lineHeight = 16.sp,
     ),
 )
+
+// ---- user-selectable type pairings ----
+//
+// The web offers six pairings and loads them from Google Fonts. Android fetches
+// the same families through the downloadable-fonts provider rather than
+// bundling eight more that most users will never pick; while a family is being
+// fetched Compose falls back to the bundled faces, so text never disappears.
+
+private val googleFontsProvider = GoogleFont.Provider(
+    providerAuthority = "com.google.android.gms.fonts",
+    providerPackage = "com.google.android.gms",
+    certificates = R.array.com_google_android_gms_fonts_certs,
+)
+
+private fun googleFamily(name: String) = FontFamily(
+    Font(GoogleFont(name), googleFontsProvider, FontWeight.Normal),
+    Font(GoogleFont(name), googleFontsProvider, FontWeight.Medium),
+    Font(GoogleFont(name), googleFontsProvider, FontWeight.SemiBold),
+    Font(GoogleFont(name), googleFontsProvider, FontWeight.Bold),
+)
+
+/** Display + UI families for one pairing key, mirroring the web's `FONTS`. */
+private fun familiesFor(key: String): Pair<FontFamily, FontFamily> = when (key) {
+    "editorial" -> googleFamily("Fraunces") to googleFamily("Hanken Grotesk")
+    "modern" -> googleFamily("Space Grotesk") to googleFamily("Inter")
+    "classic" -> googleFamily("Playfair Display") to googleFamily("Lora")
+    "rounded" -> googleFamily("Baloo 2") to googleFamily("Nunito")
+    "system" -> FontFamily.SansSerif to FontFamily.SansSerif
+    // "default" and anything unknown keep the bundled pairing.
+    else -> Sora to HankenGrotesk
+}
+
+/**
+ * The base typography restyled for the chosen pairing: display sizes keep the
+ * display family, everything else takes the UI family. Sizes and weights are
+ * untouched, so only the faces change.
+ */
+@Composable
+fun rememberBrokeTypography(fontKey: String): Typography = remember(fontKey) {
+    if (fontKey == "default") return@remember BrokeTypography
+    val (display, sans) = familiesFor(fontKey)
+    fun TextStyle.on(family: FontFamily) = copy(fontFamily = family)
+    BrokeTypography.copy(
+        displayLarge = BrokeTypography.displayLarge.on(display),
+        displayMedium = BrokeTypography.displayMedium.on(display),
+        titleLarge = BrokeTypography.titleLarge.on(display),
+        titleMedium = BrokeTypography.titleMedium.on(display),
+        bodyLarge = BrokeTypography.bodyLarge.on(sans),
+        bodyMedium = BrokeTypography.bodyMedium.on(sans),
+        bodySmall = BrokeTypography.bodySmall.on(sans),
+        labelLarge = BrokeTypography.labelLarge.on(sans),
+        labelMedium = BrokeTypography.labelMedium.on(sans),
+        labelSmall = BrokeTypography.labelSmall.on(sans),
+    )
+}

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.CompareArrows
@@ -24,8 +25,10 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.CallMade
 import androidx.compose.material.icons.outlined.CallReceived
+import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,16 +44,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
+import com.asura.finanzas.data.NetworkException
+import com.asura.finanzas.data.Outbox
 import com.asura.finanzas.data.Transaction
+import com.asura.finanzas.data.TransactionCategory
 import com.asura.finanzas.data.TxTotals
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.ChipButton
+import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.EmptyState
+import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.HairLine
@@ -59,7 +68,7 @@ import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
-import com.asura.finanzas.ui.components.PeriodChoice
+import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.PeriodPickerDialog
 import com.asura.finanzas.ui.components.PickerField
@@ -69,13 +78,57 @@ import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
+import com.asura.finanzas.ui.parseAmountToCents
+import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+/**
+ * A row to render: an ordinary movement, or — when both legs of a transfer are
+ * in the list — the two folded into one line (origin → destination). `tx` is the
+ * `transfer_out` leg, the canonical handle for edit and delete.
+ */
+private data class TxRow(val tx: Transaction, val toLeg: Transaction? = null)
+
+/**
+ * Folds each pair of transfer legs into a single row. A lone leg — the list is
+ * filtered to one wallet, or the sibling fell off the page — stays as it is:
+ * there its +/− is the whole story. Mirrors the web's `foldTransfers`.
+ */
+private fun foldTransfers(transactions: List<Transaction>): List<TxRow> {
+    val byGroup = transactions
+        .filter { it.transferGroupId != null }
+        .groupBy { it.transferGroupId }
+    val folded = mutableSetOf<Long>()
+    val rows = mutableListOf<TxRow>()
+    for (tx in transactions) {
+        if (tx.id in folded) continue
+        val legs = tx.transferGroupId?.let { byGroup[it] }
+        val out = legs?.firstOrNull { it.kind == "transfer_out" }
+        val into = legs?.firstOrNull { it.kind == "transfer_in" }
+        if (legs?.size == 2 && out != null && into != null) {
+            folded += out.id
+            folded += into.id
+            rows += TxRow(out, into)
+        } else {
+            rows += TxRow(tx)
+        }
+    }
+    return rows
+}
+
+/**
+ * Apartado moves ride the transactions list with a negative id that encodes the
+ * goal_contributions row — that is how the web addresses them for edit/delete.
+ */
+val Transaction.isApartado: Boolean
+    get() = kind == "reserve" || kind == "release"
 
 /** The kind filter tabs the web shows above the list. */
 private enum class KindFilter(val labelRes: Int, val wire: String?) {
@@ -86,18 +139,38 @@ private enum class KindFilter(val labelRes: Int, val wire: String?) {
 }
 
 @Composable
-fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
+fun TransactionsScreen(
+    repository: BrokeRepository,
+    outbox: Outbox,
+    modifier: Modifier = Modifier,
+) {
     val (key, reload) = rememberReloadKey()
     var filter by remember { mutableStateOf(KindFilter.All) }
     var wallet by remember { mutableStateOf<Wallet?>(null) }
-    var period by remember { mutableStateOf(PeriodChoice.AllTime) }
+    // Category only applies to income/expense and is scoped to the chosen kind,
+    // so switching kind clears it (web: TransactionFilters).
+    var category by remember { mutableStateOf<TransactionCategory?>(null) }
+    var period by remember { mutableStateOf<Period>(Period.AllTime) }
     var showPeriod by remember { mutableStateOf(false) }
 
-    val state by loadSynced(Triple(key, filter, wallet?.id) to period) {
+    // Includes the reserved categories a capture form would not offer, because a
+    // movement may already be filed under one.
+    val filterCategories by produceState(initialValue = emptyList<TransactionCategory>(), key) {
+        value = runCatching { repository.filterCategories() }.getOrDefault(emptyList())
+    }
+
+    // "Todo el tiempo" drops the date filter entirely rather than asking for the
+    // allTime window — this is a ledger, so a movement dated in the future has
+    // to stay visible (web: TransactionFilters). Sending null also lets the
+    // unfiltered list hit the offline cache, which keys on period == null.
+    val periodFilter = period.takeIf { it != Period.AllTime }?.toJson()
+
+    val state by loadSynced(listOf(key, filter, wallet?.id, category?.id, period)) {
         repository.transactions(
             walletId = wallet?.id,
             kind = filter.wire,
-            period = period.toJson(),
+            categoryId = category?.id,
+            period = periodFilter,
         )
     }
     val wallets by produceState(initialValue = emptyList<Wallet>(), key) {
@@ -108,12 +181,17 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
     var editing by remember { mutableStateOf<Transaction?>(null) }
     var actionsFor by remember { mutableStateOf<Transaction?>(null) }
     var pendingDelete by remember { mutableStateOf<Transaction?>(null) }
+    var editingApartado by remember { mutableStateOf<Transaction?>(null) }
 
     // Totals only exist for a single-sided kind; the API rejects them otherwise.
-    val totals by produceState<TxTotals?>(null, key, filter, wallet?.id, period) {
+    val totals by produceState<TxTotals?>(null, key, filter, wallet?.id, category?.id, period) {
         value = filter.wire
             ?.takeIf { it == "income" || it == "expense" }
-            ?.let { runCatching { repository.transactionTotals(it, wallet?.id, period.toJson()) }.getOrNull() }
+            ?.let {
+                runCatching {
+                    repository.transactionTotals(it, wallet?.id, category?.id, periodFilter)
+                }.getOrNull()
+            }
     }
     val scope = rememberCoroutineScope()
 
@@ -122,12 +200,18 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
             is Load.Loading -> LoadingBox()
             is Load.Failed -> ErrorBox(current.message, reload)
             is Load.Ready -> TransactionList(
+                outbox = outbox,
+                repository = repository,
+                onSynced = reload,
                 transactions = current.data,
                 filter = filter,
-                onFilter = { filter = it },
+                onFilter = { filter = it; category = null },
                 wallets = wallets,
                 wallet = wallet,
                 onWallet = { wallet = it },
+                categories = filterCategories,
+                category = category,
+                onCategory = { category = it },
                 period = period,
                 onPickPeriod = { showPeriod = true },
                 fromCache = current.fromCache,
@@ -141,8 +225,10 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
     if (showPeriod) {
         PeriodPickerDialog(
             selected = period,
-            onSelect = { period = it; showPeriod = false },
+            // Parameters are edited inline, so a pick applies without closing.
+            onSelect = { period = it },
             onDismiss = { showPeriod = false },
+            allowAll = true,
         )
     }
 
@@ -152,6 +238,15 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
             wallets = wallets,
             onDismiss = { showForm = false },
             onSaved = { showForm = false; reload() },
+        )
+    }
+
+    editingApartado?.let { target ->
+        ApartadoEditSheet(
+            repository = repository,
+            transaction = target,
+            onDismiss = { editingApartado = null },
+            onSaved = { editingApartado = null; reload() },
         )
     }
 
@@ -178,13 +273,11 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
             },
             text = {
                 Column {
-                    // A transfer is two rows sharing a group id and needs
-                    // update_transfer; editing one leg alone would unbalance it.
-                    if (!target.kind.startsWith("transfer")) {
-                        DialogAction(stringResource(R.string.common_edit)) {
-                            actionsFor = null
-                            editing = target
-                        }
+                    // Transfers included: the edit sheet loads both legs and
+                    // saves them together, so the pair can never unbalance.
+                    DialogAction(stringResource(R.string.common_edit)) {
+                        actionsFor = null
+                        if (target.isApartado) editingApartado = target else editing = target
                     }
                     DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
                         actionsFor = null
@@ -204,13 +297,34 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(stringResource(R.string.transactions_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.transactions_delete_confirm)) },
+            title = {
+                Text(
+                    stringResource(
+                        if (target.isApartado) R.string.transactions_apartado_delete_title
+                        else R.string.transactions_delete_confirm_title,
+                    ),
+                )
+            },
+            text = {
+                Text(
+                    stringResource(
+                        if (target.isApartado) R.string.transactions_apartado_delete_confirm
+                        else R.string.transactions_delete_confirm,
+                    ),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     pendingDelete = null
                     scope.launch {
-                        runCatching { repository.deleteTransaction(target.id) }
+                        runCatching {
+                            // An apartado row carries the contribution id negated.
+                            if (target.isApartado) {
+                                repository.deleteGoalContribution(-target.id)
+                            } else {
+                                repository.deleteTransaction(target.id)
+                            }
+                        }
                         reload()
                     }
                 }) { Text(stringResource(R.string.common_delete), color = Broke.colors.danger) }
@@ -226,13 +340,19 @@ fun TransactionsScreen(repository: BrokeRepository, modifier: Modifier = Modifie
 
 @Composable
 private fun TransactionList(
+    outbox: Outbox,
+    repository: BrokeRepository,
+    onSynced: () -> Unit,
     transactions: List<Transaction>,
     filter: KindFilter,
     onFilter: (KindFilter) -> Unit,
     wallets: List<Wallet>,
     wallet: Wallet?,
     onWallet: (Wallet?) -> Unit,
-    period: PeriodChoice,
+    categories: List<TransactionCategory>,
+    category: TransactionCategory?,
+    onCategory: (TransactionCategory?) -> Unit,
+    period: Period,
     onPickPeriod: () -> Unit,
     fromCache: Boolean,
     onNew: () -> Unit,
@@ -243,7 +363,8 @@ private fun TransactionList(
     val hide = LocalAppSettings.current.hideBalances
 
     // The server applies the filters; the list arrives ready to render.
-    val shown = transactions
+    // Both legs of a transfer read as one line, like the web's list.
+    val shown = foldTransfers(transactions)
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -262,6 +383,16 @@ private fun TransactionList(
 
         if (fromCache) {
             item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
+        }
+
+        item {
+            OutboxPanel(
+                outbox = outbox,
+                repository = repository,
+                wallets = wallets,
+                onSynced = onSynced,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
 
         item {
@@ -284,6 +415,26 @@ private fun TransactionList(
                 onSelect = onFilter,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        // Category only applies to income/expense, and only lists the ones that
+        // belong to the chosen kind — same rule as the web.
+        if (filter == KindFilter.Income || filter == KindFilter.Expense) {
+            item {
+                val ofKind = categories.filter { it.kind == filter.wire }
+                PickerField(
+                    label = stringResource(R.string.transactions_category),
+                    options = listOf<TransactionCategory?>(null) + ofKind,
+                    selected = category,
+                    optionLabel = {
+                        it?.let { c -> seedName(c.name, c.isSystem) }
+                            ?: stringResource(R.string.transactions_all_categories)
+                    },
+                    onSelect = onCategory,
+                    emptyLabel = stringResource(R.string.transactions_all_categories),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         item {
@@ -348,9 +499,9 @@ private fun TransactionList(
                         .background(colors.surfaceRaised)
                         .border(1.dp, colors.borderMuted, RoundedCornerShape(24.dp)),
                 ) {
-                    shown.forEachIndexed { index, tx ->
+                    shown.forEachIndexed { index, row ->
                         if (index > 0) HairLine()
-                        TransactionRow(tx, hide, onLongPress)
+                        TransactionRow(row.tx, row.toLeg, hide, onLongPress)
                     }
                 }
             }
@@ -360,18 +511,29 @@ private fun TransactionList(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TransactionRow(tx: Transaction, hide: Boolean, onLongPress: (Transaction) -> Unit) {
+private fun TransactionRow(
+    tx: Transaction,
+    /** The `transfer_in` leg, only on folded transfer rows. */
+    toLeg: Transaction?,
+    hide: Boolean,
+    onLongPress: (Transaction) -> Unit,
+) {
     val colors = Broke.colors
     // The web colours by kind, not by sign: income violet, transfer cyan,
     // expense rose.
     val (icon: ImageVector, tint: Color) = when (tx.kind) {
         "income" -> Icons.Outlined.CallReceived to colors.accent
         "transfer_in", "transfer_out" -> Icons.AutoMirrored.Outlined.CompareArrows to colors.cyan
+        // Apartado moves are information only: no money leaves the wallet, so
+        // they read neutral with an arrow instead of a signed amount.
+        "reserve", "release" -> Icons.Outlined.Savings to colors.fgMuted
         else -> Icons.Outlined.CallMade to colors.danger
     }
     val sign = when (tx.kind) {
         "income", "transfer_in" -> "+"
         "transfer_out" -> ""
+        "reserve" -> "→"
+        "release" -> "←"
         else -> "−"
     }
 
@@ -386,9 +548,16 @@ private fun TransactionRow(tx: Transaction, hide: Boolean, onLongPress: (Transac
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = tx.description?.takeIf { it.isNotBlank() }
-                    ?: tx.categoryName
-                    ?: kindLabel(tx.kind),
+                text = if (tx.isApartado) {
+                    stringResource(
+                        if (tx.kind == "reserve") R.string.transactions_reserved
+                        else R.string.transactions_released,
+                    ) + " · " + tx.description.orEmpty()
+                } else {
+                    tx.description?.takeIf { it.isNotBlank() }
+                        ?: tx.categoryName?.let { seedName(it) }
+                        ?: kindLabel(tx.kind)
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 color = colors.fg,
             )
@@ -396,8 +565,13 @@ private fun TransactionRow(tx: Transaction, hide: Boolean, onLongPress: (Transac
                 text = listOfNotNull(
                     // ISO date, same as the web's list.
                     tx.occurredAt.take(10),
-                    transactionTime(tx),
-                    tx.walletName.takeIf { it.isNotBlank() },
+                    transactionTimeLabel(tx),
+                    // A folded transfer names both ends instead of one wallet.
+                    if (toLeg != null) {
+                        "${tx.walletName} → ${toLeg.walletName}"
+                    } else {
+                        tx.walletName.takeIf { it.isNotBlank() }
+                    },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.fgSubtle,
@@ -405,7 +579,17 @@ private fun TransactionRow(tx: Transaction, hide: Boolean, onLongPress: (Transac
         }
         Spacer(Modifier.width(10.dp))
         Text(
-            text = sign + maskIfHidden(formatMoney(tx.amountCents), hide),
+            // A folded transfer carries no sign — nothing entered or left the
+            // books. Both amounts show only when the legs differ, which happens
+            // across currencies.
+            text = when {
+                toLeg == null -> sign + maskIfHidden(formatMoney(tx.amountCents), hide)
+                toLeg.amountCents != tx.amountCents -> maskIfHidden(
+                    formatMoney(tx.amountCents),
+                    hide,
+                ) + " → " + maskIfHidden(formatMoney(toLeg.amountCents), hide)
+                else -> maskIfHidden(formatMoney(tx.amountCents), hide)
+            },
             style = MaterialTheme.typography.labelLarge,
             color = tint,
         )
@@ -426,24 +610,107 @@ private fun kindLabel(kind: String): String = when (kind) {
  * `transactionTime`. Honours the 12/24 h setting.
  */
 @Composable
-private fun transactionTime(tx: Transaction): String? {
-    val clock24 = LocalAppSettings.current.clock24
-    val pattern = if (clock24) "HH:mm" else "h:mm a"
+fun transactionTimeLabel(tx: Transaction): String? {
+    val settings = LocalAppSettings.current
+    val pattern = if (settings.clock24) "HH:mm" else "h:mm a"
     val formatter = remember(pattern) { DateTimeFormatter.ofPattern(pattern, Locale.US) }
 
     tx.occurredTime?.takeIf { it.isNotBlank() }?.let { own ->
         return runCatching { LocalTime.parse(own).format(formatter) }.getOrNull() ?: own
     }
 
+    // Falls back to the insert stamp, converted to the timezone chosen in the
+    // app's settings — not the device's, which is what the web does too.
     val created = tx.createdAt ?: return null
     return runCatching {
         LocalDateTime
             .parse(created.replace(" ", "T"))
             .atZone(ZoneId.of("UTC"))
-            .withZoneSameInstant(ZoneId.systemDefault())
+            .withZoneSameInstant(ZoneId.of(settings.timezone))
             .format(formatter)
     }.getOrNull()
 }
 
 @Composable
 private fun allWalletsLabel(): String = stringResource(R.string.transactions_all_wallets)
+
+/**
+ * Edit an apartado move straight from the history. The row's id is the goal
+ * contribution's, negated; the sign of the amount is what tells reserve from
+ * release, so it is rebuilt from the row's kind rather than typed.
+ */
+@Composable
+private fun ApartadoEditSheet(
+    repository: BrokeRepository,
+    transaction: Transaction,
+    onDismiss: () -> Unit,
+    onSaved: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var amount by remember {
+        mutableStateOf(formatMoney(transaction.amountCents, withSymbol = false))
+    }
+    var date by remember {
+        mutableStateOf(
+            runCatching { LocalDate.parse(transaction.occurredAt.take(10)) }
+                .getOrDefault(LocalDate.now()),
+        )
+    }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val genericError = stringResource(R.string.common_error)
+    val offlineError = stringResource(R.string.offline_banner)
+
+    val cents = parseAmountToCents(amount)
+    val canSave = !busy && cents != null && cents > 0
+
+    FormSheet(
+        title = stringResource(R.string.transactions_apartado_edit_title),
+        busy = busy,
+        error = error,
+        canSave = canSave,
+        onDismiss = onDismiss,
+        onSave = {
+            val amountCents = cents ?: return@FormSheet
+            busy = true
+            error = null
+            scope.launch {
+                runCatching {
+                    repository.updateGoalContribution(
+                        id = -transaction.id,
+                        amountCents = if (transaction.kind == "release") -amountCents else amountCents,
+                        occurredAt = date.toString(),
+                    )
+                }
+                    .onSuccess { onSaved() }
+                    .onFailure {
+                        error = if (it is NetworkException) offlineError else it.message ?: genericError
+                        busy = false
+                    }
+            }
+        },
+    ) {
+        Text(
+            stringResource(
+                if (transaction.kind == "reserve") R.string.transactions_reserved
+                else R.string.transactions_released,
+            ) + " · " + transaction.description.orEmpty(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Broke.colors.fgMuted,
+        )
+        OutlinedTextField(
+            value = amount,
+            onValueChange = { amount = it; error = null },
+            label = { Text(stringResource(R.string.transactions_amount)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        DateField(
+            label = stringResource(R.string.transactions_date),
+            value = date,
+            onChange = { date = it },
+        )
+    }
+}

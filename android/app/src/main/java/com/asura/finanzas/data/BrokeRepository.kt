@@ -1,7 +1,10 @@
 package com.asura.finanzas.data
 
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -21,6 +24,7 @@ class BrokeRepository(
     private val rpc: RpcClient,
     private val cache: JsonCache,
     private val cookieJar: SessionCookieJar,
+    private val outbox: Outbox,
 ) {
 
     // ---- session ----
@@ -43,6 +47,19 @@ class BrokeRepository(
         return rpc.json.decodeFromJsonElement(User.serializer(), element)
     }
 
+    /**
+     * Trade a Google ID token for a session. The worker verifies the token with
+     * Google and checks it was issued for this project before honouring it, so
+     * nothing here is trusted on the phone's word.
+     */
+    suspend fun loginWithGoogle(idToken: String): User {
+        val element = rpc.post(
+            "/api/auth/google/token",
+            buildJsonObject { put("idToken", idToken) },
+        )
+        return rpc.json.decodeFromJsonElement(User.serializer(), element)
+    }
+
     suspend fun me(): User {
         val element = rpc.get("/api/auth/me")
         return rpc.json.decodeFromJsonElement(User.serializer(), element)
@@ -52,6 +69,7 @@ class BrokeRepository(
         runCatching { rpc.post("/api/auth/logout", JsonObject(emptyMap())) }
         cookieJar.clear()
         cache.clear()
+        outbox.clear()
     }
 
     /** Revokes every other session server-side; this device keeps its own. */
@@ -80,6 +98,27 @@ class BrokeRepository(
     }
 
     fun hasStoredSession(): Boolean = cookieJar.hasSession()
+
+    /** Raw account setting; null when unset. */
+    suspend fun getSetting(key: String): String? = runCatching {
+        val element = rpc.call("get_setting", buildJsonObject { put("key", key) })
+        (element as? JsonPrimitive)?.takeIf { !it.isString || it.content.isNotEmpty() }?.content
+    }.getOrNull()
+
+    suspend fun setSetting(key: String, value: String) {
+        rpc.call("set_setting", buildJsonObject { put("key", key); put("value", value) })
+    }
+
+    /**
+     * The release version currently deployed, from the same `version.json` the
+     * web uses to spot a new build. Null when it cannot be read — an update
+     * check is never worth surfacing an error for.
+     */
+    suspend fun deployedAppVersion(): String? = runCatching {
+        (rpc.get("/version.json") as? JsonObject)
+            ?.get("appVersion")
+            ?.let { rpc.json.decodeFromJsonElement(String.serializer(), it) }
+    }.getOrNull()
 
     // ---- reads ----
 
@@ -111,6 +150,49 @@ class BrokeRepository(
                 buildJsonObject { put("includeClosed", includeClosed) },
             )
         }
+
+    /**
+     * What a plan would grow into. Stateless: nothing is read from or written to
+     * the account, and the compounding happens in Rust.
+     */
+    suspend fun simulateInvestment(
+        initialCents: Long,
+        contributionCents: Long,
+        cadence: String,
+        annualRateBps: Long,
+        months: Int,
+    ): SimResult = rpc.json.decodeFromJsonElement(
+        SimResult.serializer(),
+        rpc.call(
+            "simulate_investment",
+            buildJsonObject {
+                put("initialCents", initialCents)
+                put("contributionCents", contributionCents)
+                put("cadence", cadence)
+                put("annualRateBps", annualRateBps)
+                put("months", months)
+            },
+        ),
+    )
+
+    /** The monthly contribution that reaches a target in a given time. */
+    suspend fun solveContribution(
+        initialCents: Long,
+        targetCents: Long,
+        annualRateBps: Long,
+        months: Int,
+    ): SolveResult = rpc.json.decodeFromJsonElement(
+        SolveResult.serializer(),
+        rpc.call(
+            "solve_contribution",
+            buildJsonObject {
+                put("initialCents", initialCents)
+                put("targetCents", targetCents)
+                put("annualRateBps", annualRateBps)
+                put("months", months)
+            },
+        ),
+    )
 
     suspend fun investmentCatalog(): List<CatalogItem> =
         rpc.json.decodeFromJsonElement(
@@ -149,6 +231,82 @@ class BrokeRepository(
             InvestmentDetail.serializer(),
             rpc.call("get_investment_detail", buildJsonObject { put("id", id) }),
         )
+
+    /**
+     * Edit an existing investment. The calculator and its params travel too,
+     * because changing the rate of a CETES is a legitimate edit — the server
+     * revalues from them.
+     */
+    suspend fun updateInvestment(
+        id: Long,
+        name: String,
+        currencyCode: String,
+        principalCents: Long,
+        startDate: String,
+        paramsJson: String,
+        linkedWalletId: Long?,
+        notes: String?,
+    ) {
+        rpc.call(
+            "update_investment",
+            buildJsonObject {
+                put("id", id)
+                put("name", name.trim())
+                put("currencyCode", currencyCode)
+                put("principalCents", principalCents)
+                put("startDate", startDate)
+                put("paramsJson", paramsJson)
+                linkedWalletId?.let { put("linkedWalletId", it) }
+                notes?.takeIf { it.isNotBlank() }?.let { put("notes", it) }
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    /** One movement with the wallet leg the list shape does not carry. */
+    suspend fun investmentMovement(id: Long): MovementDetail =
+        rpc.json.decodeFromJsonElement(
+            MovementDetail.serializer(),
+            rpc.call("get_investment_movement", buildJsonObject { put("id", id) }),
+        )
+
+    /**
+     * The same movement addressed by its wallet transfer leg, which is all the
+     * transactions list knows about it.
+     */
+    suspend fun investmentMovementByTransaction(transactionId: Long): MovementDetail =
+        rpc.json.decodeFromJsonElement(
+            MovementDetail.serializer(),
+            rpc.call(
+                "get_investment_movement",
+                buildJsonObject { put("transactionId", transactionId) },
+            ),
+        )
+
+    suspend fun updateInvestmentMovement(
+        id: Long,
+        kind: String,
+        amountCents: Long,
+        occurredAt: String,
+        walletId: Long?,
+    ) {
+        rpc.call(
+            "update_investment_movement",
+            buildJsonObject {
+                put("id", id)
+                put("kind", kind)
+                put("amountCents", amountCents)
+                put("occurredAt", occurredAt)
+                walletId?.let { put("walletId", it) }
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun deleteInvestmentMovement(id: Long) {
+        rpc.call("delete_investment_movement", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
 
     suspend fun addInvestmentMovement(
         investmentId: Long,
@@ -220,11 +378,16 @@ class BrokeRepository(
         limit: Int = 100,
         walletId: Long? = null,
         kind: String? = null,
+        categoryId: Long? = null,
         period: JsonObject? = null,
     ): Synced<List<Transaction>> {
         // Only the unfiltered list is worth keeping for offline: a cache keyed
         // by every filter combination would mostly be misses.
-        val key = if (walletId == null && kind == null && period == null) "transactions" else null
+        val key = if (walletId == null && kind == null && categoryId == null && period == null) {
+            "transactions"
+        } else {
+            null
+        }
         return cached(key, ListSerializer(Transaction.serializer())) {
             rpc.call(
                 "list_transactions",
@@ -235,6 +398,7 @@ class BrokeRepository(
                         put("offset", 0)
                         walletId?.let { put("walletId", it) }
                         kind?.let { put("kind", it) }
+                        categoryId?.let { put("categoryId", it) }
                         period?.let { put("period", it) }
                     }
                 },
@@ -248,12 +412,30 @@ class BrokeRepository(
             rpc.call("list_transaction_categories", buildJsonObject { put("kind", kind) }),
         )
 
+    /**
+     * Every category a movement may already point at, including the reserved
+     * ones the pickers hide (goal contributions, MSI instalments). Mirrors the
+     * web's `listFilterCategories`: a filter has to be able to name a category
+     * that capture forms will not offer.
+     */
+    suspend fun filterCategories(): List<TransactionCategory> =
+        rpc.json.decodeFromJsonElement(
+            ListSerializer(TransactionCategory.serializer()),
+            rpc.call(
+                "list_transaction_categories",
+                buildJsonObject { put("includeReserved", true) },
+            ),
+        )
+
     // ---- writes ----
     //
-    // The three capture commands accept a clientId the server uses for
-    // idempotency (unique index on transactions.client_id), so a retry after a
-    // lost response can never double-post. That is what an offline outbox will
-    // build on; today it already makes a flaky-network retry safe.
+    // The three capture commands go through the outbox: it sends them, and only
+    // queues when the request never reached the server. Each carries a clientId
+    // the server uses for idempotency (unique index on transactions.client_id),
+    // so replaying after a dropped response can never double-post.
+    //
+    // They return true when the movement was queued rather than sent, which is
+    // what the form tells the user.
 
     suspend fun addIncome(
         walletId: Long,
@@ -262,8 +444,9 @@ class BrokeRepository(
         categoryId: Long?,
         description: String?,
         occurredTime: String?,
-        clientId: String,
-    ) = addSimple("add_income", walletId, amountCents, occurredAt, categoryId, description, occurredTime, clientId)
+    ): Boolean = addSimple(
+        "add_income", walletId, amountCents, occurredAt, categoryId, description, occurredTime,
+    )
 
     suspend fun addExpense(
         walletId: Long,
@@ -272,8 +455,9 @@ class BrokeRepository(
         categoryId: Long?,
         description: String?,
         occurredTime: String?,
-        clientId: String,
-    ) = addSimple("add_expense", walletId, amountCents, occurredAt, categoryId, description, occurredTime, clientId)
+    ): Boolean = addSimple(
+        "add_expense", walletId, amountCents, occurredAt, categoryId, description, occurredTime,
+    )
 
     private suspend fun addSimple(
         command: String,
@@ -283,9 +467,8 @@ class BrokeRepository(
         categoryId: Long?,
         description: String?,
         occurredTime: String?,
-        clientId: String,
-    ) {
-        rpc.call(
+    ): Boolean {
+        val queued = outbox.submitOrQueue(
             command,
             buildJsonObject {
                 put("walletId", walletId)
@@ -294,10 +477,10 @@ class BrokeRepository(
                 categoryId?.let { put("categoryId", it) }
                 description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
                 occurredTime?.let { put("occurredTime", it) }
-                put("clientId", clientId)
             },
         )
-        cache.invalidateReads()
+        if (!queued) cache.invalidateReads()
+        return queued
     }
 
     suspend fun addTransfer(
@@ -308,9 +491,8 @@ class BrokeRepository(
         occurredAt: String,
         description: String?,
         occurredTime: String?,
-        clientId: String,
-    ) {
-        rpc.call(
+    ): Boolean {
+        val queued = outbox.submitOrQueue(
             "add_transfer",
             buildJsonObject {
                 put("fromWalletId", fromWalletId)
@@ -320,16 +502,24 @@ class BrokeRepository(
                 put("occurredAt", occurredAt)
                 description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
                 occurredTime?.let { put("occurredTime", it) }
-                put("clientId", clientId)
             },
         )
-        cache.invalidateReads()
+        if (!queued) cache.invalidateReads()
+        return queued
+    }
+
+    /** Drain whatever the outbox is still holding; returns how many synced. */
+    suspend fun flushOutbox(): Int {
+        val synced = outbox.flush()
+        if (synced > 0) cache.invalidateReads()
+        return synced
     }
 
     /** Totals for a filtered slice; only meaningful for income or expense. */
     suspend fun transactionTotals(
         kind: String,
         walletId: Long?,
+        categoryId: Long?,
         period: JsonObject?,
     ): TxTotals = rpc.json.decodeFromJsonElement(
         TxTotals.serializer(),
@@ -339,6 +529,7 @@ class BrokeRepository(
                 putJsonObject("filter") {
                     put("kind", kind)
                     walletId?.let { put("walletId", it) }
+                    categoryId?.let { put("categoryId", it) }
                     period?.let { put("period", it) }
                 }
             },
@@ -369,6 +560,59 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
+    /**
+     * The movements behind one breakdown slice, over the same period the widget
+     * is showing. `categoryId` null means the "uncategorized" slice.
+     */
+    suspend fun categoryTransactions(
+        kind: String,
+        categoryId: Long?,
+        period: JsonObject,
+    ): List<Transaction> = rpc.json.decodeFromJsonElement(
+        ListSerializer(Transaction.serializer()),
+        rpc.call(
+            "get_category_transactions",
+            buildJsonObject {
+                put("kind", kind)
+                categoryId?.let { put("categoryId", it) }
+                put("period", period)
+            },
+        ),
+    )
+
+    /** Reads a whole transfer from any one of its two leg ids. */
+    suspend fun getTransfer(id: Long): TransferDetail = rpc.json.decodeFromJsonElement(
+        TransferDetail.serializer(),
+        rpc.call("get_transfer", buildJsonObject { put("id", id) }),
+    )
+
+    /** Edits both legs at once; the worker keeps them in one atomic batch. */
+    suspend fun updateTransfer(
+        id: Long,
+        fromWalletId: Long,
+        toWalletId: Long,
+        amountFromCents: Long,
+        amountToCents: Long,
+        description: String?,
+        occurredAt: String,
+        occurredTime: String?,
+    ) {
+        rpc.call(
+            "update_transfer",
+            buildJsonObject {
+                put("id", id)
+                put("fromWalletId", fromWalletId)
+                put("toWalletId", toWalletId)
+                put("amountFromCents", amountFromCents)
+                put("amountToCents", amountToCents)
+                description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
+                put("occurredAt", occurredAt)
+                occurredTime?.let { put("occurredTime", it) }
+            },
+        )
+        cache.invalidateReads()
+    }
+
     suspend fun deleteTransaction(id: Long) {
         rpc.call("delete_transaction", buildJsonObject { put("id", id) })
         cache.invalidateReads()
@@ -390,6 +634,23 @@ class BrokeRepository(
     /** Ask the server to refresh rates from its market sources. */
     suspend fun fetchExchangeRates() {
         rpc.call("fetch_exchange_rates")
+        cache.invalidateReads()
+    }
+
+    /**
+     * Pin a rate by hand. The worker stores it against this user, where it wins
+     * over the auto-fetched global one — for this account only. Micros are built
+     * here from the typed decimal only to shape the request; nothing about a
+     * balance is computed on the phone.
+     */
+    suspend fun setExchangeRate(currencyCode: String, rateToMxnMicros: Long) {
+        rpc.call(
+            "set_exchange_rate",
+            buildJsonObject {
+                put("currencyCode", currencyCode)
+                put("rateToMxnMicros", rateToMxnMicros)
+            },
+        )
         cache.invalidateReads()
     }
 
@@ -441,6 +702,56 @@ class BrokeRepository(
             rpc.call("get_credit_card_summary", buildJsonObject { put("walletId", walletId) }),
         )
 
+    /**
+     * The schedule an MSI plan would produce, without writing anything — the
+     * live "≈ $X/mes · primer cargo el…" line under the form.
+     */
+    suspend fun previewMsiPlan(
+        walletId: Long,
+        totalCents: Long,
+        months: Int,
+        purchasedAt: String?,
+    ): MsiSchedulePreview = rpc.json.decodeFromJsonElement(
+        MsiSchedulePreview.serializer(),
+        rpc.call(
+            "preview_msi_plan",
+            buildJsonObject {
+                put("walletId", walletId)
+                put("description", "")
+                put("totalCents", totalCents)
+                put("months", months)
+                purchasedAt?.let { put("purchasedAt", it) }
+            },
+        ),
+    )
+
+    /** Creates the plan and returns the same schedule the preview showed. */
+    suspend fun createMsiPlan(
+        walletId: Long,
+        description: String,
+        totalCents: Long,
+        months: Int,
+        purchasedAt: String?,
+        categoryId: Long?,
+    ): MsiSchedulePreview {
+        val result = rpc.json.decodeFromJsonElement(
+            MsiSchedulePreview.serializer(),
+            rpc.call(
+                "create_msi_plan",
+                buildJsonObject {
+                    put("walletId", walletId)
+                    put("description", description.trim())
+                    put("totalCents", totalCents)
+                    put("months", months)
+                    purchasedAt?.let { put("purchasedAt", it) }
+                    categoryId?.let { put("categoryId", it) }
+                },
+            ),
+        )
+        cache.invalidateReads()
+        return result
+    }
+
     suspend fun deleteMsiPlan(id: Long) {
         rpc.call("delete_msi_plan", buildJsonObject { put("id", id) })
         cache.invalidateReads()
@@ -456,6 +767,26 @@ class BrokeRepository(
 
     suspend fun deleteWallet(id: Long) {
         rpc.call("delete_wallet", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    // ---- ordering ----
+    //
+    // Each of these takes the full list of ids in their new order and the worker
+    // rewrites sort_order in one batch, exactly as the web sends it on drop.
+
+    suspend fun reorderWallets(ids: List<Long>) = reorder("reorder_wallets", ids)
+
+    suspend fun reorderTransactionCategories(ids: List<Long>) =
+        reorder("reorder_transaction_categories", ids)
+
+    suspend fun reorderSavingsGoals(ids: List<Long>) = reorder("reorder_savings_goals", ids)
+
+    private suspend fun reorder(command: String, ids: List<Long>) {
+        rpc.call(
+            command,
+            buildJsonObject { put("ids", JsonArray(ids.map { JsonPrimitive(it) })) },
+        )
         cache.invalidateReads()
     }
 
@@ -498,6 +829,56 @@ class BrokeRepository(
 
     suspend fun deleteGoal(id: Long) {
         rpc.call("delete_savings_goal", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    /**
+     * Spend a purchase goal: the apartado is released and the money leaves the
+     * wallet as an expense. The server does all of it in one batch.
+     */
+    suspend fun useGoal(id: Long) {
+        rpc.call("use_savings_goal", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    /**
+     * Graduate a fund goal into its own wallet, moving the reserved money there
+     * and closing the goal. Style is optional: without it the new wallet
+     * inherits the goal's own name and colour.
+     */
+    suspend fun convertGoalToWallet(
+        id: Long,
+        name: String?,
+        color: String?,
+        categoryId: Long?,
+    ) {
+        rpc.call(
+            "convert_goal_to_wallet",
+            buildJsonObject {
+                put("id", id)
+                name?.takeIf { it.isNotBlank() }?.let { put("name", it) }
+                color?.let { put("color", it) }
+                categoryId?.let { put("categoryId", it) }
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    /** Edit an apartado move from the movements history. */
+    suspend fun updateGoalContribution(id: Long, amountCents: Long, occurredAt: String) {
+        rpc.call(
+            "update_goal_contribution",
+            buildJsonObject {
+                put("id", id)
+                put("amountCents", amountCents)
+                put("occurredAt", occurredAt)
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun deleteGoalContribution(id: Long) {
+        rpc.call("delete_goal_contribution", buildJsonObject { put("id", id) })
         cache.invalidateReads()
     }
 

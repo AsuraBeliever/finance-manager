@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.asura.finanzas.BuildConfig
 import com.asura.finanzas.R
 import com.asura.finanzas.data.AppPreferences
+import com.asura.finanzas.data.AppearanceSync
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.SessionInfo
 import com.asura.finanzas.data.ThemeChoice
@@ -51,6 +52,7 @@ import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.SettingRow
+import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
 
@@ -64,6 +66,7 @@ private enum class Locale(val label: String, val tag: String) {
 fun SettingsScreen(
     repository: BrokeRepository,
     preferences: AppPreferences,
+    appearanceSync: AppearanceSync,
     onSignedOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -71,6 +74,7 @@ fun SettingsScreen(
     val settings = LocalAppSettings.current
     val scope = rememberCoroutineScope()
     var showCurrencies by remember { mutableStateOf(false) }
+    var showAppearance by remember { mutableStateOf(false) }
     var showWhatsNew by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
     var reloadSessions by remember { mutableStateOf(0) }
@@ -89,6 +93,15 @@ fun SettingsScreen(
         (listOf(settings.timezone, java.util.TimeZone.getDefault().id) +
             java.util.TimeZone.getAvailableIDs().filter { it.contains('/') }.sorted())
             .distinct()
+    }
+
+    if (showAppearance) {
+        AppearanceScreen(
+            sync = appearanceSync,
+            onBack = { showAppearance = false },
+            modifier = modifier,
+        )
+        return
     }
 
     if (showCurrencies) {
@@ -224,6 +237,20 @@ fun SettingsScreen(
             }
         }
 
+        GlassCard(Modifier.fillMaxWidth().clickable { showAppearance = true }) {
+            Text(
+                stringResource(R.string.appearance_manage),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.appearance_settings_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+            )
+        }
+
         GlassCard(Modifier.fillMaxWidth().clickable { onOpenCurrencies() }) {
             Text(
                 stringResource(R.string.settings_currencies),
@@ -249,7 +276,7 @@ fun SettingsScreen(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     walletCategories.forEach { category ->
                         Text(
-                            category.name,
+                            seedName(category.name, category.isSystem).orEmpty(),
                             style = MaterialTheme.typography.labelLarge,
                             color = colors.fgMuted,
                             modifier = Modifier

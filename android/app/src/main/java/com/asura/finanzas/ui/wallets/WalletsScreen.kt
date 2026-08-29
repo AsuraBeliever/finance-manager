@@ -17,7 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
@@ -32,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,7 +41,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
@@ -56,6 +60,8 @@ import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.PrimaryButton
+import com.asura.finanzas.ui.components.ReorderHandle
+import com.asura.finanzas.ui.components.rememberReorderState
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatMoney
@@ -107,6 +113,8 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
             onNew = { creating = true },
             onOpen = { openId = it.id },
             onLongPress = { actionsFor = it },
+            // Only top-level wallets reorder; apartados follow their parent.
+            onReorder = { ids -> scope.launch { runCatching { repository.reorderWallets(ids) } } },
             modifier = modifier,
         )
     }
@@ -194,6 +202,7 @@ private fun WalletList(
     onNew: () -> Unit,
     onOpen: (Wallet) -> Unit,
     onLongPress: (Wallet) -> Unit,
+    onReorder: (List<Long>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val hide = LocalAppSettings.current.hideBalances
@@ -201,10 +210,30 @@ private fun WalletList(
     // Apartados hang off a parent wallet; listing them at the top level would
     // double-count what the user sees, so they nest under their parent.
     val visible = wallets.filter { !it.isArchived }
-    val roots = visible.filter { it.parentWalletId == null }
     val pockets = visible.filter { it.parentWalletId != null }.groupBy { it.parentWalletId }
 
+    // Dragging rewrites this list as the finger moves so the rows shuffle live;
+    // the server is told once, on drop. Rebuilt whenever a fresh load arrives.
+    val roots = remember(wallets) {
+        mutableStateListOf<Wallet>().apply {
+            addAll(visible.filter { it.parentWalletId == null })
+        }
+    }
+
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    // Header, and the offline notice when shown, sit above the draggable rows.
+    val firstRow = 1 + (if (fromCache) 1 else 0)
+    val reorderState = rememberReorderState(
+        listState = listState,
+        scope = scope,
+        range = { firstRow until firstRow + roots.size },
+        onMove = { from, to -> roots.add(to, roots.removeAt(from)) },
+        onDrop = { onReorder(roots.map { it.id }) },
+    )
+
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -232,9 +261,24 @@ private fun WalletList(
             }
         }
 
-        items(roots, key = { it.id }) { wallet ->
-            Column {
-                WalletCard(wallet, hide, onOpen, onLongPress)
+        itemsIndexed(roots, key = { _, it -> it.id }) { index, wallet ->
+            val lazyIndex = firstRow + index
+            val dragging = reorderState.draggingIndex == lazyIndex
+            Column(
+                Modifier
+                    .zIndex(if (dragging) 1f else 0f)
+                    .graphicsLayer { translationY = if (dragging) reorderState.offsetY else 0f },
+            ) {
+                WalletCard(
+                    wallet, hide, onOpen, onLongPress,
+                    handle = {
+                        ReorderHandle(
+                            state = reorderState,
+                            key = wallet.id,
+                            index = { firstRow + roots.indexOfFirst { it.id == wallet.id } },
+                        )
+                    },
+                )
                 val children = pockets[wallet.id].orEmpty()
                 if (children.isNotEmpty()) {
                     Spacer(Modifier.height(10.dp))
@@ -263,6 +307,8 @@ private fun WalletCard(
     hide: Boolean,
     onOpen: (Wallet) -> Unit,
     onLongPress: (Wallet) -> Unit,
+    /** The drag grip, drawn in the corner; a tap anywhere else still opens. */
+    handle: @Composable () -> Unit = {},
 ) {
     val colors = Broke.colors
     val skin = walletSkin(wallet.skin, wallet.color, wallet.categoryName)
@@ -302,6 +348,8 @@ private fun WalletCard(
                     style = MaterialTheme.typography.labelLarge,
                     color = skin.fg.copy(alpha = 0.85f),
                 )
+                Spacer(Modifier.width(8.dp))
+                handle()
             }
 
             Spacer(Modifier.weight(1f))

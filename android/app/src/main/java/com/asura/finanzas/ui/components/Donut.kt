@@ -1,6 +1,7 @@
 package com.asura.finanzas.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,8 @@ fun DonutChart(
     centerLabel: String,
     centerValue: String,
     modifier: Modifier = Modifier,
+    /** Tapping a legend row drills into that slice; null leaves it read-only. */
+    onSliceClick: ((Int) -> Unit)? = null,
 ) {
     val colors = Broke.colors
     val total = slices.sumOf { it.valueCents.coerceAtLeast(0) }
@@ -98,9 +101,18 @@ fun DonutChart(
 
         Spacer(Modifier.height(12.dp))
 
-        slices.forEach { slice ->
+        slices.forEachIndexed { index, slice ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (onSliceClick != null) {
+                            Modifier.clickable { onSliceClick(index) }
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .padding(vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Dot(slice.color)

@@ -1,6 +1,8 @@
 package com.asura.finanzas.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +49,9 @@ fun <T> SegmentedControl(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(colors.surfaceOverlay)
+            // Long labels would otherwise be squeezed until each one wrapped
+            // down several lines, blowing the pill up into a tall block.
+            .horizontalScroll(rememberScrollState())
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -81,6 +86,8 @@ fun <T> SegmentedControl(
                     style = MaterialTheme.typography.labelLarge,
                     color = if (isSelected) colors.accent else colors.fgMuted,
                     textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
                 )
             }
         }

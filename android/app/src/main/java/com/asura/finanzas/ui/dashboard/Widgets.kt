@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.Budget
 import com.asura.finanzas.data.CategoryBreakdown
+import com.asura.finanzas.data.CategorySlice
 import com.asura.finanzas.data.DashboardSummary
 import com.asura.finanzas.data.SavingsGoal
 import com.asura.finanzas.data.Subscription
@@ -30,6 +31,7 @@ import com.asura.finanzas.ui.components.RingGauge
 import com.asura.finanzas.ui.components.chartColor
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
+import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
 
@@ -56,14 +58,26 @@ private fun WidgetHeader(title: String, onViewAll: (() -> Unit)? = null) {
 
 /** Spending vs income split by category — the web's BreakdownWidget. */
 @Composable
-fun BreakdownWidget(title: String, breakdown: CategoryBreakdown, hide: Boolean) {
+fun BreakdownWidget(
+    title: String,
+    breakdown: CategoryBreakdown,
+    hide: Boolean,
+    /** Tapping a slice drills into the movements behind it. */
+    onSlice: ((CategorySlice) -> Unit)? = null,
+) {
     GlassCard(Modifier.fillMaxWidth()) {
         WidgetHeader(title)
         Spacer(Modifier.height(8.dp))
         DonutChart(
             slices = breakdown.slices.mapIndexed { index, slice ->
                 DonutSlice(
-                    label = slice.name.ifBlank { stringResource(R.string.dashboard_uncategorized) },
+                    // The worker labels the null-category slice "Sin categoría"
+                    // whatever the locale, so that bucket is named here instead.
+                    label = if (slice.categoryId == null) {
+                        stringResource(R.string.dashboard_uncategorized)
+                    } else {
+                        seedName(slice.name).orEmpty()
+                    },
                     valueCents = slice.mxnCents,
                     color = parseHexColor(slice.color) ?: chartColor(index),
                     formatted = maskIfHidden(formatMoney(slice.mxnCents), hide),
@@ -71,6 +85,9 @@ fun BreakdownWidget(title: String, breakdown: CategoryBreakdown, hide: Boolean) 
             },
             centerLabel = stringResource(R.string.dashboard_total),
             centerValue = maskIfHidden(formatMoney(breakdown.totalMxnCents), hide),
+            onSliceClick = onSlice?.let { handler ->
+                { index -> breakdown.slices.getOrNull(index)?.let(handler) }
+            },
         )
     }
 }

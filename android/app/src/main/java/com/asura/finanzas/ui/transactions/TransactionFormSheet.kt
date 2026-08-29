@@ -19,33 +19,42 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
+import com.asura.finanzas.data.MsiSchedulePreview
 import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.TransactionCategory
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.components.TimeField
 import com.asura.finanzas.ui.parseAmountToCents
+import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.wallets.MsiPreviewLines
+import com.asura.finanzas.ui.wallets.MsiSavedInfo
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.util.UUID
 
 enum class TxKind { Income, Expense, Transfer }
 
@@ -76,9 +85,23 @@ fun TransactionFormSheet(
     var category by remember { mutableStateOf<TransactionCategory?>(null) }
     var description by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(LocalDate.now()) }
+    // Optional, like the web: a movement without a time falls back to its
+    // createdAt rendered in the chosen timezone.
+    var time by remember { mutableStateOf<String?>(null) }
+    // A new expense on a configured credit card can be an MSI purchase: instead
+    // of one expense the worker creates a plan and each instalment posts itself
+    // on its own statement. Edits never convert to or from MSI.
+    var msiEnabled by remember { mutableStateOf(false) }
+    var msiMonths by remember { mutableStateOf("12") }
+    var savedMsi by remember { mutableStateOf<MsiSchedulePreview?>(null) }
+    var queued by remember { mutableStateOf(false) }
     var categories by remember { mutableStateOf<List<TransactionCategory>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+
+    val offlineError = stringResource(R.string.offline_banner)
+    val needsDescription = stringResource(R.string.credit_msi_needs_description)
+    val invalidMonths = stringResource(R.string.credit_msi_invalid_months)
 
     // Income and expense have separate category sets, same as the web form.
     LaunchedEffect(kind) {
@@ -90,6 +113,11 @@ fun TransactionFormSheet(
             runCatching { repository.transactionCategories(wanted) }.getOrDefault(emptyList())
         }
     }
+
+    val isCreditWallet = wallet?.creditCutDay != null
+    val msiActive = kind == TxKind.Expense && isCreditWallet && msiEnabled
+    val msiMonthsValue = msiMonths.trim().toIntOrNull()
+    val msiMonthsValid = msiMonthsValue != null && msiMonthsValue in 2..60
 
     // A cross-currency transfer needs both legs; same currency mirrors the amount.
     val crossCurrency = kind == TxKind.Transfer &&
@@ -106,19 +134,32 @@ fun TransactionFormSheet(
         }
         busy = true
         error = null
-        val clientId = UUID.randomUUID().toString()
 
         scope.launch {
+            var wasQueued = false
             val result = runCatching {
                 when (kind) {
-                    TxKind.Income -> repository.addIncome(
+                    TxKind.Income -> wasQueued = repository.addIncome(
                         source.id, cents, date.toString(), category?.id,
-                        description, null, clientId,
+                        description, time,
                     )
-                    TxKind.Expense -> repository.addExpense(
-                        source.id, cents, date.toString(), category?.id,
-                        description, null, clientId,
-                    )
+                    TxKind.Expense -> if (msiActive) {
+                        if (description.isBlank()) error(needsDescription)
+                        if (!msiMonthsValid) error(invalidMonths)
+                        savedMsi = repository.createMsiPlan(
+                            walletId = source.id,
+                            description = description,
+                            totalCents = cents,
+                            months = msiMonthsValue ?: 0,
+                            purchasedAt = date.toString(),
+                            categoryId = category?.id,
+                        )
+                    } else {
+                        wasQueued = repository.addExpense(
+                            source.id, cents, date.toString(), category?.id,
+                            description, time,
+                        )
+                    }
                     TxKind.Transfer -> {
                         val target = toWallet ?: error("sin destino")
                         val received = if (crossCurrency) {
@@ -126,20 +167,30 @@ fun TransactionFormSheet(
                         } else {
                             cents
                         }
-                        repository.addTransfer(
+                        wasQueued = repository.addTransfer(
                             source.id, target.id, cents, received,
-                            date.toString(), description, null, clientId,
+                            date.toString(), description, time,
                         )
                     }
                 }
             }
             result
-                .onSuccess { onSaved() }
+                .onSuccess {
+                    when {
+                        savedMsi != null -> busy = false
+                        // Queued rather than sent: say so instead of closing
+                        // silently, or it looks like nothing happened.
+                        wasQueued -> queued = true
+                        else -> onSaved()
+                    }
+                }
                 .onFailure {
                     error = when (it) {
-                        is NetworkException -> null
+                        // Only a real refusal reaches here; a lost connection
+                        // was already absorbed into the outbox.
+                        is NetworkException -> offlineError
                         else -> it.message
-                    } ?: "Sin conexión"
+                    } ?: offlineError
                     busy = false
                 }
         }
@@ -147,6 +198,7 @@ fun TransactionFormSheet(
 
     val amountCents = parseAmountToCents(amount)
     val canSave = !busy &&
+        (!msiActive || (description.isNotBlank() && msiMonthsValid)) &&
         wallet != null &&
         amountCents != null && amountCents > 0 &&
         (kind != TxKind.Transfer || (toWallet != null && toWallet?.id != wallet?.id &&
@@ -228,7 +280,7 @@ fun TransactionFormSheet(
                     label = stringResource(R.string.transactions_category),
                     options = categories,
                     selected = category,
-                    optionLabel = { it.name },
+                    optionLabel = { seedName(it.name, it.isSystem).orEmpty() },
                     onSelect = { category = it },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -247,6 +299,46 @@ fun TransactionFormSheet(
                 value = date,
                 onChange = { date = it },
             )
+
+            TimeField(
+                label = stringResource(R.string.transactions_time),
+                value = time,
+                onChange = { time = it },
+            )
+
+            if (kind == TxKind.Expense && isCreditWallet) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.credit_msi_toggle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.fg,
+                        )
+                        Text(
+                            stringResource(R.string.credit_msi_toggle_hint),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.fgSubtle,
+                        )
+                    }
+                    Switch(checked = msiEnabled, onCheckedChange = { msiEnabled = it })
+                }
+            }
+
+            if (msiActive) {
+                OutlinedTextField(
+                    value = msiMonths,
+                    onValueChange = { msiMonths = it.filter { c -> c.isDigit() }.take(2) },
+                    label = { Text(stringResource(R.string.credit_msi_months)) },
+                    singleLine = true,
+                    isError = msiMonths.isNotBlank() && !msiMonthsValid,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                MsiPreview(repository, wallet, amountCents, msiMonthsValue, date, msiMonthsValid)
+            }
 
             error?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.danger)
@@ -267,6 +359,70 @@ fun TransactionFormSheet(
             }
         }
     }
+
+    if (queued) {
+        AlertDialog(
+            onDismissRequest = { queued = false; onSaved() },
+            containerColor = colors.surfaceOverlay,
+            title = { Text(stringResource(R.string.common_offline), color = colors.fg) },
+            text = {
+                Text(
+                    stringResource(R.string.offline_saved_pending),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.fgMuted,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { queued = false; onSaved() }) {
+                    Text(stringResource(R.string.common_close), color = colors.fgMuted)
+                }
+            },
+        )
+    }
+
+    // Saving an MSI plan ends on a confirmation: nothing visible happens at
+    // save time otherwise, since the instalments post later.
+    savedMsi?.let { schedule ->
+        AlertDialog(
+            onDismissRequest = { savedMsi = null; onSaved() },
+            containerColor = colors.surfaceOverlay,
+            title = { Text(stringResource(R.string.credit_msi_saved_title), color = colors.fg) },
+            text = {
+                Column {
+                    MsiSavedInfo(schedule, wallet?.currencyCode ?: "MXN")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { savedMsi = null; onSaved() }) {
+                    Text(stringResource(R.string.common_close), color = colors.fgMuted)
+                }
+            },
+        )
+    }
+}
+
+/** Live schedule under the MSI fields; a failed preview simply shows nothing. */
+@Composable
+private fun MsiPreview(
+    repository: BrokeRepository,
+    wallet: Wallet?,
+    totalCents: Long?,
+    months: Int?,
+    purchasedAt: LocalDate,
+    valid: Boolean,
+) {
+    val preview by produceState<MsiSchedulePreview?>(
+        null, wallet?.id, totalCents, months, purchasedAt, valid,
+    ) {
+        value = if (wallet == null || totalCents == null || totalCents <= 0 || !valid) {
+            null
+        } else {
+            runCatching {
+                repository.previewMsiPlan(wallet.id, totalCents, months!!, purchasedAt.toString())
+            }.getOrNull()
+        }
+    }
+    preview?.let { MsiPreviewLines(it, wallet?.currencyCode ?: "MXN") }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

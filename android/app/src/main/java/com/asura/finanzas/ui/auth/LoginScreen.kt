@@ -1,6 +1,11 @@
 package com.asura.finanzas.ui.auth
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -37,6 +43,9 @@ import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.ui.components.HeroAmount
+import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.settings.BrandMark
+import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
 
@@ -54,6 +63,31 @@ fun LoginScreen(
     val colors = Broke.colors
     val genericError = stringResource(R.string.common_error)
     val offlineError = stringResource(R.string.offline_banner)
+
+    val context = LocalContext.current
+    val googleError = stringResource(R.string.auth_google_error)
+
+    fun signInWithGoogle() {
+        if (busy) return
+        busy = true
+        error = null
+        scope.launch {
+            runCatching {
+                val idToken = requestGoogleIdToken(context)
+                repository.loginWithGoogle(idToken)
+            }
+                .onSuccess { onSignedIn() }
+                .onFailure {
+                    error = when (it) {
+                        // Dismissing the sheet is a choice, not a failure.
+                        is GoogleSignInCancelled -> null
+                        is NetworkException -> offlineError
+                        else -> it.message ?: googleError
+                    }
+                    busy = false
+                }
+        }
+    }
 
     fun submit() {
         if (busy || email.isBlank() || password.isBlank()) return
@@ -85,7 +119,11 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        HeroAmount(stringResource(R.string.app_name))
+        // The brand the user configured, falling back to the app's own name.
+        val appearance = LocalAppSettings.current.appearance
+        BrandMark(appearance, size = 40.dp)
+        Spacer(Modifier.height(8.dp))
+        HeroAmount(appearance.appName.ifBlank { stringResource(R.string.app_name) })
         Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(
@@ -94,7 +132,23 @@ fun LoginScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = colors.fgMuted,
         )
-        Spacer(Modifier.height(36.dp))
+        Spacer(Modifier.height(28.dp))
+
+        // Same order as the web: Google first, then the email form.
+        GoogleButton(enabled = !busy, onClick = { signInWithGoogle() })
+
+        Spacer(Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            HairLine(Modifier.weight(1f))
+            Text(
+                stringResource(R.string.auth_or),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            HairLine(Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(16.dp))
 
         OutlinedTextField(
             value = email,
@@ -165,6 +219,31 @@ fun LoginScreen(
                 registering = !registering
                 error = null
             },
+        )
+    }
+}
+
+/**
+ * Google's button, in its own white-on-light treatment rather than the app's
+ * palette — the brand guidelines require it, and the web renders it the same
+ * way for the same reason.
+ */
+@Composable
+private fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.White)
+            .clickable(enabled = enabled, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.auth_continue_with_google),
+            style = MaterialTheme.typography.labelLarge,
+            color = Color(0xFF1F2937),
         )
     }
 }

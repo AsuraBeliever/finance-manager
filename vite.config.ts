@@ -13,14 +13,18 @@ const host = process.env.TAURI_DEV_HOST;
 // WebKitGTK desktop shell, where service workers don't fire update events.
 const buildId = String(Date.now());
 
-// Emit dist/version.json holding the current build id.
+// Emit dist/version.json holding the current build id, plus the release version
+// itself. The web only needs the build id (any redeploy is an update), but the
+// Android app ships separately and can only compare semver: `appVersion` is the
+// same package.json version its APK is stamped with, so it tells the phone when
+// a newer build than the one installed exists.
 const emitVersion: Plugin = {
   name: "emit-version",
   generateBundle() {
     this.emitFile({
       type: "asset",
       fileName: "version.json",
-      source: JSON.stringify({ buildId }),
+      source: JSON.stringify({ buildId, appVersion }),
     });
   },
 };

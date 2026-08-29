@@ -17,11 +17,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.CatalogItem
+import com.asura.finanzas.data.InvestmentDetail
 import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
@@ -39,6 +41,12 @@ fun NewInvestmentSheet(
     repository: BrokeRepository,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
+    /**
+     * Null creates from the catalog; non-null edits in place. Editing keeps the
+     * calculator fixed — swapping it would revalue the whole history under
+     * different rules, which the web does not allow either.
+     */
+    existing: InvestmentDetail? = null,
 ) {
     val scope = rememberCoroutineScope()
     val colors = Broke.colors
@@ -46,9 +54,18 @@ fun NewInvestmentSheet(
     var catalog by remember { mutableStateOf<List<CatalogItem>>(emptyList()) }
     var wallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
     var choice by remember { mutableStateOf<CatalogItem?>(null) }
-    var name by remember { mutableStateOf("") }
-    var principal by remember { mutableStateOf("") }
-    var startDate by remember { mutableStateOf(LocalDate.now()) }
+    var name by remember { mutableStateOf(existing?.name.orEmpty()) }
+    var principal by remember {
+        mutableStateOf(
+            existing?.principalCents?.let { formatMoney(it, withSymbol = false) }.orEmpty(),
+        )
+    }
+    var startDate by remember {
+        mutableStateOf(
+            existing?.startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                ?: LocalDate.now(),
+        )
+    }
     var wallet by remember { mutableStateOf<Wallet?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -60,7 +77,12 @@ fun NewInvestmentSheet(
     LaunchedEffect(Unit) {
         catalog = runCatching { repository.investmentCatalog() }.getOrDefault(emptyList())
         wallets = runCatching { repository.wallets().value }.getOrDefault(emptyList())
-        choice = catalog.firstOrNull()
+        choice = if (existing == null) {
+            catalog.firstOrNull()
+        } else {
+            catalog.firstOrNull { it.calculator == existing.calculator }
+        }
+        wallet = wallets.firstOrNull { it.id == existing?.linkedWalletId }
     }
 
     // Names resolved in composition; the select callback is not a composable
@@ -68,30 +90,49 @@ fun NewInvestmentSheet(
     val names = catalog.associate { it.id to catalogName(it) }
 
     val cents = parseAmountToCents(principal)
-    val canSave = !busy && choice != null && name.isNotBlank() && cents != null && cents > 0
+    val canSave = !busy && (existing != null || choice != null) &&
+        name.isNotBlank() && cents != null && cents > 0
 
     FormSheet(
-        title = stringResource(R.string.investments_new_investment),
+        title = stringResource(
+            if (existing == null) R.string.investments_new_investment
+            else R.string.investments_edit_investment,
+        ),
         busy = busy,
         error = error,
         canSave = canSave,
         onDismiss = onDismiss,
         onSave = {
-            val item = choice ?: return@FormSheet
             busy = true
             error = null
             scope.launch {
                 runCatching {
-                    repository.createInvestment(
-                        calculator = item.calculator,
-                        name = name,
-                        currencyCode = wallet?.currencyCode ?: "MXN",
-                        principalCents = cents ?: 0,
-                        startDate = startDate.toString(),
-                        paramsJson = item.paramsJson,
-                        linkedWalletId = wallet?.id,
-                        notes = null,
-                    )
+                    if (existing != null) {
+                        repository.updateInvestment(
+                            id = existing.id,
+                            name = name,
+                            currencyCode = wallet?.currencyCode ?: existing.currencyCode,
+                            principalCents = cents ?: 0,
+                            startDate = startDate.toString(),
+                            // Keep the calculator's own configuration as stored:
+                            // its rate and term are not editable from this form.
+                            paramsJson = existing.paramsJson,
+                            linkedWalletId = wallet?.id,
+                            notes = existing.notes,
+                        )
+                    } else {
+                        val item = choice ?: error("sin instrumento")
+                        repository.createInvestment(
+                            calculator = item.calculator,
+                            name = name,
+                            currencyCode = wallet?.currencyCode ?: "MXN",
+                            principalCents = cents ?: 0,
+                            startDate = startDate.toString(),
+                            paramsJson = item.paramsJson,
+                            linkedWalletId = wallet?.id,
+                            notes = null,
+                        )
+                    }
                 }
                     .onSuccess { onSaved() }
                     .onFailure {
@@ -101,17 +142,20 @@ fun NewInvestmentSheet(
             }
         },
     ) {
-        PickerField(
-            label = stringResource(R.string.investments_catalog_title),
-            options = catalog,
-            selected = choice,
-            optionLabel = { catalogLabel(it) },
-            onSelect = {
-                choice = it
-                if (name.isBlank()) name = names[it.id].orEmpty()
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        // The instrument is only chosen at creation time.
+        if (existing == null) {
+            PickerField(
+                label = stringResource(R.string.investments_catalog_title),
+                options = catalog,
+                selected = choice,
+                optionLabel = { catalogLabel(it) },
+                onSelect = {
+                    choice = it
+                    if (name.isBlank()) name = names[it.id].orEmpty()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         choice?.rateBps?.let { bps ->
             Text(
@@ -158,7 +202,7 @@ fun NewInvestmentSheet(
 
 /** Catalog entries are identified by a stable id the dictionary names. */
 @Composable
-private fun catalogName(item: CatalogItem): String = stringResource(
+fun catalogName(item: CatalogItem): String = stringResource(
     when (item.id) {
         "cetes_28" -> R.string.investments_catalog_cetes_28_name
         "cetes_91" -> R.string.investments_catalog_cetes_91_name

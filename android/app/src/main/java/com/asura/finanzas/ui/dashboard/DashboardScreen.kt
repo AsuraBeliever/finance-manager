@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
+import com.asura.finanzas.data.CategorySlice
+import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.data.Budget
 import com.asura.finanzas.data.CategoryBreakdown
 import com.asura.finanzas.data.DashboardSummary
@@ -53,7 +55,7 @@ import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
-import com.asura.finanzas.ui.components.PeriodChoice
+import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.PeriodPickerDialog
 import com.asura.finanzas.ui.components.loadSynced
@@ -73,8 +75,14 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
 ) {
     val (key, reload) = rememberReloadKey()
-    var period by remember { mutableStateOf(PeriodChoice.CurrentMonth) }
+    var period by remember { mutableStateOf<Period>(Period.CurrentMonth) }
     var showPeriod by remember { mutableStateOf(false) }
+    // Which breakdown slice is open, as (kind, target).
+    var drillInto by remember { mutableStateOf<Pair<String, CategoryDetailTarget>?>(null) }
+    // Only needed to name each drill-down row's currency; failing is harmless.
+    val walletsForDrill by produceState(initialValue = emptyList<Wallet>(), key) {
+        value = runCatching { repository.wallets().value }.getOrDefault(emptyList())
+    }
 
     val summaryState by loadSynced(key to period) { repository.dashboard() }
     val trendsState by loadSynced(key to period) { repository.spendingTrends(period.toJson()) }
@@ -116,15 +124,35 @@ fun DashboardScreen(
             period = period,
             onPickPeriod = { showPeriod = true },
             onViewAll = onViewAll,
+            onSlice = { kind, slice ->
+                drillInto = kind to CategoryDetailTarget(
+                    categoryId = slice.categoryId,
+                    name = slice.name,
+                    mxnCents = slice.mxnCents,
+                )
+            },
             modifier = modifier,
+        )
+    }
+
+    drillInto?.let { (kind, target) ->
+        CategoryDetailDialog(
+            repository = repository,
+            kind = kind,
+            period = period,
+            target = target,
+            wallets = walletsForDrill,
+            onDismiss = { drillInto = null },
         )
     }
 
     if (showPeriod) {
         PeriodPickerDialog(
             selected = period,
-            onSelect = { period = it; showPeriod = false },
+            // Parameters are edited inline, so a pick applies without closing.
+            onSelect = { period = it },
             onDismiss = { showPeriod = false },
+            allowAll = true,
         )
     }
 }
@@ -139,9 +167,10 @@ private fun DashboardContent(
     goals: List<SavingsGoal>,
     subscriptions: SubscriptionList?,
     fromCache: Boolean,
-    period: PeriodChoice,
+    period: Period,
     onPickPeriod: () -> Unit,
     onViewAll: (DashboardTarget) -> Unit,
+    onSlice: (String, CategorySlice) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -271,6 +300,7 @@ private fun DashboardContent(
                     stringResource(R.string.dashboard_expense_by_category),
                     breakdown,
                     hide,
+                    onSlice = { onSlice("expense", it) },
                 )
             }
         }
@@ -281,6 +311,7 @@ private fun DashboardContent(
                     stringResource(R.string.dashboard_income_by_category),
                     breakdown,
                     hide,
+                    onSlice = { onSlice("income", it) },
                 )
             }
         }
