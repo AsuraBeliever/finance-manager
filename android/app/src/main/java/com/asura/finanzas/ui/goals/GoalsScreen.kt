@@ -5,8 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -102,6 +107,10 @@ fun GoalsScreen(
             onBack = onBack,
             onNew = { creating = true },
             onLongPress = { actionsFor = it },
+            walletName = walletName,
+            onContribute = { contributing = it },
+            onUse = { if (it.goalKind == "fund") confirmConvert = it else confirmUse = it },
+            onAdjustDate = { editing = it },
             onReorder = { ids ->
                 scope.launch { runCatching { repository.reorderSavingsGoals(ids) } }
             },
@@ -284,6 +293,10 @@ private fun GoalList(
     onBack: () -> Unit,
     onNew: () -> Unit,
     onLongPress: (SavingsGoal) -> Unit,
+    walletName: (Long?) -> String?,
+    onContribute: (SavingsGoal) -> Unit,
+    onUse: (SavingsGoal) -> Unit,
+    onAdjustDate: (SavingsGoal) -> Unit,
     onReorder: (List<Long>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -347,6 +360,10 @@ private fun GoalList(
                 goal = goal,
                 hide = hide,
                 onLongPress = onLongPress,
+                walletName = walletName,
+                onContribute = onContribute,
+                onUse = onUse,
+                onAdjustDate = onAdjustDate,
                 reorderState = reorderState,
                 lazyIndex = firstRow + index,
                 currentIndex = { firstRow + ordered.indexOfFirst { g -> g.id == goal.id } },
@@ -362,6 +379,10 @@ private fun GoalCard(
     goal: SavingsGoal,
     hide: Boolean,
     onLongPress: (SavingsGoal) -> Unit,
+    walletName: (Long?) -> String?,
+    onContribute: (SavingsGoal) -> Unit,
+    onUse: (SavingsGoal) -> Unit,
+    onAdjustDate: (SavingsGoal) -> Unit,
     reorderState: ReorderState,
     lazyIndex: Int,
     currentIndex: () -> Int,
@@ -376,17 +397,39 @@ private fun GoalCard(
             .combinedClickable(onClick = {}, onLongClick = { onLongPress(goal) }),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Dot(parseHexColor(goal.color) ?: colors.accent, 12.dp)
+            val tint = parseHexColor(goal.color) ?: colors.accent
+            Box(
+                Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(tint.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Savings,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             Spacer(Modifier.width(10.dp))
             // Neither the deadline nor the percentage repeats here: the plan
             // sentence already carries the date, and the progress line below
             // carries the percentage — the same split the web makes.
-            Text(
-                goal.name,
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
-                modifier = Modifier.weight(1f),
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    goal.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.fg,
+                )
+                Text(
+                    walletName(goal.linkedWalletId)
+                        ?.let { "${stringResource(R.string.goals_apartado_in)} $it" }
+                        ?: stringResource(R.string.goals_track_only),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.fgSubtle,
+                )
+            }
             Spacer(Modifier.width(8.dp))
             ReorderHandle(state = reorderState, key = goal.id, index = currentIndex)
         }
@@ -411,17 +454,44 @@ private fun GoalCard(
 
         Spacer(Modifier.height(6.dp))
         val remaining = (goal.targetCents - goal.savedCents).coerceAtLeast(0)
-        Text(
-            if (remaining == 0L) {
-                stringResource(R.string.goals_completed)
-            } else {
-                "${formatBps(goal.progressBps)} · " +
-                    stringResource(R.string.goals_remaining) + " " +
-                    maskIfHidden(formatMoney(remaining, goal.currencyCode), hide)
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = if (remaining == 0L) colors.positive else colors.fgMuted,
-        )
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (remaining == 0L) {
+                    stringResource(R.string.goals_completed)
+                } else {
+                    "${formatBps(goal.progressBps)} · " +
+                        stringResource(R.string.goals_remaining) + " " +
+                        maskIfHidden(formatMoney(remaining, goal.currencyCode), hide)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = if (remaining == 0L) colors.positive else colors.fgMuted,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                stringResource(R.string.goals_contribute),
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.accent,
+                modifier = Modifier
+                    .clickable { onContribute(goal) }
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+            // Spending a purchase goal and graduating a fund are the same slot
+            // on the web; which one shows depends on the goal's kind.
+            if (goal.savedCents > 0) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    stringResource(
+                        if (goal.goalKind == "fund") R.string.goals_convert_to_wallet
+                        else R.string.goals_buy,
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.accent,
+                    modifier = Modifier
+                        .clickable { onUse(goal) }
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
 
         // The deadline plan, only once the goal actually has one and is unmet.
         val plan = goal.plan
@@ -430,8 +500,29 @@ private fun GoalCard(
             HairLine()
             Spacer(Modifier.height(10.dp))
             GoalPlanLines(goal, plan, hide)
+            // Only offered when the plan is off track — the same condition the
+            // web uses, so it does not nag an on-pace goal.
+            if (plan.overdue || goal.isBehind) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.goals_adjust_date),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.accent,
+                    modifier = Modifier.clickable { onAdjustDate(goal) },
+                )
+            }
         }
     }
+}
+
+/** Short, locale-aware date like "30 nov 2026" for the plan line. */
+@Composable
+private fun planDate(iso: String?): String {
+    if (iso.isNullOrBlank()) return ""
+    val locale = java.util.Locale.forLanguageTag(LocalAppSettings.current.locale)
+    val date = runCatching { java.time.LocalDate.parse(iso) }.getOrNull() ?: return iso
+    val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, locale)
+    return "${date.dayOfMonth} $month ${date.year}"
 }
 
 /** Cadence adverb ("al mes") for the reserve sentence. */
@@ -484,7 +575,7 @@ private fun GoalPlanLines(goal: SavingsGoal, plan: ContributionPlan, hide: Boole
                 R.string.goals_plan_reserve,
                 "amount" to money(plan.periodQuotaCents),
                 "cadence" to cadenceAdverb(goal.cadence),
-                "date" to goal.targetDate.orEmpty(),
+                "date" to planDate(goal.targetDate),
             )
             plan.periodMissingCents > 0 -> text(
                 R.string.goals_plan_progress,
@@ -496,7 +587,7 @@ private fun GoalPlanLines(goal: SavingsGoal, plan: ContributionPlan, hide: Boole
             else -> text(
                 R.string.goals_plan_covered,
                 "period" to periodNoun(goal.cadence),
-                "date" to goal.targetDate.orEmpty(),
+                "date" to planDate(goal.targetDate),
             )
         }
         Text(line, style = MaterialTheme.typography.labelSmall, color = colors.fgMuted)

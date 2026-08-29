@@ -1,5 +1,8 @@
 package com.asura.finanzas.ui.dashboard
 
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,6 +79,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
 ) {
     val (key, reload) = rememberReloadKey()
+    val scope = rememberCoroutineScope()
     var period by remember { mutableStateOf<Period>(Period.CurrentMonth) }
     var showPeriod by remember { mutableStateOf(false) }
     // Which breakdown slice is open, as (kind, target).
@@ -125,6 +129,9 @@ fun DashboardScreen(
             period = period,
             onPickPeriod = { showPeriod = true },
             onViewAll = onViewAll,
+            onResetLayout = {
+                scope.launch { runCatching { repository.setSetting("dashboardLayout", "") } }
+            },
             onSlice = { kind, slice ->
                 drillInto = kind to CategoryDetailTarget(
                     categoryId = slice.categoryId,
@@ -172,6 +179,7 @@ private fun DashboardContent(
     onPickPeriod: () -> Unit,
     onViewAll: (DashboardTarget) -> Unit,
     onSlice: (String, CategorySlice) -> Unit,
+    onResetLayout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -190,6 +198,16 @@ private fun DashboardContent(
         item {
             PageHeader(stringResource(R.string.dashboard_title)) {
                 PrivacyToggle()
+                // The web only lets you drag widgets at tablet width and up; on
+                // a phone it stacks them in a fixed order, which is what this
+                // screen already does. What the button still does from a phone
+                // is clear the shared layout so every device snaps back.
+                Text(
+                    stringResource(R.string.dashboard_reset_layout),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.fgMuted,
+                    modifier = Modifier.clickable { onResetLayout() },
+                )
                 ChipButton(
                     text = PeriodLabel(period),
                     onClick = onPickPeriod,
@@ -249,7 +267,7 @@ private fun DashboardContent(
                     FlowRow(
                         label = stringResource(R.string.dashboard_incomes),
                         amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
-                        previous = maskIfHidden(formatMoney(trends.incomePrevMxnCents), hide),
+                        previousCents = trends.incomePrevMxnCents,
                         trendBps = trends.incomeTrendBps,
                         upIsGood = true,
                     )
@@ -257,7 +275,7 @@ private fun DashboardContent(
                     FlowRow(
                         label = stringResource(R.string.dashboard_expenses),
                         amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
-                        previous = maskIfHidden(formatMoney(trends.expensePrevMxnCents), hide),
+                        previousCents = trends.expensePrevMxnCents,
                         trendBps = trends.expenseTrendBps,
                         upIsGood = false,
                     )
@@ -360,10 +378,11 @@ private fun LegendRow(color: androidx.compose.ui.graphics.Color, label: String, 
 private fun FlowRow(
     label: String,
     amount: String,
-    previous: String,
+    previousCents: Long,
     trendBps: Long,
     upIsGood: Boolean,
 ) {
+    val hide = LocalAppSettings.current.hideBalances
     val colors = Broke.colors
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Text(label, style = MaterialTheme.typography.bodyLarge, color = colors.fgMuted)
@@ -387,52 +406,84 @@ private fun FlowRow(
             )
         }
     }
-    Text(
-        text = "${stringResource(R.string.dashboard_previously)} $previous",
-        style = MaterialTheme.typography.labelSmall,
-        color = colors.fgSubtle,
-    )
+    // Nothing to compare against reads as noise, so the web hides it at zero.
+    if (previousCents > 0) {
+        Text(
+            text = stringResource(R.string.dashboard_previously) + " " +
+                maskIfHidden(formatMoney(previousCents), hide),
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.fgSubtle,
+        )
+    }
 }
 
-/** Income vs expense bars, the native counterpart of the web's `FlowChart`. */
+/**
+ * Income vs expense bars, the native counterpart of the web's `FlowChart`.
+ *
+ * Carries the same furniture the web chart has: a vertical scale, a label under
+ * each bucket and the legend in the same order (expenses first). The tick values
+ * only divide a server-computed maximum — no money is worked out here.
+ */
 @Composable
 private fun FlowChart(trends: SpendingTrends) {
     val colors = Broke.colors
-    val max = trends.buckets.maxOf { maxOf(it.incomeMxnCents, it.expenseMxnCents) }.coerceAtLeast(1)
+    val hide = LocalAppSettings.current.hideBalances
+    val buckets = trends.buckets.takeLast(24)
+    val max = buckets.maxOfOrNull { maxOf(it.incomeMxnCents, it.expenseMxnCents) }
+        ?.coerceAtLeast(1) ?: 1
 
-    Row(
-        modifier = Modifier.fillMaxWidth().height(150.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        trends.buckets.takeLast(24).forEach { bucket ->
+    Row(modifier = Modifier.fillMaxWidth().height(170.dp)) {
+        // Vertical scale, hidden with the balances like every other figure.
+        if (!hide) {
             Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Bottom,
+                modifier = Modifier.height(150.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.End,
             ) {
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                listOf(1f, 0.5f, 0f).forEach { fraction ->
+                    Text(
+                        formatMoney((max * fraction).toLong(), withSymbol = false),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.fgSubtle,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+        }
+
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            buckets.forEach { bucket ->
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Bottom,
                 ) {
-                    Bar(bucket.incomeMxnCents, max, colors.positive)
-                    Bar(bucket.expenseMxnCents, max, colors.danger)
+                    Row(
+                        modifier = Modifier.height(150.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Bar(bucket.incomeMxnCents, max, colors.positive)
+                        Bar(bucket.expenseMxnCents, max, colors.danger)
+                    }
+                    Text(
+                        bucketLabel(bucket.key, trends.bucketUnit),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.fgSubtle,
+                        maxLines = 1,
+                    )
                 }
             }
         }
     }
 
     Spacer(Modifier.height(12.dp))
+    // Expenses first, the order the web's legend uses.
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Dot(colors.positive, 9.dp)
-            Text(
-                stringResource(R.string.dashboard_incomes),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgMuted,
-                modifier = Modifier.padding(start = 6.dp),
-            )
-        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Dot(colors.danger, 9.dp)
             Text(
@@ -442,6 +493,33 @@ private fun FlowChart(trends: SpendingTrends) {
                 modifier = Modifier.padding(start = 6.dp),
             )
         }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Dot(colors.positive, 9.dp)
+            Text(
+                stringResource(R.string.dashboard_incomes),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgMuted,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Short label under a bar: the day for daily buckets, month + year for monthly
+ * ones — the web's `bucketLabel` in its compact form.
+ */
+@Composable
+private fun bucketLabel(key: String, unit: String): String {
+    val locale = java.util.Locale.forLanguageTag(LocalAppSettings.current.locale)
+    return if (unit == "month") {
+        runCatching {
+            val (y, m) = key.split("-").let { it[0].toInt() to it[1].toInt() }
+            java.time.Month.of(m).getDisplayName(java.time.format.TextStyle.SHORT, locale) +
+                " " + (y % 100)
+        }.getOrDefault(key)
+    } else {
+        key.takeLast(2)
     }
 }
 

@@ -231,6 +231,7 @@ private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
                 },
                 centerLabel = stringResource(R.string.dashboard_total),
                 centerValue = maskIfHidden(formatMoney(portfolio.totalValueCents), hide),
+                showValues = false,
             )
         }
     }

@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Payments
@@ -295,14 +297,32 @@ private fun WalletList(
                 )
                 val children = pockets[wallet.id].orEmpty()
                 if (children.isNotEmpty()) {
+                    // Collapsible, like the web's section: a wallet with many
+                    // apartados should not bury the next card.
+                    var expanded by remember(wallet.id) { mutableStateOf(true) }
                     Spacer(Modifier.height(10.dp))
-                    MicroLabel(
-                        "${stringResource(R.string.wallets_apartados_label)} · ${children.size}",
-                        Modifier.padding(start = 4.dp, bottom = 6.dp),
-                    )
-                    children.forEach { pocket ->
-                        PocketRow(pocket, hide)
-                        Spacer(Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clickable { expanded = !expanded }
+                            .padding(start = 4.dp, bottom = 6.dp),
+                    ) {
+                        Icon(
+                            if (expanded) Icons.Outlined.ExpandMore else Icons.Outlined.ChevronRight,
+                            contentDescription = null,
+                            tint = Broke.colors.fgSubtle,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        MicroLabel(
+                            "${stringResource(R.string.wallets_apartados_label)} · ${children.size}",
+                        )
+                    }
+                    if (expanded) {
+                        children.forEach { pocket ->
+                            PocketRow(pocket, hide)
+                            Spacer(Modifier.height(6.dp))
+                        }
                     }
                 }
             }

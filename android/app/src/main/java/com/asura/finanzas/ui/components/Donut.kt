@@ -43,6 +43,11 @@ fun DonutChart(
     modifier: Modifier = Modifier,
     /** Tapping a legend row drills into that slice; null leaves it read-only. */
     onSliceClick: ((Int) -> Unit)? = null,
+    /**
+     * Whether the legend carries the amount and share next to each name. The
+     * portfolio donut lists names only, like the web does there.
+     */
+    showValues: Boolean = true,
 ) {
     val colors = Broke.colors
     val total = slices.sumOf { it.valueCents.coerceAtLeast(0) }
@@ -123,12 +128,14 @@ fun DonutChart(
                     color = colors.fgMuted,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    slice.formatted,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.fg,
-                )
-                if (total > 0) {
+                if (showValues) {
+                    Text(
+                        slice.formatted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.fg,
+                    )
+                }
+                if (showValues && total > 0) {
                     Spacer(Modifier.width(10.dp))
                     Text(
                         // Share of a server-computed total: presentation, not money math.

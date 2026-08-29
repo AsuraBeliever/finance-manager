@@ -1,6 +1,9 @@
 package com.asura.finanzas.ui.categories
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.OutlinedTextField
+import com.asura.finanzas.ui.components.CATEGORY_PALETTE
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -67,7 +70,6 @@ fun CategoriesScreen(
     val state by loadSynced(key) { repository.manageCategories() }
     val scope = rememberCoroutineScope()
 
-    var creating by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<TransactionCategory?>(null) }
     var actionsFor by remember { mutableStateOf<TransactionCategory?>(null) }
 
@@ -78,22 +80,27 @@ fun CategoriesScreen(
             categories = current.data,
             fromCache = current.fromCache,
             onBack = onBack,
-            onNew = { creating = true },
             onLongPress = { actionsFor = it },
             // Order is kept per kind, exactly like the web's two sortable lists.
             onReorder = { ids ->
                 scope.launch { runCatching { repository.reorderTransactionCategories(ids) } }
             },
+            onCreate = { name, kind, color ->
+                scope.launch {
+                    runCatching { repository.createCategory(name, kind, color) }
+                    reload()
+                }
+            },
             modifier = modifier,
         )
     }
 
-    if (creating || editing != null) {
+    if (editing != null) {
         CategoryFormSheet(
             repository = repository,
             existing = editing,
-            onDismiss = { creating = false; editing = null },
-            onSaved = { creating = false; editing = null; reload() },
+            onDismiss = { editing = null },
+            onSaved = { editing = null; reload() },
         )
     }
 
@@ -153,9 +160,9 @@ private fun CategoryList(
     categories: List<TransactionCategory>,
     fromCache: Boolean,
     onBack: () -> Unit,
-    onNew: () -> Unit,
     onLongPress: (TransactionCategory) -> Unit,
     onReorder: (List<Long>) -> Unit,
+    onCreate: (name: String, kind: String, color: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Hidden categories stay on the list, dimmed and badged, so they can be
@@ -177,9 +184,10 @@ private fun CategoryList(
     // Where each draggable block starts, given the header rows above it.
     val headerRows = 1 + (if (fromCache) 1 else 0) + (if (categories.isEmpty()) 1 else 0)
     // Income first, then expenses — the order the web lists them in.
+    // Income first, then expenses — the order the web lists them in. Each block
+    // is one label, its rows, then the inline add.
     val incomeStart = headerRows + 1
-    val incomeSection = if (income.isEmpty()) 0 else 1 + income.size
-    val expenseStart = headerRows + incomeSection + 1
+    val expenseStart = incomeStart + income.size + 2
 
     val expenseReorder = rememberReorderState(
         listState = listState,
@@ -204,11 +212,11 @@ private fun CategoryList(
     ) {
         item {
             BackHeader(stringResource(R.string.categories_title), onBack)
-            Spacer(Modifier.height(12.dp))
-            PrimaryButton(
-                text = stringResource(R.string.categories_add),
-                onClick = onNew,
-                leadingIcon = Icons.Outlined.Add,
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.categories_settings_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = Broke.colors.fgSubtle,
             )
         }
 
@@ -225,31 +233,36 @@ private fun CategoryList(
             }
         }
 
-        if (income.isNotEmpty()) {
-            item { MicroLabel(stringResource(R.string.transactions_income), Modifier.padding(top = 8.dp)) }
-            itemsIndexed(income, key = { _, it -> "i-${it.id}" }) { index, category ->
-                CategoryRow(
-                    category = category,
-                    onLongPress = onLongPress,
-                    reorderState = incomeReorder,
-                    lazyIndex = incomeStart + index,
-                    currentIndex = { incomeStart + income.indexOfFirst { c -> c.id == category.id } },
-                )
-            }
+        // Both sections always render: the add row lives inside each one, so an
+        // empty kind still needs somewhere to add to — same as the web's cards.
+        item { MicroLabel(stringResource(R.string.categories_income)) }
+        itemsIndexed(income, key = { _, it -> "i-${it.id}" }) { index, category ->
+            CategoryRow(
+                category = category,
+                onLongPress = onLongPress,
+                reorderState = incomeReorder,
+                lazyIndex = incomeStart + index,
+                currentIndex = { incomeStart + income.indexOfFirst { c -> c.id == category.id } },
+            )
         }
-        if (expense.isNotEmpty()) {
-            item { MicroLabel(stringResource(R.string.transactions_expense)) }
-            itemsIndexed(expense, key = { _, it -> "e-${it.id}" }) { index, category ->
-                CategoryRow(
-                    category = category,
-                    onLongPress = onLongPress,
-                    reorderState = expenseReorder,
-                    lazyIndex = expenseStart + index,
-                    currentIndex = { expenseStart + expense.indexOfFirst { c -> c.id == category.id } },
-                )
-            }
-        }
+        item { InlineAddCategory(kind = "income", existing = income, onCreate = onCreate) }
 
+        item {
+            MicroLabel(
+                stringResource(R.string.categories_expense),
+                Modifier.padding(top = 8.dp),
+            )
+        }
+        itemsIndexed(expense, key = { _, it -> "e-${it.id}" }) { index, category ->
+            CategoryRow(
+                category = category,
+                onLongPress = onLongPress,
+                reorderState = expenseReorder,
+                lazyIndex = expenseStart + index,
+                currentIndex = { expenseStart + expense.indexOfFirst { c -> c.id == category.id } },
+            )
+        }
+        item { InlineAddCategory(kind = "expense", existing = expense, onCreate = onCreate) }
     }
 }
 
@@ -300,5 +313,51 @@ private fun CategoryRow(
                 index = currentIndex,
             )
         }
+    }
+}
+
+/**
+ * Add a category straight into its section, the way the web does it: type a
+ * name and press add, with the colour picked from the palette rather than
+ * asked for. The kind comes from the section, so it can never be wrong.
+ */
+@Composable
+private fun InlineAddCategory(
+    kind: String,
+    existing: List<TransactionCategory>,
+    onCreate: (name: String, kind: String, color: String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    val colors = Broke.colors
+    // First unused swatch, else wrap around — same rule as the web's nextColor.
+    val color = remember(existing) {
+        val used = existing.mapNotNull { it.color }.toSet()
+        CATEGORY_PALETTE.firstOrNull { it !in used }
+            ?: CATEGORY_PALETTE[existing.size % CATEGORY_PALETTE.size]
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+    ) {
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            placeholder = { Text(stringResource(R.string.categories_add_placeholder)) },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            stringResource(R.string.categories_add),
+            style = MaterialTheme.typography.labelLarge,
+            color = if (name.isBlank()) colors.fgSubtle else colors.accent,
+            modifier = Modifier
+                .clickable(enabled = name.isNotBlank()) {
+                    onCreate(name.trim(), kind, color)
+                    name = ""
+                }
+                .padding(8.dp),
+        )
     }
 }
