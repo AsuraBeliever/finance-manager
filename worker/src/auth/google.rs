@@ -16,12 +16,15 @@ use worker::{Fetch, Headers, Method, Request, RequestInit, Response, RouteContex
 
 use super::{cookie, create_session, session_cookie, user_agent, SESSION_MAX_AGE_SECS};
 use crate::db::{exec, first, random_bytes};
-use crate::error::db_err;
+use crate::error::{db_err, error_response};
 use crate::jsv;
 
 const STATE_COOKIE: &str = "oauth_state";
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+/// Google validates the signature and returns the claims. Used only for tokens
+/// that arrive from a client (the Android app) rather than from TOKEN_URL.
+const TOKENINFO_URL: &str = "https://oauth2.googleapis.com/tokeninfo?id_token=";
 
 fn client_id(ctx: &RouteContext<()>) -> AppResult<String> {
     ctx.env
@@ -302,6 +305,92 @@ pub async fn callback(req: Request, ctx: RouteContext<()>) -> worker::Result<Res
             fail()
         }
     }
+}
+
+/// What `tokeninfo` answers. Every field is a string there, including the
+/// booleans, which is why `email_verified` is compared against "true".
+#[derive(Deserialize)]
+struct TokenInfo {
+    sub: String,
+    aud: String,
+    email: Option<String>,
+    email_verified: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoogleTokenArgs {
+    pub id_token: String,
+}
+
+/// Exchange a Google ID token for a session — the native-app counterpart of the
+/// redirect flow above.
+///
+/// The redirect flow can trust its token because it came straight from Google's
+/// token endpoint over TLS. This one arrives from the client, so it is verified
+/// with Google before anything else, and its `aud` must be our own client id:
+/// without that check any valid Google token, issued to any app, would sign the
+/// bearer in as whoever it names.
+pub async fn token_sign_in(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    if let Err(e) = super::check_origin(&req) {
+        return error_response(&e);
+    }
+    let args: GoogleTokenArgs = match req.json().await {
+        Ok(a) => a,
+        Err(_) => {
+            return error_response(&AppError::InvalidInput("cuerpo inválido".into()));
+        }
+    };
+
+    let result: AppResult<(super::UserInfo, String)> = async {
+        let info = verify_id_token(&args.id_token).await?;
+        if info.aud != client_id(&ctx)? {
+            return Err(AppError::Unauthorized(
+                "el token no fue emitido para esta app".into(),
+            ));
+        }
+        if info.email_verified.as_deref() != Some("true") {
+            return Err(AppError::Unauthorized(
+                "correo de Google no verificado".into(),
+            ));
+        }
+        let email = info
+            .email
+            .ok_or_else(|| AppError::Unauthorized("Google no compartió el correo".into()))?
+            .trim()
+            .to_lowercase();
+        let db = ctx.env.d1("DB").map_err(db_err)?;
+        let uid = find_or_create_user(&db, &info.sub, &email, super::max_users(&ctx)).await?;
+        let token = create_session(&db, uid, user_agent(&req)).await?;
+        Ok((super::UserInfo { id: uid, email }, token))
+    }
+    .await;
+
+    match result {
+        Ok((user, token)) => {
+            let resp = Response::from_json(&user)?;
+            super::with_cookie(resp, &session_cookie(&token, SESSION_MAX_AGE_SECS))
+        }
+        Err(e) => error_response(&e),
+    }
+}
+
+/// Ask Google whether the token is genuine. A non-200 means it is not.
+async fn verify_id_token(id_token: &str) -> AppResult<TokenInfo> {
+    let url = format!("{TOKENINFO_URL}{}", enc(id_token));
+    let mut resp = Fetch::Url(
+        url.parse()
+            .map_err(|_| AppError::Internal("URL de verificación inválida".into()))?,
+    )
+    .send()
+    .await
+    .map_err(|e| AppError::Internal(format!("verificación con Google falló: {e}")))?;
+    if resp.status_code() != 200 {
+        return Err(AppError::Unauthorized("token de Google inválido".into()));
+    }
+    resp.json()
+        .await
+        .map_err(|e| AppError::Internal(format!("respuesta de Google inválida: {e}")))
 }
 
 #[cfg(test)]

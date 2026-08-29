@@ -177,7 +177,7 @@ pub(crate) fn session_cookie(token: &str, max_age: i64) -> String {
     format!("{SESSION_COOKIE}={token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={max_age}")
 }
 
-fn with_cookie(resp: Response, cookie: &str) -> worker::Result<Response> {
+pub(super) fn with_cookie(resp: Response, cookie: &str) -> worker::Result<Response> {
     let headers = resp.headers().clone();
     headers.set("Set-Cookie", cookie)?;
     Ok(resp.with_headers(headers))
@@ -187,7 +187,7 @@ fn with_cookie(resp: Response, cookie: &str) -> worker::Result<Response> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct UserInfo {
+pub(super) struct UserInfo {
     id: i64,
     email: String,
 }
@@ -211,7 +211,7 @@ fn pbkdf2_iterations(ctx: &RouteContext<()>) -> u32 {
 /// can never fill up and start erroring. Configurable via the MAX_USERS var;
 /// 0 or unset means no cap. We start conservative and raise it as real usage
 /// is observed.
-fn max_users(ctx: &RouteContext<()>) -> Option<i64> {
+pub(super) fn max_users(ctx: &RouteContext<()>) -> Option<i64> {
     ctx.env
         .var("MAX_USERS")
         .ok()
