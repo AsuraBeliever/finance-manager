@@ -179,7 +179,7 @@ export function PeriodPicker({
                       </div>
                       <div className="min-w-0 flex-1">
                         <Select
-                          aria-label="Año"
+                          aria-label={es.common.year}
                           value={value.year}
                           onChange={(year) => onChange({ ...value, year })}
                           options={years.map((y) => ({ value: y, label: String(y) }))}

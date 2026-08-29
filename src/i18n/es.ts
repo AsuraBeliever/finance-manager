@@ -198,6 +198,8 @@ export const esDict = {
     pickMonthYear: "Elegir mes y año",
     prevYear: "Año anterior",
     nextYear: "Año siguiente",
+    year: "Año",
+    clear: "Quitar",
   },
   dashboard: {
     title: "Resumen",
@@ -664,6 +666,11 @@ export const esDict = {
     currencies: "Monedas",
     currenciesHint:
       "Los tipos de cambio se obtienen y actualizan solos al usar cualquier moneda distinta de MXN.",
+    rateManualTitle: "Fijar tipo de cambio",
+    rateManualHint:
+      "Cuánto vale 1 {code} en pesos. Tu valor manual reemplaza al automático solo para tu cuenta.",
+    rateManualLabel: "Pesos por 1 {code}",
+    rateManualInvalid: "Escribe un número mayor que cero.",
     walletCategories: "Categorías de cartera",
     session: "Sesión",
     about: "Acerca de",

@@ -192,6 +192,8 @@ export const en: Dict = {
     pickMonthYear: "Pick month and year",
     prevYear: "Previous year",
     nextYear: "Next year",
+    year: "Year",
+    clear: "Clear",
   },
   dashboard: {
     title: "Overview",
@@ -651,6 +653,11 @@ export const en: Dict = {
     clock12: "12 h",
     clock24: "24 h",
     currencies: "Currencies",
+    rateManualTitle: "Set exchange rate",
+    rateManualHint:
+      "How much 1 {code} is worth in pesos. Your manual value replaces the automatic one for your account only.",
+    rateManualLabel: "Pesos per 1 {code}",
+    rateManualInvalid: "Enter a number greater than zero.",
     currenciesHint:
       "Exchange rates are fetched and kept up to date automatically when you use any currency other than MXN.",
     walletCategories: "Wallet categories",

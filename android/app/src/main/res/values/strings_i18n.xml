@@ -176,6 +176,8 @@
     <string name="common_pick_month_year">Elegir mes y año</string>
     <string name="common_prev_year">Año anterior</string>
     <string name="common_next_year">Año siguiente</string>
+    <string name="common_year">Año</string>
+    <string name="common_clear">Quitar</string>
     <string name="dashboard_title">Resumen</string>
     <string name="dashboard_reset_layout">Restablecer vista</string>
     <string name="dashboard_net_worth">Patrimonio total</string>
@@ -560,6 +562,10 @@
     <string name="settings_clock24">24 h</string>
     <string name="settings_currencies">Monedas</string>
     <string name="settings_currencies_hint">Los tipos de cambio se obtienen y actualizan solos al usar cualquier moneda distinta de MXN.</string>
+    <string name="settings_rate_manual_title">Fijar tipo de cambio</string>
+    <string name="settings_rate_manual_hint">Cuánto vale 1 {code} en pesos. Tu valor manual reemplaza al automático solo para tu cuenta.</string>
+    <string name="settings_rate_manual_label">Pesos por 1 {code}</string>
+    <string name="settings_rate_manual_invalid">Escribe un número mayor que cero.</string>
     <string name="settings_wallet_categories">Categorías de cartera</string>
     <string name="settings_session">Sesión</string>
     <string name="settings_about">Acerca de</string>

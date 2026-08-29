@@ -5,7 +5,7 @@ import { getLocale } from "./store";
 // The UI is bilingual, so when the active locale is English we translate those
 // canonical Spanish names on the fly. User-created rows are never in this map
 // and fall through unchanged.
-const EN: Record<string, string> = {
+export const EN: Record<string, string> = {
   // Wallet categories
   Efectivo: "Cash",
   "Tarjeta de débito": "Debit card",
