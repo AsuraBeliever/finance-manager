@@ -236,13 +236,12 @@ private fun CategoryList(
         // Both sections always render: the add row lives inside each one, so an
         // empty kind still needs somewhere to add to — same as the web's cards.
         item { MicroLabel(stringResource(R.string.categories_income)) }
-        itemsIndexed(income, key = { _, it -> "i-${it.id}" }) { index, category ->
+        itemsIndexed(income, key = { _, it -> "i-${it.id}" }) { _, category ->
             CategoryRow(
                 category = category,
                 onLongPress = onLongPress,
                 reorderState = incomeReorder,
-                lazyIndex = incomeStart + index,
-                currentIndex = { incomeStart + income.indexOfFirst { c -> c.id == category.id } },
+                rowKey = "i-${category.id}",
             )
         }
         item { InlineAddCategory(kind = "income", existing = income, onCreate = onCreate) }
@@ -253,13 +252,12 @@ private fun CategoryList(
                 Modifier.padding(top = 8.dp),
             )
         }
-        itemsIndexed(expense, key = { _, it -> "e-${it.id}" }) { index, category ->
+        itemsIndexed(expense, key = { _, it -> "e-${it.id}" }) { _, category ->
             CategoryRow(
                 category = category,
                 onLongPress = onLongPress,
                 reorderState = expenseReorder,
-                lazyIndex = expenseStart + index,
-                currentIndex = { expenseStart + expense.indexOfFirst { c -> c.id == category.id } },
+                rowKey = "e-${category.id}",
             )
         }
         item { InlineAddCategory(kind = "expense", existing = expense, onCreate = onCreate) }
@@ -272,11 +270,11 @@ private fun CategoryRow(
     category: TransactionCategory,
     onLongPress: (TransactionCategory) -> Unit,
     reorderState: ReorderState,
-    lazyIndex: Int,
-    currentIndex: () -> Int,
+    rowKey: String,
 ) {
     val colors = Broke.colors
-    val dragging = reorderState.draggingIndex == lazyIndex
+    val dragging = reorderState.draggingKey == "i-${category.id}" ||
+        reorderState.draggingKey == "e-${category.id}"
     // A hidden category is dimmed rather than removed, the same signal the web
     // gives before you decide whether to restore it.
     val alpha = if (category.isHidden) 0.5f else 1f
@@ -307,11 +305,7 @@ private fun CategoryRow(
                     Modifier.padding(end = 8.dp),
                 )
             }
-            ReorderHandle(
-                state = reorderState,
-                key = category.id,
-                index = currentIndex,
-            )
+            ReorderHandle(state = reorderState, key = rowKey)
         }
     }
 }

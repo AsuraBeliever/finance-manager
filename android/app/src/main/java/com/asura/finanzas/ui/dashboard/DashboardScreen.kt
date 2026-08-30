@@ -15,6 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import com.asura.finanzas.ui.components.ReorderHandle
+import com.asura.finanzas.ui.components.rememberReorderState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,6 +44,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.CategorySlice
@@ -69,6 +79,8 @@ import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
 
+private val rpcJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
 /** Where a widget's "View all" sends you. */
 enum class DashboardTarget { Budgets, Goals, Subscriptions }
 
@@ -84,6 +96,16 @@ fun DashboardScreen(
     var showPeriod by remember { mutableStateOf(false) }
     // Which breakdown slice is open, as (kind, target).
     var drillInto by remember { mutableStateOf<Pair<String, CategoryDetailTarget>?>(null) }
+    // Widget order, shared with the web through the account.
+    var savedOrder by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(key) {
+        savedOrder = runCatching {
+            repository.getSetting("dashboardOrder")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { rpcJson.decodeFromString(ListSerializer(String.serializer()), it) }
+                .orEmpty()
+        }.getOrDefault(emptyList())
+    }
     // Only needed to name each drill-down row's currency; failing is harmless.
     val walletsForDrill by produceState(initialValue = emptyList<Wallet>(), key) {
         value = runCatching { repository.wallets().value }.getOrDefault(emptyList())
@@ -130,7 +152,28 @@ fun DashboardScreen(
             onPickPeriod = { showPeriod = true },
             onViewAll = onViewAll,
             onResetLayout = {
-                scope.launch { runCatching { repository.setSetting("dashboardLayout", "") } }
+                scope.launch {
+                    runCatching { repository.setSetting("dashboardLayout", "") }
+                    runCatching { repository.setSetting("dashboardOrder", "") }
+                    savedOrder = emptyList()
+                }
+            },
+            savedOrder = savedOrder,
+            onReorder = { keys ->
+                // Keys this build does not render (a widget only the web has, or
+                // one whose data has not loaded) keep their place at the end
+                // instead of being dropped from the shared order.
+                val extra = savedOrder.filterNot { it in keys }
+                val next = keys + extra
+                savedOrder = next
+                scope.launch {
+                    runCatching {
+                        repository.setSetting(
+                            "dashboardOrder",
+                            rpcJson.encodeToString(ListSerializer(String.serializer()), next),
+                        )
+                    }
+                }
             },
             onSlice = { kind, slice ->
                 drillInto = kind to CategoryDetailTarget(
@@ -180,6 +223,8 @@ private fun DashboardContent(
     onViewAll: (DashboardTarget) -> Unit,
     onSlice: (String, CategorySlice) -> Unit,
     onResetLayout: () -> Unit,
+    savedOrder: List<String>,
+    onReorder: (List<String>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -190,7 +235,105 @@ private fun DashboardContent(
     val netStart = summary.totalStartMxnCents + summary.investmentsStartMxnCents
     val netEnd = summary.totalEndMxnCents + summary.investmentsTotalMxnCents
 
+    // Keys, order and the condition for showing each one all match the web's
+    // `DashboardPage` exactly: the arrangement is stored per account, so a key
+    // means the same widget on both clients and the defaults line up.
+    val available = buildList<DashWidget> {
+        add(
+            DashWidget("networth") { handle ->
+                NetWorthCard(summary, trends, netStart, netEnd, hide, handle)
+            },
+        )
+        if (trends != null && trends.buckets.isNotEmpty()) {
+            add(DashWidget("flow") { handle -> FlowCard(trends, handle) })
+        }
+        if (budgets.isNotEmpty()) {
+            add(
+                DashWidget("budget") { handle ->
+                    BudgetWidget(budgets, hide, handle) { onViewAll(DashboardTarget.Budgets) }
+                },
+            )
+        }
+        expenseBreakdown?.takeIf { it.slices.isNotEmpty() }?.let { breakdown ->
+            add(
+                DashWidget("breakdownExpense") { handle ->
+                    BreakdownWidget(
+                        stringResource(R.string.dashboard_expense_by_category),
+                        breakdown,
+                        hide,
+                        onSlice = { onSlice("expense", it) },
+                        handle = handle,
+                    )
+                },
+            )
+        }
+        incomeBreakdown?.takeIf { it.slices.isNotEmpty() }?.let { breakdown ->
+            add(
+                DashWidget("breakdownIncome") { handle ->
+                    BreakdownWidget(
+                        stringResource(R.string.dashboard_income_by_category),
+                        breakdown,
+                        hide,
+                        onSlice = { onSlice("income", it) },
+                        handle = handle,
+                    )
+                },
+            )
+        }
+        if (goals.isNotEmpty()) {
+            add(
+                DashWidget("goals") { handle ->
+                    GoalsWidget(goals, hide, handle) { onViewAll(DashboardTarget.Goals) }
+                },
+            )
+        }
+        // Like the web: only when something actually charges in this period, so
+        // browsing a quiet month drops the card instead of showing an empty one.
+        subscriptions?.takeIf { list -> list.subscriptions.any { it.chargedInPeriod } }?.let { list ->
+            add(
+                DashWidget("subscriptions") { handle ->
+                    SubscriptionsWidget(list.subscriptions, list.monthlyTotalMxnCents, hide, handle) {
+                        onViewAll(DashboardTarget.Subscriptions)
+                    }
+                },
+            )
+        }
+        if (summary.wallets.isNotEmpty()) {
+            add(DashWidget("byWallet") { handle -> ByWalletWidget(summary, hide, handle) })
+        }
+        if (summary.investments.isNotEmpty()) {
+            add(DashWidget("byInvestment") { handle -> ByInvestmentWidget(summary, hide, handle) })
+        }
+        if (trends != null && (trends.incomeMxnCents > 0 || trends.expenseMxnCents > 0)) {
+            add(DashWidget("flowRange") { handle -> FlowRangeCard(trends, hide, handle) })
+        }
+    }
+
+    val byKey = available.associateBy { it.key }
+    // Only the KEY order lives in state. Holding the widgets themselves would
+    // pin their lambdas — and with them the summary they closed over — so
+    // switching period would redraw last period's figures whenever the set of
+    // widgets happened not to change.
+    val keys = available.map { it.key }
+    val order = remember(keys, savedOrder) {
+        mutableStateListOf<String>().apply { addAll(applyOrder(keys, savedOrder)) }
+    }
+
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val firstRow = 1 +
+        (if (fromCache) 1 else 0) +
+        (if (summary.missingRates.isNotEmpty()) 1 else 0)
+    val reorderState = rememberReorderState(
+        listState = listState,
+        scope = scope,
+        range = { firstRow until firstRow + order.size },
+        onMove = { from, to -> order.add(to, order.removeAt(from)) },
+        onDrop = { onReorder(order.toList()) },
+    )
+
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -198,10 +341,8 @@ private fun DashboardContent(
         item {
             PageHeader(stringResource(R.string.dashboard_title)) {
                 PrivacyToggle()
-                // The web only lets you drag widgets at tablet width and up; on
-                // a phone it stacks them in a fixed order, which is what this
-                // screen already does. What the button still does from a phone
-                // is clear the shared layout so every device snaps back.
+                // Clears both the phone order and the desktop grid layout, so
+                // every device snaps back to the defaults together.
                 Text(
                     stringResource(R.string.dashboard_reset_layout),
                     style = MaterialTheme.typography.labelLarge,
@@ -221,82 +362,8 @@ private fun DashboardContent(
             item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
         }
 
-        item {
-            GlassCard(Modifier.fillMaxWidth()) {
-                MicroLabel(stringResource(R.string.dashboard_net_worth))
-                Spacer(Modifier.height(14.dp))
-
-                MicroLabel(stringResource(R.string.dashboard_period_start), color = colors.fgSubtle)
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        maskIfHidden(formatMoney(netStart), hide),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = colors.fgMuted,
-                    )
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = colors.fgSubtle,
-                        modifier = Modifier.padding(start = 12.dp).size(20.dp),
-                    )
-                }
-
-                Spacer(Modifier.height(14.dp))
-                MicroLabel(stringResource(R.string.dashboard_period_end), color = colors.fgSubtle)
-                Spacer(Modifier.height(2.dp))
-                HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 40.sp)
-
-                Spacer(Modifier.height(16.dp))
-                LegendRow(
-                    color = colors.accent,
-                    label = stringResource(R.string.nav_wallets),
-                    amount = maskIfHidden(formatMoney(summary.totalEndMxnCents), hide),
-                )
-                Spacer(Modifier.height(6.dp))
-                LegendRow(
-                    color = colors.cyan,
-                    label = stringResource(R.string.nav_investments),
-                    amount = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
-                )
-
-                if (trends != null) {
-                    Spacer(Modifier.height(16.dp))
-                    HairLine()
-                    Spacer(Modifier.height(14.dp))
-                    FlowRow(
-                        label = stringResource(R.string.dashboard_incomes),
-                        amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
-                        previousCents = trends.incomePrevMxnCents,
-                        trendBps = trends.incomeTrendBps,
-                        upIsGood = true,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    FlowRow(
-                        label = stringResource(R.string.dashboard_expenses),
-                        amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
-                        previousCents = trends.expensePrevMxnCents,
-                        trendBps = trends.expenseTrendBps,
-                        upIsGood = false,
-                    )
-                }
-            }
-        }
-
-        if (trends != null && trends.buckets.isNotEmpty()) {
-            item {
-                GlassCard(Modifier.fillMaxWidth()) {
-                    Text(
-                        stringResource(R.string.dashboard_income_vs_expense),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colors.fg,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    FlowChart(trends)
-                }
-            }
-        }
-
+        // The rates warning is not one of the web's grid widgets, so it stays
+        // put rather than joining the draggable stack.
         if (summary.missingRates.isNotEmpty()) {
             item {
                 GlassCard(Modifier.fillMaxWidth()) {
@@ -310,48 +377,19 @@ private fun DashboardContent(
             }
         }
 
-        if (budgets.isNotEmpty()) {
-            item { BudgetWidget(budgets, hide) { onViewAll(DashboardTarget.Budgets) } }
-        }
-
-        expenseBreakdown?.takeIf { it.slices.isNotEmpty() }?.let { breakdown ->
-            item {
-                BreakdownWidget(
-                    stringResource(R.string.dashboard_expense_by_category),
-                    breakdown,
-                    hide,
-                    onSlice = { onSlice("expense", it) },
-                )
-            }
-        }
-
-        incomeBreakdown?.takeIf { it.slices.isNotEmpty() }?.let { breakdown ->
-            item {
-                BreakdownWidget(
-                    stringResource(R.string.dashboard_income_by_category),
-                    breakdown,
-                    hide,
-                    onSlice = { onSlice("income", it) },
-                )
-            }
-        }
-
-        if (goals.isNotEmpty()) {
-            item { GoalsWidget(goals, hide) { onViewAll(DashboardTarget.Goals) } }
-        }
-
-        if (summary.wallets.isNotEmpty()) {
-            item { ByWalletWidget(summary, hide) }
-        }
-
-        if (summary.investments.isNotEmpty()) {
-            item { ByInvestmentWidget(summary, hide) }
-        }
-
-        subscriptions?.let {
-            item {
-                SubscriptionsWidget(it.subscriptions, it.monthlyTotalMxnCents, hide) {
-                    onViewAll(DashboardTarget.Subscriptions)
+        itemsIndexed(order, key = { _, key -> key }) { _, key ->
+            val widget = byKey[key]
+            if (widget != null) {
+                val dragging = reorderState.draggingKey == key
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .zIndex(if (dragging) 1f else 0f)
+                        .graphicsLayer { translationY = if (dragging) reorderState.offsetY else 0f },
+                ) {
+                    // The grip goes in the card's own header row, next to
+                    // "View all", so nothing inside the widget gets covered.
+                    widget.content { ReorderHandle(state = reorderState, key = key) }
                 }
             }
         }
@@ -533,4 +571,239 @@ private fun Bar(value: Long, max: Long, color: androidx.compose.ui.graphics.Colo
             .clip(RoundedCornerShape(3.dp))
             .background(color),
     )
+}
+
+/**
+ * One draggable card on the overview. The key is the web's widget key, so the
+ * order saved on the account means the same thing in both clients. The card
+ * draws the drag handle it is given inside its own header.
+ */
+private class DashWidget(
+    val key: String,
+    val content: @Composable (handle: @Composable () -> Unit) -> Unit,
+)
+
+/**
+ * Apply a saved order: the keys it mentions first, in the order it lists them,
+ * then anything it does not mention — a widget added since the order was saved,
+ * or one that only shows up once its own query lands — appended at the end,
+ * keeping the natural order among themselves.
+ */
+private fun applyOrder(keys: List<String>, order: List<String>): List<String> {
+    if (order.isEmpty()) return keys
+    val rank = order.withIndex().associate { (index, key) -> key to index }
+    return keys.sortedBy { rank[it] ?: Int.MAX_VALUE }
+}
+
+/** Patrimonio: where the period started, where it ended, and the split. */
+@Composable
+private fun NetWorthCard(
+    summary: DashboardSummary,
+    trends: SpendingTrends?,
+    netStart: Long,
+    netEnd: Long,
+    hide: Boolean,
+    handle: @Composable () -> Unit,
+) {
+    val colors = Broke.colors
+    GlassCard(Modifier.fillMaxWidth()) {
+        // No "View all" here, so the label and the grip share the top row.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { MicroLabel(stringResource(R.string.dashboard_net_worth)) }
+            handle()
+        }
+        Spacer(Modifier.height(14.dp))
+
+        MicroLabel(stringResource(R.string.dashboard_period_start), color = colors.fgSubtle)
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                maskIfHidden(formatMoney(netStart), hide),
+                style = MaterialTheme.typography.headlineMedium,
+                color = colors.fgMuted,
+            )
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = colors.fgSubtle,
+                modifier = Modifier.padding(start = 12.dp).size(20.dp),
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+        MicroLabel(stringResource(R.string.dashboard_period_end), color = colors.fgSubtle)
+        Spacer(Modifier.height(2.dp))
+        HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 40.sp)
+
+        Spacer(Modifier.height(16.dp))
+        LegendRow(
+            color = colors.accent,
+            label = stringResource(R.string.nav_wallets),
+            amount = maskIfHidden(formatMoney(summary.totalEndMxnCents), hide),
+        )
+        Spacer(Modifier.height(6.dp))
+        LegendRow(
+            color = colors.cyan,
+            label = stringResource(R.string.nav_investments),
+            amount = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
+        )
+
+        if (trends != null) {
+            Spacer(Modifier.height(16.dp))
+            HairLine()
+            Spacer(Modifier.height(14.dp))
+            FlowRow(
+                label = stringResource(R.string.dashboard_incomes),
+                amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
+                previousCents = trends.incomePrevMxnCents,
+                trendBps = trends.incomeTrendBps,
+                upIsGood = true,
+            )
+            Spacer(Modifier.height(8.dp))
+            FlowRow(
+                label = stringResource(R.string.dashboard_expenses),
+                amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
+                previousCents = trends.expensePrevMxnCents,
+                trendBps = trends.expenseTrendBps,
+                upIsGood = false,
+            )
+        }
+    }
+}
+
+/** Income and expenses bucket by bucket — the web's "flow" widget. */
+@Composable
+private fun FlowCard(trends: SpendingTrends, handle: @Composable () -> Unit) {
+    GlassCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.dashboard_flow),
+                style = MaterialTheme.typography.titleMedium,
+                color = Broke.colors.fg,
+                modifier = Modifier.weight(1f),
+            )
+            handle()
+        }
+        Spacer(Modifier.height(16.dp))
+        FlowChart(trends)
+    }
+}
+
+/**
+ * The period's income against its expenses, as two bars — the web's
+ * `FlowRangeWidget`. Both figures come straight from `getSpendingTrends`; the
+ * only arithmetic here is the fraction that sets each bar's height.
+ */
+@Composable
+private fun FlowRangeCard(
+    trends: SpendingTrends,
+    hide: Boolean,
+    handle: @Composable () -> Unit,
+) {
+    val colors = Broke.colors
+    val max = maxOf(trends.incomeMxnCents, trends.expenseMxnCents).coerceAtLeast(1)
+
+    GlassCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.dashboard_income_vs_expense),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+                modifier = Modifier.weight(1f),
+            )
+            handle()
+        }
+        Spacer(Modifier.height(20.dp))
+
+        // Same furniture as the bucket chart above it: a vertical scale on the
+        // left and the legend underneath, expenses first.
+        Row(modifier = Modifier.fillMaxWidth().height(170.dp)) {
+            if (!hide) {
+                Column(
+                    modifier = Modifier.height(150.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    listOf(1f, 0.5f, 0f).forEach { fraction ->
+                        Text(
+                            formatMoney((max * fraction).toLong(), withSymbol = false),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.fgSubtle,
+                        )
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+            }
+
+            Row(
+                modifier = Modifier.weight(1f).height(150.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                TotalsBar(
+                    amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
+                    fraction = trends.expenseMxnCents.toFloat() / max.toFloat(),
+                    color = colors.danger,
+                    modifier = Modifier.weight(1f),
+                )
+                TotalsBar(
+                    amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
+                    fraction = trends.incomeMxnCents.toFloat() / max.toFloat(),
+                    color = colors.positive,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Dot(colors.danger, 9.dp)
+                Text(
+                    stringResource(R.string.dashboard_expenses),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.fgMuted,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Dot(colors.positive, 9.dp)
+                Text(
+                    stringResource(R.string.dashboard_incomes),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.fgMuted,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One bar of the totals chart, with its figure above it. The web puts that
+ * figure in a hover tooltip; on a phone there is nothing to hover, so it is
+ * drawn in place — and it obeys "hide balances" like every other amount.
+ */
+@Composable
+private fun TotalsBar(
+    amount: String,
+    fraction: Float,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom,
+    ) {
+        Text(amount, style = MaterialTheme.typography.labelSmall, color = Broke.colors.fgMuted)
+        Spacer(Modifier.height(6.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height((120 * fraction.coerceIn(0f, 1f)).dp.coerceAtLeast(4.dp))
+                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                .background(color),
+        )
+    }
 }

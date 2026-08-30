@@ -14,7 +14,9 @@ export function StatWidget({ title, action, className = "", children }: StatWidg
     <section
       className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-border-muted bg-surface-raised p-5 shadow-card transition-colors duration-300 hover:border-accent/40 ${className}`}
     >
-      <header className="mb-4 flex items-center justify-between gap-3">
+      {/* pr-7 leaves room for the grid's drag grip, which floats in this
+          corner: without it the grip sits on top of the action link. */}
+      <header className="mb-4 flex items-center justify-between gap-3 pr-7">
         <h3 className="font-display text-lg font-medium tracking-tight text-fg">{title}</h3>
         {action}
       </header>

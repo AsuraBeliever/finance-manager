@@ -1,6 +1,24 @@
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GripVertical } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { es } from "../i18n/es";
 import {
   ResponsiveGridLayout,
   useContainerWidth,
@@ -14,6 +32,11 @@ import { getSetting, setSetting } from "../lib/api";
 
 // Per-user setting key — synced across all devices (server-side).
 const SETTING_KEY = "dashboardLayout";
+// Phone-width order, kept apart from the grid layout above because the two are
+// different shapes: the grid places widgets in columns, this is a plain list of
+// keys. The Android app reorders the same setting, so a stack arranged on the
+// phone reads back the same here.
+const ORDER_KEY = "dashboardOrder";
 const COLS = { lg: 12, md: 12, sm: 6, xs: 4, xxs: 2 };
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
 const ROW_HEIGHT = 72;
@@ -31,6 +54,61 @@ export interface GridItemSpec {
    *  scroll (expense-by-category). Omit for content widgets, which grow to fit. */
   mobileHeight?: number;
   node: ReactNode;
+}
+
+function parseOrder(raw: string | null | undefined): string[] {
+  try {
+    const parsed = JSON.parse(raw ?? "[]");
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Apply the saved phone order: the keys it mentions first, in the order it
+ * lists them, then anything it does not mention — a widget added since the
+ * order was saved, or one that only appears once its data loads — appended at
+ * the end, keeping the natural order among themselves.
+ */
+function orderedForPhone(items: GridItemSpec[], raw: string | null | undefined): GridItemSpec[] {
+  const order = parseOrder(raw);
+  if (order.length === 0) return items;
+  const rank = new Map(order.map((key, index) => [key, index]));
+  return [...items].sort(
+    (a, b) =>
+      (rank.get(a.key) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.key) ?? Number.MAX_SAFE_INTEGER),
+  );
+}
+
+/** One card of the phone stack, draggable from its grip. */
+function PhoneCard({ item }: { item: GridItemSpec }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.key,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        ...(item.mobileHeight ? { height: item.mobileHeight } : {}),
+      }}
+      className={`group/cell relative ${isDragging ? "z-10 opacity-75" : ""}`}
+    >
+      <button
+        type="button"
+        aria-label={es.dashboard.reorder}
+        {...attributes}
+        {...listeners}
+        // touch-none, or the browser scrolls the page instead of starting the drag.
+        className="dash-drag touch-action-reveal absolute right-2.5 top-2.5 z-10 touch-none cursor-grab rounded-md p-1 text-fg-subtle transition-opacity hover:bg-surface-overlay hover:text-fg active:cursor-grabbing"
+      >
+        <GripVertical size={16} />
+      </button>
+      {item.node}
+    </div>
+  );
 }
 
 /** Shelf-packs the items into the 12-col grid for a sensible default order. */
@@ -120,6 +198,19 @@ export function DashboardGrid({
   const queryClient = useQueryClient();
   // Source of truth: the per-user setting. Refetch on mount so a change made on
   // another device is picked up; the persisted cache gives an instant first paint.
+  // Phone order, read alongside the grid layout so the mobile branch below has
+  // it ready without a second render pass.
+  const savedOrder = useQuery({
+    queryKey: ["dashboardOrder"],
+    queryFn: () => getSetting(ORDER_KEY),
+    staleTime: 0,
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   const saved = useQuery({
     queryKey: ["dashboardLayout"],
     queryFn: () => getSetting(SETTING_KEY),
@@ -158,7 +249,16 @@ export function DashboardGrid({
     setLayouts(next);
   }, [saved.isSuccess, saved.data, keySig]);
 
-  // Reset: snap to defaults and persist (so every device resets too).
+  // Save the phone order: cache first (so the next paint uses it) then persist.
+  const saveOrder = useRef((keys: string[]) => {
+    const serialized = JSON.stringify(keys);
+    queryClient.setQueryData(["dashboardOrder"], serialized);
+    setSetting(ORDER_KEY, serialized);
+  });
+
+  // Reset: snap to defaults and persist (so every device resets too). Clears the
+  // phone order alongside the grid layout — the button promises one reset, and
+  // the Android app clears both from its own button too.
   const firstReset = useRef(resetSignal);
   useEffect(() => {
     if (resetSignal === firstReset.current) return;
@@ -167,6 +267,7 @@ export function DashboardGrid({
     layoutsRef.current = reset;
     setLayouts(reset);
     save.current(reset);
+    saveOrder.current([]);
   }, [resetSignal]);
 
   // We drive RGL as a controlled component only when WE change the layout
@@ -202,15 +303,37 @@ export function DashboardGrid({
   const isMobile = width > 0 && width < BREAKPOINTS.sm;
 
   if (isMobile) {
+    const stacked = orderedForPhone(items, savedOrder.data);
+
+    // Dropping writes the same per-user setting the Android app reorders, so a
+    // stack arranged on either phone reads back the same on the other.
+    const onDragEnd = ({ active, over }: DragEndEvent) => {
+      if (!over || active.id === over.id) return;
+      const current = stacked.map((it) => it.key);
+      const from = current.indexOf(String(active.id));
+      const to = current.indexOf(String(over.id));
+      if (from < 0 || to < 0) return;
+      const next = arrayMove(current, from, to);
+      // Keys this render does not show (a widget whose data is empty for the
+      // period) keep their place at the end instead of being dropped.
+      const extra = parseOrder(savedOrder.data).filter((k) => !next.includes(k));
+      saveOrder.current([...next, ...extra]);
+    };
+
     return (
       <div ref={containerRef}>
-        <div className="flex flex-col gap-4">
-          {items.map((it) => (
-            <div key={it.key} style={it.mobileHeight ? { height: it.mobileHeight } : undefined}>
-              {it.node}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext
+            items={stacked.map((it) => it.key)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-col gap-4">
+              {stacked.map((it) => (
+                <PhoneCard key={it.key} item={it} />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       </div>
     );
   }
@@ -235,7 +358,7 @@ export function DashboardGrid({
             <div key={it.key} className="group/cell relative h-full">
               <button
                 type="button"
-                aria-label="Mover"
+                aria-label={es.dashboard.reorder}
                 className="dash-drag touch-action-reveal absolute right-2.5 top-2.5 z-10 cursor-grab rounded-md p-1 text-fg-subtle transition-opacity hover:bg-surface-overlay hover:text-fg active:cursor-grabbing"
               >
                 <GripVertical size={16} />

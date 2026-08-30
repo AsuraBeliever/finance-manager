@@ -180,6 +180,7 @@
     <string name="common_clear">Clear</string>
     <string name="dashboard_title">Overview</string>
     <string name="dashboard_reset_layout">Reset layout</string>
+    <string name="dashboard_reorder">Drag to reorder</string>
     <string name="dashboard_net_worth">Net worth</string>
     <string name="dashboard_period_start">Period start</string>
     <string name="dashboard_period_end">At the end</string>

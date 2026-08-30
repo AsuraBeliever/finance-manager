@@ -39,10 +39,13 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Donas «por cartera» y «por inversión» | `ui/dashboard/Widgets` | ✅ |
 | Aviso de tipos de cambio faltantes | `ui/dashboard` | ✅ |
 | Gráfica de flujo (`FlowChart`, `getSpendingTrends`) | `ui/dashboard` | ✅ |
+| Widget «ingresos vs gastos» del periodo (`FlowRangeWidget`) | `ui/dashboard` (`FlowRangeCard`) | ✅ |
 | Widget desglose por categoría (dona gasto + ingreso) | `ui/dashboard/Widgets` + `CategoryDetailDialog` | ✅ |
 | Widget de presupuestos («límite de gasto») | `ui/dashboard/Widgets` | ✅ |
 | Widget de metas (anillo + barras) | `ui/dashboard/Widgets` | ✅ |
 | Widget de suscripciones | `ui/dashboard/Widgets` | ✅ |
+| «Ver todo» de cada widget lleva a su pantalla | `ui/dashboard/Widgets` | ✅ |
+| Reordenar widgets + «Restablecer vista» | `ui/dashboard` ↔ `components/DashboardGrid` | ✅ mismo ajuste `dashboardOrder` |
 | Ocultar saldos (`PrivacyToggle`) | `ui/settings` + todas las cifras | ✅ |
 
 ## Carteras
@@ -159,6 +162,24 @@ credenciales:
 
 El código compila y funciona sin esto; lo único que pasa es que el botón falla
 al pedir la credencial.
+
+## Nota: el orden de los widgets del panel
+
+El panel guarda **dos** ajustes por cuenta, porque son formas distintas:
+
+- `dashboardLayout` — la rejilla del escritorio (columnas, tamaños), de
+  react-grid-layout. Sólo la web la usa.
+- `dashboardOrder` — la lista de llaves de la pila a ancho de teléfono. La
+  escriben y la leen **las dos** superficies: la web a ancho < 768 px
+  (`DashboardGrid`, con dnd-kit) y el APK (`ui/dashboard`, con
+  `components/Reorder`). Reordenar en el teléfono se ve en la web y al revés.
+
+Para que eso funcione, las llaves de los widgets tienen que ser **las mismas en
+los dos clientes** (`networth`, `flow`, `budget`, `breakdownExpense`,
+`breakdownIncome`, `goals`, `subscriptions`, `byWallet`, `byInvestment`,
+`flowRange`), y en el mismo orden natural. Al agregar un widget hay que darlo de
+alta en las dos con la misma llave: las que un cliente no conoce se conservan al
+final del orden en vez de perderse. «Restablecer vista» limpia los dos ajustes.
 
 ## Diferencias que quedan a propósito
 

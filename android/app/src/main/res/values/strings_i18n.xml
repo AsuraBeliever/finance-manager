@@ -180,6 +180,7 @@
     <string name="common_clear">Quitar</string>
     <string name="dashboard_title">Resumen</string>
     <string name="dashboard_reset_layout">Restablecer vista</string>
+    <string name="dashboard_reorder">Arrastra para reordenar</string>
     <string name="dashboard_net_worth">Patrimonio total</string>
     <string name="dashboard_period_start">Inicio del periodo</string>
     <string name="dashboard_period_end">Al final</string>

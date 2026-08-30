@@ -1,7 +1,9 @@
 package com.asura.finanzas.ui.components
 
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragIndicator
@@ -11,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -23,14 +26,22 @@ import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+/** How close to an edge the finger has to get before the list starts scrolling. */
+private const val EDGE_PX = 120f
+
+/** Pixels per drag event to scroll when held against an edge. */
+private const val EDGE_SPEED = 12f
+
 /**
  * Drag-to-reorder for a `LazyColumn`, matching what the web does with dnd-kit:
  * the drag starts only from an explicit handle, so a plain tap on the row still
  * opens it. Rows shuffle live while dragging; the new order is sent once, on
  * drop — the same single `reorder_*` call the web makes.
  *
- * Item keys must be stable, and `onMove` has to reorder the caller's own list
- * so the visual result survives recomposition.
+ * The row being dragged is tracked by its **key**, never by its position. Its
+ * index changes the instant a swap happens, and the list has not recomposed
+ * yet at that point, so anything derived from the old index reads a stale
+ * layout — which is what made dragging jump around and land on the wrong row.
  */
 class ReorderState(
     val listState: LazyListState,
@@ -44,61 +55,75 @@ class ReorderState(
     private val onDrop: () -> Unit,
     private val scope: CoroutineScope,
 ) {
-    /** Index into the lazy list of the row being dragged, or null when idle. */
-    var draggingIndex by mutableStateOf<Int?>(null)
+    /** Key of the row being dragged, or null when idle. */
+    var draggingKey by mutableStateOf<Any?>(null)
         private set
 
     /** How far the dragged row has travelled from its resting slot. */
     var offsetY by mutableFloatStateOf(0f)
         private set
 
-    private fun itemAt(index: Int) =
-        listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    /** Live layout of the dragged row, looked up by key so a swap can't lose it. */
+    private val dragged: LazyListItemInfo?
+        get() = draggingKey?.let { key ->
+            listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
+        }
 
-    fun onDragStart(index: Int) {
-        draggingIndex = index
+    fun onDragStart(key: Any) {
+        draggingKey = key
         offsetY = 0f
     }
 
     fun onDrag(delta: Float) {
-        val current = draggingIndex ?: return
+        val info = dragged ?: return
         offsetY += delta
 
-        val dragged = itemAt(current) ?: return
-        // Where the dragged row's edges are right now, mid-gesture.
-        val top = dragged.offset + offsetY
-        val bottom = top + dragged.size
+        // Where the row's middle sits right now, mid-gesture.
+        val centre = info.offset + info.size / 2f + offsetY
 
-        // Swap as soon as the dragged row's leading edge passes a neighbour's
-        // midpoint; one step at a time keeps it stable during a fast flick.
+        // Rows have very different heights here (a wallet with apartados is far
+        // taller than one without), so the target is whichever row actually
+        // contains that point rather than one guessed from a fixed step.
         val draggable = range()
-        val target = listState.layoutInfo.visibleItemsInfo
-            .firstOrNull { candidate ->
-                candidate.index != current && candidate.index in draggable &&
-                    if (candidate.index > current) {
-                        bottom > candidate.offset + candidate.size / 2
-                    } else {
-                        top < candidate.offset + candidate.size / 2
-                    }
-            }
-            ?: return
+        val target = listState.layoutInfo.visibleItemsInfo.firstOrNull {
+            it.index != info.index && it.index in draggable &&
+                centre >= it.offset && centre <= it.offset + it.size
+        }
 
-        onMove(current - draggable.first, target.index - draggable.first)
-        // The row keeps following the finger: it has taken the target's slot, so
-        // the accumulated offset shrinks by exactly the distance jumped.
-        offsetY += dragged.offset - target.offset
-        draggingIndex = target.index
+        if (target != null) {
+            onMove(info.index - draggable.first, target.index - draggable.first)
+            // The row keeps following the finger: it has taken the target's
+            // slot, so the accumulated offset shrinks by the distance jumped.
+            offsetY += info.offset - target.offset
+        }
+
+        autoScroll(centre)
+    }
+
+    /**
+     * Held against the top or bottom edge, the list scrolls so a row can travel
+     * further than one screenful. Without this a wallet could never be moved
+     * past the handful of cards that happen to be visible.
+     */
+    private fun autoScroll(centre: Float) {
+        val viewportEnd = listState.layoutInfo.viewportEndOffset
+        val amount = when {
+            centre < EDGE_PX -> -EDGE_SPEED
+            centre > viewportEnd - EDGE_PX -> EDGE_SPEED
+            else -> return
+        }
+        scope.launch { listState.scrollBy(amount) }
     }
 
     fun onDragEnd() {
-        val moved = draggingIndex != null
-        draggingIndex = null
+        val moved = draggingKey != null
+        draggingKey = null
         offsetY = 0f
         if (moved) scope.launch { onDrop() }
     }
 
     fun onDragCancel() {
-        draggingIndex = null
+        draggingKey = null
         offsetY = 0f
     }
 }
@@ -110,7 +135,24 @@ fun rememberReorderState(
     range: () -> IntRange,
     onMove: (from: Int, to: Int) -> Unit,
     onDrop: () -> Unit,
-): ReorderState = remember(listState) { ReorderState(listState, range, onMove, onDrop, scope) }
+): ReorderState {
+    // The state outlives the lambdas: callers rebuild them whenever their list
+    // is rebuilt (a query lands, a saved order arrives), so it has to call the
+    // LATEST ones. Holding the first set means dragging reorders a list that is
+    // no longer the one on screen — the rows never move.
+    val currentRange = rememberUpdatedState(range)
+    val currentMove = rememberUpdatedState(onMove)
+    val currentDrop = rememberUpdatedState(onDrop)
+    return remember(listState) {
+        ReorderState(
+            listState = listState,
+            range = { currentRange.value() },
+            onMove = { from, to -> currentMove.value(from, to) },
+            onDrop = { currentDrop.value() },
+            scope = scope,
+        )
+    }
+}
 
 /**
  * The grip that starts a drag. Put it on a small, obvious area of the row —
@@ -120,13 +162,10 @@ fun rememberReorderState(
 fun ReorderHandle(
     state: ReorderState,
     /**
-     * Stable identity of the row — its database id, never its position. Keying
-     * the gesture on the index would restart the detector the moment a swap
-     * moves the row, aborting the drag halfway through.
+     * Stable identity of the row — the same value passed as its `key` in the
+     * LazyColumn, so the state can find it again after a swap.
      */
     key: Any,
-    /** Read lazily, so the handler always sees the row's current position. */
-    index: () -> Int,
     modifier: Modifier = Modifier,
 ) {
     val label = stringResource(R.string.wallets_reorder)
@@ -135,11 +174,11 @@ fun ReorderHandle(
         contentDescription = label,
         tint = Broke.colors.fgSubtle,
         modifier = modifier
-            .size(24.dp)
+            .size(28.dp)
             .semantics { contentDescription = label }
             .pointerInput(key) {
                 detectDragGestures(
-                    onDragStart = { state.onDragStart(index()) },
+                    onDragStart = { state.onDragStart(key) },
                     onDrag = { change, drag ->
                         change.consume()
                         state.onDrag(drag.y)

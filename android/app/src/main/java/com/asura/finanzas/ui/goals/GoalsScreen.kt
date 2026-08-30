@@ -355,7 +355,7 @@ private fun GoalList(
             }
         }
 
-        itemsIndexed(ordered, key = { _, it -> it.id }) { index, goal ->
+        itemsIndexed(ordered, key = { _, it -> it.id }) { _, goal ->
             GoalCard(
                 goal = goal,
                 hide = hide,
@@ -365,8 +365,6 @@ private fun GoalList(
                 onUse = onUse,
                 onAdjustDate = onAdjustDate,
                 reorderState = reorderState,
-                lazyIndex = firstRow + index,
-                currentIndex = { firstRow + ordered.indexOfFirst { g -> g.id == goal.id } },
             )
         }
 
@@ -384,11 +382,9 @@ private fun GoalCard(
     onUse: (SavingsGoal) -> Unit,
     onAdjustDate: (SavingsGoal) -> Unit,
     reorderState: ReorderState,
-    lazyIndex: Int,
-    currentIndex: () -> Int,
 ) {
     val colors = Broke.colors
-    val dragging = reorderState.draggingIndex == lazyIndex
+    val dragging = reorderState.draggingKey == goal.id
     GlassCard(
         Modifier
             .fillMaxWidth()
@@ -431,7 +427,7 @@ private fun GoalCard(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            ReorderHandle(state = reorderState, key = goal.id, index = currentIndex)
+            ReorderHandle(state = reorderState, key = goal.id)
         }
 
         Spacer(Modifier.height(12.dp))

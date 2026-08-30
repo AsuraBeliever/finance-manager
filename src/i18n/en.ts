@@ -198,6 +198,7 @@ export const en: Dict = {
   dashboard: {
     title: "Overview",
     resetLayout: "Reset layout",
+    reorder: "Drag to reorder",
     netWorth: "Net worth",
     periodStart: "Period start",
     periodEnd: "At the end",

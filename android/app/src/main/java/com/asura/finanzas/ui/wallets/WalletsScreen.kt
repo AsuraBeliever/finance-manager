@@ -277,9 +277,8 @@ private fun WalletList(
             }
         }
 
-        itemsIndexed(roots, key = { _, it -> it.id }) { index, wallet ->
-            val lazyIndex = firstRow + index
-            val dragging = reorderState.draggingIndex == lazyIndex
+        itemsIndexed(roots, key = { _, it -> it.id }) { _, wallet ->
+            val dragging = reorderState.draggingKey == wallet.id
             Column(
                 Modifier
                     .zIndex(if (dragging) 1f else 0f)
@@ -287,13 +286,7 @@ private fun WalletList(
             ) {
                 WalletCard(
                     wallet, hide, onOpen, onLongPress,
-                    handle = {
-                        ReorderHandle(
-                            state = reorderState,
-                            key = wallet.id,
-                            index = { firstRow + roots.indexOfFirst { it.id == wallet.id } },
-                        )
-                    },
+                    handle = { ReorderHandle(state = reorderState, key = wallet.id) },
                 )
                 val children = pockets[wallet.id].orEmpty()
                 if (children.isNotEmpty()) {

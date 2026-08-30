@@ -204,6 +204,7 @@ export const esDict = {
   dashboard: {
     title: "Resumen",
     resetLayout: "Restablecer vista",
+    reorder: "Arrastra para reordenar",
     netWorth: "Patrimonio total",
     periodStart: "Inicio del periodo",
     periodEnd: "Al final",
