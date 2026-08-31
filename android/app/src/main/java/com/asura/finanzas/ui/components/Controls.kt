@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.theme.Broke
 
 /**
@@ -104,12 +105,15 @@ fun PrimaryButton(
     leadingIcon: ImageVector? = null,
 ) {
     val colors = Broke.colors
+    // Metrics copied from the web's Button: rounded-lg, px-4 py-2, text-sm, on
+    // the dimmed accent. It shows up on nearly every screen, so a fatter pill
+    // here is a difference the eye catches everywhere at once.
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (enabled) colors.accent else colors.surfaceOverlay)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (enabled) colors.accentDim else colors.surfaceOverlay)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 13.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
@@ -118,12 +122,12 @@ fun PrimaryButton(
                 it,
                 contentDescription = null,
                 tint = if (enabled) Color.White else colors.fgSubtle,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(16.dp),
             )
         }
         Text(
             text = text,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
             color = if (enabled) Color.White else colors.fgSubtle,
         )
     }

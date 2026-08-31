@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.wallets
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -7,15 +9,21 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,6 +37,8 @@ import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -43,8 +53,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,7 +65,10 @@ import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.parseHexColor
+import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.components.EmptyState
+import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.Load
@@ -244,18 +260,31 @@ private fun WalletList(
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item {
             PageHeader(stringResource(R.string.wallets_title)) {
                 PrivacyToggle()
-                Text(
-                    stringResource(R.string.wallets_show_archived),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (showArchived) Broke.colors.accent else Broke.colors.fgMuted,
+                // A real checkbox, as on the web — the label alone gave no clue
+                // whether archived wallets were being shown.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { onToggleArchived() },
-                )
+                ) {
+                    Checkbox(
+                        checked = showArchived,
+                        onCheckedChange = { onToggleArchived() },
+                        colors = CheckboxDefaults.colors(checkedColor = Broke.colors.accent),
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.wallets_show_archived),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Broke.colors.fgMuted,
+                    )
+                }
                 PrimaryButton(
                     text = stringResource(R.string.wallets_new_wallet),
                     onClick = onNew,
@@ -284,37 +313,51 @@ private fun WalletList(
                     .zIndex(if (dragging) 1f else 0f)
                     .graphicsLayer { translationY = if (dragging) reorderState.offsetY else 0f },
             ) {
+                val children = pockets[wallet.id].orEmpty()
                 WalletCard(
                     wallet, hide, onOpen, onLongPress,
+                    pockets = children,
                     handle = { ReorderHandle(state = reorderState, key = wallet.id) },
                 )
-                val children = pockets[wallet.id].orEmpty()
                 if (children.isNotEmpty()) {
-                    // Collapsible, like the web's section: a wallet with many
-                    // apartados should not bury the next card.
-                    var expanded by remember(wallet.id) { mutableStateOf(true) }
-                    Spacer(Modifier.height(10.dp))
+                    // Collapsed until asked for, like the web: a wallet with
+                    // many apartados should not bury the next card.
+                    var expanded by remember(wallet.id) { mutableStateOf(false) }
+                    val turn by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+                    Spacer(Modifier.height(8.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
                             .clickable { expanded = !expanded }
-                            .padding(start = 4.dp, bottom = 6.dp),
+                            .padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
                     ) {
                         Icon(
-                            if (expanded) Icons.Outlined.ExpandMore else Icons.Outlined.ChevronRight,
+                            Icons.Outlined.ExpandMore,
                             contentDescription = null,
                             tint = Broke.colors.fgSubtle,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = turn },
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(6.dp))
                         MicroLabel(
                             "${stringResource(R.string.wallets_apartados_label)} · ${children.size}",
                         )
                     }
-                    if (expanded) {
-                        children.forEach { pocket ->
-                            PocketRow(pocket, hide)
-                            Spacer(Modifier.height(6.dp))
+                    AnimatedVisibility(expanded) {
+                        // The pockets hang off a rail, the web's border-l-2.
+                        Row(Modifier.padding(top = 4.dp)) {
+                            Box(
+                                Modifier
+                                    .width(2.dp)
+                                    .fillMaxHeight()
+                                    .background(Broke.colors.borderMuted),
+                            )
+                            Column(Modifier.padding(start = 12.dp)) {
+                                children.forEach { pocket ->
+                                    PocketRow(pocket, hide, onOpen)
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                            }
                         }
                     }
                 }
@@ -334,104 +377,238 @@ private fun WalletCard(
     hide: Boolean,
     onOpen: (Wallet) -> Unit,
     onLongPress: (Wallet) -> Unit,
+    /** The wallet's apartados, which the headline folds back in — see below. */
+    pockets: List<Wallet> = emptyList(),
     /** The drag grip, drawn in the corner; a tap anywhere else still opens. */
     handle: @Composable () -> Unit = {},
 ) {
-    val colors = Broke.colors
     val skin = walletSkin(wallet.skin, wallet.color, wallet.categoryName)
-    // Available is what the server already reports minus what it already
-    // reports as reserved — a presentation pairing of two given figures.
+
+    // Same pairing the web's WalletCard shows, on figures the server already
+    // computed: money in a pocket left the parent through a transfer, so the
+    // headline adds it back to show what the bank shows. Only same-currency
+    // pockets add up.
+    val pocketsCents = pockets
+        .filter { it.currencyCode == wallet.currencyCode }
+        .sumOf { it.balanceCents }
+    val reserved = wallet.reservedCents + pocketsCents
+    val total = wallet.balanceCents + pocketsCents
     val available = wallet.balanceCents - wallet.reservedCents
 
-    Box(
+    BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .height(196.dp)
-            .clip(RoundedCornerShape(26.dp))
+            // Credit-card proportions, the web's aspect-[1.586/1].
+            .aspectRatio(1.586f)
+            .clip(RoundedCornerShape(16.dp))
             .background(skin.brush())
-            .border(1.dp, colors.borderMuted, RoundedCornerShape(26.dp))
             .combinedClickable(onClick = { onOpen(wallet) }, onLongClick = { onLongPress(wallet) }),
     ) {
-        Icon(
-            skinArtIcon(skin.art),
-            contentDescription = null,
-            tint = skin.fg.copy(alpha = 0.16f),
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 18.dp)
-                .size(132.dp),
+        // Crystalline gloss, then the soft top-left highlight, then the big
+        // faint motif — the three layers the web stacks over the skin.
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.linearGradient(
+                        0f to Color.White.copy(alpha = 0.30f),
+                        0.22f to Color.White.copy(alpha = 0.06f),
+                        0.46f to Color.Transparent,
+                    ),
+                ),
+        )
+        // The web sizes this highlight off the card itself (2/3 of it, pulled a
+        // third up and a quarter left), so it scales with the card instead of
+        // reading as a bright blob at one size and vanishing at another.
+        Box(
+            Modifier
+                .size(width = maxWidth * 2 / 3, height = maxHeight * 2 / 3)
+                .offset(x = -maxWidth / 4, y = -maxHeight / 3)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color.White.copy(alpha = 0.28f * 0.70f), Color.Transparent),
+                    ),
+                    CircleShape,
+                ),
+        )
+        if (skin.art != SkinArt.None) {
+            Icon(
+                skinArtIcon(skin.art),
+                contentDescription = null,
+                tint = skin.fg.copy(alpha = 0.14f),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset(x = 2.dp)
+                    .size(150.dp),
+            )
+        }
+        // Hairline highlight around the edge (the web's ring-inset white/15).
+        Box(
+            Modifier
+                .matchParentSize()
+                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp)),
         )
 
-        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+        Column(
+            Modifier.fillMaxSize().padding(20.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Text(
                     wallet.name,
                     style = MaterialTheme.typography.titleMedium,
                     color = skin.fg,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    wallet.currencyCode,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = skin.fg.copy(alpha = 0.85f),
-                )
                 Spacer(Modifier.width(8.dp))
-                handle()
+                if (wallet.isArchived) {
+                    Text(
+                        stringResource(R.string.wallets_archived),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                        color = skin.fg,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.30f))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
+                } else {
+                    Text(
+                        wallet.currencyCode,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        color = skin.fg.copy(alpha = 0.80f),
+                    )
+                }
             }
 
-            Spacer(Modifier.weight(1f))
+            // Middle slot: the chip for card skins, a small motif for the money
+            // ones, and otherwise the same empty gap the web leaves.
+            when {
+                skin.art == SkinArt.Chip -> CardChip()
+                skin.art != SkinArt.None -> Icon(
+                    skinArtIcon(skin.art),
+                    contentDescription = null,
+                    tint = skin.fg,
+                    modifier = Modifier.size(30.dp),
+                )
+                else -> Spacer(Modifier.height(28.dp))
+            }
 
-            Text(
-                maskIfHidden(formatMoney(wallet.balanceCents, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.displayLarge.copy(fontSize = 32.sp, lineHeight = 38.sp),
-                color = skin.fg,
-            )
-            Text(
-                buildString {
-                    append(stringResource(R.string.wallets_available))
-                    append(' ')
-                    append(maskIfHidden(formatMoney(available, wallet.currencyCode), hide))
-                    if (wallet.reservedCents > 0) {
-                        append(" · ")
-                        append(stringResource(R.string.wallets_reserved))
-                        append(' ')
-                        append(maskIfHidden(formatMoney(wallet.reservedCents, wallet.currencyCode), hide))
-                    }
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = skin.fg.copy(alpha = 0.82f),
-                modifier = Modifier.padding(top = 4.dp),
+            Column {
+                Text(
+                    maskIfHidden(formatMoney(total, wallet.currencyCode), hide),
+                    style = MaterialTheme.typography.displayLarge
+                        .copy(fontSize = 24.sp, lineHeight = 30.sp),
+                    color = skin.fg,
+                )
+                Text(
+                    if (reserved > 0) {
+                        stringResource(R.string.wallets_available) + " " +
+                            maskIfHidden(formatMoney(available, wallet.currencyCode), hide) +
+                            " · " + stringResource(R.string.wallets_reserved) + " " +
+                            maskIfHidden(formatMoney(reserved, wallet.currencyCode), hide)
+                    } else {
+                        seedName(wallet.categoryName).orEmpty()
+                    },
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    color = skin.fg.copy(alpha = 0.80f),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+
+        // The grip sits in the bottom corner over a dark pill, exactly where the
+        // web puts it, so it reads on any skin without covering the figures.
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(12.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.Black.copy(alpha = 0.25f))
+                .padding(6.dp),
+        ) {
+            handle()
+        }
+    }
+}
+
+/** The gold contact plate on card skins — the web's CSS chip. */
+@Composable
+private fun CardChip() {
+    Column(
+        Modifier
+            .size(width = 40.dp, height = 28.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(Color(0xFFFEF3C6).copy(alpha = 0.95f), Color(0xFFFBBF24).copy(alpha = 0.85f)),
+                ),
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        repeat(3) {
+            Box(
+                Modifier
+                    .padding(top = 4.dp)
+                    .size(width = 24.dp, height = 2.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.15f)),
             )
         }
     }
 }
 
+/** An apartado under its parent card: colour tab, piggy, name, amount. */
 @Composable
-private fun PocketRow(pocket: Wallet, hide: Boolean) {
+private fun PocketRow(pocket: Wallet, hide: Boolean, onOpen: (Wallet) -> Unit) {
     val colors = Broke.colors
-    GlassCard(Modifier.fillMaxWidth(), padding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Spacer(Modifier.width(6.dp))
-            Text(
-                pocket.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.fgMuted,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                maskIfHidden(formatMoney(pocket.balanceCents, pocket.currencyCode), hide),
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.fg,
-            )
-        }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surfaceRaised)
+            .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
+            .clickable { onOpen(pocket) }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Box(
+            Modifier
+                .size(width = 4.dp, height = 24.dp)
+                .clip(CircleShape)
+                .background(parseHexColor(pocket.color) ?: colors.accent),
+        )
+        Spacer(Modifier.width(10.dp))
+        Icon(
+            Lucide.PiggyBank,
+            contentDescription = null,
+            tint = colors.fgSubtle,
+            modifier = Modifier.size(15.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            pocket.name,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.fg,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            maskIfHidden(formatMoney(pocket.balanceCents, pocket.currencyCode), hide),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.fg,
+        )
     }
 }
 
 /** The motif the web draws on each skin group. */
 @Composable
 private fun skinArtIcon(art: SkinArt) = when (art) {
-    SkinArt.Wallet -> Icons.Outlined.AccountBalanceWallet
-    SkinArt.Banknote -> Icons.Outlined.Payments
-    SkinArt.Coins, SkinArt.Piggy -> Icons.Outlined.Savings
-    else -> Icons.Outlined.CreditCard
+    SkinArt.Wallet -> Lucide.Wallet
+    SkinArt.Banknote -> Lucide.Banknote
+    SkinArt.Coins -> Lucide.Coins
+    SkinArt.Piggy -> Lucide.PiggyBank
+    else -> Lucide.CreditCard
 }

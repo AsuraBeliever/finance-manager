@@ -105,22 +105,24 @@ fun PageHeader(
     val colors = Broke.colors
     Column(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Same tab and title metrics as the web's PageHeader: a 4×28 rule
+            // in the "gold" accent (cyan here) and a 1.9rem display title.
             Box(
                 Modifier
-                    .width(5.dp)
-                    .height(40.dp)
-                    .clip(RoundedCornerShape(3.dp))
+                    .width(4.dp)
+                    .height(28.dp)
+                    .clip(RoundedCornerShape(2.dp))
                     .background(colors.cyan),
             )
             Text(
                 text = title,
-                style = MaterialTheme.typography.displayLarge.copy(fontSize = 38.sp, lineHeight = 44.sp),
+                style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp, lineHeight = 30.sp),
                 color = colors.fg,
-                modifier = Modifier.padding(start = 14.dp),
+                modifier = Modifier.padding(start = 12.dp),
             )
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             content = actions,
