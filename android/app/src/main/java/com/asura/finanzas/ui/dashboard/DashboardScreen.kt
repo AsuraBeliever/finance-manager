@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import com.asura.finanzas.ui.components.ReorderHandle
 import com.asura.finanzas.ui.components.rememberReorderState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -41,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,6 +67,7 @@ import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.Load
+import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.OfflineNotice
@@ -335,26 +339,39 @@ private fun DashboardContent(
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             PageHeader(stringResource(R.string.dashboard_title)) {
-                PrivacyToggle()
-                // Clears both the phone order and the desktop grid layout, so
-                // every device snaps back to the defaults together.
-                Text(
-                    stringResource(R.string.dashboard_reset_layout),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.fgMuted,
-                    modifier = Modifier.clickable { onResetLayout() },
-                )
                 ChipButton(
                     text = PeriodLabel(period),
                     onClick = onPickPeriod,
-                    leadingIcon = Icons.Outlined.CalendarMonth,
-                    trailingIcon = Icons.Outlined.ExpandMore,
+                    leadingIcon = Lucide.Calendar,
+                    trailingIcon = Lucide.ChevronDown,
                 )
+                // Clears both the phone order and the desktop grid layout, so
+                // every device snaps back to the defaults together.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onResetLayout() }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                ) {
+                    Icon(
+                        Lucide.RotateCcw,
+                        contentDescription = null,
+                        tint = colors.fg,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.dashboard_reset_layout),
+                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                        color = colors.fg,
+                    )
+                }
             }
         }
 
@@ -399,16 +416,22 @@ private fun DashboardContent(
 @Composable
 private fun LegendRow(color: androidx.compose.ui.graphics.Color, label: String, amount: String) {
     val colors = Broke.colors
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Dot(color)
-        Spacer(Modifier.width(10.dp))
+    // The web keeps these inline — dot, label, figure, all butted together —
+    // rather than pushing the figure out to the right edge.
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Dot(color, 8.dp)
+        Spacer(Modifier.width(6.dp))
         Text(
             label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
             color = colors.fgMuted,
-            modifier = Modifier.weight(1f),
         )
-        Text(amount, style = MaterialTheme.typography.bodyLarge, color = colors.fg)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            amount,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = colors.fg,
+        )
     }
 }
 
@@ -422,36 +445,60 @@ private fun FlowRow(
 ) {
     val hide = LocalAppSettings.current.hideBalances
     val colors = Broke.colors
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = colors.fgMuted)
-        Spacer(Modifier.width(10.dp))
-        Text(amount, style = MaterialTheme.typography.bodyLarge, color = colors.fg)
-        Spacer(Modifier.weight(1f))
+    // Label, figure, "before X" and the badge sit on one line, as on the web —
+    // not with the badge pushed to the far edge and the comparison below it.
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = colors.fgMuted,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            amount,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = colors.fg,
+        )
+        // Nothing to compare against reads as noise, so the web hides it at zero.
+        if (previousCents > 0) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.dashboard_previously) + " " +
+                    maskIfHidden(formatMoney(previousCents), hide),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
+            )
+        }
         if (trendBps != 0L) {
+            Spacer(Modifier.width(8.dp))
             // Basis points to a percentage is presentation; the comparison
             // itself was computed by the server.
             val up = trendBps > 0
             val good = up == upIsGood
-            val tint = if (good) colors.positive else colors.danger
-            Text(
-                text = (if (up) "+" else "−") + "%.1f%%".format(kotlin.math.abs(trendBps) / 100.0),
-                style = MaterialTheme.typography.labelSmall,
-                color = tint,
+            val tint = if (good) colors.accent else colors.danger
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(tint.copy(alpha = 0.14f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            )
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = 0.15f))
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+            ) {
+                // The web's chip carries the little trend arrow next to the
+                // percentage; text alone read as a plain tag.
+                Icon(
+                    if (up) Lucide.TrendingUp else Lucide.TrendingDown,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(13.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = (if (up) "+" else "−") + "%.1f%%".format(kotlin.math.abs(trendBps) / 100.0),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    color = tint,
+                )
+            }
         }
-    }
-    // Nothing to compare against reads as noise, so the web hides it at zero.
-    if (previousCents > 0) {
-        Text(
-            text = stringResource(R.string.dashboard_previously) + " " +
-                maskIfHidden(formatMoney(previousCents), hide),
-            style = MaterialTheme.typography.labelSmall,
-            color = colors.fgSubtle,
-        )
     }
 }
 
@@ -467,8 +514,13 @@ private fun FlowChart(trends: SpendingTrends) {
     val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
     val buckets = trends.buckets.takeLast(24)
-    val max = buckets.maxOfOrNull { maxOf(it.incomeMxnCents, it.expenseMxnCents) }
+    val peak = buckets.maxOfOrNull { maxOf(it.incomeMxnCents, it.expenseMxnCents) }
         ?.coerceAtLeast(1) ?: 1
+    // The chart library the web uses rounds the axis up to a friendly number and
+    // labels four even steps; a raw peak gave ticks like "824.74".
+    val max = niceCeiling(peak)
+    val axisColor = colors.borderMuted
+    val axisLabelHeight = 20.dp
 
     Row(modifier = Modifier.fillMaxWidth().height(170.dp)) {
         // Vertical scale, hidden with the balances like every other figure.
@@ -478,10 +530,10 @@ private fun FlowChart(trends: SpendingTrends) {
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.End,
             ) {
-                listOf(1f, 0.5f, 0f).forEach { fraction ->
+                listOf(1f, 0.75f, 0.5f, 0.25f, 0f).forEach { fraction ->
                     Text(
-                        formatMoney((max * fraction).toLong(), withSymbol = false),
-                        style = MaterialTheme.typography.labelSmall,
+                        ((max * fraction).toLong() / 100).toString(),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                         color = colors.fgSubtle,
                     )
                 }
@@ -489,8 +541,25 @@ private fun FlowChart(trends: SpendingTrends) {
             Spacer(Modifier.width(8.dp))
         }
 
+        // The chart draws its axes as hairlines; without them the bars floated.
+        Box(
+            Modifier
+                .width(1.dp)
+                .height(150.dp)
+                .background(colors.borderMuted),
+        )
         Row(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .drawBehind {
+                    val y = size.height - axisLabelHeight.toPx()
+                    drawLine(
+                        color = axisColor,
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                },
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
@@ -521,26 +590,52 @@ private fun FlowChart(trends: SpendingTrends) {
 
     Spacer(Modifier.height(12.dp))
     // Expenses first, the order the web's legend uses.
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Dot(colors.danger, 9.dp)
-            Text(
-                stringResource(R.string.dashboard_expenses),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgMuted,
-                modifier = Modifier.padding(start = 6.dp),
-            )
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Dot(colors.positive, 9.dp)
-            Text(
-                stringResource(R.string.dashboard_incomes),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgMuted,
-                modifier = Modifier.padding(start = 6.dp),
-            )
-        }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
+    ) {
+        ChartLegend(colors.danger, stringResource(R.string.dashboard_expenses))
+        ChartLegend(colors.positive, stringResource(R.string.dashboard_incomes))
     }
+}
+
+/** One legend entry: the chart library marks series with a small square. */
+@Composable
+private fun ChartLegend(color: androidx.compose.ui.graphics.Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(12.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(color),
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = Broke.colors.fgMuted,
+            modifier = Modifier.padding(start = 6.dp),
+        )
+    }
+}
+
+/**
+ * Rounds a peak up to the next 1/2/2.5/5 × 10ⁿ, so the axis reads 250 · 500 ·
+ * 750 · 1000 instead of quarters of whatever the tallest bar happened to be.
+ * Works on whole cents; nothing here is money arithmetic, it is axis furniture.
+ */
+private fun niceCeiling(peak: Long): Long {
+    val pesos = peak / 100.0
+    if (pesos <= 0) return 100
+    val magnitude = Math.pow(10.0, Math.floor(Math.log10(pesos)))
+    val normalized = pesos / magnitude
+    val step = when {
+        normalized <= 1.0 -> 1.0
+        normalized <= 2.0 -> 2.0
+        normalized <= 2.5 -> 2.5
+        normalized <= 5.0 -> 5.0
+        else -> 10.0
+    }
+    return Math.round(step * magnitude * 100)
 }
 
 /**
@@ -607,9 +702,13 @@ private fun NetWorthCard(
 ) {
     val colors = Broke.colors
     GlassCard(Modifier.fillMaxWidth()) {
-        // No "View all" here, so the label and the grip share the top row.
+        // The eye lives here, beside the eyebrow, exactly as on the web — not
+        // up in the page header.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { MicroLabel(stringResource(R.string.dashboard_net_worth)) }
+            MicroLabel(stringResource(R.string.dashboard_net_worth))
+            Spacer(Modifier.width(8.dp))
+            PrivacyToggle()
+            Spacer(Modifier.weight(1f))
             handle()
         }
         Spacer(Modifier.height(14.dp))

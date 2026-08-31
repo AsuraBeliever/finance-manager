@@ -28,6 +28,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import com.asura.finanzas.ui.components.Lucide
+import com.asura.finanzas.ui.components.OutlineButton
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Investment
@@ -128,28 +142,40 @@ private fun InvestmentList(
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
+            // Same order and shapes as the web: eye, the "show closed" checkbox,
+            // the outlined simulator link, then the primary action.
             PageHeader(stringResource(R.string.investments_title)) {
                 PrivacyToggle()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onToggleClosed() },
+                ) {
+                    Checkbox(
+                        checked = showClosed,
+                        onCheckedChange = { onToggleClosed() },
+                        colors = CheckboxDefaults.colors(checkedColor = colors.accent),
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.investments_show_closed),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.fgMuted,
+                    )
+                }
+                OutlineButton(
+                    text = stringResource(R.string.simulator_open),
+                    onClick = onSimulator,
+                    leadingIcon = Lucide.Calculator,
+                )
                 PrimaryButton(
                     text = stringResource(R.string.investments_new_investment),
                     onClick = onNew,
-                    leadingIcon = Icons.Outlined.Add,
-                )
-                Text(
-                    stringResource(R.string.simulator_open),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.accent,
-                    modifier = Modifier.clickable { onSimulator() },
-                )
-                Text(
-                    stringResource(R.string.investments_show_closed),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (showClosed) colors.accent else colors.fgMuted,
-                    modifier = Modifier.clickable { onToggleClosed() },
+                    leadingIcon = Lucide.Plus,
                 )
             }
         }
@@ -203,7 +229,7 @@ private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
         Row(Modifier.fillMaxWidth()) {
             Stat(
                 stringResource(R.string.investments_portfolio_gain),
-                maskIfHidden(formatDelta(portfolio.totalGainCents), hide),
+                maskIfHidden(formatMoney(portfolio.totalGainCents), hide),
                 if (portfolio.totalGainCents >= 0) colors.positive else colors.danger,
                 Modifier.weight(1f),
             )
@@ -219,20 +245,37 @@ private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
         }
 
         if (portfolio.slices.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp))
-            DonutChart(
-                slices = portfolio.slices.mapIndexed { index, slice ->
-                    DonutSlice(
-                        label = slice.name,
-                        valueCents = slice.currentValueCents,
-                        color = chartColor(index),
-                        formatted = maskIfHidden(formatMoney(slice.currentValueCents), hide),
-                    )
-                },
-                centerLabel = stringResource(R.string.dashboard_total),
-                centerValue = maskIfHidden(formatMoney(portfolio.totalValueCents), hide),
-                showValues = false,
-            )
+            Spacer(Modifier.height(16.dp))
+            // A small ring beside its key, the way the web draws it — not a big
+            // centred donut with the total in the hole.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MiniDonut(
+                    slices = portfolio.slices.map { it.currentValueCents },
+                    modifier = Modifier.size(120.dp),
+                )
+                Spacer(Modifier.width(16.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // The web lists at most five, truncated.
+                    portfolio.slices.take(5).forEachIndexed { index, slice ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier
+                                    .size(10.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(chartColor(index)),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                slice.name,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                                color = colors.fgMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -313,3 +356,32 @@ private fun calculatorLabel(calculator: String): String = stringResource(
         else -> R.string.investments_calculators_manual
     },
 )
+
+
+/**
+ * The portfolio ring: 120 dp across with a 34→56 radius and a 2° gap between
+ * slices, matching the web's chart exactly. No labels — the key sits beside it.
+ */
+@Composable
+private fun MiniDonut(slices: List<Long>, modifier: Modifier = Modifier) {
+    val total = slices.sum().coerceAtLeast(1)
+    val colors = slices.indices.map { chartColor(it) }
+    Canvas(modifier) {
+        val stroke = (56f - 34f) / 56f * (size.minDimension / 2f)
+        val radius = size.minDimension / 2f - stroke / 2f
+        var start = -90f
+        slices.forEachIndexed { index, value ->
+            val sweep = 360f * (value.toFloat() / total.toFloat())
+            drawArc(
+                color = colors[index],
+                startAngle = start + 1f,
+                sweepAngle = (sweep - 2f).coerceAtLeast(0f),
+                useCenter = false,
+                topLeft = Offset(size.width / 2f - radius, size.height / 2f - radius),
+                size = Size(radius * 2, radius * 2),
+                style = Stroke(width = stroke),
+            )
+            start += sweep
+        }
+    }
+}

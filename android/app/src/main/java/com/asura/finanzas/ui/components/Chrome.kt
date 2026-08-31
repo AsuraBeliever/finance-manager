@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -96,11 +99,12 @@ fun MeshBackground(modifier: Modifier = Modifier, content: @Composable () -> Uni
  * Page title: a cyan rule followed by the name of the screen in the display
  * face — the web's `PageHeader`.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PageHeader(
     title: String,
     modifier: Modifier = Modifier,
-    actions: @Composable RowScope.() -> Unit = {},
+    actions: @Composable FlowRowScope.() -> Unit = {},
 ) {
     val colors = Broke.colors
     Column(modifier.fillMaxWidth()) {
@@ -121,9 +125,11 @@ fun PageHeader(
                 modifier = Modifier.padding(start = 12.dp),
             )
         }
-        Row(
+        // The web's header wraps its actions (`flex-wrap`); a plain Row squeezed
+        // them instead, which chopped a button's label into three lines.
+        FlowRow(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.Center,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             content = actions,
         )
@@ -141,11 +147,13 @@ fun GlassCard(
     padding: androidx.compose.ui.unit.Dp = 20.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // rounded-2xl, like every card on the web. A rounder corner is one of the
+    // first things that reads as "a different app" when the two sit together.
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(Broke.colors.surfaceRaised)
-            .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(24.dp))
+            .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(16.dp))
             .padding(padding),
         content = content,
     )
@@ -248,6 +256,7 @@ fun EmptyState(title: String, description: String, modifier: Modifier = Modifier
 }
 
 /** Page header with a back affordance, for the screens reached from "More". */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BackHeader(
     title: String,

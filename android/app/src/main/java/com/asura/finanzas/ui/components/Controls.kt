@@ -131,6 +131,38 @@ fun PrimaryButton(
     }
 }
 
+/**
+ * The web's bordered secondary link (the simulator entry point): no fill, just
+ * a hairline outline with muted text.
+ */
+@Composable
+fun OutlineButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: ImageVector? = null,
+) {
+    val colors = Broke.colors
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        leadingIcon?.let {
+            Icon(it, contentDescription = null, tint = colors.fgMuted, modifier = Modifier.size(16.dp))
+        }
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+            color = colors.fgMuted,
+        )
+    }
+}
+
 /** Quiet pill used for the period picker and other secondary chips. */
 @Composable
 fun ChipButton(

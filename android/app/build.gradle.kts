@@ -96,6 +96,9 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        // FlowRow is how the shared page header reproduces the web's wrapping
+        // action bar; opting in per call site would mean annotating every screen.
+        freeCompilerArgs += "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi"
     }
 
     lint {
