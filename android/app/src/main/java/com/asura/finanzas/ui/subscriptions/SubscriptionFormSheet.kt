@@ -2,7 +2,6 @@ package com.asura.finanzas.ui.subscriptions
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -107,21 +107,21 @@ fun SubscriptionFormSheet(
             }
         },
     ) {
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.subscriptions_name),
             value = name,
             onValueChange = { name = it; error = null },
-            label = { Text(stringResource(R.string.subscriptions_name)) },
-            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.subscriptions_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
-            label = { Text(stringResource(R.string.subscriptions_amount)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            suffix = { wallet?.let { Text(it.currencyCode, color = Broke.colors.fgSubtle) } },
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            suffix = wallet?.currencyCode.orEmpty(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         SegmentedControl(
             options = listOf("monthly", "yearly"),

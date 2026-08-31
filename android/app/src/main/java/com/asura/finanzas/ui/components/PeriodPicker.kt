@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -197,18 +196,18 @@ fun PeriodPickerDialog(
 private fun PeriodModeEditor(selected: Period, onSelect: (Period) -> Unit) {
     val locale = appLocale()
     when (selected) {
-        is Period.LastMonths -> OutlinedTextField(
+        is Period.LastMonths -> FormField(
+            label = stringResource(R.string.dashboard_period_months_count),
             value = selected.months.toString(),
             onValueChange = { raw ->
                 val n = raw.filter { it.isDigit() }.take(2).toIntOrNull() ?: 1
                 onSelect(Period.LastMonths(n.coerceIn(1, 36)))
             },
-            label = { Text(stringResource(R.string.dashboard_period_months_count)) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 28.dp, bottom = 8.dp),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
 
         is Period.Month -> Row(

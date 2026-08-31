@@ -1,7 +1,6 @@
 package com.asura.finanzas.ui.categories
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -11,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -68,12 +68,12 @@ fun CategoryFormSheet(
             }
         },
     ) {
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.categories_add_placeholder),
             value = name,
             onValueChange = { name = it; error = null },
-            label = { Text(stringResource(R.string.categories_add_placeholder)) },
-            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
         )
         if (existing == null) {
             SegmentedControl(

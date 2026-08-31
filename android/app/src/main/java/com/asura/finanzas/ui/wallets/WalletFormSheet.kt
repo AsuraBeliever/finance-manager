@@ -16,7 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -33,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Currency
@@ -161,12 +161,12 @@ fun WalletFormSheet(
                 color = colors.fg,
             )
 
-            OutlinedTextField(
+            FormField(
+                label = stringResource(R.string.wallets_name),
                 value = name,
                 onValueChange = { name = it; error = null },
-                label = { Text(stringResource(R.string.wallets_name)) },
-                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
             )
 
             PickerField(
@@ -188,13 +188,13 @@ fun WalletFormSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            OutlinedTextField(
+            FormField(
+                label = stringResource(R.string.wallets_initial_balance),
                 value = initial,
                 onValueChange = { initial = it },
-                label = { Text(stringResource(R.string.wallets_initial_balance)) },
+                modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
             )
 
             PickerField(
@@ -226,21 +226,21 @@ fun WalletFormSheet(
             }
 
             if (earnsYield) {
-                OutlinedTextField(
+                FormField(
+                    label = stringResource(R.string.wallets_yield_rate),
                     value = yieldRate,
                     onValueChange = { yieldRate = it },
-                    label = { Text(stringResource(R.string.wallets_yield_rate)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    suffix = { Text("%", color = colors.fgSubtle) },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    suffix = "%",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
             }
 
-            OutlinedTextField(
+            FormField(
+                label = stringResource(R.string.wallets_notes),
                 value = notes,
                 onValueChange = { notes = it },
-                label = { Text(stringResource(R.string.wallets_notes)) },
                 modifier = Modifier.fillMaxWidth(),
             )
 

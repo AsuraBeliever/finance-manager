@@ -32,7 +32,6 @@ import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -766,13 +766,13 @@ private fun ApartadoEditSheet(
             style = MaterialTheme.typography.bodyMedium,
             color = Broke.colors.fgMuted,
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.transactions_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
-            label = { Text(stringResource(R.string.transactions_amount)) },
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
         )
         DateField(
             label = stringResource(R.string.transactions_date),

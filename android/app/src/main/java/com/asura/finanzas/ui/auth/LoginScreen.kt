@@ -32,7 +32,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,6 +50,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -183,56 +183,56 @@ fun LoginScreen(
         }
         Spacer(Modifier.height(16.dp))
 
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.auth_email),
             value = email,
             onValueChange = { email = it; error = null },
-            label = { Text(stringResource(R.string.auth_email)) },
-            placeholder = { Text(stringResource(R.string.auth_email_placeholder)) },
-            singleLine = true,
-            enabled = !busy,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
-                imeAction = ImeAction.Next,
-            ),
             modifier = Modifier.fillMaxWidth(),
+            placeholder = stringResource(R.string.auth_email_placeholder),
+            enabled = !busy,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Next,
+            ),
         )
         Spacer(Modifier.height(14.dp))
 
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.auth_password),
             value = password,
             onValueChange = { password = it; error = null },
-            label = { Text(stringResource(R.string.auth_password)) },
-            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
             enabled = !busy,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Go,
+            ),
+            keyboardActions = KeyboardActions(onGo = { submit() }),
             visualTransformation = if (showPassword) {
                 VisualTransformation.None
             } else {
                 PasswordVisualTransformation()
             },
-            trailingIcon = {
+            trailing = {
                 val label = stringResource(
                     if (showPassword) R.string.auth_hide_password
                     else R.string.auth_show_password,
                 )
                 Icon(
-                    imageVector = if (showPassword) {
+            imageVector = if (showPassword) {
                         Icons.Outlined.VisibilityOff
                     } else {
                         Icons.Outlined.Visibility
                     },
-                    contentDescription = label,
-                    tint = colors.fgSubtle,
-                    modifier = Modifier
+            contentDescription = label,
+            tint = colors.fgSubtle,
+            modifier = Modifier
                         .clickable { showPassword = !showPassword }
                         .padding(horizontal = 12.dp),
                 )
             },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Go,
-            ),
-            keyboardActions = KeyboardActions(onGo = { submit() }),
-            modifier = Modifier.fillMaxWidth(),
         )
 
         if (registering) {

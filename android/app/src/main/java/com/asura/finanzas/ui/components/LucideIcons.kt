@@ -188,6 +188,8 @@ object Lucide {
         )
     }
 
+    val X by lazy { icon("M18 6 6 18", "m6 6 12 12") }
+
     val ChevronDown by lazy { icon("m6 9 6 6 6-6") }
 
     val Trash by lazy {

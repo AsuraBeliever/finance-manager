@@ -2,7 +2,6 @@ package com.asura.finanzas.ui.categories
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.material3.OutlinedTextField
 import com.asura.finanzas.ui.components.CATEGORY_PALETTE
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +47,7 @@ import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.Lucide
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.TransactionCategory
@@ -466,12 +466,14 @@ private fun InlineAddCategory(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
     ) {
-        OutlinedTextField(
+        FormField(
+            // The web's add row shows only the placeholder, no caption.
+            label = "",
             value = name,
             onValueChange = { name = it },
-            placeholder = { Text(stringResource(R.string.categories_add_placeholder)) },
-            singleLine = true,
             modifier = Modifier.weight(1f),
+            placeholder = stringResource(R.string.categories_add_placeholder),
+            singleLine = true,
         )
         Spacer(Modifier.width(10.dp))
         Text(

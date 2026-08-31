@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -28,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.APPEARANCE_FONTS
 import com.asura.finanzas.data.APPEARANCE_ICONS
@@ -135,12 +135,12 @@ fun AppearanceScreen(
 
         item { MicroLabel(stringResource(R.string.appearance_brand)) }
         item {
-            OutlinedTextField(
+            FormField(
+                label = stringResource(R.string.appearance_app_name),
                 value = current.appName,
                 onValueChange = { name -> update { it.copy(appName = name) } },
-                label = { Text(stringResource(R.string.appearance_app_name)) },
-                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
             )
         }
         item {

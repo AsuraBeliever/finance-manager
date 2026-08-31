@@ -2,7 +2,6 @@ package com.asura.finanzas.ui.budgets
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Budget
@@ -89,13 +89,13 @@ fun BudgetFormSheet(
             emptyLabel = overallLabel,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.budgets_limit),
             value = limit,
             onValueChange = { limit = it; error = null },
-            label = { Text(stringResource(R.string.budgets_limit)) },
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

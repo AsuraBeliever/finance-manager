@@ -16,7 +16,6 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.ExchangeRate
@@ -209,16 +209,14 @@ private fun ManualRateDialog(
                     color = colors.fgSubtle,
                 )
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
+                FormField(
+                    label = text(R.string.settings_rate_manual_label, "code" to rate.currencyCode),
                     value = value,
                     onValueChange = { value = it; error = null },
-                    label = {
-                        Text(text(R.string.settings_rate_manual_label, "code" to rate.currencyCode))
-                    },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = value.isNotBlank() && !valid,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
                 )
                 error?.let {
                     Spacer(Modifier.height(8.dp))

@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
@@ -17,7 +19,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -38,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.theme.Broke
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.LocalAppSettings
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -146,19 +149,35 @@ fun DateField(
     modifier: Modifier = Modifier,
 ) {
     var showDialog by remember { mutableStateOf(false) }
+    val locale = java.util.Locale.forLanguageTag(LocalAppSettings.current.locale)
 
-    OutlinedTextField(
-        value = value.toString(),
-        onValueChange = {},
-        readOnly = true,
-        label = { Text(label) },
-        modifier = modifier.fillMaxWidth(),
-        trailingIcon = {
-            TextButton(onClick = { showDialog = true }) {
-                Text(stringResource(R.string.common_pick_date))
-            }
-        },
-    )
+    // The web shows the date spelled out with a calendar glyph inside the box,
+    // and the whole box opens the picker — not a "Pick date" text button.
+    val shown = remember(value, locale) {
+        runCatching {
+            value.format(
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale),
+            )
+        }.getOrDefault(value.toString())
+    }
+    Box(Modifier.clickable { showDialog = true }) {
+        FormField(
+            label = label,
+            value = shown,
+            onValueChange = {},
+            modifier = modifier.fillMaxWidth(),
+            enabled = false,
+            readOnly = true,
+            trailing = {
+                Icon(
+                    Lucide.Calendar,
+                    contentDescription = null,
+                    tint = Broke.colors.fgMuted,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+        )
+    }
 
     if (showDialog) {
         val state = rememberDatePickerState(
@@ -204,13 +223,13 @@ fun TimeField(
     var showDialog by remember { mutableStateOf(false) }
     val clock24 = LocalAppSettings.current.clock24
 
-    OutlinedTextField(
+    FormField(
+        label = label,
         value = value?.let { formatClock(it, clock24) }.orEmpty(),
         onValueChange = {},
-        readOnly = true,
-        label = { Text(label) },
         modifier = modifier.fillMaxWidth(),
-        trailingIcon = {
+        readOnly = true,
+        trailing = {
             Row {
                 if (value != null) {
                     TextButton(onClick = { onChange(null) }) {

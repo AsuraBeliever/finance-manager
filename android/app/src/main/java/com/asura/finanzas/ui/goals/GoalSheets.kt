@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -111,20 +111,20 @@ fun GoalFormSheet(
             }
         },
     ) {
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.goals_name),
             value = name,
             onValueChange = { name = it; error = null },
-            label = { Text(stringResource(R.string.goals_name)) },
-            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.goals_target),
             value = target,
             onValueChange = { target = it; error = null },
-            label = { Text(stringResource(R.string.goals_target)) },
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
         )
         PickerField(
             label = stringResource(R.string.goals_apartado_wallet),
@@ -252,14 +252,14 @@ fun ContributeSheet(
             },
             onSelect = { release = it },
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.goals_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
-            label = { Text(stringResource(R.string.goals_amount)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            suffix = { Text(goal.currencyCode, color = Broke.colors.fgSubtle) },
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            suffix = goal.currencyCode,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
     }
 }

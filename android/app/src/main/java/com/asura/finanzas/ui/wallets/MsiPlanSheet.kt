@@ -3,7 +3,6 @@ package com.asura.finanzas.ui.wallets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.MsiSchedulePreview
@@ -131,30 +131,30 @@ fun MsiPlanSheet(
             }
         },
     ) {
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.transactions_description),
             value = description,
             onValueChange = { description = it; error = null },
-            label = { Text(stringResource(R.string.transactions_description)) },
-            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.credit_msi_total),
             value = total,
             onValueChange = { total = it; error = null },
-            label = { Text(stringResource(R.string.credit_msi_total)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            suffix = { Text(wallet.currencyCode, color = colors.fgSubtle) },
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            suffix = wallet.currencyCode,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.credit_msi_months),
             value = monthsText,
             onValueChange = { monthsText = it.filter { c -> c.isDigit() }.take(2); error = null },
-            label = { Text(stringResource(R.string.credit_msi_months)) },
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             isError = monthsText.isNotBlank() && !monthsValid,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
         )
         PickerField(
             label = stringResource(R.string.transactions_category),

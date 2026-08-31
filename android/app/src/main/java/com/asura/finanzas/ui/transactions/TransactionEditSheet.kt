@@ -2,7 +2,6 @@ package com.asura.finanzas.ui.transactions
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -147,14 +147,14 @@ private fun SimpleEditSheet(
             onSelect = { wallet = it },
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.transactions_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
-            label = { Text(stringResource(R.string.transactions_amount)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            suffix = { wallet?.let { Text(it.currencyCode, color = colors.fgSubtle) } },
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            suffix = wallet?.currencyCode.orEmpty(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         PickerField(
             label = stringResource(R.string.transactions_category),
@@ -165,12 +165,12 @@ private fun SimpleEditSheet(
             emptyLabel = noCategory,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.transactions_description),
             value = description,
             onValueChange = { description = it },
-            label = { Text(stringResource(R.string.transactions_description)) },
-            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
         )
         DateField(
             label = stringResource(R.string.transactions_date),
@@ -296,32 +296,32 @@ private fun TransferEditSheet(
             onSelect = { toWallet = it },
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.transactions_amount),
             value = amountFrom,
             onValueChange = { amountFrom = it; error = null },
-            label = { Text(stringResource(R.string.transactions_amount)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            suffix = { fromWallet?.let { Text(it.currencyCode, color = colors.fgSubtle) } },
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            suffix = fromWallet?.currencyCode.orEmpty(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         if (crossCurrency) {
-            OutlinedTextField(
+            FormField(
+                label = stringResource(R.string.transactions_amount_received),
                 value = amountTo,
                 onValueChange = { amountTo = it; error = null },
-                label = { Text(stringResource(R.string.transactions_amount_received)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                suffix = { toWallet?.let { Text(it.currencyCode, color = colors.fgSubtle) } },
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                suffix = toWallet?.currencyCode.orEmpty(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             )
         }
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.transactions_description),
             value = description,
             onValueChange = { description = it },
-            label = { Text(stringResource(R.string.transactions_description)) },
-            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
         )
         DateField(
             label = stringResource(R.string.transactions_date),

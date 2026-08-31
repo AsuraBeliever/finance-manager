@@ -21,7 +21,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.MsiSchedulePreview
@@ -253,25 +253,25 @@ fun TransactionFormSheet(
                 )
             }
 
-            OutlinedTextField(
+            FormField(
+                label = stringResource(R.string.transactions_amount),
                 value = amount,
                 onValueChange = { amount = it; error = null },
-                label = { Text(stringResource(R.string.transactions_amount)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                suffix = { wallet?.let { Text(it.currencyCode, color = colors.fgSubtle) } },
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                suffix = wallet?.currencyCode.orEmpty(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             )
 
             if (crossCurrency) {
-                OutlinedTextField(
+                FormField(
+                    label = stringResource(R.string.transactions_amount_received),
                     value = amountTo,
                     onValueChange = { amountTo = it; error = null },
-                    label = { Text(stringResource(R.string.transactions_amount_received)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    suffix = { toWallet?.let { Text(it.currencyCode, color = colors.fgSubtle) } },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    suffix = toWallet?.currencyCode.orEmpty(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
             }
 
@@ -286,12 +286,12 @@ fun TransactionFormSheet(
                 )
             }
 
-            OutlinedTextField(
+            FormField(
+                label = stringResource(R.string.transactions_description),
                 value = description,
                 onValueChange = { description = it },
-                label = { Text(stringResource(R.string.transactions_description)) },
-                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
             )
 
             DateField(
@@ -328,14 +328,14 @@ fun TransactionFormSheet(
             }
 
             if (msiActive) {
-                OutlinedTextField(
+                FormField(
+                    label = stringResource(R.string.credit_msi_months),
                     value = msiMonths,
                     onValueChange = { msiMonths = it.filter { c -> c.isDigit() }.take(2) },
-                    label = { Text(stringResource(R.string.credit_msi_months)) },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = msiMonths.isNotBlank() && !msiMonthsValid,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
                 )
                 MsiPreview(repository, wallet, amountCents, msiMonthsValue, date, msiMonthsValid)
             }

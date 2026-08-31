@@ -2,7 +2,6 @@ package com.asura.finanzas.ui.investments
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.CatalogItem
@@ -168,20 +168,20 @@ fun NewInvestmentSheet(
             )
         }
 
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.investments_name),
             value = name,
             onValueChange = { name = it; error = null },
-            label = { Text(stringResource(R.string.investments_name)) },
-            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
         )
-        OutlinedTextField(
+        FormField(
+            label = stringResource(R.string.investments_principal),
             value = principal,
             onValueChange = { principal = it; error = null },
-            label = { Text(stringResource(R.string.investments_principal)) },
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
         )
         DateField(
             label = stringResource(R.string.investments_start_date),
