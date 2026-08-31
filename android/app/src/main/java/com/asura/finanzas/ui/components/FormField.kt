@@ -27,6 +27,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import com.asura.finanzas.R
+import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
 
 /**
@@ -199,3 +213,102 @@ private fun groupCents(cents: Long): String {
 
 private fun String.toBigDecimalOrNull(): java.math.BigDecimal? =
     runCatching { java.math.BigDecimal(this) }.getOrNull()
+
+/**
+ * The shared colour picker: a row of preset swatches, exactly the palette the
+ * web offers, plus a custom swatch that opens a hex entry. Used wherever a
+ * colour is chosen (goals, categories, subscriptions).
+ */
+@Composable
+fun ColorPicker(value: String?, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val colors = Broke.colors
+    var custom by remember { mutableStateOf(false) }
+    val isPreset = value != null && value in CATEGORY_PALETTE
+
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        CATEGORY_PALETTE.forEach { hex ->
+            Box(
+                Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(parseHexColor(hex) ?: colors.accent)
+                    .then(
+                        if (value == hex) {
+                            Modifier.border(2.dp, colors.accent, CircleShape)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .clickable { onChange(hex) },
+            )
+        }
+        // Anything outside the palette is a custom colour; the swatch shows it.
+        Box(
+            Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(
+                    if (value != null && !isPreset) {
+                        SolidColor(parseHexColor(value) ?: colors.accent)
+                    } else {
+                        Brush.sweepGradient(
+                            listOf(
+                                Color(0xFFEF4444), Color(0xFFEAB308), Color(0xFF22C55E),
+                                Color(0xFF06B6D4), Color(0xFF3B82F6), Color(0xFFA855F7),
+                                Color(0xFFEF4444),
+                            ),
+                        )
+                    },
+                )
+                .then(
+                    if (value != null && !isPreset) {
+                        Modifier.border(2.dp, colors.accent, CircleShape)
+                    } else {
+                        Modifier
+                    },
+                )
+                .clickable { custom = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Lucide.Palette,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(12.dp),
+            )
+        }
+    }
+
+    if (custom) {
+        var hex by remember { mutableStateOf(value ?: "#A855F7") }
+        AlertDialog(
+            onDismissRequest = { custom = false },
+            containerColor = colors.surfaceOverlay,
+            title = { Text(stringResource(R.string.categories_custom_color), color = colors.fg) },
+            text = {
+                FormField(
+                    label = "",
+                    value = hex,
+                    onValueChange = { hex = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = "#A855F7",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    parseHexColor(hex)?.let { onChange(hex) }
+                    custom = false
+                }) { Text(stringResource(R.string.common_save), color = colors.accent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { custom = false }) {
+                    Text(stringResource(R.string.common_cancel), color = colors.fgMuted)
+                }
+            },
+        )
+    }
+}

@@ -21,6 +21,20 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.components.ColorPicker
+import com.asura.finanzas.ui.components.FieldLabel
+import androidx.compose.foundation.layout.padding
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -62,6 +76,7 @@ fun GoalFormSheet(
         )
     }
     var cadence by remember { mutableStateOf(existing?.cadence ?: "monthly") }
+    var color by remember { mutableStateOf(existing?.color) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -96,7 +111,7 @@ fun GoalFormSheet(
                         currencyCode = wallet?.currencyCode ?: existing?.currencyCode ?: "MXN",
                         targetCents = cents ?: 0,
                         walletId = wallet?.id,
-                        color = existing?.color,
+                        color = color,
                         // Clearing the deadline clears the cadence with it: the
                         // server only computes a plan when both are present.
                         targetDate = if (hasDeadline) targetDate.toString() else null,
@@ -119,25 +134,11 @@ fun GoalFormSheet(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        MoneyField(
-            label = stringResource(R.string.goals_target),
-            value = target,
-            onValueChange = { target = it; error = null },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        PickerField(
-            label = stringResource(R.string.goals_apartado_wallet),
-            options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
-            selected = wallet,
-            optionLabel = { it?.name ?: noneLabel },
-            onSelect = { wallet = it },
-            emptyLabel = noneLabel,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start,
-        ) {
+
+        // Web order: name · what it's for (+hint) · target and currency ·
+        // wallet to reserve from (+hint) · deadline card · colour.
+        Column {
+            FieldLabel(stringResource(R.string.goals_kind_label))
             SegmentedControl(
                 options = listOf("purchase", "fund"),
                 selected = kind,
@@ -147,53 +148,119 @@ fun GoalFormSheet(
                     )
                 },
                 onSelect = { kind = it },
+                modifier = Modifier.fillMaxWidth(),
+                fillEqually = true,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(
+                    if (kind == "fund") R.string.goals_kind_fund_hint
+                    else R.string.goals_kind_purchase_hint,
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = Broke.colors.fgSubtle,
             )
         }
 
-        // Deadline + cadence: with both set the server returns a contribution
-        // plan and the card starts telling you what to set aside each period.
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.goals_enable_deadline),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Broke.colors.fg,
-                )
-                Text(
-                    stringResource(R.string.goals_deadline_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Broke.colors.fgSubtle,
-                )
-            }
-            Switch(checked = hasDeadline, onCheckedChange = { hasDeadline = it })
+            MoneyField(
+                label = stringResource(R.string.goals_target),
+                value = target,
+                onValueChange = { target = it; error = null },
+                modifier = Modifier.weight(1f),
+            )
+            FormField(
+                label = stringResource(R.string.investments_currency),
+                value = wallet?.currencyCode ?: existing?.currencyCode ?: "MXN",
+                onValueChange = {},
+                modifier = Modifier.weight(1f),
+                enabled = false,
+                readOnly = true,
+            )
         }
 
-        if (hasDeadline) {
-            DateField(
-                label = stringResource(R.string.goals_deadline_date_label),
-                value = targetDate,
-                onChange = { targetDate = it },
-            )
+        Column {
             PickerField(
-                label = stringResource(R.string.goals_cadence_label),
-                options = listOf("daily", "weekly", "monthly", "yearly"),
-                selected = cadence,
-                optionLabel = {
-                    stringResource(
-                        when (it) {
-                            "daily" -> R.string.goals_cadence_daily
-                            "weekly" -> R.string.goals_cadence_weekly
-                            "yearly" -> R.string.goals_cadence_yearly
-                            else -> R.string.goals_cadence_monthly
-                        },
-                    )
-                },
-                onSelect = { cadence = it },
+                label = stringResource(R.string.goals_apartado_wallet),
+                options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
+                selected = wallet,
+                optionLabel = { it?.name ?: noneLabel },
+                onSelect = { wallet = it },
+                emptyLabel = noneLabel,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(
+                    if (wallet == null) R.string.goals_apartado_none_hint
+                    else R.string.goals_apartado_hint,
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = Broke.colors.fgSubtle,
+            )
+        }
+
+        // The deadline is a bordered card with a checkbox, as on the web.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(8.dp))
+                .padding(14.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = hasDeadline,
+                    onCheckedChange = { hasDeadline = it },
+                    colors = CheckboxDefaults.colors(checkedColor = Broke.colors.accent),
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    stringResource(R.string.goals_enable_deadline),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    color = Broke.colors.fg,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.goals_deadline_hint),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = Broke.colors.fgSubtle,
+            )
+            if (hasDeadline) {
+                Spacer(Modifier.height(12.dp))
+                DateField(
+                    label = stringResource(R.string.goals_deadline_date_label),
+                    value = targetDate,
+                    onChange = { targetDate = it },
+                )
+                PickerField(
+                    label = stringResource(R.string.goals_cadence_label),
+                    options = listOf("daily", "weekly", "monthly", "yearly"),
+                    selected = cadence,
+                    optionLabel = {
+                        stringResource(
+                            when (it) {
+                                "daily" -> R.string.goals_cadence_daily
+                                "weekly" -> R.string.goals_cadence_weekly
+                                "yearly" -> R.string.goals_cadence_yearly
+                                else -> R.string.goals_cadence_monthly
+                            },
+                        )
+                    },
+                    onSelect = { cadence = it },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        Column {
+            FieldLabel(stringResource(R.string.categories_color))
+            ColorPicker(value = color, onChange = { color = it })
         }
     }
 }
