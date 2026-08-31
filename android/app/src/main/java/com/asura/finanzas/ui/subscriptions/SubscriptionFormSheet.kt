@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
+import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -114,14 +115,12 @@ fun SubscriptionFormSheet(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        FormField(
+        MoneyField(
             label = stringResource(R.string.subscriptions_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
             suffix = wallet?.currencyCode.orEmpty(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         SegmentedControl(
             options = listOf("monthly", "yearly"),

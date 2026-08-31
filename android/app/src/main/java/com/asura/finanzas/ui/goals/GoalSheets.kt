@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
+import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -118,13 +119,11 @@ fun GoalFormSheet(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        FormField(
+        MoneyField(
             label = stringResource(R.string.goals_target),
             value = target,
             onValueChange = { target = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         PickerField(
             label = stringResource(R.string.goals_apartado_wallet),
@@ -252,14 +251,12 @@ fun ContributeSheet(
             },
             onSelect = { release = it },
         )
-        FormField(
+        MoneyField(
             label = stringResource(R.string.goals_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
             suffix = goal.currencyCode,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
     }
 }

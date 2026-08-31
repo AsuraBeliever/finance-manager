@@ -38,7 +38,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FormSheet
+import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.FormField
+import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.MsiSchedulePreview
@@ -77,7 +80,7 @@ fun TransactionFormSheet(
 
     val spendable = remember(wallets) { wallets.filter { !it.isArchived } }
 
-    var kind by remember { mutableStateOf(TxKind.Expense) }
+    var kind by remember { mutableStateOf(TxKind.Income) }
     var wallet by remember { mutableStateOf(spendable.firstOrNull()) }
     var toWallet by remember { mutableStateOf<Wallet?>(null) }
     var amount by remember { mutableStateOf("") }
@@ -204,31 +207,35 @@ fun TransactionFormSheet(
         (kind != TxKind.Transfer || (toWallet != null && toWallet?.id != wallet?.id &&
             (!crossCurrency || parseAmountToCents(amountTo).let { it != null && it > 0 })))
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = colors.surfaceOverlay,
+    // The shared dialog carries the title, the X, the divider and the
+    // Cancel/Save pair, so this file is only its fields — same as the web,
+    // where every form is a `<Modal>` with the fields inside.
+    FormSheet(
+        title = stringResource(R.string.transactions_new_transaction),
+        busy = busy,
+        error = error,
+        canSave = canSave,
+        onSave = { save() },
+        onDismiss = onDismiss,
     ) {
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .imePadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(
-                stringResource(R.string.transactions_new_transaction),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
+        run {
+            // The web leads with a full-width segmented control, not three pills.
+            SegmentedControl(
+                options = listOf(TxKind.Income, TxKind.Expense, TxKind.Transfer),
+                selected = kind,
+                label = {
+                    stringResource(
+                        when (it) {
+                            TxKind.Income -> R.string.transactions_income
+                            TxKind.Expense -> R.string.transactions_expense
+                            else -> R.string.transactions_transfer
+                        },
+                    )
+                },
+                onSelect = { kind = it },
+                modifier = Modifier.fillMaxWidth(),
+                fillEqually = true,
             )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KindChip(TxKind.Expense, kind, R.string.transactions_expense) { kind = it }
-                KindChip(TxKind.Income, kind, R.string.transactions_income) { kind = it }
-                KindChip(TxKind.Transfer, kind, R.string.transactions_transfer) { kind = it }
-            }
 
             PickerField(
                 label = stringResource(
@@ -253,25 +260,39 @@ fun TransactionFormSheet(
                 )
             }
 
-            FormField(
+            MoneyField(
                 label = stringResource(R.string.transactions_amount),
                 value = amount,
                 onValueChange = { amount = it; error = null },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                suffix = wallet?.currencyCode.orEmpty(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             )
 
+            // Date and time share a row, as on the web.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                DateField(
+                    label = stringResource(R.string.transactions_date),
+                    value = date,
+                    onChange = { date = it },
+                    modifier = Modifier.weight(1f),
+                )
+                TimeField(
+                    label = stringResource(R.string.transactions_time),
+                    value = time,
+                    onChange = { time = it },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
             if (crossCurrency) {
-                FormField(
-                    label = stringResource(R.string.transactions_amount_received),
+                MoneyField(
+                    label = stringResource(R.string.transactions_amount_received) +
+                        " (" + toWallet?.currencyCode.orEmpty() + ")",
                     value = amountTo,
                     onValueChange = { amountTo = it; error = null },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    suffix = toWallet?.currencyCode.orEmpty(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
             }
 
@@ -282,6 +303,7 @@ fun TransactionFormSheet(
                     selected = category,
                     optionLabel = { seedName(it.name, it.isSystem).orEmpty() },
                     onSelect = { category = it },
+                    emptyLabel = stringResource(R.string.transactions_no_category),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -292,18 +314,6 @@ fun TransactionFormSheet(
                 onValueChange = { description = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-            )
-
-            DateField(
-                label = stringResource(R.string.transactions_date),
-                value = date,
-                onChange = { date = it },
-            )
-
-            TimeField(
-                label = stringResource(R.string.transactions_time),
-                value = time,
-                onChange = { time = it },
             )
 
             if (kind == TxKind.Expense && isCreditWallet) {
@@ -340,23 +350,6 @@ fun TransactionFormSheet(
                 MsiPreview(repository, wallet, amountCents, msiMonthsValue, date, msiMonthsValid)
             }
 
-            error?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.danger)
-            }
-
-            Spacer(Modifier.height(4.dp))
-            Button(
-                onClick = { save() },
-                enabled = canSave,
-                colors = ButtonDefaults.buttonColors(containerColor = colors.accent),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.height(20.dp))
-                } else {
-                    Text(stringResource(R.string.common_save))
-                }
-            }
         }
     }
 

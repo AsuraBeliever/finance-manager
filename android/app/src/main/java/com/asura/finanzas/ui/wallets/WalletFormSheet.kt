@@ -32,7 +32,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.FormField
+import com.asura.finanzas.ui.components.MoneyField
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Currency
@@ -78,6 +88,8 @@ fun WalletFormSheet(
         )
     }
     var notes by remember { mutableStateOf(existing?.notes.orEmpty()) }
+    // Chosen card design; null means "let the category decide", as on the web.
+    var skinId by remember { mutableStateOf(existing?.skin) }
     var earnsYield by remember { mutableStateOf(existing?.yieldRateBps != null) }
     var yieldRate by remember {
         mutableStateOf(existing?.yieldRateBps?.let { "%.2f".format(it / 100.0) }.orEmpty())
@@ -116,7 +128,7 @@ fun WalletFormSheet(
                     currencyCode = chosenCurrency.code,
                     initialBalanceCents = parseAmountToCents(initial) ?: 0,
                     color = existing?.color,
-                    skin = existing?.skin,
+                    skin = skinId,
                     notes = notes,
                     // Percent in the field, basis points on the wire.
                     yieldRateBps = if (earnsYield) {
@@ -139,28 +151,17 @@ fun WalletFormSheet(
         }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = colors.surfaceOverlay,
+    FormSheet(
+        title = stringResource(
+            if (existing == null) R.string.wallets_new_wallet else R.string.wallets_edit_wallet,
+        ),
+        busy = busy,
+        error = error,
+        canSave = canSave,
+        onSave = { save() },
+        onDismiss = onDismiss,
     ) {
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .imePadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(
-                stringResource(
-                    if (existing == null) R.string.wallets_new_wallet else R.string.wallets_edit_wallet,
-                ),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
-            )
-
+        run {
             FormField(
                 label = stringResource(R.string.wallets_name),
                 value = name,
@@ -169,34 +170,8 @@ fun WalletFormSheet(
                 singleLine = true,
             )
 
-            PickerField(
-                label = stringResource(R.string.wallets_category),
-                options = categories,
-                selected = category,
-                optionLabel = { it.name },
-                onSelect = { category = it },
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            PickerField(
-                label = stringResource(R.string.wallets_currency),
-                options = currencies,
-                selected = currency,
-                optionLabel = { "${it.code} · ${it.name}" },
-                onSelect = { currency = it },
-                enabled = existing == null, // currency is fixed once there are movements
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            FormField(
-                label = stringResource(R.string.wallets_initial_balance),
-                value = initial,
-                onValueChange = { initial = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            )
-
+            // Web order: name, what it nests under (with its hint), then the
+            // category and currency side by side.
             PickerField(
                 label = stringResource(R.string.wallets_parent_wallet),
                 options = listOf<Wallet?>(null) + wallets.filter {
@@ -207,35 +182,53 @@ fun WalletFormSheet(
                 onSelect = { parent = it },
                 modifier = Modifier.fillMaxWidth(),
             )
+            Text(
+                stringResource(
+                    if (parent == null) R.string.wallets_parent_none_hint
+                    else R.string.wallets_parent_hint,
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    stringResource(R.string.wallets_yield_enable),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colors.fg,
+                PickerField(
+                    label = stringResource(R.string.wallets_category),
+                    options = categories,
+                    selected = category,
+                    optionLabel = { it.name },
+                    onSelect = { category = it },
+                    modifier = Modifier.weight(1f),
                 )
-                Switch(
-                    checked = earnsYield,
-                    onCheckedChange = { earnsYield = it },
-                    colors = SwitchDefaults.colors(checkedTrackColor = colors.accent),
+                PickerField(
+                    label = stringResource(R.string.wallets_currency),
+                    options = currencies,
+                    selected = currency,
+                    optionLabel = { "${it.code} · ${it.name}" },
+                    onSelect = { currency = it },
+                    // Currency is fixed once there are movements.
+                    enabled = existing == null,
+                    modifier = Modifier.weight(1f),
                 )
             }
 
-            if (earnsYield) {
-                FormField(
-                    label = stringResource(R.string.wallets_yield_rate),
-                    value = yieldRate,
-                    onValueChange = { yieldRate = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    suffix = "%",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-            }
+            MoneyField(
+                label = stringResource(R.string.wallets_initial_balance),
+                value = initial,
+                onValueChange = { initial = it },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            // Card design: the same catalogue the web offers, in its groups.
+            // Without this the APK simply could not choose one.
+            SkinPicker(
+                selected = skinId,
+                categoryName = category?.name,
+                onSelect = { skinId = it },
+            )
 
             FormField(
                 label = stringResource(R.string.wallets_notes),
@@ -244,21 +237,49 @@ fun WalletFormSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            error?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.danger)
+            // The web frames this as a bordered card with a checkbox and a
+            // paragraph explaining it, not a bare switch row.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+                    .padding(14.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = earnsYield,
+                        onCheckedChange = { earnsYield = it },
+                        colors = CheckboxDefaults.colors(checkedColor = colors.accent),
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        stringResource(R.string.wallets_yield_enable),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                        color = colors.fg,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.wallets_yield_hint),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    color = colors.fgSubtle,
+                )
+                if (earnsYield) {
+                    Spacer(Modifier.height(12.dp))
+                    FormField(
+                        label = stringResource(R.string.wallets_yield_rate),
+                        value = yieldRate,
+                        onValueChange = { yieldRate = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        suffix = "%",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    )
+                }
             }
 
-            Spacer(Modifier.height(4.dp))
-            if (busy) {
-                CircularProgressIndicator(color = colors.accent, strokeWidth = 2.dp)
-            } else {
-                PrimaryButton(
-                    text = stringResource(R.string.common_save),
-                    onClick = { save() },
-                    enabled = canSave,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
         }
     }
 }

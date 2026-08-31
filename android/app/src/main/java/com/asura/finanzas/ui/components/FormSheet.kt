@@ -70,7 +70,7 @@ fun FormSheet(
                 .widthIn(max = 448.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(colors.surfaceRaised)
+                .background(colors.surfaceOverlay)
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
                 .imePadding(),
         ) {

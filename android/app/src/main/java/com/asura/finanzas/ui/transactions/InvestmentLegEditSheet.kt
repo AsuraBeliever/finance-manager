@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
+import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.MovementDetail
@@ -127,14 +128,12 @@ fun InvestmentLegEditSheet(
             onSelect = { kind = it },
             modifier = Modifier.fillMaxWidth(),
         )
-        FormField(
+        MoneyField(
             label = stringResource(R.string.investments_movement_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
             suffix = detail?.currencyCode.orEmpty(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         DateField(
             label = stringResource(R.string.investments_movement_date),

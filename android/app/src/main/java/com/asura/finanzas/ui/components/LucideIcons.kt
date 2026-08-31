@@ -190,6 +190,10 @@ object Lucide {
 
     val X by lazy { icon("M18 6 6 18", "m6 6 12 12") }
 
+    val Clock by lazy { icon("M12 6v6l4 2", "M22 12a10 10 0 1 1-20 0 10 10 0 1 1 20 0z") }
+
+    val Upload by lazy { icon("M12 3v12", "m17 8-5-5-5 5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4") }
+
     val ChevronDown by lazy { icon("m6 9 6 6 6-6") }
 
     val Trash by lazy {

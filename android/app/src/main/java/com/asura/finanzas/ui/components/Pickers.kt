@@ -160,12 +160,12 @@ fun DateField(
             )
         }.getOrDefault(value.toString())
     }
-    Box(Modifier.clickable { showDialog = true }) {
+    Box(modifier.clickable { showDialog = true }) {
         FormField(
             label = label,
             value = shown,
             onValueChange = {},
-            modifier = modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             enabled = false,
             readOnly = true,
             trailing = {
@@ -223,25 +223,38 @@ fun TimeField(
     var showDialog by remember { mutableStateOf(false) }
     val clock24 = LocalAppSettings.current.clock24
 
-    FormField(
-        label = label,
-        value = value?.let { formatClock(it, clock24) }.orEmpty(),
-        onValueChange = {},
-        modifier = modifier.fillMaxWidth(),
-        readOnly = true,
-        trailing = {
-            Row {
+    // Clock glyph then the time, the way the web's TimeInput reads; tapping the
+    // box opens the picker and the little x clears it.
+    Box(modifier.clickable { showDialog = true }) {
+        FormField(
+            label = label,
+            value = value?.let { formatClock(it, clock24) }.orEmpty(),
+            onValueChange = {},
+            modifier = Modifier.fillMaxWidth(),
+            enabled = false,
+            readOnly = true,
+            leading = {
+                Icon(
+                    Lucide.Clock,
+                    contentDescription = null,
+                    tint = Broke.colors.fgMuted,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+            trailing = {
                 if (value != null) {
-                    TextButton(onClick = { onChange(null) }) {
-                        Text(stringResource(R.string.common_clear))
-                    }
+                    Icon(
+                        Lucide.X,
+                        contentDescription = stringResource(R.string.common_clear),
+                        tint = Broke.colors.fgMuted,
+                        modifier = Modifier
+                            .clickable { onChange(null) }
+                            .size(15.dp),
+                    )
                 }
-                TextButton(onClick = { showDialog = true }) {
-                    Text(stringResource(R.string.transactions_time))
-                }
-            }
-        },
-    )
+            },
+        )
+    }
 
     if (showDialog) {
         val parsed = value?.let { runCatching { LocalTime.parse(it) }.getOrNull() }

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
+import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.MsiSchedulePreview
@@ -138,14 +139,12 @@ fun MsiPlanSheet(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        FormField(
+        MoneyField(
             label = stringResource(R.string.credit_msi_total),
             value = total,
             onValueChange = { total = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
             suffix = wallet.currencyCode,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         FormField(
             label = stringResource(R.string.credit_msi_months),

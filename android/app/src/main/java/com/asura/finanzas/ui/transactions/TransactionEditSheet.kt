@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
+import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -147,14 +148,12 @@ private fun SimpleEditSheet(
             onSelect = { wallet = it },
             modifier = Modifier.fillMaxWidth(),
         )
-        FormField(
+        MoneyField(
             label = stringResource(R.string.transactions_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
             suffix = wallet?.currencyCode.orEmpty(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         PickerField(
             label = stringResource(R.string.transactions_category),
@@ -296,24 +295,20 @@ private fun TransferEditSheet(
             onSelect = { toWallet = it },
             modifier = Modifier.fillMaxWidth(),
         )
-        FormField(
+        MoneyField(
             label = stringResource(R.string.transactions_amount),
             value = amountFrom,
             onValueChange = { amountFrom = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
             suffix = fromWallet?.currencyCode.orEmpty(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         if (crossCurrency) {
-            FormField(
+            MoneyField(
                 label = stringResource(R.string.transactions_amount_received),
                 value = amountTo,
                 onValueChange = { amountTo = it; error = null },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
                 suffix = toWallet?.currencyCode.orEmpty(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             )
         }
         FormField(

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
+import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Budget
@@ -89,13 +90,11 @@ fun BudgetFormSheet(
             emptyLabel = overallLabel,
             modifier = Modifier.fillMaxWidth(),
         )
-        FormField(
+        MoneyField(
             label = stringResource(R.string.budgets_limit),
             value = limit,
             onValueChange = { limit = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
     }
 }

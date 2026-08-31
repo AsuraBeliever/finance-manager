@@ -1,5 +1,44 @@
 package com.asura.finanzas.ui.wallets
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.asura.finanzas.R
+import com.asura.finanzas.ui.components.FieldLabel
+import com.asura.finanzas.ui.components.Lucide
+import com.asura.finanzas.ui.theme.Broke
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -110,3 +149,191 @@ fun WalletSkin.brush(): Brush {
         end = Offset.Infinite,
     )
 }
+
+
+/**
+ * The catalogue as the form shows it, in the web's four groups and order
+ * (`SkinGroup` in `src/lib/skins.ts`). Ids match, so a card designed on one
+ * surface is the same card on the other.
+ */
+val SKIN_GROUPS: List<Pair<Int, List<String>>> = listOf(
+    com.asura.finanzas.R.string.wallets_skin_group_banco to
+        listOf("azul", "marino", "turquesa", "rojo", "vino", "morado", "verde"),
+    com.asura.finanzas.R.string.wallets_skin_group_nivel to
+        listOf("oro", "platino", "black", "infinite"),
+    com.asura.finanzas.R.string.wallets_skin_group_efectivo to
+        listOf("efectivo", "cuero", "monedas", "ahorro"),
+    com.asura.finanzas.R.string.wallets_skin_group_glass to
+        listOf("neon", "holo", "noche"),
+)
+
+/** The catalogue entry for an id, for drawing a swatch. */
+fun skinById(id: String): WalletSkin? = CATALOG[id]
+
+/**
+ * The card-design picker from the web's wallet form: the "auto" tile, the
+ * custom-colour tile, and the catalogue laid out in its four labelled groups.
+ * Selecting one stores the skin id, which is exactly what the web stores.
+ */
+@Composable
+fun SkinPicker(selected: String?, categoryName: String?, onSelect: (String?) -> Unit) {
+    val colors = Broke.colors
+    var showCustom by remember { mutableStateOf(false) }
+    val borderColor = colors.borderMuted
+    Column {
+        FieldLabel(stringResource(R.string.wallets_skin))
+        // First row, as on the web: auto, a custom colour, and an import tile.
+        val context = LocalContext.current
+        val picker = rememberLauncherForActivityResult(
+            ActivityResultContracts.PickVisualMedia(),
+        ) { uri -> uri?.let { encodeImageSkin(context, it)?.let(onSelect) } }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SkinTile(
+                brush = CATALOG.getValue(categoryDefaultSkin(categoryName)).brush(),
+                selected = selected == null,
+                onClick = { onSelect(null) },
+                mark = Lucide.Check,
+                modifier = Modifier.weight(1f),
+            )
+            SkinTile(
+                brush = CATALOG.getValue("morado").brush(),
+                selected = selected?.startsWith("grad:") == true,
+                onClick = { showCustom = true },
+                mark = Lucide.Palette,
+                alwaysMark = true,
+                modifier = Modifier.weight(1f),
+            )
+            Row(
+                modifier = Modifier
+                    .weight(2f)
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .drawBehind {
+                        drawRoundRect(
+                            color = borderColor,
+                            style = Stroke(
+                                width = 1.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(
+                                    floatArrayOf(8.dp.toPx(), 6.dp.toPx()),
+                                ),
+                            ),
+                            cornerRadius = CornerRadius(8.dp.toPx()),
+                        )
+                    }
+                    .clickable {
+                        picker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            ) {
+                Icon(
+                    Lucide.Upload,
+                    contentDescription = null,
+                    tint = colors.fgMuted,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    stringResource(R.string.wallets_skin_import),
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                    color = colors.fgMuted,
+                )
+            }
+        }
+        SKIN_GROUPS.forEach { (labelRes, ids) ->
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(labelRes).uppercase(),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    letterSpacing = 1.6.sp,
+                    fontSize = 11.sp,
+                ),
+                color = colors.fgSubtle,
+            )
+            Spacer(Modifier.height(8.dp))
+            // Four to a row, like the web's grid.
+            ids.chunked(4).forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    row.forEach { id ->
+                        SkinTile(
+                            brush = CATALOG.getValue(id).brush(),
+                            selected = selected == id,
+                            onClick = { onSelect(id) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkinTile(
+    brush: Brush,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    mark: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    /** Show the mark even when this tile is not the chosen one. */
+    alwaysMark: Boolean = false,
+) {
+    Box(
+        modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(brush)
+            .then(
+                if (selected) {
+                    Modifier.border(2.dp, Broke.colors.accent, RoundedCornerShape(8.dp))
+                } else {
+                    Modifier.border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(8.dp))
+                },
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if ((selected || alwaysMark) && mark != null) {
+            Icon(mark, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+
+/**
+ * Scale an imported photo down and hand it back as a `img:<data-url>` skin —
+ * the same shape the web's `compressImage` produces, so the card renders the
+ * same on both surfaces and the value round-trips through the API unchanged.
+ */
+private fun encodeImageSkin(context: android.content.Context, uri: android.net.Uri): String? =
+    runCatching {
+        val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+        val bitmap = android.graphics.ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+            decoder.isMutableRequired = false
+        }
+        // 640 px on the long edge is plenty for a card and keeps the row small.
+        val scale = 640f / maxOf(bitmap.width, bitmap.height).toFloat()
+        val scaled = if (scale < 1f) {
+            android.graphics.Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scale).toInt(),
+                (bitmap.height * scale).toInt(),
+                true,
+            )
+        } else {
+            bitmap
+        }
+        val out = java.io.ByteArrayOutputStream()
+        scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, out)
+        "img:data:image/jpeg;base64," +
+            android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+    }.getOrNull()

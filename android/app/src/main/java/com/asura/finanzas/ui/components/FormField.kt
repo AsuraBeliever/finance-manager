@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -140,3 +141,61 @@ fun FieldLabel(text: String, modifier: Modifier = Modifier) {
         modifier = modifier.padding(bottom = 6.dp),
     )
 }
+
+/**
+ * Money entry, matching the web's `MoneyInput`: a `$` adornment, a "0.00"
+ * placeholder, and cash-register behaviour — the digits you type fill in from
+ * the right, so "1234" reads as 12.34 and the box always holds a fully grouped
+ * amount.
+ *
+ * The value handed back is a plain major-unit string ("1234.56", or "" when
+ * empty), which is what `parseAmountToCents` already expects. No money is
+ * computed here; this only groups the digits someone typed.
+ */
+@Composable
+fun MoneyField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    suffix: String = "",
+) {
+    val cents = value.toBigDecimalOrNull()?.movePointRight(2)?.toLong()
+    val display = cents?.let { groupCents(it) }.orEmpty()
+
+    FormField(
+        label = label,
+        value = display,
+        onValueChange = { raw ->
+            val digits = raw.filter { it.isDigit() }.take(13)
+            onValueChange(
+                if (digits.isEmpty()) "" else {
+                    java.math.BigDecimal(digits).movePointLeft(2).setScale(2).toPlainString()
+                },
+            )
+        },
+        modifier = modifier,
+        placeholder = "0.00",
+        singleLine = true,
+        suffix = suffix,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        leading = {
+            Text(
+                "$",
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = Broke.colors.fgSubtle,
+            )
+        },
+    )
+}
+
+/** 1234 cents -> "12.34", grouped in thousands. */
+private fun groupCents(cents: Long): String {
+    val s = kotlin.math.abs(cents).toString().padStart(3, '0')
+    val frac = s.takeLast(2)
+    val int = s.dropLast(2).reversed().chunked(3).joinToString(",").reversed()
+    return (if (cents < 0) "-" else "") + int + "." + frac
+}
+
+private fun String.toBigDecimalOrNull(): java.math.BigDecimal? =
+    runCatching { java.math.BigDecimal(this) }.getOrNull()
