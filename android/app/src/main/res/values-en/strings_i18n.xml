@@ -134,6 +134,7 @@
     <string name="budgets_empty_title">No budgets</string>
     <string name="budgets_empty_description">Set a monthly spending limit, overall or per category.</string>
     <string name="budgets_delete_confirm">Delete this budget?</string>
+    <string name="subscriptions_name_placeholder">e.g. Spotify, Netflix…</string>
     <string name="subscriptions_title">Subscriptions</string>
     <string name="subscriptions_new_subscription">New subscription</string>
     <string name="subscriptions_edit_subscription">Edit subscription</string>

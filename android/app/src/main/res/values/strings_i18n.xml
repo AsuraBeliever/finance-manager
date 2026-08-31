@@ -134,6 +134,7 @@
     <string name="budgets_empty_title">Sin presupuestos</string>
     <string name="budgets_empty_description">Define un límite mensual de gasto, general o por categoría.</string>
     <string name="budgets_delete_confirm">¿Eliminar este presupuesto?</string>
+    <string name="subscriptions_name_placeholder">Ej. Spotify, Netflix…</string>
     <string name="subscriptions_title">Suscripciones</string>
     <string name="subscriptions_new_subscription">Nueva suscripción</string>
     <string name="subscriptions_edit_subscription">Editar suscripción</string>

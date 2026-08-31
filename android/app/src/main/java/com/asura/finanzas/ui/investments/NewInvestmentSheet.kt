@@ -14,6 +14,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.components.FieldLabel
+import com.asura.finanzas.ui.components.PlainSheet
+import com.asura.finanzas.ui.components.formatBps
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.CatalogItem
@@ -52,6 +73,8 @@ fun NewInvestmentSheet(
     val colors = Broke.colors
 
     var catalog by remember { mutableStateOf<List<CatalogItem>>(emptyList()) }
+    // The web makes picking the instrument a step of its own before the fields.
+    var step by remember { mutableStateOf(if (existing == null) "catalog" else "form") }
     var wallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
     var choice by remember { mutableStateOf<CatalogItem?>(null) }
     var name by remember { mutableStateOf(existing?.name.orEmpty()) }
@@ -92,6 +115,19 @@ fun NewInvestmentSheet(
     val cents = parseAmountToCents(principal)
     val canSave = !busy && (existing != null || choice != null) &&
         name.isNotBlank() && cents != null && cents > 0
+
+    if (step == "catalog") {
+        CatalogSheet(
+            catalog = catalog,
+            onPick = {
+                choice = it
+                if (name.isBlank()) name = names[it.id].orEmpty()
+                step = "form"
+            },
+            onDismiss = onDismiss,
+        )
+        return
+    }
 
     FormSheet(
         title = stringResource(
@@ -142,19 +178,24 @@ fun NewInvestmentSheet(
             }
         },
     ) {
-        // The instrument is only chosen at creation time.
+        // Which instrument this is, and a way back to the catalogue — the web
+        // shows the same pair once you are past the picker.
         if (existing == null) {
-            PickerField(
-                label = stringResource(R.string.investments_catalog_title),
-                options = catalog,
-                selected = choice,
-                optionLabel = { catalogLabel(it) },
-                onSelect = {
-                    choice = it
-                    if (name.isBlank()) name = names[it.id].orEmpty()
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Column {
+                FieldLabel(stringResource(R.string.investments_catalog_title))
+                Text(
+                    choice?.let { catalogLabel(it) }.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    color = Broke.colors.fg,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.investments_catalog_back),
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                    color = Broke.colors.accent,
+                    modifier = Modifier.clickable { step = "catalog" },
+                )
+            }
         }
 
         choice?.rateBps?.let { bps ->
@@ -216,9 +257,104 @@ fun catalogName(item: CatalogItem): String = stringResource(
     },
 )
 
+/** The one-line explanation under each catalogue entry, as on the web. */
+@Composable
+private fun catalogDescription(item: CatalogItem): String = stringResource(
+    when (item.id) {
+        "cetes_28" -> R.string.investments_catalog_cetes_28_description
+        "cetes_91" -> R.string.investments_catalog_cetes_91_description
+        "cetes_182" -> R.string.investments_catalog_cetes_182_description
+        "cetes_364" -> R.string.investments_catalog_cetes_364_description
+        "bonddia" -> R.string.investments_catalog_bonddia_description
+        "nu_cajita" -> R.string.investments_catalog_nu_cajita_description
+        "crypto" -> R.string.investments_catalog_crypto_description
+        "fixed_rate" -> R.string.investments_catalog_fixed_rate_description
+        else -> R.string.investments_catalog_manual_description
+    },
+)
+
 @Composable
 private fun catalogLabel(item: CatalogItem): String {
     val name = catalogName(item)
-    val rate = item.rateBps?.let { " · %.2f%%".format(it / 100.0) }.orEmpty()
+    val rate = item.rateBps?.let { " · " + formatBps(it) }.orEmpty()
     return name + rate
+}
+
+
+/**
+ * The catalogue step: one card per instrument with its description and the live
+ * rate the server attached, exactly as the web lists them.
+ */
+@Composable
+private fun CatalogSheet(
+    catalog: List<CatalogItem>,
+    onPick: (CatalogItem) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = Broke.colors
+    PlainSheet(
+        title = stringResource(R.string.investments_catalog_title),
+        onDismiss = onDismiss,
+    ) {
+        if (catalog.isEmpty()) {
+            Text(
+                stringResource(R.string.investments_catalog_loading),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fgSubtle,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                textAlign = TextAlign.Center,
+            )
+        }
+        catalog.forEach { item ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colors.surface)
+                    .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
+                    .clickable { onPick(item) }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        catalogName(item),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                        color = colors.fg,
+                    )
+                    Text(
+                        catalogDescription(item),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        color = colors.fgSubtle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                val bps = item.rateBps
+                if (bps != null) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            formatBps(bps),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = colors.accent,
+                        )
+                        item.rateDate?.let {
+                            Text(
+                                stringResource(R.string.investments_catalog_rate_as_of) + " " + it,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                                color = colors.fgSubtle,
+                            )
+                        }
+                    }
+                } else if (item.id == "nu_cajita" || item.id == "fixed_rate") {
+                    Text(
+                        stringResource(R.string.investments_catalog_no_rate),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        color = colors.fgSubtle,
+                    )
+                }
+            }
+        }
+    }
 }

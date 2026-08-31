@@ -15,6 +15,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.ColorPicker
+import com.asura.finanzas.ui.components.FieldLabel
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -58,10 +64,12 @@ fun SubscriptionFormSheet(
     var category by remember { mutableStateOf<TransactionCategory?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var color by remember { mutableStateOf(existing?.color) }
 
     val genericError = stringResource(R.string.common_error)
     val offlineError = stringResource(R.string.offline_banner)
-    val noneLabel = stringResource(R.string.transactions_no_category)
+    // The web labels both empty options "None" here, not "Uncategorized".
+    val noneLabel = stringResource(R.string.subscriptions_none)
 
     LaunchedEffect(Unit) {
         wallets = runCatching { repository.wallets().value }.getOrDefault(emptyList())
@@ -97,7 +105,7 @@ fun SubscriptionFormSheet(
                         nextChargeDate = nextCharge.toString(),
                         walletId = wallet?.id,
                         categoryId = category?.id,
-                        color = existing?.color,
+                        color = color,
                     )
                 }
                     .onSuccess { onSaved() }
@@ -113,37 +121,64 @@ fun SubscriptionFormSheet(
             value = name,
             onValueChange = { name = it; error = null },
             modifier = Modifier.fillMaxWidth(),
+            placeholder = stringResource(R.string.subscriptions_name_placeholder),
             singleLine = true,
         )
-        MoneyField(
-            label = stringResource(R.string.subscriptions_amount),
-            value = amount,
-            onValueChange = { amount = it; error = null },
+
+        // Web order: amount + currency, then frequency + next charge, both in
+        // two-column rows.
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            suffix = wallet?.currencyCode.orEmpty(),
-        )
-        SegmentedControl(
-            options = listOf("monthly", "yearly"),
-            selected = cadence,
-            label = {
-                stringResource(
-                    if (it == "yearly") R.string.subscriptions_yearly
-                    else R.string.subscriptions_monthly,
-                )
-            },
-            onSelect = { cadence = it },
-        )
-        DateField(
-            label = stringResource(R.string.subscriptions_next_charge),
-            value = nextCharge,
-            onChange = { nextCharge = it },
-        )
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            MoneyField(
+                label = stringResource(R.string.subscriptions_amount),
+                value = amount,
+                onValueChange = { amount = it; error = null },
+                modifier = Modifier.weight(1f),
+            )
+            FormField(
+                label = stringResource(R.string.investments_currency),
+                value = wallet?.currencyCode ?: existing?.currencyCode ?: "MXN",
+                onValueChange = {},
+                modifier = Modifier.weight(1f),
+                enabled = false,
+                readOnly = true,
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PickerField(
+                label = stringResource(R.string.subscriptions_cadence),
+                options = listOf("monthly", "yearly"),
+                selected = cadence,
+                optionLabel = {
+                    stringResource(
+                        if (it == "yearly") R.string.subscriptions_yearly
+                        else R.string.subscriptions_monthly,
+                    )
+                },
+                onSelect = { cadence = it },
+                modifier = Modifier.weight(1f),
+            )
+            DateField(
+                label = stringResource(R.string.subscriptions_next_charge),
+                value = nextCharge,
+                onChange = { nextCharge = it },
+                modifier = Modifier.weight(1f),
+            )
+        }
+
         PickerField(
             label = stringResource(R.string.subscriptions_wallet),
-            options = wallets.filter { !it.isArchived },
+            options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
             selected = wallet,
-            optionLabel = { it.name },
+            optionLabel = { it?.name ?: noneLabel },
             onSelect = { wallet = it },
+            emptyLabel = noneLabel,
             modifier = Modifier.fillMaxWidth(),
         )
         PickerField(
@@ -155,5 +190,10 @@ fun SubscriptionFormSheet(
             emptyLabel = noneLabel,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        Column {
+            FieldLabel(stringResource(R.string.categories_color))
+            ColorPicker(value = color, onChange = { color = it })
+        }
     }
 }

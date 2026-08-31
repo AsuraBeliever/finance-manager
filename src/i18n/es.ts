@@ -154,6 +154,7 @@ export const esDict = {
     deleteConfirm: "¿Eliminar este presupuesto?",
   },
   subscriptions: {
+    namePlaceholder: "Ej. Spotify, Netflix…",
     title: "Suscripciones",
     newSubscription: "Nueva suscripción",
     editSubscription: "Editar suscripción",

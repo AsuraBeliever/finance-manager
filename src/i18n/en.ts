@@ -148,6 +148,7 @@ export const en: Dict = {
     deleteConfirm: "Delete this budget?",
   },
   subscriptions: {
+    namePlaceholder: "e.g. Spotify, Netflix…",
     title: "Subscriptions",
     newSubscription: "New subscription",
     editSubscription: "Edit subscription",

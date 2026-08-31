@@ -52,8 +52,9 @@ fun ProgressBar(
     }
 }
 
-/** Percentage text for a basis-point value: 7350 -> "73.5%". */
-fun formatBps(bps: Long): String = "%.1f%%".format(bps / 100.0)
+/** Percentage text for a basis-point value: 7350 -> "73.50 %", as the web
+ *  formats it (two decimals, with the space before the sign). */
+fun formatBps(bps: Long): String = "%.2f %%".format(bps / 100.0)
 
 /** Neutral track colour when a caller needs it outside the bar. */
 val progressTrack: Color

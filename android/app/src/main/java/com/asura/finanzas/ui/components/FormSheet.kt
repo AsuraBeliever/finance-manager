@@ -174,3 +174,59 @@ fun DialogAction(
             .padding(vertical = 14.dp),
     )
 }
+
+/**
+ * The same dialog shell without the Cancel/Save footer, for steps that are a
+ * choice rather than a form (the investment catalogue).
+ */
+@Composable
+fun PlainSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = Broke.colors
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .widthIn(max = 448.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(colors.surfaceOverlay)
+                .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp)),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.displayLarge
+                        .copy(fontSize = 18.sp, lineHeight = 24.sp),
+                    color = colors.fg,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Lucide.X,
+                    contentDescription = stringResource(R.string.common_close),
+                    tint = colors.fgMuted,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(onClick = onDismiss)
+                        .padding(4.dp)
+                        .size(18.dp),
+                )
+            }
+            HairLine()
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                content = content,
+            )
+        }
+    }
+}
