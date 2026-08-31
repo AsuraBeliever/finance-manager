@@ -15,6 +15,35 @@ Nunca escribas una cadena a mano en un composable: agrégala en `es.ts` + `en.ts
 regenera y commitea. El generador falla si las dos lenguas no tienen las mismas
 llaves.
 
+## Paridad visual: la web es el plano, no la inspiración
+
+No basta con que la feature exista: **el APK tiene que verse igual que la web a
+ancho de teléfono.** El usuario usa las dos con la misma cuenta y no debe notar
+que cambió de superficie.
+
+Cómo se verifica (es la única forma que ha funcionado):
+
+1. `cd worker && npx wrangler dev --ip 0.0.0.0` y compilar el APK con
+   `-PbrokeApiBase=http://<ip-lan>:8787`, para que las dos vean los mismos datos.
+2. Capturar la web con Playwright al **tamaño exacto del teléfono** (el S25U de
+   pruebas reporta 720×1560 con densidad 280 → viewport 411×891 y
+   `deviceScaleFactor` 1.75), y el APK con `adb exec-out screencap -p`.
+3. Pegar las dos imágenes lado a lado y comparar. Las diferencias de verdad
+   (una cifra distinta, un control que falta, otro glifo) sólo se ven así.
+
+Cosas que salieron de hacer esto y conviene no repetir:
+
+- **Los íconos de Material no son los de Lucide.** Son primos, no el mismo
+  dibujo. Los glifos que usa la web viven en `ui/components/LucideIcons.kt`.
+- **Nada de controles con cara de Material**: el `PickerField` es la caja del
+  `<select>` de la web con su etiqueta encima, no un `OutlinedTextField` con
+  etiqueta flotante.
+- **Los nombres semilla se traducen** con `seedName()` en toda pantalla que los
+  muestre; sin eso salen en español dentro de la app en inglés.
+- Medidas compartidas: tarjetas `rounded-2xl` (16 dp), márgenes de página
+  16 dp, botón primario `rounded-lg` px16/py8 sobre `accentDim`, encabezado con
+  regla de 4×28 y título de 30 sp cuyas acciones **envuelven**.
+
 Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 
 ## Sesión

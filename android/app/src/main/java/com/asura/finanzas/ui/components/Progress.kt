@@ -23,6 +23,8 @@ fun ProgressBar(
     progressBps: Long,
     modifier: Modifier = Modifier,
     over: Boolean = false,
+    /** A goal paints its bar in its own colour, as on the web. */
+    color: androidx.compose.ui.graphics.Color? = null,
 ) {
     val colors = Broke.colors
     val fraction = (progressBps / 10_000f).coerceIn(0f, 1f)
@@ -40,10 +42,10 @@ fun ProgressBar(
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp))
                 .background(
-                    if (over) {
-                        Brush.linearGradient(listOf(colors.danger, colors.danger))
-                    } else {
-                        Brush.linearGradient(listOf(colors.accent, colors.cyan))
+                    when {
+                        over -> Brush.linearGradient(listOf(colors.danger, colors.danger))
+                        color != null -> Brush.linearGradient(listOf(color, color))
+                        else -> Brush.linearGradient(listOf(colors.accent, colors.cyan))
                     },
                 ),
         )

@@ -46,6 +46,11 @@ fun <T> SegmentedControl(
     icon: ((T) -> ImageVector?)? = null,
     /** Split the width evenly, as the web does wherever the row has space. */
     fillEqually: Boolean = false,
+    /**
+     * The theme switch marks its choice in the accent (the web's ThemeToggle);
+     * every other segmented control uses the plain raised chip.
+     */
+    accentSelected: Boolean = false,
 ) {
     val colors = Broke.colors
     // The web's control: rounded-xl tray, p-1, gap-1; the selected option is a
@@ -53,7 +58,7 @@ fun <T> SegmentedControl(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(colors.surfaceOverlay)
+            .background(colors.surface)
             // Long labels would otherwise be squeezed until each one wrapped
             // down several lines, blowing the pill up into a tall block.
             .then(if (fillEqually) Modifier else Modifier.horizontalScroll(rememberScrollState()))
@@ -66,7 +71,13 @@ fun <T> SegmentedControl(
                 modifier = Modifier
                     .then(if (fillEqually) Modifier.weight(1f) else Modifier)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) colors.surfaceRaised else Color.Transparent)
+                    .background(
+                        when {
+                            !isSelected -> Color.Transparent
+                            accentSelected -> colors.accentDim.copy(alpha = 0.20f)
+                            else -> colors.surfaceRaised
+                        },
+                    )
                     .clickable { onSelect(option) }
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -76,14 +87,22 @@ fun <T> SegmentedControl(
                     Icon(
                         it,
                         contentDescription = null,
-                        tint = if (isSelected) colors.fg else colors.fgSubtle,
+                        tint = when {
+                            !isSelected -> colors.fgSubtle
+                            accentSelected -> colors.accent
+                            else -> colors.fg
+                        },
                         modifier = Modifier.size(16.dp),
                     )
                 }
                 Text(
                     text = label(option),
                     style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-                    color = if (isSelected) colors.fg else colors.fgSubtle,
+                    color = when {
+                        !isSelected -> colors.fgSubtle
+                        accentSelected -> colors.accent
+                        else -> colors.fg
+                    },
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     softWrap = false,
@@ -212,6 +231,8 @@ fun IconBadge(icon: ImageVector, tint: Color, modifier: Modifier = Modifier) {
 fun SettingRow(
     label: String,
     modifier: Modifier = Modifier,
+    /** A row nested inside a card is labelled small and muted, as on the web. */
+    subtle: Boolean = false,
     control: @Composable RowScope.() -> Unit,
 ) {
     Row(
@@ -219,7 +240,15 @@ fun SettingRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, style = MaterialTheme.typography.titleMedium, color = Broke.colors.fg)
+        Text(
+            label,
+            style = if (subtle) {
+                MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+            } else {
+                MaterialTheme.typography.titleMedium
+            },
+            color = if (subtle) Broke.colors.fgMuted else Broke.colors.fg,
+        )
         Spacer(Modifier.width(12.dp))
         control()
     }

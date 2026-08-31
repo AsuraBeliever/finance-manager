@@ -28,6 +28,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.components.Lucide
+import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.R
 import com.asura.finanzas.data.Budget
 import com.asura.finanzas.data.BrokeRepository
@@ -75,6 +84,12 @@ fun BudgetsScreen(
             onBack = onBack,
             onNew = { creating = true },
             onLongPress = { actionsFor = it },
+            onDelete = { target ->
+                scope.launch {
+                    runCatching { repository.deleteBudget(target.id) }
+                    reload()
+                }
+            },
             modifier = modifier,
         )
     }
@@ -94,7 +109,8 @@ fun BudgetsScreen(
             containerColor = Broke.colors.surfaceOverlay,
             title = {
                 Text(
-                    target.categoryName ?: stringResource(R.string.budgets_overall),
+                    target.categoryName?.let { seedName(it) }
+                        ?: stringResource(R.string.budgets_overall),
                     color = Broke.colors.fg,
                 )
             },
@@ -129,13 +145,14 @@ private fun BudgetList(
     onBack: () -> Unit,
     onNew: () -> Unit,
     onLongPress: (Budget) -> Unit,
+    onDelete: (Budget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val hide = LocalAppSettings.current.hideBalances
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -144,7 +161,7 @@ private fun BudgetList(
             PrimaryButton(
                 text = stringResource(R.string.budgets_new_budget),
                 onClick = onNew,
-                leadingIcon = Icons.Outlined.Add,
+                leadingIcon = Lucide.Plus,
             )
         }
 
@@ -161,51 +178,74 @@ private fun BudgetList(
             }
         }
 
-        items(budgets, key = { it.id }) { budget -> BudgetCard(budget, hide, onLongPress) }
+        items(budgets, key = { it.id }) { budget ->
+            BudgetCard(budget, hide, onLongPress, onDelete)
+        }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BudgetCard(budget: Budget, hide: Boolean, onLongPress: (Budget) -> Unit) {
+private fun BudgetCard(
+    budget: Budget,
+    hide: Boolean,
+    onLongPress: (Budget) -> Unit,
+    onDelete: (Budget) -> Unit,
+) {
     val colors = Broke.colors
     // "Over budget" is a comparison of two server-computed figures, not a
     // recalculation of either.
     val over = budget.spentMxnCents > budget.limitCents
+    val remaining = kotlin.math.abs(budget.limitCents - budget.spentMxnCents)
+    val tint = parseHexColor(budget.color) ?: colors.cyan
 
     GlassCard(
         Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = { onLongPress(budget) }),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Dot(parseHexColor(budget.color) ?: colors.accent, 12.dp)
-            Spacer(Modifier.width(10.dp))
+            Dot(tint, 12.dp)
+            Spacer(Modifier.width(8.dp))
             Text(
-                budget.categoryName ?: stringResource(R.string.dashboard_uncategorized),
+                // Seeded names come back in Spanish whatever the language, so
+                // they go through the same translation the web applies — this
+                // screen was showing "Comida" in an English app.
+                budget.categoryName?.let { seedName(it) }
+                    ?: stringResource(R.string.budgets_overall),
                 style = MaterialTheme.typography.titleMedium,
                 color = colors.fg,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                formatBps(budget.progressBps),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (over) colors.danger else colors.fgMuted,
+            // The web offers delete on the row; there is no percentage here.
+            Icon(
+                Lucide.Trash,
+                contentDescription = stringResource(R.string.common_delete),
+                tint = colors.fgSubtle,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { onDelete(budget) }
+                    .padding(6.dp)
+                    .size(15.dp),
             )
         }
 
-        Spacer(Modifier.height(12.dp))
-        ProgressBar(budget.progressBps, over = over)
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
+        ProgressBar(budget.progressBps, over = over, color = if (over) null else tint)
+        Spacer(Modifier.height(8.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                maskIfHidden(formatMoney(budget.spentMxnCents), hide),
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (over) colors.danger else colors.fg,
+                maskIfHidden(formatMoney(budget.spentMxnCents), hide) + " " +
+                    stringResource(R.string.goals_of) + " " +
+                    maskIfHidden(formatMoney(budget.limitCents), hide),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fgMuted,
+                modifier = Modifier.weight(1f),
             )
             Text(
-                "  /  " + maskIfHidden(formatMoney(budget.limitCents), hide),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.fgSubtle,
+                stringResource(if (over) R.string.budgets_over else R.string.budgets_remaining) +
+                    ": " + maskIfHidden(formatMoney(remaining), hide),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = if (over) colors.danger else colors.accent,
             )
         }
     }

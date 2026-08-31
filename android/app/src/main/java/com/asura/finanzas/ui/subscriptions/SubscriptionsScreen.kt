@@ -30,6 +30,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
+import com.asura.finanzas.ui.components.Lucide
+import com.asura.finanzas.ui.components.chartColor
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Subscription
@@ -78,6 +91,25 @@ fun SubscriptionsScreen(
             onBack = onBack,
             onNew = { creating = true },
             onLongPress = { actionsFor = it },
+            onPay = { target ->
+                scope.launch {
+                    runCatching { repository.registerSubscriptionPayment(target.id) }
+                    reload()
+                }
+            },
+            onToggle = { target ->
+                scope.launch {
+                    runCatching { repository.setSubscriptionActive(target.id, !target.isActive) }
+                    reload()
+                }
+            },
+            onEdit = { editing = it },
+            onDelete = { target ->
+                scope.launch {
+                    runCatching { repository.deleteSubscription(target.id) }
+                    reload()
+                }
+            },
             modifier = modifier,
         )
     }
@@ -153,6 +185,10 @@ private fun SubscriptionContent(
     onBack: () -> Unit,
     onNew: () -> Unit,
     onLongPress: (Subscription) -> Unit,
+    onPay: (Subscription) -> Unit,
+    onToggle: (Subscription) -> Unit,
+    onEdit: (Subscription) -> Unit,
+    onDelete: (Subscription) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val hide = LocalAppSettings.current.hideBalances
@@ -179,12 +215,18 @@ private fun SubscriptionContent(
         }
 
         item {
-            GlassCard(Modifier.fillMaxWidth()) {
-                MicroLabel(stringResource(R.string.subscriptions_monthly_total))
-                Spacer(Modifier.height(4.dp))
-                HeroAmount(
+            // A quiet line on the web, not a hero card.
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    stringResource(R.string.subscriptions_monthly_total) + ": ",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    color = Broke.colors.fgMuted,
+                )
+                Text(
                     maskIfHidden(formatMoney(data.monthlyTotalMxnCents), hide),
-                    fontSize = 32.sp,
+                    style = MaterialTheme.typography.displayLarge
+                        .copy(fontSize = 16.sp, lineHeight = 20.sp),
+                    color = Broke.colors.fg,
                 )
             }
         }
@@ -198,17 +240,18 @@ private fun SubscriptionContent(
             }
         }
 
-        items(active, key = { it.id }) { SubscriptionCard(it, hide, onLongPress) }
-
-        if (paused.isNotEmpty()) {
-            item {
-                MicroLabel(
-                    stringResource(R.string.subscriptions_paused),
-                    Modifier.padding(top = 8.dp),
-                )
-            }
+        // One list in the server's order — the web dims the paused ones in
+        // place instead of moving them under a heading of their own.
+        itemsIndexed(data.subscriptions, key = { _, it -> it.id }) { index, subscription ->
+            SubscriptionCard(
+                subscription, hide, index,
+                onLongPress = onLongPress,
+                onPay = onPay,
+                onToggle = onToggle,
+                onEdit = onEdit,
+                onDelete = onDelete,
+            )
         }
-        items(paused, key = { "paused-${it.id}" }) { SubscriptionCard(it, hide, onLongPress) }
     }
 }
 
@@ -217,49 +260,103 @@ private fun SubscriptionContent(
 private fun SubscriptionCard(
     subscription: Subscription,
     hide: Boolean,
+    index: Int,
     onLongPress: (Subscription) -> Unit,
+    onPay: (Subscription) -> Unit,
+    onToggle: (Subscription) -> Unit,
+    onEdit: (Subscription) -> Unit,
+    onDelete: (Subscription) -> Unit,
 ) {
     val colors = Broke.colors
+    val tint = parseHexColor(subscription.color) ?: chartColor(index)
+    // A paused subscription is dimmed rather than hidden, as on the web.
+    val alpha = if (subscription.isActive) 1f else 0.6f
+
     GlassCard(
-        Modifier.fillMaxWidth()
+        Modifier
+            .fillMaxWidth()
+            .alpha(alpha)
             .combinedClickable(onClick = {}, onLongClick = { onLongPress(subscription) }),
+        padding = 16.dp,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Dot(parseHexColor(subscription.color) ?: colors.accent, 12.dp)
-            Spacer(Modifier.width(10.dp))
+            // The web's badge: a colour tile with the service's initial.
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(tint),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    subscription.name.take(1).uppercase(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     subscription.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (subscription.isActive) colors.fg else colors.fgSubtle,
-                )
-                Text(
-                    "${stringResource(R.string.subscriptions_next_charge)}: ${subscription.nextChargeDate}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgSubtle,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    maskIfHidden(
-                        formatMoney(subscription.amountCents, subscription.currencyCode),
-                        hide,
-                    ),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                     color = colors.fg,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
+                    // Cadence and next charge share one line on the web.
                     stringResource(
-                        if (subscription.cadence == "yearly") {
-                            R.string.subscriptions_yearly
-                        } else {
-                            R.string.subscriptions_monthly
-                        },
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
+                        if (subscription.cadence == "yearly") R.string.subscriptions_yearly
+                        else R.string.subscriptions_monthly,
+                    ) + " · " + stringResource(R.string.subscriptions_next_charge) +
+                        ": " + subscription.nextChargeDate,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                     color = colors.fgSubtle,
                 )
             }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                maskIfHidden(
+                    formatMoney(subscription.amountCents, subscription.currencyCode),
+                    hide,
+                ),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fg,
+            )
+        }
+
+        // Register a payment, pause/resume, edit, delete — the four the web
+        // puts on every row.
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+        ) {
+            RowAction(Lucide.Receipt, subscription.walletId != null) { onPay(subscription) }
+            RowAction(if (subscription.isActive) Lucide.Pause else Lucide.Play) {
+                onToggle(subscription)
+            }
+            RowAction(Lucide.Pencil) { onEdit(subscription) }
+            RowAction(Lucide.Trash) { onDelete(subscription) }
         }
     }
+}
+
+/** One of the small icon buttons on a subscription row. */
+@Composable
+private fun RowAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Icon(
+        icon,
+        contentDescription = null,
+        tint = Broke.colors.fgSubtle.copy(alpha = if (enabled) 1f else 0.4f),
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(6.dp)
+            .size(16.dp),
+    )
 }

@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.Lucide
+import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.ContributionPlan
@@ -107,6 +109,8 @@ fun GoalsScreen(
             onBack = onBack,
             onNew = { creating = true },
             onLongPress = { actionsFor = it },
+            onEdit = { editing = it },
+            onDelete = { confirmDelete = it },
             walletName = walletName,
             onContribute = { contributing = it },
             onUse = { if (it.goalKind == "fund") confirmConvert = it else confirmUse = it },
@@ -297,6 +301,8 @@ private fun GoalList(
     onContribute: (SavingsGoal) -> Unit,
     onUse: (SavingsGoal) -> Unit,
     onAdjustDate: (SavingsGoal) -> Unit,
+    onEdit: (SavingsGoal) -> Unit,
+    onDelete: (SavingsGoal) -> Unit,
     onReorder: (List<Long>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -364,6 +370,8 @@ private fun GoalList(
                 onContribute = onContribute,
                 onUse = onUse,
                 onAdjustDate = onAdjustDate,
+                onEdit = onEdit,
+                onDelete = onDelete,
                 reorderState = reorderState,
             )
         }
@@ -381,6 +389,8 @@ private fun GoalCard(
     onContribute: (SavingsGoal) -> Unit,
     onUse: (SavingsGoal) -> Unit,
     onAdjustDate: (SavingsGoal) -> Unit,
+    onEdit: (SavingsGoal) -> Unit,
+    onDelete: (SavingsGoal) -> Unit,
     reorderState: ReorderState,
 ) {
     val colors = Broke.colors
@@ -392,23 +402,26 @@ private fun GoalCard(
             .graphicsLayer { translationY = if (dragging) reorderState.offsetY else 0f }
             .combinedClickable(onClick = {}, onLongClick = { onLongPress(goal) }),
     ) {
+        val tint = parseHexColor(goal.color) ?: colors.accent
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            val tint = parseHexColor(goal.color) ?: colors.accent
+            // Grip first, then the badge — the order the web lays out.
+            ReorderHandle(state = reorderState, key = goal.id)
+            Spacer(Modifier.width(8.dp))
             Box(
                 Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(tint.copy(alpha = 0.16f)),
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(tint.copy(alpha = 0.22f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Outlined.Savings,
+                    Lucide.PiggyBank,
                     contentDescription = null,
                     tint = tint,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(17.dp),
                 )
             }
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
             // Neither the deadline nor the percentage repeats here: the plan
             // sentence already carries the date, and the progress line below
             // carries the percentage — the same split the web makes.
@@ -427,35 +440,58 @@ private fun GoalCard(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            ReorderHandle(state = reorderState, key = goal.id)
+            // The web offers edit and delete on the card itself.
+            Icon(
+                Lucide.Pencil,
+                contentDescription = stringResource(R.string.common_edit),
+                tint = colors.fgSubtle,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { onEdit(goal) }
+                    .padding(6.dp)
+                    .size(15.dp),
+            )
+            Icon(
+                Lucide.Trash,
+                contentDescription = stringResource(R.string.common_delete),
+                tint = colors.fgSubtle,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { onDelete(goal) }
+                    .padding(6.dp)
+                    .size(15.dp),
+            )
         }
 
-        Spacer(Modifier.height(12.dp))
-        ProgressBar(goal.progressBps)
-        Spacer(Modifier.height(10.dp))
-
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // Figure first, bar under it — the web's order; and the bar carries the
+        // goal's own colour rather than the app accent.
+        Spacer(Modifier.height(14.dp))
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             Text(
                 maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.displayLarge
+                    .copy(fontSize = 24.sp, lineHeight = 28.sp),
                 color = colors.fg,
             )
             Text(
-                "  " + stringResource(R.string.goals_of) + "  " +
+                " " + stringResource(R.string.goals_of) + " " +
                     maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                 color = colors.fgSubtle,
+                modifier = Modifier.padding(start = 6.dp, bottom = 2.dp),
             )
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(12.dp))
+        ProgressBar(goal.progressBps, color = tint)
+        Spacer(Modifier.height(12.dp))
         val remaining = (goal.targetCents - goal.savedCents).coerceAtLeast(0)
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 if (remaining == 0L) {
                     stringResource(R.string.goals_completed)
                 } else {
-                    "${formatBps(goal.progressBps)} · " +
+                    "${Math.round(goal.progressBps / 100.0)}% · " +
                         stringResource(R.string.goals_remaining) + " " +
                         maskIfHidden(formatMoney(remaining, goal.currencyCode), hide)
                 },
@@ -475,17 +511,30 @@ private fun GoalCard(
             // on the web; which one shows depends on the goal's kind.
             if (goal.savedCents > 0) {
                 Spacer(Modifier.width(4.dp))
-                Text(
-                    stringResource(
-                        if (goal.goalKind == "fund") R.string.goals_convert_to_wallet
-                        else R.string.goals_buy,
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.accent,
+                // The web marks this one with a check, so it does not read as a
+                // second plain link next to "Add".
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clickable { onUse(goal) }
                         .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
+                ) {
+                    Icon(
+                        Lucide.Check,
+                        contentDescription = null,
+                        tint = colors.accent,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        stringResource(
+                            if (goal.goalKind == "fund") R.string.goals_convert_to_wallet
+                            else R.string.goals_buy,
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.accent,
+                    )
+                }
             }
         }
 
@@ -517,8 +566,12 @@ private fun planDate(iso: String?): String {
     if (iso.isNullOrBlank()) return ""
     val locale = java.util.Locale.forLanguageTag(LocalAppSettings.current.locale)
     val date = runCatching { java.time.LocalDate.parse(iso) }.getOrNull() ?: return iso
-    val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, locale)
-    return "${date.dayOfMonth} $month ${date.year}"
+    // The locale decides the order ("Dec 31, 2026" vs "31 dic 2026"); hand-
+    // assembling it always produced the Spanish order, even in English.
+    val formatter = java.time.format.DateTimeFormatter
+        .ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
+        .withLocale(locale)
+    return runCatching { date.format(formatter) }.getOrDefault(iso)
 }
 
 /** Cadence adverb ("al mes") for the reserve sentence. */

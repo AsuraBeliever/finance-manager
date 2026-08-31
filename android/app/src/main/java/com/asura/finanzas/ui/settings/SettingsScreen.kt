@@ -38,6 +38,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.BuildConfig
+import com.asura.finanzas.ui.components.Lucide
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.AppPreferences
 import com.asura.finanzas.data.AppearanceSync
@@ -158,6 +163,7 @@ fun SettingsScreen(
         GlassCard(Modifier.fillMaxWidth()) {
             SettingRow(stringResource(R.string.theme_label)) {
                 SegmentedControl(
+                    accentSelected = true,
                     // Web order: Light, Dark, Auto.
                     options = listOf(ThemeChoice.Light, ThemeChoice.Dark, ThemeChoice.System),
                     selected = settings.theme,
@@ -192,18 +198,21 @@ fun SettingsScreen(
                 color = colors.fgSubtle,
             )
             Spacer(Modifier.height(12.dp))
+            // The web's select sits bare under the hint — no second label.
             PickerField(
-                label = stringResource(R.string.settings_timezone),
+                label = "",
                 options = timezones,
                 selected = settings.timezone,
-                optionLabel = { it },
+                // The web prints zone ids with spaces, not underscores.
+                optionLabel = { it.replace('_', ' ') },
                 onSelect = { scope.launch { preferences.setTimezone(it) } },
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
-
-        GlassCard(Modifier.fillMaxWidth()) {
-            SettingRow(stringResource(R.string.settings_clock)) {
+            // Clock format lives inside this card on the web, not in one of its
+            // own; and there is no "hide balance" row at all — the eye in the
+            // headers is the control, on both surfaces.
+            Spacer(Modifier.height(16.dp))
+            SettingRow(stringResource(R.string.settings_clock), subtle = true) {
                 SegmentedControl(
                     options = listOf(false, true),
                     selected = settings.clock24,
@@ -215,40 +224,42 @@ fun SettingsScreen(
             }
         }
 
-        GlassCard(Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
+        GlassCard(Modifier.fillMaxWidth().clickable { showAppearance = true }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Lucide.Palette,
+                    contentDescription = null,
+                    tint = colors.fgSubtle,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    stringResource(R.string.dashboard_hide_balance),
+                    stringResource(R.string.appearance_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.fg,
                 )
-                Switch(
-                    checked = settings.hideBalances,
-                    onCheckedChange = { scope.launch { preferences.setHideBalances(it) } },
-                    colors = SwitchDefaults.colors(
-                        checkedTrackColor = colors.accent,
-                        checkedThumbColor = colors.surface,
-                    ),
-                )
             }
-        }
-
-        GlassCard(Modifier.fillMaxWidth().clickable { showAppearance = true }) {
-            Text(
-                stringResource(R.string.appearance_manage),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
-            )
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.appearance_settings_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.fgSubtle,
             )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.appearance_manage),
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                    color = colors.accent,
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    Lucide.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.accent,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
         }
 
         GlassCard(Modifier.fillMaxWidth().clickable { onOpenCurrencies() }) {
