@@ -44,48 +44,46 @@ fun <T> SegmentedControl(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     icon: ((T) -> ImageVector?)? = null,
+    /** Split the width evenly, as the web does wherever the row has space. */
+    fillEqually: Boolean = false,
 ) {
     val colors = Broke.colors
+    // The web's control: rounded-xl tray, p-1, gap-1; the selected option is a
+    // rounded-lg raised chip with plain foreground text — not accent-coloured.
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(colors.surfaceOverlay)
             // Long labels would otherwise be squeezed until each one wrapped
             // down several lines, blowing the pill up into a tall block.
-            .horizontalScroll(rememberScrollState())
+            .then(if (fillEqually) Modifier else Modifier.horizontalScroll(rememberScrollState()))
             .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         options.forEach { option ->
             val isSelected = option == selected
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(11.dp))
+                    .then(if (fillEqually) Modifier.weight(1f) else Modifier)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(if (isSelected) colors.surfaceRaised else Color.Transparent)
-                    .then(
-                        if (isSelected) Modifier.border(
-                            1.dp,
-                            colors.borderMuted,
-                            RoundedCornerShape(11.dp),
-                        ) else Modifier,
-                    )
                     .clickable { onSelect(option) }
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             ) {
                 icon?.invoke(option)?.let {
                     Icon(
                         it,
                         contentDescription = null,
-                        tint = if (isSelected) colors.accent else colors.fgMuted,
+                        tint = if (isSelected) colors.fg else colors.fgSubtle,
                         modifier = Modifier.size(16.dp),
                     )
                 }
                 Text(
                     text = label(option),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) colors.accent else colors.fgMuted,
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                    color = if (isSelected) colors.fg else colors.fgSubtle,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     softWrap = false,

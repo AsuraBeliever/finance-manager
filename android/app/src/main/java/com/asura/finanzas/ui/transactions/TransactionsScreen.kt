@@ -3,6 +3,7 @@ package com.asura.finanzas.ui.transactions
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.CompareArrows
 import androidx.compose.material.icons.outlined.Add
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.outlined.CallReceived
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,8 +48,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -63,6 +69,7 @@ import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.HairLine
+import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.IconBadge
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
@@ -219,6 +226,8 @@ fun TransactionsScreen(
                 onNew = { showForm = true },
                 totals = totals,
                 onLongPress = { actionsFor = it },
+                onEdit = { if (it.isApartado) editingApartado = it else editing = it },
+                onDelete = { pendingDelete = it },
             )
         }
     }
@@ -359,6 +368,8 @@ private fun TransactionList(
     onNew: () -> Unit,
     totals: TxTotals?,
     onLongPress: (Transaction) -> Unit,
+    onEdit: (Transaction) -> Unit,
+    onDelete: (Transaction) -> Unit,
 ) {
     val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
@@ -399,7 +410,8 @@ private fun TransactionList(
 
         item {
             PickerField(
-                label = stringResource(R.string.transactions_wallet),
+                // The web's filter bar shows the select bare, with no label.
+                label = "",
                 options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
                 selected = wallet,
                 optionLabel = { it?.name ?: allWalletsLabel() },
@@ -416,6 +428,7 @@ private fun TransactionList(
                 label = { stringResource(it.labelRes) },
                 onSelect = onFilter,
                 modifier = Modifier.fillMaxWidth(),
+                fillEqually = true,
             )
         }
 
@@ -497,13 +510,13 @@ private fun TransactionList(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(colors.surfaceRaised)
-                        .border(1.dp, colors.borderMuted, RoundedCornerShape(24.dp)),
+                        .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp)),
                 ) {
                     shown.forEachIndexed { index, row ->
                         if (index > 0) HairLine()
-                        TransactionRow(row.tx, row.toLeg, hide, onLongPress)
+                        TransactionRow(row.tx, row.toLeg, hide, onLongPress, onEdit, onDelete)
                     }
                 }
             }
@@ -519,17 +532,20 @@ private fun TransactionRow(
     toLeg: Transaction?,
     hide: Boolean,
     onLongPress: (Transaction) -> Unit,
+    onEdit: (Transaction) -> Unit,
+    onDelete: (Transaction) -> Unit,
 ) {
     val colors = Broke.colors
     // The web colours by kind, not by sign: income violet, transfer cyan,
     // expense rose.
     val (icon: ImageVector, tint: Color) = when (tx.kind) {
-        "income" -> Icons.Outlined.CallReceived to colors.accent
-        "transfer_in", "transfer_out" -> Icons.AutoMirrored.Outlined.CompareArrows to colors.cyan
+        "income" -> Lucide.ArrowDownLeft to colors.accent
+        // sky-400, the web's transfer colour — not the app's cyan token.
+        "transfer_in", "transfer_out" -> Lucide.ArrowLeftRight to Color(0xFF38BDF8)
         // Apartado moves are information only: no money leaves the wallet, so
         // they read neutral with an arrow instead of a signed amount.
-        "reserve", "release" -> Icons.Outlined.Savings to colors.fgMuted
-        else -> Icons.Outlined.CallMade to colors.danger
+        "reserve", "release" -> Lucide.PiggyBank to colors.fgMuted
+        else -> Lucide.ArrowUpRight to colors.danger
     }
     val sign = when (tx.kind) {
         "income", "transfer_in" -> "+"
@@ -543,11 +559,21 @@ private fun TransactionRow(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = {}, onLongClick = { onLongPress(tx) })
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBadge(icon, tint)
-        Spacer(Modifier.width(14.dp))
+        // The web's mark: a small neutral disc with the glyph carrying the
+        // colour, not a disc tinted by kind.
+        Box(
+            Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(colors.surfaceOverlay),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+        }
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = if (tx.isApartado) {
@@ -560,8 +586,10 @@ private fun TransactionRow(
                         ?: tx.categoryName?.let { seedName(it) }
                         ?: kindLabel(tx.kind)
                 },
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                 color = colors.fg,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = listOfNotNull(
@@ -581,11 +609,11 @@ private fun TransactionRow(
                         ?.takeIf { !tx.description.isNullOrBlank() && !tx.isApartado }
                         ?.let { seedName(it) },
                 ).joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = colors.fgSubtle,
             )
         }
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(12.dp))
         Text(
             // A folded transfer carries no sign — nothing entered or left the
             // books. Both amounts show only when the legs differ, which happens
@@ -598,9 +626,40 @@ private fun TransactionRow(
                 ) + " → " + maskIfHidden(formatMoney(toLeg.amountCents), hide)
                 else -> maskIfHidden(formatMoney(tx.amountCents), hide)
             },
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
             color = tint,
         )
+        // The web puts an edit and a delete button on every row; hiding them
+        // behind a long press meant the two surfaces did not even offer the
+        // same affordances. Fixed-width slot so the amounts stay aligned.
+        Row(
+            modifier = Modifier.width(64.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            run {
+                Icon(
+                    Lucide.Pencil,
+                    contentDescription = stringResource(R.string.common_edit),
+                    tint = colors.fgSubtle,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onEdit(tx) }
+                        .padding(6.dp)
+                        .size(15.dp),
+                )
+            }
+            Icon(
+                Lucide.Trash,
+                contentDescription = stringResource(R.string.common_delete),
+                tint = colors.fgSubtle,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { onDelete(tx) }
+                    .padding(6.dp)
+                    .size(15.dp),
+            )
+        }
     }
 }
 

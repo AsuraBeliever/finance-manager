@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.R
+import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.ui.budgets.BudgetsScreen
 import com.asura.finanzas.ui.categories.CategoriesScreen
@@ -45,9 +46,9 @@ import com.asura.finanzas.ui.theme.Broke
  * place they already learned.
  */
 enum class MoreDestination(val labelRes: Int, val icon: ImageVector) {
-    Goals(R.string.nav_goals, Icons.Outlined.Savings),
-    Budgets(R.string.nav_budgets, Icons.Outlined.TrackChanges),
-    Subscriptions(R.string.nav_subscriptions, Icons.Outlined.Repeat),
+    Goals(R.string.nav_goals, Lucide.PiggyBank),
+    Budgets(R.string.nav_budgets, Lucide.Target),
+    Subscriptions(R.string.nav_subscriptions, Lucide.CreditCard),
     Categories(R.string.categories_title, Icons.Outlined.Category),
 }
 

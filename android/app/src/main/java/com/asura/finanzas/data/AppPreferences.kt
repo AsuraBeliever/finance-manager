@@ -55,7 +55,10 @@ class AppPreferences(private val context: Context) {
             theme = prefs[themeKey]?.let { runCatching { ThemeChoice.valueOf(it) }.getOrNull() }
                 ?: ThemeChoice.System,
             hideBalances = prefs[hideBalancesKey] ?: false,
-            clock24 = prefs[clock24Key] ?: true,
+            // Until the user picks one, follow the phone's own convention —
+            // the web reads the same thing off the browser locale, and a
+            // hard-coded 24 h made the two disagree out of the box.
+            clock24 = prefs[clock24Key] ?: android.text.format.DateFormat.is24HourFormat(context),
             timezone = prefs[timezoneKey] ?: java.util.TimeZone.getDefault().id,
             changelogEnabled = prefs[changelogEnabledKey] ?: true,
             changelogSeen = prefs[changelogSeenKey],

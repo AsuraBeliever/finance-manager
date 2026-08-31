@@ -1,8 +1,16 @@
 package com.asura.finanzas.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -20,8 +28,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.theme.Broke
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.LocalAppSettings
 import java.time.Instant
@@ -30,7 +44,15 @@ import java.time.LocalTime
 import java.time.ZoneOffset
 import java.util.Locale
 
-/** Labelled single-choice dropdown, the native stand-in for the web's `Select`. */
+/**
+ * Single-choice dropdown, drawn as the web's `<select>` rather than a Material
+ * text field: a plain bordered box with the label sitting above it. Material's
+ * floating label and filled underline are an instantly recognisable "this is
+ * the Android one" tell, which is exactly what this app must not have.
+ *
+ * Pass a blank `label` where the web shows the control on its own (the filter
+ * bars), and the row above is skipped.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun <T> PickerField(
@@ -46,32 +68,66 @@ fun <T> PickerField(
     emptyLabel: String = "",
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val colors = Broke.colors
 
-    ExposedDropdownMenuBox(
-        expanded = expanded && enabled,
-        onExpandedChange = { if (enabled) expanded = it },
-        modifier = modifier,
-    ) {
-        OutlinedTextField(
-            value = if (selected != null) optionLabel(selected) else emptyLabel,
-            onValueChange = {},
-            readOnly = true,
-            enabled = enabled,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable)
-                .fillMaxWidth(),
-        )
-        ExposedDropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(optionLabel(option)) },
-                    onClick = {
-                        onSelect(option)
-                        expanded = false
-                    },
+    Column(modifier) {
+        if (label.isNotBlank()) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.8.sp),
+                color = colors.fgMuted,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+        }
+        ExposedDropdownMenuBox(
+            expanded = expanded && enabled,
+            onExpandedChange = { if (enabled) expanded = it },
+        ) {
+            Row(
+                modifier = Modifier
+                    .menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(colors.surface)
+                    .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (selected != null) optionLabel(selected) else emptyLabel,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    color = if (enabled) colors.fg else colors.fgSubtle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                Icon(
+                    Lucide.ChevronDown,
+                    contentDescription = null,
+                    tint = colors.fgSubtle,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            ExposedDropdownMenu(
+                expanded = expanded && enabled,
+                onDismissRequest = { expanded = false },
+                containerColor = colors.surfaceOverlay,
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                optionLabel(option),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                                color = colors.fg,
+                            )
+                        },
+                        onClick = {
+                            onSelect(option)
+                            expanded = false
+                        },
+                    )
+                }
             }
         }
     }

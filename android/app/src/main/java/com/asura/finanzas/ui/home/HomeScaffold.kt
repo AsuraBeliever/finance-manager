@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
+import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.data.AppPreferences
 import com.asura.finanzas.data.AppearanceSync
 import com.asura.finanzas.data.Outbox
@@ -60,12 +61,12 @@ import com.asura.finanzas.ui.wallets.WalletsScreen
 
 /** The six tabs the web shows in its mobile bottom bar, in the same order. */
 enum class Tab(val labelRes: Int, val icon: ImageVector) {
-    Dashboard(R.string.nav_dashboard, Icons.Outlined.GridView),
-    Wallets(R.string.nav_wallets, Icons.Outlined.CreditCard),
-    Transactions(R.string.nav_transactions, Icons.AutoMirrored.Outlined.CompareArrows),
-    Investments(R.string.nav_investments, Icons.Outlined.TrendingUp),
-    Settings(R.string.nav_settings, Icons.Outlined.Settings),
-    More(R.string.nav_more, Icons.Outlined.MoreHoriz),
+    Dashboard(R.string.nav_dashboard, Lucide.LayoutDashboard),
+    Wallets(R.string.nav_wallets, Lucide.Wallet),
+    Transactions(R.string.nav_transactions, Lucide.ArrowLeftRight),
+    Investments(R.string.nav_investments, Lucide.TrendingUp),
+    Settings(R.string.nav_settings, Lucide.Settings),
+    More(R.string.nav_more, Lucide.Ellipsis),
 }
 
 @Composable
