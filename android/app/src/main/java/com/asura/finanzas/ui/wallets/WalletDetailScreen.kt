@@ -38,6 +38,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
+import com.asura.finanzas.data.SavingsGoal
+import com.asura.finanzas.ui.components.Lucide
+import com.asura.finanzas.ui.seedName
+import com.asura.finanzas.ui.transactions.TransactionListCard
+import com.asura.finanzas.ui.transactions.TransactionFormSheet
+import com.asura.finanzas.ui.transactions.TransactionEditSheet
+import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.CreditCardSummary
@@ -81,6 +89,13 @@ fun WalletDetailScreen(
     var wallet by remember { mutableStateOf<Wallet?>(null) }
     var credit by remember { mutableStateOf<CreditCardSummary?>(null) }
     var movements by remember { mutableStateOf<List<Transaction>>(emptyList()) }
+    var pockets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
+    var goals by remember { mutableStateOf<List<SavingsGoal>>(emptyList()) }
+    var addingPocket by remember { mutableStateOf(false) }
+    var addingTx by remember { mutableStateOf(false) }
+    var editingTx by remember { mutableStateOf<Transaction?>(null) }
+    var deletingTx by remember { mutableStateOf<Transaction?>(null) }
+    var allWallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
     var reloadKey by remember { mutableStateOf(0) }
     var addingMsi by remember { mutableStateOf(false) }
     // The schedule the server confirmed, shown once after saving: nothing
@@ -93,6 +108,12 @@ fun WalletDetailScreen(
             .getOrDefault(emptyList())
         credit = wallet?.takeIf { it.creditCutDay != null }
             ?.let { runCatching { repository.creditCardSummary(walletId) }.getOrNull() }
+        allWallets = runCatching { repository.wallets().value }.getOrDefault(emptyList())
+        pockets = allWallets.filter { it.parentWalletId == walletId }
+        // Goals whose apartado is reserved inside this wallet, as the web lists.
+        goals = runCatching { repository.savingsGoals().value }
+            .getOrDefault(emptyList())
+            .filter { it.linkedWalletId == walletId }
     }
 
     val current = wallet
@@ -136,7 +157,7 @@ fun WalletDetailScreen(
             }
         }
 
-        item { BalanceCard(current, credit, hide) }
+        item { BalanceCard(current, credit, pockets, hide) }
 
         credit?.let { summary ->
             item {
@@ -154,10 +175,87 @@ fun WalletDetailScreen(
             }
         }
 
-        if (movements.isNotEmpty()) {
-            item { MicroLabel(stringResource(R.string.transactions_title)) }
-            items(movements, key = { it.id }) { tx -> MovementRow(tx, hide) }
+        // Pockets of this wallet, with the same card the list uses. Apartados
+        // stay one level deep, so a pocket has none of its own.
+        if (current.parentWalletId == null) {
+            item {
+                SectionHeader(
+                    stringResource(R.string.wallets_apartados_label),
+                    stringResource(R.string.wallets_add_apartado),
+                ) { addingPocket = true }
+            }
+            items(pockets, key = { "pocket-${it.id}" }) { pocket ->
+                WalletCard(pocket, hide, onOpen = {}, onLongPress = {})
+            }
         }
+
+        if (goals.isNotEmpty()) {
+            item { MicroLabel(stringResource(R.string.goals_wallet_section_title)) }
+            items(goals, key = { "goal-${it.id}" }) { goal -> WalletGoalRow(goal, hide) }
+        }
+
+        item {
+            SectionHeader(
+                stringResource(R.string.transactions_title),
+                stringResource(R.string.transactions_new_transaction),
+            ) { addingTx = true }
+        }
+        if (movements.isNotEmpty()) {
+            item {
+                TransactionListCard(
+                    transactions = movements,
+                    hide = hide,
+                    onLongPress = {},
+                    onEdit = { editingTx = it },
+                    onDelete = { deletingTx = it },
+                )
+            }
+        }
+    }
+
+    if (addingPocket) {
+        WalletFormSheet(
+            repository = repository,
+            existing = null,
+            wallets = allWallets,
+            parentDefault = current,
+            onDismiss = { addingPocket = false },
+            onSaved = { addingPocket = false; reloadKey++ },
+        )
+    }
+
+    if (addingTx) {
+        TransactionFormSheet(
+            repository = repository,
+            wallets = allWallets,
+            onDismiss = { addingTx = false },
+            onSaved = { addingTx = false; reloadKey++ },
+        )
+    }
+
+    editingTx?.let { target ->
+        TransactionEditSheet(
+            repository = repository,
+            transaction = target,
+            wallets = allWallets,
+            onDismiss = { editingTx = null },
+            onSaved = { editingTx = null; reloadKey++ },
+        )
+    }
+
+    deletingTx?.let { target ->
+        ConfirmDialog(
+            title = stringResource(R.string.common_delete),
+            message = stringResource(R.string.transactions_delete_confirm),
+            onConfirm = {
+                deletingTx = null
+                scope.launch {
+                    runCatching { repository.deleteTransaction(target.id) }
+                    reloadKey++
+                }
+            },
+            onDismiss = { deletingTx = null },
+        )
     }
 
     if (addingMsi) {
@@ -213,47 +311,101 @@ private fun Action(
 }
 
 @Composable
-private fun BalanceCard(wallet: Wallet, credit: CreditCardSummary?, hide: Boolean) {
+private fun BalanceCard(
+    wallet: Wallet,
+    credit: CreditCardSummary?,
+    pockets: List<Wallet>,
+    hide: Boolean,
+) {
     val colors = Broke.colors
+    // Same reading as the card in the list, so the figure does not change when
+    // you tap it: pocket money left the balance through a transfer, so it is
+    // added back here too. Only same-currency pockets add up.
+    val pocketsCents = pockets
+        .filter { it.currencyCode == wallet.currencyCode }
+        .sumOf { it.balanceCents }
+    val reserved = wallet.reservedCents + pocketsCents
+
     GlassCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Dot(parseHexColor(wallet.color) ?: colors.fgSubtle)
-            Spacer(Modifier.width(10.dp))
+            Dot(parseHexColor(wallet.color) ?: colors.fgSubtle, 12.dp)
+            Spacer(Modifier.width(8.dp))
             Text(
-                "${wallet.categoryName} · ${wallet.currencyCode}",
-                style = MaterialTheme.typography.bodyLarge,
+                // Seeded category names arrive in Spanish whatever the app's
+                // language, so they go through the shared translation.
+                "${seedName(wallet.categoryName).orEmpty()} · ${wallet.currencyCode}",
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                 color = colors.fgMuted,
             )
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(4.dp))
         Text(
             // For a card the web leads with available credit, not the negative
             // balance, so the debt is only stated once — in its own panel.
             maskIfHidden(
                 formatMoney(
-                    credit?.availableCreditCents ?: wallet.balanceCents,
+                    credit?.availableCreditCents ?: (wallet.balanceCents + pocketsCents),
                     wallet.currencyCode,
                 ),
                 hide,
             ),
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 34.sp),
+            style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp),
             color = colors.fg,
         )
         credit?.creditLimitCents?.let { limit ->
             Text(
-                text(
-                    R.string.wallets_available,
-                ) + " " + maskIfHidden(formatMoney(limit, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall,
+                text(R.string.credit_available_of_limit).replace(
+                    "{limit}",
+                    maskIfHidden(formatMoney(limit, wallet.currencyCode), hide),
+                ),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = colors.fgSubtle,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
-        if (credit == null && wallet.reservedCents > 0) {
+        if (credit == null && reserved > 0) {
             Text(
-                "${stringResource(R.string.wallets_reserved)} " +
-                    maskIfHidden(formatMoney(wallet.reservedCents, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall,
+                stringResource(R.string.wallets_available) + " " +
+                    maskIfHidden(
+                        formatMoney(wallet.balanceCents - wallet.reservedCents, wallet.currencyCode),
+                        hide,
+                    ) + " · " + stringResource(R.string.wallets_reserved) + " " +
+                    maskIfHidden(formatMoney(reserved, wallet.currencyCode), hide),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = colors.fgSubtle,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        // On a credit card the opening balance is registered debt, so calling it
+        // "initial balance" would read wrong.
+        if (wallet.creditCutDay != null) {
+            if (wallet.initialBalanceCents < 0) {
+                Text(
+                    stringResource(R.string.credit_initial_debt_line) + ": " +
+                        maskIfHidden(
+                            formatMoney(-wallet.initialBalanceCents, wallet.currencyCode),
+                            hide,
+                        ),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    color = colors.fgSubtle,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        } else {
+            Text(
+                stringResource(R.string.wallets_initial_balance) + ": " +
+                    maskIfHidden(formatMoney(wallet.initialBalanceCents, wallet.currencyCode), hide),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        wallet.notes?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fgMuted,
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
     }
@@ -434,41 +586,76 @@ private fun MsiRow(plan: MsiPlan, hide: Boolean, onDelete: () -> Unit) {
     }
 }
 
+/** Section heading with its action, the pair the web puts above each block. */
 @Composable
-private fun MovementRow(tx: Transaction, hide: Boolean) {
+private fun SectionHeader(title: String, action: String, onAction: () -> Unit) {
     val colors = Broke.colors
-    val incoming = tx.kind == "income" || tx.kind == "transfer_in"
-    GlassCard(Modifier.fillMaxWidth(), padding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    // Fall back to the kind so a bare transfer is never a blank row.
-                    tx.description?.takeIf { it.isNotBlank() }
-                        ?: tx.categoryName
-                        ?: kindLabel(tx.kind),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.fg,
-                )
-                Text(
-                    tx.occurredAt.take(10),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgSubtle,
-                )
-            }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = colors.fg)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onAction)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
+            Icon(
+                Lucide.Plus,
+                contentDescription = null,
+                tint = colors.fg,
+                modifier = Modifier.size(15.dp),
+            )
+            Spacer(Modifier.width(8.dp))
             Text(
-                (if (incoming) "+" else "−") + maskIfHidden(formatMoney(tx.amountCents), hide),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (incoming) colors.accent else colors.danger,
+                action,
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                color = colors.fg,
             )
         }
     }
 }
 
+/** One goal reserved inside this wallet, as the web's section lists them. */
 @Composable
-private fun kindLabel(kind: String): String = stringResource(
-    when (kind) {
-        "income" -> R.string.transactions_income
-        "expense" -> R.string.transactions_expense
-        else -> R.string.transactions_transfer
-    },
-)
+private fun WalletGoalRow(goal: SavingsGoal, hide: Boolean) {
+    val colors = Broke.colors
+    val tint = parseHexColor(goal.color) ?: colors.accent
+    GlassCard(Modifier.fillMaxWidth(), padding = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(tint.copy(alpha = 0.22f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Lucide.PiggyBank,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                goal.name,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fg,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide) + " " +
+                    stringResource(R.string.goals_of) + " " +
+                    maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        ProgressBar(goal.progressBps, color = tint)
+    }
+}

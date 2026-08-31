@@ -340,6 +340,28 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
+    /**
+     * Re-runs the projection over a horizon, optionally with imagined recurring
+     * contributions. Every figure is finanzas-core's; this only asks for them.
+     */
+    suspend fun projectInvestment(
+        id: Long,
+        months: Int,
+        contributionCents: Long = 0,
+        cadence: String = "none",
+    ): InvestmentProjection = rpc.json.decodeFromJsonElement(
+        InvestmentProjection.serializer(),
+        rpc.call(
+            "project_investment",
+            buildJsonObject {
+                put("id", id)
+                put("months", months)
+                put("contributionCents", contributionCents)
+                put("cadence", cadence)
+            },
+        ),
+    )
+
     suspend fun closeInvestment(id: Long, closed: Boolean) {
         rpc.call(
             "close_investment",

@@ -230,3 +230,37 @@ fun PlainSheet(
         }
     }
 }
+
+
+/** Yes/no confirmation, the web's `ConfirmDialog`. */
+@Composable
+fun ConfirmDialog(
+    title: String,
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = Broke.colors
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.surfaceOverlay,
+        title = { Text(title, color = colors.fg) },
+        text = {
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fgMuted,
+            )
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.common_delete), color = colors.danger)
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel), color = colors.fgMuted)
+            }
+        },
+    )
+}

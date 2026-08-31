@@ -30,6 +30,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import com.asura.finanzas.ui.components.Lucide
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.border
+import com.asura.finanzas.data.InvestmentProjection
+import com.asura.finanzas.ui.components.OutlineButton
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.InvestmentDetail
@@ -61,6 +71,7 @@ fun InvestmentDetailScreen(
     var reloadKey by remember { mutableStateOf(0) }
     var addingMovement by remember { mutableStateOf(false) }
     var addingSnapshot by remember { mutableStateOf(false) }
+    var simulating by remember { mutableStateOf(false) }
     var actions by remember { mutableStateOf(false) }
     var movementActions by remember { mutableStateOf<InvestmentMovement?>(null) }
     var editingMovement by remember { mutableStateOf<InvestmentMovement?>(null) }
@@ -78,14 +89,33 @@ fun InvestmentDetailScreen(
     }
 
     DetailContent(
+        repository = repository,
         detail = current,
         onBack = onBack,
         onAddMovement = { addingMovement = true },
         onAddSnapshot = { addingSnapshot = true },
-        onActions = { actions = true },
+        onSimulate = { simulating = true },
+        onEdit = { editingInvestment = true },
+        onClose = {
+            scope.launch {
+                runCatching { repository.closeInvestment(investmentId, closed = true) }
+                reloadKey++
+            }
+        },
+        onDelete = {
+            scope.launch {
+                runCatching { repository.deleteInvestment(investmentId) }
+                onBack()
+            }
+        },
         onMovementLongPress = { movementActions = it },
         modifier = modifier,
     )
+
+    if (simulating) {
+        SimulatorScreen(repository = repository, onBack = { simulating = false })
+        return
+    }
 
     if (addingMovement) {
         InvestmentMovementSheet(
@@ -198,16 +228,26 @@ fun InvestmentDetailScreen(
 
 @Composable
 private fun DetailContent(
+    repository: BrokeRepository,
     detail: InvestmentDetail,
     onBack: () -> Unit,
     onAddMovement: () -> Unit,
     onAddSnapshot: () -> Unit,
-    onActions: () -> Unit,
+    onSimulate: () -> Unit,
+    onEdit: () -> Unit,
+    onClose: () -> Unit,
+    onDelete: () -> Unit,
     onMovementLongPress: (InvestmentMovement) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
+    // Horizon in years, as the web's zoom control sets it.
+    var years by remember { mutableStateOf(5) }
+    var projection by remember { mutableStateOf<InvestmentProjection?>(null) }
+    LaunchedEffect(detail.id, years) {
+        projection = runCatching { repository.projectInvestment(detail.id, years * 12) }.getOrNull()
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -217,82 +257,174 @@ private fun DetailContent(
         item {
             BackHeader(detail.name, onBack)
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PrimaryButton(
-                    text = stringResource(R.string.investments_movements),
-                    onClick = onAddMovement,
-                    leadingIcon = Icons.Outlined.Add,
+            // The web offers edit, close and delete up here as quiet actions.
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                DetailAction(Lucide.Pencil, stringResource(R.string.common_edit)) { onEdit() }
+                DetailAction(Lucide.Lock, stringResource(R.string.investments_close)) { onClose() }
+                DetailAction(
+                    Lucide.Trash,
+                    stringResource(R.string.common_delete),
+                    colors.danger,
+                ) { onDelete() }
+            }
+        }
+
+        // Four figures in a 2×2 grid, as on the web — not one hero card.
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                StatBox(
+                    stringResource(R.string.investments_current_value),
+                    maskIfHidden(formatMoney(detail.currentValueCents, detail.currencyCode), hide),
+                    modifier = Modifier.weight(1f),
                 )
-                PrimaryButton(
-                    text = stringResource(R.string.common_edit),
-                    onClick = onActions,
+                StatBox(
+                    stringResource(R.string.investments_gain),
+                    maskIfHidden(formatDelta(detail.gainCents, detail.currencyCode), hide),
+                    valueColor = if (detail.gainCents >= 0) colors.positive else colors.danger,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                StatBox(
+                    stringResource(R.string.investments_net_invested),
+                    maskIfHidden(formatMoney(detail.netInvestedCents, detail.currencyCode), hide),
+                    modifier = Modifier.weight(1f),
+                )
+                StatBox(
+                    stringResource(R.string.investments_start_date),
+                    detail.startDate,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        detail.maturityDate?.let { maturity ->
+            item {
+                StatBox(
+                    stringResource(R.string.investments_maturity),
+                    maturity,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
 
         item {
             GlassCard(Modifier.fillMaxWidth()) {
-                MicroLabel(stringResource(R.string.investments_current_value))
-                Spacer(Modifier.height(4.dp))
-                HeroAmount(
-                    maskIfHidden(formatMoney(detail.currentValueCents, detail.currencyCode), hide),
-                    fontSize = 34.sp,
-                )
-                Spacer(Modifier.height(14.dp))
-                HairLine()
-                Spacer(Modifier.height(12.dp))
-                Line(
-                    stringResource(R.string.investments_net_invested),
-                    maskIfHidden(formatMoney(detail.netInvestedCents, detail.currencyCode), hide),
-                )
-                Spacer(Modifier.height(6.dp))
-                Line(
-                    stringResource(R.string.investments_gain),
-                    maskIfHidden(formatDelta(detail.gainCents, detail.currencyCode), hide),
-                    if (detail.gainCents >= 0) colors.positive else colors.danger,
-                )
-                detail.maturityDate?.let {
-                    Spacer(Modifier.height(6.dp))
-                    Line(stringResource(R.string.investments_maturity), it)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.investments_projection),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.fg,
+                        )
+                        projection?.annualRateBps?.let { bps ->
+                            Text(
+                                stringResource(R.string.investments_projection_at_rate)
+                                    .replace("{rate}", "%.2f".format(bps / 100.0)),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                                color = colors.fgSubtle,
+                            )
+                        }
+                    }
+                    // Horizon stepper, the web's zoom control.
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+                            .padding(2.dp),
+                    ) {
+                        Icon(
+                            Lucide.ZoomIn,
+                            contentDescription = null,
+                            tint = colors.fgMuted,
+                            modifier = Modifier
+                                .clickable(enabled = years > 1) { years -= 1 }
+                                .padding(4.dp)
+                                .size(15.dp),
+                        )
+                        Text(
+                            "$years",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                            color = colors.fg,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
+                        Text(
+                            stringResource(R.string.investments_projection_years_short),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                            color = colors.fgSubtle,
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
+                        Icon(
+                            Lucide.ZoomOut,
+                            contentDescription = null,
+                            tint = colors.fgMuted,
+                            modifier = Modifier
+                                .clickable(enabled = years < 50) { years += 1 }
+                                .padding(4.dp)
+                                .size(15.dp),
+                        )
+                    }
                 }
-            }
-        }
+                Spacer(Modifier.height(10.dp))
+                OutlineButton(
+                    text = stringResource(R.string.investments_projection_sim_toggle),
+                    onClick = onSimulate,
+                    leadingIcon = Lucide.SlidersHorizontal,
+                )
 
-        if (detail.projection.isNotEmpty()) {
-            item {
-                GlassCard(Modifier.fillMaxWidth()) {
-                    MicroLabel(stringResource(R.string.investments_projection))
-                    Spacer(Modifier.height(10.dp))
+                val points = projection?.projection.orEmpty().ifEmpty { detail.projection }
+                if (points.size >= 2) {
+                    Spacer(Modifier.height(12.dp))
                     // Every point comes from finanzas-core; the chart only maps
                     // the given cents onto pixels.
-                    val points = detail.projection
+                    val lo = points.minOf { it.valueCents }
+                    val hi = points.maxOf { it.valueCents }
+                    val today = java.time.LocalDate.now().toString()
                     LineChart(
                         values = points.map { it.valueCents },
                         startLabel = points.first().date,
                         endLabel = points.last().date,
-                        minLabel = maskIfHidden(
-                            formatMoney(points.minOf { it.valueCents }, detail.currencyCode),
-                            hide,
-                        ),
-                        maxLabel = maskIfHidden(
-                            formatMoney(points.maxOf { it.valueCents }, detail.currencyCode),
-                            hide,
-                        ),
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Line(
-                        points.last().date,
-                        maskIfHidden(
-                            formatMoney(points.last().valueCents, detail.currencyCode),
-                            hide,
-                        ),
+                        minLabel = maskIfHidden(formatMoney(lo, detail.currencyCode), hide),
+                        maxLabel = maskIfHidden(formatMoney(hi, detail.currencyCode), hide),
+                        forecastFrom = points.indexOfLast { it.date <= today }.takeIf { it >= 0 },
+                        ticks = if (hide) emptyList() else axisTicks(lo, hi),
                     )
                 }
             }
         }
 
         if (detail.movements.isNotEmpty()) {
-            item { MicroLabel(stringResource(R.string.investments_movements)) }
+            item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MicroLabel(
+                    stringResource(R.string.investments_movements),
+                    Modifier.weight(1f),
+                )
+                DetailAction(Lucide.ArrowDownLeft, stringResource(R.string.investments_deposit)) {
+                    onAddMovement()
+                }
+                Spacer(Modifier.width(12.dp))
+                DetailAction(
+                    Lucide.ArrowUpRight,
+                    stringResource(R.string.investments_withdrawal),
+                    colors.danger,
+                ) { onAddMovement() }
+            }
+        }
             items(detail.movements, key = { it.id }) { movement ->
                 MovementRow(movement, detail.currencyCode, hide, onMovementLongPress)
             }
@@ -370,4 +502,86 @@ private fun Line(label: String, value: String, valueColor: androidx.compose.ui.g
         )
         Text(value, style = MaterialTheme.typography.bodyLarge, color = valueColor ?: colors.fg)
     }
+}
+
+
+/** One of the boxed figures the web's detail lays out in a 2×2 grid. */
+@Composable
+private fun StatBox(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: androidx.compose.ui.graphics.Color? = null,
+) {
+    val colors = Broke.colors
+    GlassCard(modifier, padding = 16.dp) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.8.sp),
+            color = colors.fgMuted,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            value,
+            style = MaterialTheme.typography.displayLarge.copy(fontSize = 20.sp, lineHeight = 26.sp),
+            color = valueColor ?: colors.fg,
+        )
+    }
+}
+
+/** A quiet header action (edit / close / delete). */
+@Composable
+private fun DetailAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: androidx.compose.ui.graphics.Color? = null,
+    onClick: () -> Unit,
+) {
+    val colors = Broke.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = tint ?: colors.fg, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+            color = tint ?: colors.fg,
+        )
+    }
+}
+
+
+/**
+ * Y-axis labels the way the chart library writes them: five even steps over a
+ * rounded range, abbreviated with "k" once the numbers get long.
+ */
+private fun axisTicks(lowCents: Long, highCents: Long): List<String> {
+    val low = lowCents / 100.0
+    val high = highCents / 100.0
+    val step = niceStep((high - low) / 4.0)
+    val base = Math.floor(low / step) * step
+    return (4 downTo 0).map { i ->
+        val v = base + step * i
+        if (Math.abs(v) >= 1000) "%.1fk".format(v / 1000.0) else "%.0f".format(v)
+    }
+}
+
+/** Rounds a raw step up to 1/2/2.5/5 × 10ⁿ. */
+private fun niceStep(raw: Double): Double {
+    if (raw <= 0) return 1.0
+    val magnitude = Math.pow(10.0, Math.floor(Math.log10(raw)))
+    val n = raw / magnitude
+    val step = when {
+        n <= 1.0 -> 1.0
+        n <= 2.0 -> 2.0
+        n <= 2.5 -> 2.5
+        n <= 5.0 -> 5.0
+        else -> 10.0
+    }
+    return step * magnitude
 }

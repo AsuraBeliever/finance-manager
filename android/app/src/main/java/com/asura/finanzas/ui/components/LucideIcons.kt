@@ -194,6 +194,28 @@ object Lucide {
 
     val Upload by lazy { icon("M12 3v12", "m17 8-5-5-5 5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4") }
 
+    val Lock by lazy {
+        icon(
+            "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z",
+            "M7 11V7a5 5 0 0 1 10 0v4",
+        )
+    }
+
+    val ZoomIn by lazy {
+        icon("M21 21l-4.34-4.34", "M17 11a6 6 0 1 1-12 0 6 6 0 1 1 12 0z", "M8 11h6", "M11 8v6")
+    }
+
+    val ZoomOut by lazy {
+        icon("M21 21l-4.34-4.34", "M17 11a6 6 0 1 1-12 0 6 6 0 1 1 12 0z", "M8 11h6")
+    }
+
+    val SlidersHorizontal by lazy {
+        icon(
+            "M10 5H3", "M12 19H3", "M14 3v4", "M16 17v4",
+            "M21 12h-9", "M21 19h-5", "M21 5h-7", "M8 10v4", "M8 12H3",
+        )
+    }
+
     val ChevronDown by lazy { icon("m6 9 6 6 6-6") }
 
     val Trash by lazy {

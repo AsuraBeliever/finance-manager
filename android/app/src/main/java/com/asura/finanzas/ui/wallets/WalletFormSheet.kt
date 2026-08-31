@@ -66,6 +66,8 @@ fun WalletFormSheet(
     repository: BrokeRepository,
     existing: Wallet?,
     wallets: List<Wallet>,
+    /** Pre-selected parent, for "add pocket" from a wallet's detail. */
+    parentDefault: Wallet? = null,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
 ) {
@@ -94,7 +96,7 @@ fun WalletFormSheet(
     var yieldRate by remember {
         mutableStateOf(existing?.yieldRateBps?.let { "%.2f".format(it / 100.0) }.orEmpty())
     }
-    var parent by remember { mutableStateOf<Wallet?>(null) }
+    var parent by remember { mutableStateOf(parentDefault) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 

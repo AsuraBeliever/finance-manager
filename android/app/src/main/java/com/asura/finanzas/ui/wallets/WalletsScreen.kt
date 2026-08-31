@@ -372,7 +372,7 @@ private fun WalletList(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun WalletCard(
+fun WalletCard(
     wallet: Wallet,
     hide: Boolean,
     onOpen: (Wallet) -> Unit,
@@ -431,7 +431,9 @@ private fun WalletCard(
                     CircleShape,
                 ),
         )
-        if (skin.art != SkinArt.None) {
+        // Only the money skins get the big faint motif; a card skin shows its
+        // chip and nothing else, exactly as the web's ART_ICON map decides.
+        if (skin.art != SkinArt.None && skin.art != SkinArt.Chip) {
             Icon(
                 skinArtIcon(skin.art),
                 contentDescription = null,

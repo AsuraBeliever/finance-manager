@@ -508,3 +508,14 @@ data class SolveResult(
     /** What you would have to put in monthly to hit the target on time. */
     val monthlyContributionCents: Long = 0,
 )
+
+
+/** `project_investment`: the same curve the web's detail chart draws. */
+@Serializable
+data class InvestmentProjection(
+    val projection: List<ProjectionPoint> = emptyList(),
+    val annualRateBps: Long? = null,
+    val finalValueCents: Long = 0,
+    val contributedCents: Long = 0,
+    val interestCents: Long = 0,
+)

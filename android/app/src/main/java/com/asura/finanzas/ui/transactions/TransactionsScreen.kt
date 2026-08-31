@@ -506,19 +506,13 @@ private fun TransactionList(
             }
         } else {
             item {
-                // One card holding every row, split by hairlines — the web's list.
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(colors.surfaceRaised)
-                        .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp)),
-                ) {
-                    shown.forEachIndexed { index, row ->
-                        if (index > 0) HairLine()
-                        TransactionRow(row.tx, row.toLeg, hide, onLongPress, onEdit, onDelete)
-                    }
-                }
+                TransactionListCard(
+                    transactions = transactions,
+                    hide = hide,
+                    onLongPress = onLongPress,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                )
             }
         }
     }
@@ -779,5 +773,39 @@ private fun ApartadoEditSheet(
             value = date,
             onChange = { date = it },
         )
+    }
+}
+
+
+/**
+ * The movements list itself: transfers folded into one row, all of them inside
+ * a single hairline-divided card.
+ *
+ * The wallet detail renders the very same component, because the web reuses its
+ * `TransactionList` in both places — keeping them as two separate row layouts
+ * is how they drifted apart in the first place.
+ */
+@Composable
+fun TransactionListCard(
+    transactions: List<Transaction>,
+    hide: Boolean,
+    onLongPress: (Transaction) -> Unit,
+    onEdit: (Transaction) -> Unit,
+    onDelete: (Transaction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = Broke.colors
+    val rows = foldTransfers(transactions)
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surfaceRaised)
+            .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp)),
+    ) {
+        rows.forEachIndexed { index, row ->
+            if (index > 0) HairLine()
+            TransactionRow(row.tx, row.toLeg, hide, onLongPress, onEdit, onDelete)
+        }
     }
 }
