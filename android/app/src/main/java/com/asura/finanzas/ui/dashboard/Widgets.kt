@@ -58,7 +58,8 @@ private fun WidgetHeader(
     ) {
         Text(
             title,
-            style = MaterialTheme.typography.titleMedium,
+            // A widget heading is `font-display text-lg font-medium`.
+            style = MaterialTheme.typography.titleLarge,
             color = colors.fg,
             modifier = Modifier.weight(1f),
         )

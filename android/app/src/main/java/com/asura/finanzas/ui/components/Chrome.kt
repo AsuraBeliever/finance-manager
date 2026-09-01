@@ -132,10 +132,19 @@ fun MeshBackground(modifier: Modifier = Modifier, content: @Composable () -> Uni
 fun PageHeader(
     title: String,
     modifier: Modifier = Modifier,
+    /** Gap between the actions themselves — the web's `gap-4`, or `gap-2`. */
+    actionGap: androidx.compose.ui.unit.Dp = 16.dp,
     actions: @Composable FlowRowScope.() -> Unit = {},
 ) {
     val colors = Broke.colors
-    Column(modifier.fillMaxWidth()) {
+    // `flex flex-wrap items-end justify-between gap-3`: the actions ride the
+    // title's line whenever they fit, and only drop below when they do not.
+    // Stacking them unconditionally added a row to every screen.
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Same tab and title metrics as the web's PageHeader: a 4×28 rule
             // in the "gold" accent (cyan here) and a 1.9rem display title.
@@ -153,12 +162,9 @@ fun PageHeader(
                 modifier = Modifier.padding(start = 12.dp),
             )
         }
-        // The web's header wraps its actions (`flex-wrap`); a plain Row squeezed
-        // them instead, which chopped a button's label into three lines.
         FlowRow(
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(actionGap),
             content = actions,
         )
     }
@@ -211,6 +217,8 @@ fun HeroAmount(
         style = MaterialTheme.typography.displayLarge.copy(
             fontSize = fontSize,
             lineHeight = fontSize * 1.15f,
+            // `font-semibold` on the money heroes; the headers stay medium.
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             brush = Brush.linearGradient(
                 listOf(colors.accentBright, colors.accent, colors.cyan),
             ),

@@ -778,7 +778,7 @@ private fun FlowCard(trends: SpendingTrends, handle: @Composable () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 stringResource(R.string.dashboard_flow),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = Broke.colors.fg,
                 modifier = Modifier.weight(1f),
             )
@@ -810,7 +810,7 @@ private fun FlowRangeCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 stringResource(R.string.dashboard_income_vs_expense),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = colors.fg,
                 modifier = Modifier.weight(1f),
             )

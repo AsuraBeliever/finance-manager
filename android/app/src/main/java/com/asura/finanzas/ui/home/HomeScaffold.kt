@@ -96,6 +96,10 @@ fun HomeScaffold(
             // Pops once after an update, like the web's WhatsNewAuto.
             WhatsNewAuto(preferences)
             Box(Modifier.weight(1f)) {
+                // A planning page replaces the tab under it, the way the web
+                // routes away from it; drawn over the top it let the dashboard
+                // show through.
+                if (moreTarget == null) {
                 when (tab) {
                     Tab.Dashboard -> DashboardScreen(
                         repository = repository,
@@ -115,9 +119,9 @@ fun HomeScaffold(
                     )
                     Tab.More -> Unit
                 }
+                }
 
-                // The planning pages sit over the tab, the way the web routes
-                // to them without leaving the bar behind.
+                // The planning pages, reached from the sheet.
                 when (moreTarget) {
                     null -> Unit
                     MoreDestination.Goals ->

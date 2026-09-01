@@ -40,12 +40,19 @@ val Sora = FontFamily(
     variable(R.font.sora_variable, FontWeight.Bold),
 )
 
+// Every one of these is a class the web actually writes, so a heading here is
+// the same face, size and weight as the same heading in the browser:
+//
+//   displayLarge     PageHeader h2 and modal titles — `font-display font-medium`
+//   headlineMedium   money heroes and gauges       — `font-display font-semibold`
+//   titleLarge       widget headings               — `font-display text-lg font-medium`
+//   titleMedium      section h3                    — plain `font-medium`, sans
 val BrokeTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = Sora,
-        fontWeight = FontWeight.Bold,
-        fontSize = 40.sp,
-        lineHeight = 46.sp,
+        fontWeight = FontWeight.Medium,
+        fontSize = 30.sp,
+        lineHeight = 34.sp,
     ),
     headlineMedium = TextStyle(
         fontFamily = Sora,
@@ -53,11 +60,17 @@ val BrokeTypography = Typography(
         fontSize = 24.sp,
         lineHeight = 30.sp,
     ),
-    titleMedium = TextStyle(
+    titleLarge = TextStyle(
         fontFamily = Sora,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 17.sp,
-        lineHeight = 23.sp,
+        fontWeight = FontWeight.Medium,
+        fontSize = 18.sp,
+        lineHeight = 24.sp,
+    ),
+    titleMedium = TextStyle(
+        fontFamily = HankenGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
     ),
     bodyLarge = TextStyle(
         fontFamily = HankenGrotesk,
@@ -132,8 +145,10 @@ fun rememberBrokeTypography(fontKey: String): Typography = remember(fontKey) {
     BrokeTypography.copy(
         displayLarge = BrokeTypography.displayLarge.on(display),
         displayMedium = BrokeTypography.displayMedium.on(display),
+        headlineMedium = BrokeTypography.headlineMedium.on(display),
         titleLarge = BrokeTypography.titleLarge.on(display),
-        titleMedium = BrokeTypography.titleMedium.on(display),
+        // A section heading is set in the UI face on the web, not the display one.
+        titleMedium = BrokeTypography.titleMedium.on(sans),
         bodyLarge = BrokeTypography.bodyLarge.on(sans),
         bodyMedium = BrokeTypography.bodyMedium.on(sans),
         bodySmall = BrokeTypography.bodySmall.on(sans),

@@ -268,7 +268,12 @@ private fun DetailContent(
             ) {
                 Text(
                     detail.name,
-                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
+                    // `text-2xl font-semibold` — the UI face, not the display one.
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 24.sp,
+                        lineHeight = 30.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    ),
                     color = colors.fg,
                     modifier = Modifier.weight(1f, fill = false),
                 )
@@ -345,7 +350,7 @@ private fun DetailContent(
                     ) {
                         Text(
                             stringResource(R.string.investments_projection),
-                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
+                            style = MaterialTheme.typography.titleLarge,
                             color = colors.fg,
                         )
                         projection?.annualRateBps?.let { bps ->

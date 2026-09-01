@@ -473,8 +473,11 @@ private fun GoalCard(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             Text(
                 maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide),
-                style = MaterialTheme.typography.displayLarge
-                    .copy(fontSize = 24.sp, lineHeight = 28.sp),
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = 24.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                ),
                 color = colors.fg,
             )
             Text(
@@ -503,31 +506,33 @@ private fun GoalCard(
                 color = if (remaining == 0L) colors.positive else colors.fgMuted,
                 modifier = Modifier.weight(1f),
             )
+            // Both of these are ghost Buttons on the web — plain foreground on
+            // a rounded hit area, not accent links.
             Text(
                 stringResource(R.string.goals_contribute),
                 style = MaterialTheme.typography.labelLarge,
-                color = colors.accent,
+                color = colors.fg,
                 modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
                     .clickable { onContribute(goal) }
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
             // Spending a purchase goal and graduating a fund are the same slot
             // on the web; which one shows depends on the goal's kind.
             if (goal.savedCents > 0) {
                 Spacer(Modifier.width(4.dp))
-                // The web marks this one with a check, so it does not read as a
-                // second plain link next to "Add".
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
                         .clickable { onUse(goal) }
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     Icon(
-                        Lucide.Check,
+                        if (goal.goalKind == "fund") Lucide.Wallet else Lucide.Check,
                         contentDescription = null,
-                        tint = colors.accent,
-                        modifier = Modifier.size(15.dp),
+                        tint = colors.fg,
+                        modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
@@ -536,7 +541,7 @@ private fun GoalCard(
                             else R.string.goals_buy,
                         ),
                         style = MaterialTheme.typography.labelLarge,
-                        color = colors.accent,
+                        color = colors.fg,
                     )
                 }
             }
