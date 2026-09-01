@@ -100,5 +100,5 @@ export function formatDayMonth(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
   if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
-  return d.toLocaleDateString(undefined, opts);
+  return d.toLocaleDateString(intlLocale(), opts);
 }

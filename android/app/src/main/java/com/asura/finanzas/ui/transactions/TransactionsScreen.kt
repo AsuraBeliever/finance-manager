@@ -139,7 +139,7 @@ val Transaction.isApartado: Boolean
     get() = kind == "reserve" || kind == "release"
 
 /** The kind filter tabs the web shows above the list. */
-private enum class KindFilter(val labelRes: Int, val wire: String?) {
+enum class KindFilter(val labelRes: Int, val wire: String?) {
     All(R.string.transactions_type_all, null),
     Income(R.string.transactions_income, "income"),
     Expense(R.string.transactions_expense, "expense"),
@@ -461,41 +461,7 @@ private fun TransactionList(
             )
         }
 
-        totals?.let { summary ->
-            item {
-                GlassCard(Modifier.fillMaxWidth(), padding = 16.dp) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            stringResource(
-                                if (filter.wire == "income") R.string.transactions_total_income
-                                else R.string.transactions_total_expense,
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.fgMuted,
-                        )
-                        Text(
-                            maskIfHidden(formatMoney(summary.totalMxnCents), hide),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.fg,
-                        )
-                    }
-                    if (summary.byCurrency.size > 1) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            summary.byCurrency.joinToString(" · ") {
-                                maskIfHidden(formatMoney(it.cents, it.currencyCode), hide)
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.fgSubtle,
-                        )
-                    }
-                }
-            }
-        }
+        totals?.let { summary -> item { TransactionTotal(summary, hide, filter.wire == "income") } }
 
         if (shown.isEmpty()) {
             item {
@@ -528,6 +494,7 @@ private fun TransactionRow(
     onLongPress: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
+    showWallet: Boolean,
 ) {
     val colors = Broke.colors
     // The web colours by kind, not by sign: income violet, transfer cyan,
@@ -591,10 +558,10 @@ private fun TransactionRow(
                     tx.occurredAt.take(10),
                     transactionTimeLabel(tx),
                     // A folded transfer names both ends instead of one wallet.
-                    if (toLeg != null) {
-                        "${tx.walletName} → ${toLeg.walletName}"
-                    } else {
-                        tx.walletName.takeIf { it.isNotBlank() }
+                    when {
+                        !showWallet -> null
+                        toLeg != null -> "${tx.walletName} → ${toLeg.walletName}"
+                        else -> tx.walletName.takeIf { it.isNotBlank() }
                     },
                     // The title already shows the category when there is no
                     // description; with one, the category moves down here so
@@ -802,6 +769,8 @@ fun TransactionListCard(
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
     modifier: Modifier = Modifier,
+    /** Off on a wallet's own page: every row is that wallet's. */
+    showWallet: Boolean = true,
 ) {
     val colors = Broke.colors
     val rows = foldTransfers(transactions)
@@ -814,7 +783,44 @@ fun TransactionListCard(
     ) {
         rows.forEachIndexed { index, row ->
             if (index > 0) HairLine()
-            TransactionRow(row.tx, row.toLeg, hide, onLongPress, onEdit, onDelete)
+            TransactionRow(row.tx, row.toLeg, hide, onLongPress, onEdit, onDelete, showWallet)
+        }
+    }
+}
+
+/** What the filtered set adds up to — the web's `TransactionTotal`. */
+@Composable
+fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
+    val colors = Broke.colors
+    GlassCard(Modifier.fillMaxWidth(), padding = 16.dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                stringResource(
+                    if (income) R.string.transactions_total_income
+                    else R.string.transactions_total_expense,
+                ),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fgMuted,
+            )
+            Text(
+                maskIfHidden(formatMoney(totals.totalMxnCents), hide),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+            )
+        }
+        if (totals.byCurrency.size > 1) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                totals.byCurrency.joinToString(" · ") {
+                    maskIfHidden(formatMoney(it.cents, it.currencyCode), hide)
+                },
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
+            )
         }
     }
 }

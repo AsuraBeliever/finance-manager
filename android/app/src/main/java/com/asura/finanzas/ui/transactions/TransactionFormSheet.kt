@@ -76,6 +76,12 @@ fun TransactionFormSheet(
     wallets: List<Wallet>,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
+    /** Paying a credit card opens straight on the transfer tab, pointing at it
+     *  with what clears the statement already filled in — the web's
+     *  `defaultTab` / `defaultToWalletId` / `defaultAmountText`. */
+    defaultKind: TxKind = TxKind.Income,
+    defaultToWalletId: Long? = null,
+    defaultAmountText: String = "",
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -83,10 +89,15 @@ fun TransactionFormSheet(
 
     val spendable = remember(wallets) { wallets.filter { !it.isArchived } }
 
-    var kind by remember { mutableStateOf(TxKind.Income) }
-    var wallet by remember { mutableStateOf(spendable.firstOrNull()) }
-    var toWallet by remember { mutableStateOf<Wallet?>(null) }
-    var amount by remember { mutableStateOf("") }
+    var kind by remember { mutableStateOf(defaultKind) }
+    var wallet by remember {
+        // Never default the source to the card being paid.
+        mutableStateOf(spendable.firstOrNull { it.id != defaultToWalletId })
+    }
+    var toWallet by remember {
+        mutableStateOf(spendable.firstOrNull { it.id == defaultToWalletId })
+    }
+    var amount by remember { mutableStateOf(defaultAmountText) }
     var amountTo by remember { mutableStateOf("") }
     var category by remember { mutableStateOf<TransactionCategory?>(null) }
     var description by remember { mutableStateOf("") }
@@ -229,7 +240,13 @@ fun TransactionFormSheet(
     // Cancel/Save pair, so this file is only its fields — same as the web,
     // where every form is a `<Modal>` with the fields inside.
     FormSheet(
-        title = stringResource(R.string.transactions_new_transaction),
+        title = stringResource(
+            if (defaultToWalletId != null && toWallet?.creditCutDay != null) {
+                R.string.credit_pay_title
+            } else {
+                R.string.transactions_new_transaction
+            },
+        ),
         busy = busy,
         error = error,
         canSave = canSave,

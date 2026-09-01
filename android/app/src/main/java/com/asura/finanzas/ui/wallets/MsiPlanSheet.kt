@@ -188,11 +188,12 @@ fun formatDayMonth(iso: String): String {
     val locale = java.util.Locale.forLanguageTag(LocalAppSettings.current.locale)
     val date = runCatching { LocalDate.parse(iso) }.getOrNull() ?: return iso
     val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, locale)
-    return if (date.year == LocalDate.now().year) {
-        "${date.dayOfMonth} $month"
-    } else {
-        "${date.dayOfMonth} $month ${date.year}"
-    }
+        .removeSuffix(".")
+    // English puts the month first ("Sep 4"), Spanish the day ("4 sept").
+    val head = if (locale.language == "en") "$month ${date.dayOfMonth}" else "${date.dayOfMonth} $month"
+    if (date.year == LocalDate.now().year) return head
+    // "Jul 10, 2027" in English; "10 jul 2027" in Spanish.
+    return if (locale.language == "en") "$head, ${date.year}" else "$head ${date.year}"
 }
 
 /**

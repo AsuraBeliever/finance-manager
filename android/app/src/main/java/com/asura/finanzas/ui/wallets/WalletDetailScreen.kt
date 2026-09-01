@@ -1,5 +1,18 @@
 package com.asura.finanzas.ui.wallets
 
+import com.asura.finanzas.ui.components.SegmentedControl
+import com.asura.finanzas.ui.components.PeriodPickerDialog
+import com.asura.finanzas.ui.components.PeriodLabel
+import com.asura.finanzas.ui.components.Period
+import com.asura.finanzas.ui.components.ChipButton
+import com.asura.finanzas.ui.transactions.TransactionTotal
+import com.asura.finanzas.ui.transactions.KindFilter
+import com.asura.finanzas.data.TxTotals
+import com.asura.finanzas.ui.goals.WalletGoalsSection
+import com.asura.finanzas.ui.transactions.TxKind
+import com.asura.finanzas.data.CreditStatement
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.offset
 import com.asura.finanzas.ui.components.PageHeader
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -99,14 +112,32 @@ fun WalletDetailScreen(
     var allWallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
     var reloadKey by remember { mutableStateOf(0) }
     var addingMsi by remember { mutableStateOf(false) }
+    // Non-null while the "pay the card" form is up.
+    var paying by remember { mutableStateOf<CreditCardSummary?>(null) }
     // The schedule the server confirmed, shown once after saving: nothing
     // visible happens at save time otherwise, since instalments post later.
     var savedMsi by remember { mutableStateOf<MsiSchedulePreview?>(null) }
+    // The web filters this page's ledger just like the movements page does.
+    var txKind by remember { mutableStateOf<KindFilter>(KindFilter.All) }
+    var txPeriod by remember { mutableStateOf<Period>(Period.AllTime) }
+    var showPeriod by remember { mutableStateOf(false) }
+    var totals by remember { mutableStateOf<TxTotals?>(null) }
 
-    LaunchedEffect(walletId, reloadKey) {
+    LaunchedEffect(walletId, reloadKey, txKind, txPeriod) {
         wallet = runCatching { repository.wallet(walletId) }.getOrNull()
-        movements = runCatching { repository.transactions(walletId = walletId).value }
-            .getOrDefault(emptyList())
+        movements = runCatching {
+            repository.transactions(
+                walletId = walletId,
+                kind = txKind.wire,
+                period = txPeriod.toJson(),
+            ).value
+        }.getOrDefault(emptyList())
+        // The web only totals a single-kind filter; "all" has nothing to add up.
+        totals = txKind.wire?.takeIf { it == "income" || it == "expense" }?.let { kind ->
+            runCatching {
+                repository.transactionTotals(kind, walletId, null, txPeriod.toJson())
+            }.getOrNull()
+        }
         credit = wallet?.takeIf { it.creditCutDay != null }
             ?.let { runCatching { repository.creditCardSummary(walletId) }.getOrNull() }
         allWallets = runCatching { repository.wallets().value }.getOrDefault(emptyList())
@@ -166,6 +197,7 @@ fun WalletDetailScreen(
                 CreditPanel(
                     summary = summary,
                     hide = hide,
+                    onPay = { paying = summary },
                     onAddPlan = { addingMsi = true },
                     onDeletePlan = { plan ->
                         scope.launch {
@@ -192,8 +224,15 @@ fun WalletDetailScreen(
         }
 
         if (goals.isNotEmpty()) {
-            item { MicroLabel(stringResource(R.string.goals_wallet_section_title)) }
-            items(goals, key = { "goal-${it.id}" }) { goal -> WalletGoalRow(goal, hide) }
+            item {
+                WalletGoalsSection(
+                    repository = repository,
+                    walletId = current.id,
+                    goals = goals,
+                    wallets = allWallets,
+                    onChanged = { reloadKey++ },
+                )
+            }
         }
 
         item {
@@ -202,6 +241,25 @@ fun WalletDetailScreen(
                 stringResource(R.string.transactions_new_transaction),
             ) { addingTx = true }
         }
+        item {
+            SegmentedControl(
+                options = KindFilter.entries,
+                selected = txKind,
+                label = { stringResource(it.labelRes) },
+                onSelect = { txKind = it },
+                modifier = Modifier.fillMaxWidth(),
+                fillEqually = true,
+            )
+        }
+        item {
+            ChipButton(
+                text = PeriodLabel(txPeriod),
+                onClick = { showPeriod = true },
+                leadingIcon = Lucide.CalendarRange,
+                trailingIcon = Lucide.ChevronDown,
+            )
+        }
+        totals?.let { summary -> item { TransactionTotal(summary, hide) } }
         if (movements.isNotEmpty()) {
             item {
                 TransactionListCard(
@@ -210,9 +268,20 @@ fun WalletDetailScreen(
                     onLongPress = {},
                     onEdit = { editingTx = it },
                     onDelete = { deletingTx = it },
+                    // Every row here belongs to this wallet already.
+                    showWallet = false,
                 )
             }
         }
+    }
+
+    if (showPeriod) {
+        PeriodPickerDialog(
+            selected = txPeriod,
+            onSelect = { txPeriod = it; showPeriod = false },
+            onDismiss = { showPeriod = false },
+            allowAll = true,
+        )
     }
 
     if (addingPocket) {
@@ -223,6 +292,29 @@ fun WalletDetailScreen(
             parentDefault = current,
             onDismiss = { addingPocket = false },
             onSaved = { addingPocket = false; reloadKey++ },
+        )
+    }
+
+    // Paying the card is a transfer into it, opened already pointing here with
+    // what clears the statement (or the whole debt) prefilled.
+    paying?.let { summary ->
+        val owed = if (summary.statement.remainingCents > 0) {
+            summary.statement.remainingCents
+        } else {
+            summary.debtCents
+        }
+        TransactionFormSheet(
+            repository = repository,
+            wallets = allWallets,
+            onDismiss = { paying = null },
+            onSaved = { paying = null; reloadKey++ },
+            defaultKind = TxKind.Transfer,
+            defaultToWalletId = current.id,
+            defaultAmountText = if (owed > 0) {
+                java.math.BigDecimal(owed).movePointLeft(2).setScale(2).toPlainString()
+            } else {
+                ""
+            },
         )
     }
 
@@ -365,7 +457,8 @@ private fun BalanceCard(
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
-        if (credit == null && reserved > 0) {
+        // The web prints this on a card too, under the available credit.
+        if (reserved > 0) {
             Text(
                 stringResource(R.string.wallets_available) + " " +
                     maskIfHidden(
@@ -417,10 +510,14 @@ private fun BalanceCard(
 private fun CreditPanel(
     summary: CreditCardSummary,
     hide: Boolean,
+    onPay: () -> Unit,
     onAddPlan: () -> Unit,
     onDeletePlan: (MsiPlan) -> Unit,
 ) {
     val colors = Broke.colors
+    val st = summary.statement
+    // The web colours this block red once the deadline is inside three days.
+    val urgent = st.remainingCents > 0 && st.daysToDue <= 3
 
     GlassCard(Modifier.fillMaxWidth()) {
         Row(
@@ -428,14 +525,24 @@ private fun CreditPanel(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Lucide.CreditCard,
+                    contentDescription = null,
+                    tint = colors.accent,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.credit_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.fg,
+                )
+            }
             Text(
-                stringResource(R.string.credit_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
-            )
-            Text(
-                "${stringResource(R.string.credit_next_cut)}: ${summary.nextCutDate}",
-                style = MaterialTheme.typography.labelSmall,
+                "${stringResource(R.string.credit_next_cut)}: " +
+                    formatDayMonth(summary.nextCutDate) + " · " + inDays(summary.daysToCut),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = colors.fgSubtle,
             )
         }
@@ -444,94 +551,200 @@ private fun CreditPanel(
         MicroLabel(stringResource(R.string.credit_debt))
         Text(
             maskIfHidden(formatMoney(summary.debtCents), hide),
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp),
-            color = colors.fg,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+            color = if (summary.debtCents > 0) colors.danger else colors.fg,
         )
         if (summary.pendingMsiCents > 0) {
             Text(
                 "${stringResource(R.string.credit_msi_pending_total)}: " +
                     maskIfHidden(formatMoney(summary.pendingMsiCents), hide),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = colors.fgSubtle,
             )
         }
+        // Paying the card is a transfer into it. The web offers it here always,
+        // even at zero debt — paying ahead of the cut is a fine move — and the
+        // phone had no way to do it at all.
+        Spacer(Modifier.height(8.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .offset(x = (-16).dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onPay)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Icon(
+                Lucide.ArrowDownToLine,
+                contentDescription = null,
+                tint = colors.fg,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                stringResource(R.string.credit_pay_action),
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.fg,
+            )
+        }
 
-        Spacer(Modifier.height(14.dp))
-        Box(
+        Spacer(Modifier.height(16.dp))
+        Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(colors.surfaceOverlay)
-                .padding(14.dp),
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (urgent) colors.danger.copy(alpha = 0.10f) else colors.surfaceOverlay)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
-            Column {
-                Text(
-                    "${stringResource(R.string.credit_statement)} " +
-                        "(${summary.statement.cutDate}): " +
-                        maskIfHidden(formatMoney(summary.statement.balanceCents), hide),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgMuted,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    if (summary.statement.remainingCents <= 0) {
-                        stringResource(R.string.credit_no_statement_debt)
+            Text(
+                stringResource(R.string.credit_statement) + " (" +
+                    text(R.string.credit_statement_of, "date" to formatDayMonth(st.cutDate)) +
+                    "): " + maskIfHidden(formatMoney(st.balanceCents), hide) +
+                    if (st.paidCents > 0 && st.balanceCents > 0) {
+                        " · " + stringResource(R.string.credit_paid_so_far) + ": " +
+                            maskIfHidden(formatMoney(st.paidCents), hide)
                     } else {
-                        "${stringResource(R.string.credit_pay_by)} ${summary.statement.dueDate}: " +
-                            maskIfHidden(formatMoney(summary.statement.remainingCents), hide)
+                        ""
                     },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.fg,
-                )
-            }
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                statementLine(st, hide),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+                color = if (urgent) colors.danger else colors.fgMuted,
+            )
         }
 
         summary.utilizationBps?.let { bps ->
-            Spacer(Modifier.height(14.dp))
+            val fraction = bps / 10_000f
+            Spacer(Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 MicroLabel(stringResource(R.string.credit_utilization))
                 Text(
-                    formatBps(bps),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgSubtle,
+                    "${Math.round(fraction * 100)}% · " + text(
+                        R.string.credit_utilization_of,
+                        "used" to maskIfHidden(
+                            formatMoney(summary.debtCents + summary.pendingMsiCents),
+                            hide,
+                        ),
+                        "limit" to maskIfHidden(
+                            formatMoney(summary.creditLimitCents ?: 0),
+                            hide,
+                        ),
+                    ),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    color = colors.fgMuted,
                 )
             }
             Spacer(Modifier.height(6.dp))
-            ProgressBar(bps, over = bps > 8000)
+            ProgressBar(bps, color = usageColor(fraction))
         }
 
-        Spacer(Modifier.height(16.dp))
+        summary.nextAnniversary?.let { day ->
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Lucide.CalendarClock,
+                    contentDescription = null,
+                    tint = colors.fgSubtle,
+                    modifier = Modifier.size(13.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "${stringResource(R.string.credit_next_anniversary)}: " + formatDayMonth(day),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    color = colors.fgSubtle,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
         HairLine()
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MicroLabel(stringResource(R.string.credit_msi_title))
             Text(
-                stringResource(R.string.credit_msi_add),
+                stringResource(R.string.credit_msi_title),
                 style = MaterialTheme.typography.labelLarge,
-                color = Broke.colors.accent,
-                modifier = Modifier.clickable { onAddPlan() },
+                color = colors.fg,
             )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onAddPlan() }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Icon(
+                    Lucide.Plus,
+                    contentDescription = null,
+                    tint = colors.fg,
+                    modifier = Modifier.size(15.dp),
+                )
+                Text(
+                    stringResource(R.string.credit_msi_add),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.fg,
+                )
+            }
         }
         if (summary.msiPlans.isEmpty()) {
             Spacer(Modifier.height(8.dp))
             Text(
                 stringResource(R.string.credit_msi_empty),
-                style = MaterialTheme.typography.labelSmall,
-                color = Broke.colors.fgSubtle,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
             )
         }
         summary.msiPlans.forEach { plan ->
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             MsiRow(plan, hide) { onDeletePlan(plan) }
         }
     }
+}
+
+/** What the statement box says, branch for branch as the web writes it. */
+@Composable
+private fun statementLine(st: CreditStatement, hide: Boolean): String = when {
+    st.balanceCents == 0L -> stringResource(R.string.credit_no_statement_debt)
+    st.remainingCents == 0L -> stringResource(R.string.credit_statement_paid)
+    st.daysToDue < 0 -> text(R.string.credit_overdue_by, "days" to -st.daysToDue)
+    st.daysToDue == 0 -> stringResource(R.string.credit_due_today)
+    else -> text(
+        R.string.credit_pay_by,
+        "amount" to maskIfHidden(formatMoney(st.remainingCents), hide),
+        "date" to formatDayMonth(st.dueDate),
+    )
+}
+
+/** "hoy" / "mañana" / "en N días", the web's `inDays`. */
+@Composable
+private fun inDays(days: Int): String = when {
+    days <= 0 -> stringResource(R.string.credit_today)
+    days == 1 -> stringResource(R.string.credit_tomorrow)
+    else -> text(R.string.credit_in_days, "days" to days)
+}
+
+/** Green under 30%, amber under 70%, red past it — the web's `usageColor`. */
+private fun usageColor(fraction: Float) = when {
+    fraction < 0.3f -> androidx.compose.ui.graphics.Color(0xFF34D399)
+    fraction < 0.7f -> androidx.compose.ui.graphics.Color(0xFFF59E0B)
+    else -> androidx.compose.ui.graphics.Color(0xFFEF4444)
 }
 
 @Composable

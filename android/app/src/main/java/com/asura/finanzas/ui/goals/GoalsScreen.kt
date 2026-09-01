@@ -385,7 +385,7 @@ private fun GoalList(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun GoalCard(
+fun GoalCard(
     goal: SavingsGoal,
     hide: Boolean,
     onLongPress: (SavingsGoal) -> Unit,
@@ -395,21 +395,22 @@ private fun GoalCard(
     onAdjustDate: (SavingsGoal) -> Unit,
     onEdit: (SavingsGoal) -> Unit,
     onDelete: (SavingsGoal) -> Unit,
-    reorderState: ReorderState,
+    /** Null on the wallet detail, where the cards are not reorderable. */
+    reorderState: ReorderState? = null,
 ) {
     val colors = Broke.colors
-    val dragging = reorderState.draggingKey == goal.id
+    val dragging = reorderState?.draggingKey == goal.id
     GlassCard(
         Modifier
             .fillMaxWidth()
             .zIndex(if (dragging) 1f else 0f)
-            .graphicsLayer { translationY = if (dragging) reorderState.offsetY else 0f }
+            .graphicsLayer { translationY = if (dragging) reorderState?.offsetY ?: 0f else 0f }
             .combinedClickable(onClick = {}, onLongClick = { onLongPress(goal) }),
     ) {
         val tint = parseHexColor(goal.color) ?: colors.accent
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             // Grip first, then the badge — the order the web lays out.
-            ReorderHandle(state = reorderState, key = goal.id)
+            reorderState?.let { ReorderHandle(state = it, key = goal.id) }
             Spacer(Modifier.width(8.dp))
             Box(
                 Modifier

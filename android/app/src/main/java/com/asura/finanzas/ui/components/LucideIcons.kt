@@ -234,6 +234,19 @@ object Lucide {
         )
     }
 
+    val ArrowDownToLine by lazy { icon("M12 17V3", "m6 11 6 6 6-6", "M19 21H5") }
+
+    val CalendarClock by lazy {
+        icon(
+            "M16 14v2.2l1.6 1",
+            "M16 2v4",
+            "M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5",
+            "M3 10h5",
+            "M8 2v4",
+            "M22 16a6 6 0 1 1-12 0 6 6 0 1 1 12 0z",
+        )
+    }
+
     val Plus by lazy { icon("M5 12h14", "M12 5v14") }
 
     val Palette by lazy {
