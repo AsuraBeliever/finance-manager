@@ -40,6 +40,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.subscriptions.SubscriptionsScreen
+import com.asura.finanzas.ui.goals.GoalsScreen
+import com.asura.finanzas.ui.categories.CategoriesScreen
+import com.asura.finanzas.ui.budgets.BudgetsScreen
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.data.AppPreferences
@@ -53,7 +57,7 @@ import com.asura.finanzas.ui.components.UpdateNotice
 import com.asura.finanzas.ui.settings.WhatsNewAuto
 import com.asura.finanzas.ui.investments.InvestmentsScreen
 import com.asura.finanzas.ui.more.MoreDestination
-import com.asura.finanzas.ui.more.MoreScreen
+import com.asura.finanzas.ui.more.MoreSheet
 import com.asura.finanzas.ui.settings.SettingsScreen
 import com.asura.finanzas.ui.theme.Broke
 import com.asura.finanzas.ui.transactions.TransactionsScreen
@@ -78,9 +82,14 @@ fun HomeScaffold(
     onSignedOut: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(Tab.Dashboard) }
+    // A planning destination shown over the current tab, and whether the sheet
+    // that offers them is open — the web navigates to a route and closes the
+    // sheet, which is what these two together reproduce.
     var moreTarget by remember { mutableStateOf<MoreDestination?>(null) }
+    var moreOpen by remember { mutableStateOf(false) }
 
     MeshBackground {
+      Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             // Sits above every tab, like the web banner does above the router.
             Box(Modifier.statusBarsPadding()) { UpdateNotice(repository) }
@@ -96,7 +105,6 @@ fun HomeScaffold(
                                 DashboardTarget.Goals -> MoreDestination.Goals
                                 DashboardTarget.Subscriptions -> MoreDestination.Subscriptions
                             }
-                            tab = Tab.More
                         },
                     )
                     Tab.Wallets -> WalletsScreen(repository)
@@ -105,11 +113,45 @@ fun HomeScaffold(
                     Tab.Settings -> SettingsScreen(
                         repository, preferences, appearanceSync, onSignedOut,
                     )
-                    Tab.More -> MoreScreen(repository, moreTarget)
+                    Tab.More -> Unit
                 }
+
+                // The planning pages sit over the tab, the way the web routes
+                // to them without leaving the bar behind.
+                when (moreTarget) {
+                    null -> Unit
+                    MoreDestination.Goals ->
+                        GoalsScreen(repository, onBack = { moreTarget = null })
+                    MoreDestination.Budgets ->
+                        BudgetsScreen(repository, onBack = { moreTarget = null })
+                    MoreDestination.Subscriptions ->
+                        SubscriptionsScreen(repository, onBack = { moreTarget = null })
+                    MoreDestination.Categories ->
+                        CategoriesScreen(repository, onBack = { moreTarget = null })
+                }
+
             }
-            BottomBar(selected = tab, onSelect = { moreTarget = null; tab = it })
+            BottomBar(
+                selected = if (moreTarget != null) Tab.More else tab,
+                onSelect = {
+                    if (it == Tab.More) {
+                        moreOpen = true
+                    } else {
+                        moreTarget = null
+                        tab = it
+                    }
+                },
+            )
         }
+
+        // `fixed inset-0` in the browser: the sheet covers the bar too.
+        if (moreOpen) {
+            MoreSheet(
+                onDismiss = { moreOpen = false },
+                onOpen = { moreOpen = false; moreTarget = it },
+            )
+        }
+      }
     }
 }
 

@@ -1,5 +1,8 @@
 package com.asura.finanzas.ui.budgets
 
+import com.asura.finanzas.ui.components.PrivacyToggle
+import com.asura.finanzas.ui.components.PageHeader
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,7 +44,6 @@ import com.asura.finanzas.R
 import com.asura.finanzas.data.Budget
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.BackHeader
 import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
@@ -156,13 +158,17 @@ private fun BudgetList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            BackHeader(stringResource(R.string.budgets_title), onBack)
-            Spacer(Modifier.height(12.dp))
-            PrimaryButton(
-                text = stringResource(R.string.budgets_new_budget),
-                onClick = onNew,
-                leadingIcon = Lucide.Plus,
-            )
+            // No back link in the browser: this is a top-level page there,
+            // reached from the nav. The system gesture is what goes back.
+            BackHandler(onBack = onBack)
+            PageHeader(stringResource(R.string.budgets_title)) {
+                PrivacyToggle()
+                PrimaryButton(
+                    text = stringResource(R.string.budgets_new_budget),
+                    onClick = onNew,
+                    leadingIcon = Lucide.Plus,
+                )
+            }
         }
 
         if (fromCache) {

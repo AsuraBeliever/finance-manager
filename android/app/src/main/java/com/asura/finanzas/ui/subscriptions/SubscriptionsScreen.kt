@@ -1,5 +1,8 @@
 package com.asura.finanzas.ui.subscriptions
 
+import com.asura.finanzas.ui.components.PrivacyToggle
+import com.asura.finanzas.ui.components.PageHeader
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,7 +51,6 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Subscription
 import com.asura.finanzas.data.SubscriptionList
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.BackHeader
 import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
@@ -201,13 +203,15 @@ private fun SubscriptionContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            BackHeader(stringResource(R.string.subscriptions_title), onBack)
-            Spacer(Modifier.height(12.dp))
-            PrimaryButton(
-                text = stringResource(R.string.subscriptions_new_subscription),
-                onClick = onNew,
-                leadingIcon = Icons.Outlined.Add,
-            )
+            BackHandler(onBack = onBack)
+            PageHeader(stringResource(R.string.subscriptions_title)) {
+                PrivacyToggle()
+                PrimaryButton(
+                    text = stringResource(R.string.subscriptions_new_subscription),
+                    onClick = onNew,
+                    leadingIcon = Lucide.Plus,
+                )
+            }
         }
 
         if (fromCache) {

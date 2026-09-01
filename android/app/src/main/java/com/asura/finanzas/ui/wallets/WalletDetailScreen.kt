@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.wallets
 
+import com.asura.finanzas.ui.components.PageHeader
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -54,7 +56,6 @@ import com.asura.finanzas.data.MsiSchedulePreview
 import com.asura.finanzas.data.Transaction
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.BackHeader
 import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.HairLine
@@ -128,7 +129,8 @@ fun WalletDetailScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            BackHeader(current.name, onBack)
+            BackHandler(onBack = onBack)
+            PageHeader(current.name)
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 Action(Icons.Outlined.Edit, stringResource(R.string.common_edit)) { onEdit(current) }

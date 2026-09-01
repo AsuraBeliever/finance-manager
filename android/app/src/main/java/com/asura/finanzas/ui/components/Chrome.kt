@@ -1,5 +1,6 @@
 package com.asura.finanzas.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -293,6 +294,9 @@ fun BackHeader(
     backLabel: String? = null,
 ) {
     val colors = Broke.colors
+    // These screens are pushed inside a tab rather than routed, so nothing was
+    // listening for the system gesture: back closed the whole app.
+    BackHandler(onBack = onBack)
     Column(modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

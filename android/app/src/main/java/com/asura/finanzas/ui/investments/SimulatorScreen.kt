@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.investments
 
+import com.asura.finanzas.ui.components.PageHeader
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -30,7 +32,6 @@ import com.asura.finanzas.data.CatalogItem
 import com.asura.finanzas.data.SimResult
 import com.asura.finanzas.data.SolveResult
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.BackHeader
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.LineChart
@@ -84,7 +85,8 @@ fun SimulatorScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            BackHeader(stringResource(R.string.simulator_title), onBack)
+            BackHandler(onBack = onBack)
+            PageHeader(stringResource(R.string.simulator_title))
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.simulator_description),

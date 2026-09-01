@@ -1,43 +1,36 @@
 package com.asura.finanzas.ui.more
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Repeat
-import androidx.compose.material.icons.outlined.Savings
-import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.components.Lucide
-import com.asura.finanzas.data.BrokeRepository
-import com.asura.finanzas.ui.budgets.BudgetsScreen
-import com.asura.finanzas.ui.categories.CategoriesScreen
-import com.asura.finanzas.ui.components.GlassCard
-import com.asura.finanzas.ui.components.PageHeader
-import com.asura.finanzas.ui.goals.GoalsScreen
-import com.asura.finanzas.ui.subscriptions.SubscriptionsScreen
 import com.asura.finanzas.ui.theme.Broke
 
 /**
@@ -52,60 +45,84 @@ enum class MoreDestination(val labelRes: Int, val icon: ImageVector) {
     Categories(R.string.categories_title, Icons.Outlined.Category),
 }
 
+/**
+ * The planning destinations, as the sheet the web slides up over whatever page
+ * you were on. It used to be a tab of its own here, with a "Planning" page and
+ * a list of cards — a screen the web does not have at all.
+ */
 @Composable
-fun MoreScreen(
-    repository: BrokeRepository,
-    initial: MoreDestination? = null,
-    modifier: Modifier = Modifier,
-) {
-    var destination by remember(initial) { mutableStateOf(initial) }
-
-    when (destination) {
-        null -> MoreMenu(modifier) { destination = it }
-        MoreDestination.Goals -> GoalsScreen(repository, onBack = { destination = null }, modifier = modifier)
-        MoreDestination.Budgets -> BudgetsScreen(repository, onBack = { destination = null }, modifier = modifier)
-        MoreDestination.Subscriptions ->
-            SubscriptionsScreen(repository, onBack = { destination = null }, modifier = modifier)
-        MoreDestination.Categories ->
-            CategoriesScreen(repository, onBack = { destination = null }, modifier = modifier)
-    }
-}
-
-@Composable
-private fun MoreMenu(modifier: Modifier, onOpen: (MoreDestination) -> Unit) {
+fun MoreSheet(onDismiss: () -> Unit, onOpen: (MoreDestination) -> Unit) {
     val colors = Broke.colors
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    BackHandler(onBack = onDismiss)
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.6f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.BottomCenter,
     ) {
-        item { PageHeader(stringResource(R.string.nav_planning)) }
-
-        items(MoreDestination.entries.size) { index ->
-            val entry = MoreDestination.entries[index]
-            GlassCard(
-                Modifier.fillMaxWidth().clickable { onOpen(entry) },
-                padding = 18.dp,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Icon(
-                        entry.icon,
-                        contentDescription = null,
-                        tint = colors.accent,
-                        modifier = Modifier.size(22.dp),
-                    )
-                    Spacer(Modifier.width(14.dp))
-                    Text(
-                        stringResource(entry.labelRes),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colors.fg,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Icon(
-                        Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = colors.fgSubtle,
-                    )
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                // `bg-surface-raised` is translucent, and in the browser the
+                // blur behind it is what makes it read as a solid sheet. With
+                // no cheap backdrop blur here, the page is laid under it.
+                .background(colors.surface)
+                .background(colors.surfaceRaised)
+                // Swallow taps so hitting the sheet does not close it.
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                )
+                .navigationBarsPadding()
+                .padding(bottom = 12.dp),
+        ) {
+            Text(
+                // The web's `.eyebrow`: small, spaced and upper-case.
+                stringResource(R.string.nav_planning).uppercase(),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 11.2.sp,
+                    letterSpacing = 2.02.sp,
+                ),
+                color = colors.fgMuted,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
+            )
+            Column(Modifier.padding(horizontal = 8.dp)) {
+                MoreDestination.entries.forEach { entry ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onOpen(entry) }
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(
+                            entry.icon,
+                            contentDescription = null,
+                            tint = colors.fg,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            stringResource(entry.labelRes),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = colors.fg,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            Lucide.ChevronRight,
+                            contentDescription = null,
+                            tint = colors.fgSubtle,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }

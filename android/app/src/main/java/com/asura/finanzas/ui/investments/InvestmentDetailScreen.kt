@@ -1,5 +1,8 @@
 package com.asura.finanzas.ui.investments
 
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,7 +48,6 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.InvestmentDetail
 import com.asura.finanzas.data.InvestmentMovement
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.BackHeader
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.HairLine
@@ -255,10 +257,21 @@ private fun DetailContent(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            BackHeader(detail.name, onBack)
-            Spacer(Modifier.height(12.dp))
-            // The web offers edit, close and delete up here as quiet actions.
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            // This page has no back link in the browser and no cyan rule
+            // either: just the name as a plain heading with the three quiet
+            // actions beside it. The system gesture is what goes back.
+            BackHandler(onBack = onBack)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    detail.name,
+                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
+                    color = colors.fg,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
                 DetailAction(Lucide.Pencil, stringResource(R.string.common_edit)) { onEdit() }
                 DetailAction(Lucide.Lock, stringResource(R.string.investments_close)) { onClose() }
                 DetailAction(
@@ -317,14 +330,22 @@ private fun DetailContent(
 
         item {
             GlassCard(Modifier.fillMaxWidth()) {
-                Row(
+                // The web lays the whole header out as one wrapping row: the
+                // title with the rate beside it on the same baseline, then the
+                // zoom and the what-if toggle together on the right.
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Column(Modifier.weight(1f)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.Bottom,
+                        modifier = Modifier.weight(1f, fill = false),
+                    ) {
                         Text(
                             stringResource(R.string.investments_projection),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
                             color = colors.fg,
                         )
                         projection?.annualRateBps?.let { bps ->
@@ -375,13 +396,12 @@ private fun DetailContent(
                                 .size(15.dp),
                         )
                     }
+                    OutlineButton(
+                        text = stringResource(R.string.investments_projection_sim_toggle),
+                        onClick = onSimulate,
+                        leadingIcon = Lucide.SlidersHorizontal,
+                    )
                 }
-                Spacer(Modifier.height(10.dp))
-                OutlineButton(
-                    text = stringResource(R.string.investments_projection_sim_toggle),
-                    onClick = onSimulate,
-                    leadingIcon = Lucide.SlidersHorizontal,
-                )
 
                 val points = projection?.projection.orEmpty().ifEmpty { detail.projection }
                 if (points.size >= 2) {
@@ -399,6 +419,7 @@ private fun DetailContent(
                         maxLabel = maskIfHidden(formatMoney(hi, detail.currencyCode), hide),
                         forecastFrom = points.indexOfLast { it.date <= today }.takeIf { it >= 0 },
                         ticks = if (hide) emptyList() else axisTicks(lo, hi),
+                        dates = points.map { it.date },
                     )
                 }
             }
