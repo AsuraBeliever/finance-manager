@@ -15,7 +15,9 @@ import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.TransactionCategory
-import com.asura.finanzas.ui.components.ColorPickerRow
+import androidx.compose.foundation.layout.Column
+import com.asura.finanzas.ui.components.ColorPicker
+import com.asura.finanzas.ui.components.FieldLabel
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.SegmentedControl
 import kotlinx.coroutines.launch
@@ -88,6 +90,9 @@ fun CategoryFormSheet(
                 onSelect = { kind = it },
             )
         }
-        ColorPickerRow(selected = color, onSelect = { color = it })
+        Column {
+            FieldLabel(stringResource(R.string.common_color))
+            ColorPicker(value = color, onChange = { color = it })
+        }
     }
 }

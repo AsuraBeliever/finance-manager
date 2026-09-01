@@ -300,6 +300,7 @@ fun BackHeader(
     modifier: Modifier = Modifier,
     /** Defaults to a plain "Back"; settings passes its own wording. */
     backLabel: String? = null,
+    actions: @Composable FlowRowScope.() -> Unit = {},
 ) {
     val colors = Broke.colors
     // These screens are pushed inside a tab rather than routed, so nothing was
@@ -326,6 +327,6 @@ fun BackHeader(
                 modifier = Modifier.padding(start = 6.dp),
             )
         }
-        PageHeader(title, Modifier.padding(top = 6.dp))
+        PageHeader(title, Modifier.padding(top = 6.dp), actions = actions)
     }
 }

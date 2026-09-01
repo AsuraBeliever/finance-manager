@@ -2,6 +2,7 @@ package com.asura.finanzas.ui
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
@@ -68,9 +69,17 @@ fun ProvideAppLocale(locale: String, content: @Composable () -> Unit) {
         context.createConfigurationContext(updated)
     }
 
-    CompositionLocalProvider(
-        LocalContext provides localized,
-        LocalConfiguration provides localized.resources.configuration,
-        content = content,
-    )
+    // Swapping LocalContext for a configuration context loses the trail back to
+    // the Activity, and that is how `rememberLauncherForActivityResult` finds
+    // the result registry — so anything that opens the photo picker (a wallet
+    // skin, the app logo) crashed. Carry the owner across by hand.
+    val registryOwner = LocalActivityResultRegistryOwner.current
+
+    val locals = buildList {
+        add(LocalContext provides localized)
+        add(LocalConfiguration provides localized.resources.configuration)
+        registryOwner?.let { add(LocalActivityResultRegistryOwner provides it) }
+    }.toTypedArray()
+
+    CompositionLocalProvider(values = locals, content = content)
 }

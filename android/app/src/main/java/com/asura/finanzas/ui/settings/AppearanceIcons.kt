@@ -1,32 +1,23 @@
 package com.asura.finanzas.ui.settings
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountBalance
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Diamond
-import androidx.compose.material.icons.outlined.Favorite
-import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.Rocket
-import androidx.compose.material.icons.outlined.Savings
-import androidx.compose.material.icons.outlined.Spa
-import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.asura.finanzas.ui.components.Lucide
 
 /**
- * The ten brand glyphs the appearance settings offer. The web draws them with
- * lucide; these are the closest Material equivalents, keyed identically so a
- * choice made on either client resolves on the other.
+ * The ten brand glyphs the appearance settings offer, keyed exactly as the web
+ * keys them so a choice made on either client resolves on the other. They are
+ * the same lucide drawings too: the Material lookalikes that used to stand in
+ * here made the picker read as a different set of icons.
  */
 fun appearanceIcon(key: String): ImageVector = when (key) {
-    "wallet" -> Icons.Outlined.AccountBalanceWallet
-    "piggy-bank" -> Icons.Outlined.Savings
-    "coins" -> Icons.Outlined.Payments
-    "landmark" -> Icons.Outlined.AccountBalance
-    "gem" -> Icons.Outlined.Diamond
-    "sparkles" -> Icons.Outlined.AutoAwesome
-    "rocket" -> Icons.Outlined.Rocket
-    "leaf" -> Icons.Outlined.Spa
-    "heart" -> Icons.Outlined.Favorite
-    else -> Icons.Outlined.TrendingUp
+    "wallet" -> Lucide.Wallet
+    "piggy-bank" -> Lucide.PiggyBank
+    "coins" -> Lucide.Coins
+    "landmark" -> Lucide.Landmark
+    "gem" -> Lucide.Gem
+    "sparkles" -> Lucide.Sparkles
+    "rocket" -> Lucide.Rocket
+    "leaf" -> Lucide.Leaf
+    "heart" -> Lucide.Heart
+    else -> Lucide.TrendingUp
 }

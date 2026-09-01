@@ -1,5 +1,9 @@
 package com.asura.finanzas.ui.settings
 
+import com.asura.finanzas.ui.components.Lucide
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
@@ -16,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -80,10 +85,21 @@ fun decodeLogo(dataUrl: String): Bitmap? {
  * same trade the web makes when it resizes before saving.
  */
 @Composable
-fun LogoPicker(logo: String, onPick: (String) -> Unit, onClear: () -> Unit) {
-    val context = LocalContext.current
-    val colors = Broke.colors
+fun LogoPicker(logo: String, onPickImage: () -> Unit, onClear: () -> Unit) {
+    LogoPickerBody(logo, Broke.colors, onClear, onPickImage)
+}
 
+/**
+ * The image chooser itself, remembered **outside** any lazy item.
+ *
+ * `rememberLauncherForActivityResult` needs the activity's result registry, and
+ * a LazyColumn composes items ahead of time on a background pass where that
+ * local is absent — which crashed the app the moment this row came into
+ * prefetch range.
+ */
+@Composable
+fun rememberLogoLauncher(onPick: (String) -> Unit): (Unit) -> Unit {
+    val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
@@ -109,56 +125,64 @@ fun LogoPicker(logo: String, onPick: (String) -> Unit, onClear: () -> Unit) {
         }.getOrNull()
         encoded?.let(onPick)
     }
+    return {
+        launcher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+        )
+    }
+}
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LogoPickerBody(
+    logo: String,
+    colors: com.asura.finanzas.ui.theme.BrokeColors,
+    onClear: () -> Unit,
+    onPickImage: () -> Unit,
+) {
     Column(Modifier.fillMaxWidth()) {
         Text(
             stringResource(R.string.appearance_logo),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
             color = colors.fgMuted,
         )
-        Text(
-            stringResource(R.string.appearance_logo_hint),
-            style = MaterialTheme.typography.labelSmall,
-            color = colors.fgSubtle,
-        )
         Spacer(Modifier.height(8.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        // Two ghost buttons then the hint, the order the web puts them in; the
+        // logo itself is previewed at the top of the Brand card, not here.
+        FlowRow(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            decodeLogo(logo)?.let {
-                Box(
-                    Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(colors.surfaceOverlay),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Image(
-                        bitmap = it.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp),
-                    )
-                }
+            GhostChip(Lucide.Upload, stringResource(R.string.appearance_upload_logo), onPickImage)
+            if (logo.isNotBlank()) {
+                GhostChip(Lucide.X, stringResource(R.string.appearance_remove_logo), onClear)
             }
             Text(
-                stringResource(R.string.appearance_upload_logo),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.accent,
-                modifier = Modifier.clickable {
-                    launcher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                },
+                stringResource(R.string.appearance_logo_hint),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
             )
-            if (logo.isNotBlank()) {
-                Text(
-                    stringResource(R.string.appearance_remove_logo),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.danger,
-                    modifier = Modifier.clickable { onClear() },
-                )
-            }
         }
+    }
+}
+
+/** A ghost Button with a leading glyph — `variant="ghost" className="px-3 py-2"`. */
+@Composable
+private fun GhostChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    onClick: () -> Unit,
+) {
+    val colors = Broke.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = colors.fg, modifier = Modifier.size(15.dp))
+        Text(text, style = MaterialTheme.typography.labelLarge, color = colors.fg)
     }
 }
