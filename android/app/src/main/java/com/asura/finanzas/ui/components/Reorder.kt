@@ -1,12 +1,16 @@
 package com.asura.finanzas.ui.components
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -167,14 +171,19 @@ fun ReorderHandle(
      */
     key: Any,
     modifier: Modifier = Modifier,
+    /**
+     * On a wallet card the grip sits over artwork, so the web gives it a dark
+     * pill and white dots (`bg-black/25 p-1.5`); everywhere else it is bare
+     * subtle dots with `p-1`.
+     */
+    onArtwork: Boolean = false,
 ) {
     val label = stringResource(R.string.wallets_reorder)
-    Icon(
-        imageVector = Icons.Filled.DragIndicator,
-        contentDescription = label,
-        tint = Broke.colors.fgSubtle,
+    Box(
         modifier = modifier
-            .size(28.dp)
+            .size(if (onArtwork) 28.dp else 24.dp)
+            .clip(RoundedCornerShape(if (onArtwork) 8.dp else 6.dp))
+            .then(if (onArtwork) Modifier.background(Color.Black.copy(alpha = 0.25f)) else Modifier)
             .semantics { contentDescription = label }
             .pointerInput(key) {
                 detectDragGestures(
@@ -187,5 +196,13 @@ fun ReorderHandle(
                     onDragCancel = { state.onDragCancel() },
                 )
             },
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Lucide.GripVertical,
+            contentDescription = null,
+            tint = if (onArtwork) Color.White.copy(alpha = 0.8f) else Broke.colors.fgSubtle,
+            modifier = Modifier.size(16.dp),
+        )
+    }
 }

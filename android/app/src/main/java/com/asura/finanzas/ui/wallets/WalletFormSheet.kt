@@ -35,8 +35,6 @@ import androidx.compose.ui.unit.dp
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.sp
@@ -51,6 +49,7 @@ import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.data.WalletCategory
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.PrimaryButton
+import com.asura.finanzas.ui.components.WebCheckbox
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
@@ -249,11 +248,9 @@ fun WalletFormSheet(
                     .padding(14.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
+                    WebCheckbox(
                         checked = earnsYield,
                         onCheckedChange = { earnsYield = it },
-                        colors = CheckboxDefaults.colors(checkedColor = colors.accent),
-                        modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(

@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.ui.theme.Broke
@@ -32,20 +31,21 @@ fun ProgressBar(
     Box(
         modifier
             .fillMaxWidth()
-            .height(8.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .height(10.dp)
+            .clip(RoundedCornerShape(5.dp))
             .background(colors.surfaceOverlay),
     ) {
         Box(
             Modifier
                 .fillMaxWidth(fraction)
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp))
+                // A flat fill, like the web's: the gradient here read as a
+                // different control next to the same bar in the browser.
                 .background(
                     when {
-                        over -> Brush.linearGradient(listOf(colors.danger, colors.danger))
-                        color != null -> Brush.linearGradient(listOf(color, color))
-                        else -> Brush.linearGradient(listOf(colors.accent, colors.cyan))
+                        over -> colors.danger
+                        else -> color ?: colors.accent
                     },
                 ),
         )

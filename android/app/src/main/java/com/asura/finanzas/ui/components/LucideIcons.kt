@@ -53,6 +53,15 @@ object Lucide {
         )
     }
 
+    /** Six dots in two columns — every drag handle in the app. */
+    val GripVertical by lazy {
+        icon(
+            *listOf(9f to 5f, 9f to 12f, 9f to 19f, 15f to 5f, 15f to 12f, 15f to 19f)
+                .map { (cx, cy) -> "M${cx - 1} $cy a1 1 0 1 0 2 0 a1 1 0 1 0 -2 0" }
+                .toTypedArray(),
+        )
+    }
+
     val CreditCard by lazy {
         icon(
             "M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z",

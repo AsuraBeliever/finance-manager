@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -626,16 +628,15 @@ private fun ChartLegend(color: androidx.compose.ui.graphics.Color, label: String
 private fun niceCeiling(peak: Long): Long {
     val pesos = peak / 100.0
     if (pesos <= 0) return 100
-    val magnitude = Math.pow(10.0, Math.floor(Math.log10(pesos)))
-    val normalized = pesos / magnitude
-    val step = when {
-        normalized <= 1.0 -> 1.0
-        normalized <= 2.0 -> 2.0
-        normalized <= 2.5 -> 2.5
-        normalized <= 5.0 -> 5.0
-        else -> 10.0
-    }
-    return Math.round(step * magnitude * 100)
+    // Recharts rounds the *step*, not the top: the rough step (a quarter of the
+    // range, for its five ticks) goes up to the next twentieth of its own order
+    // of magnitude, and the axis ends at four of those. That is why the web
+    // labels 550 · 1100 · 1650 · 2200 rather than a flat 2500.
+    val rough = pesos / 4.0
+    val digitCount = Math.floor(Math.log10(rough)).toInt() + 1
+    val unit = Math.pow(10.0, digitCount.toDouble()) * if (digitCount != 1) 0.05 else 0.1
+    val step = Math.ceil(rough / unit) * unit
+    return Math.round(step * 4 * 100)
 }
 
 /**
@@ -800,7 +801,10 @@ private fun FlowRangeCard(
     handle: @Composable () -> Unit,
 ) {
     val colors = Broke.colors
-    val max = maxOf(trends.incomeMxnCents, trends.expenseMxnCents).coerceAtLeast(1)
+    // Same rounded scale as the bucket chart, so both charts on the overview
+    // label their axis the way the web's does.
+    val max = niceCeiling(maxOf(trends.incomeMxnCents, trends.expenseMxnCents).coerceAtLeast(1))
+    val axisColor = colors.borderMuted
 
     GlassCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -815,7 +819,7 @@ private fun FlowRangeCard(
         Spacer(Modifier.height(20.dp))
 
         // Same furniture as the bucket chart above it: a vertical scale on the
-        // left and the legend underneath, expenses first.
+        // left, hairline axes, and the legend underneath, expenses first.
         Row(modifier = Modifier.fillMaxWidth().height(170.dp)) {
             if (!hide) {
                 Column(
@@ -823,10 +827,10 @@ private fun FlowRangeCard(
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.End,
                 ) {
-                    listOf(1f, 0.5f, 0f).forEach { fraction ->
+                    listOf(1f, 0.75f, 0.5f, 0.25f, 0f).forEach { fraction ->
                         Text(
-                            formatMoney((max * fraction).toLong(), withSymbol = false),
-                            style = MaterialTheme.typography.labelSmall,
+                            ((max * fraction).toLong() / 100).toString(),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             color = colors.fgSubtle,
                         )
                     }
@@ -834,75 +838,70 @@ private fun FlowRangeCard(
                 Spacer(Modifier.width(8.dp))
             }
 
-            Row(
-                modifier = Modifier.weight(1f).height(150.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-                verticalAlignment = Alignment.Bottom,
+            Box(
+                Modifier
+                    .width(1.dp)
+                    .height(150.dp)
+                    .background(colors.borderMuted),
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(150.dp)
+                    .drawBehind {
+                        drawLine(
+                            color = axisColor,
+                            start = Offset(0f, size.height),
+                            end = Offset(size.width, size.height),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                    },
+                contentAlignment = Alignment.BottomCenter,
             ) {
-                TotalsBar(
-                    amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
-                    fraction = trends.expenseMxnCents.toFloat() / max.toFloat(),
-                    color = colors.danger,
-                    modifier = Modifier.weight(1f),
-                )
-                TotalsBar(
-                    amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
-                    fraction = trends.incomeMxnCents.toFloat() / max.toFloat(),
-                    color = colors.positive,
-                    modifier = Modifier.weight(1f),
-                )
+                // `barGap={0}` puts the pair shoulder to shoulder in the middle
+                // of the band, income on the left; together they take a little
+                // over half the plot.
+                Row(
+                    modifier = Modifier.fillMaxWidth(0.55f).height(150.dp),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    TotalsBar(
+                        fraction = trends.incomeMxnCents.toFloat() / max.toFloat(),
+                        color = colors.positive,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TotalsBar(
+                        fraction = trends.expenseMxnCents.toFloat() / max.toFloat(),
+                        color = colors.danger,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Dot(colors.danger, 9.dp)
-                Text(
-                    stringResource(R.string.dashboard_expenses),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgMuted,
-                    modifier = Modifier.padding(start = 6.dp),
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Dot(colors.positive, 9.dp)
-                Text(
-                    stringResource(R.string.dashboard_incomes),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgMuted,
-                    modifier = Modifier.padding(start = 6.dp),
-                )
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
+        ) {
+            ChartLegend(colors.danger, stringResource(R.string.dashboard_expenses))
+            ChartLegend(colors.positive, stringResource(R.string.dashboard_incomes))
         }
     }
 }
 
-/**
- * One bar of the totals chart, with its figure above it. The web puts that
- * figure in a hover tooltip; on a phone there is nothing to hover, so it is
- * drawn in place — and it obeys "hide balances" like every other amount.
- */
+/** One bar of the totals chart: a plain column with a 4 px rounded top. */
 @Composable
 private fun TotalsBar(
-    amount: String,
     fraction: Float,
     color: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Bottom,
-    ) {
-        Text(amount, style = MaterialTheme.typography.labelSmall, color = Broke.colors.fgMuted)
-        Spacer(Modifier.height(6.dp))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height((120 * fraction.coerceIn(0f, 1f)).dp.coerceAtLeast(4.dp))
-                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                .background(color),
-        )
-    }
+    Box(
+        modifier
+            .fillMaxHeight(fraction.coerceIn(0f, 1f))
+            .heightIn(min = if (fraction > 0f) 2.dp else 0.dp)
+            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+            .background(color),
+    )
 }

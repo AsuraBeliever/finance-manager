@@ -27,8 +27,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +42,7 @@ import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.SegmentedControl
+import com.asura.finanzas.ui.components.WebCheckbox
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
@@ -212,11 +211,9 @@ fun GoalFormSheet(
                 .padding(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
+                WebCheckbox(
                     checked = hasDeadline,
                     onCheckedChange = { hasDeadline = it },
-                    colors = CheckboxDefaults.colors(checkedColor = Broke.colors.accent),
-                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(

@@ -1,5 +1,6 @@
 package com.asura.finanzas.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -208,6 +212,52 @@ fun ChipButton(
         Text(text, style = MaterialTheme.typography.labelLarge, color = colors.fg)
         trailingIcon?.let {
             Icon(it, contentDescription = null, tint = colors.fgMuted, modifier = Modifier.size(17.dp))
+        }
+    }
+}
+
+/**
+ * The browser's own checkbox, which is what the web app uses (`<input
+ * type="checkbox" class="accent-accent">`) — a 13 px square, dark grey with a
+ * light hairline when off, filled with the accent and a dark tick when on.
+ * Material's `Checkbox` is half again as big and outlined, so side by side the
+ * two screens did not look like the same app.
+ */
+@Composable
+fun WebCheckbox(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    /** 13 dp is the browser default; a couple of places ask for `h-4 w-4`. */
+    boxSize: androidx.compose.ui.unit.Dp = 13.dp,
+) {
+    val accent = Broke.colors.accent
+    // Chrome's dark-mode defaults, sampled off the rendered page.
+    val off = Color(0xFF3B3B3B)
+    val hairline = Color(0xFF858585)
+    val tick = Color(0xFF3B3B3B)
+    Canvas(
+        modifier
+            .size(boxSize)
+            .clip(RoundedCornerShape(2.dp))
+            .clickable { onCheckedChange(!checked) },
+    ) {
+        val r = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
+        drawRoundRect(color = if (checked) accent else off, cornerRadius = r)
+        if (checked) {
+            val w = size.width
+            val path = Path().apply {
+                moveTo(w * 0.22f, w * 0.52f)
+                lineTo(w * 0.42f, w * 0.72f)
+                lineTo(w * 0.78f, w * 0.28f)
+            }
+            drawPath(path, tick, style = Stroke(width = w * 0.16f, cap = StrokeCap.Square))
+        } else {
+            drawRoundRect(
+                color = hairline,
+                cornerRadius = r,
+                style = Stroke(width = 1.dp.toPx()),
+            )
         }
     }
 }

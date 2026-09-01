@@ -38,8 +38,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.OutlineButton
 import com.asura.finanzas.R
@@ -47,7 +45,6 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Investment
 import com.asura.finanzas.data.Portfolio
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.DonutChart
 import com.asura.finanzas.ui.components.DonutSlice
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
@@ -58,6 +55,7 @@ import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.PrimaryButton
+import com.asura.finanzas.ui.components.WebCheckbox
 import com.asura.finanzas.ui.components.chartColor
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
@@ -154,11 +152,9 @@ private fun InvestmentList(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { onToggleClosed() },
                 ) {
-                    Checkbox(
+                    WebCheckbox(
                         checked = showClosed,
                         onCheckedChange = { onToggleClosed() },
-                        colors = CheckboxDefaults.colors(checkedColor = colors.accent),
-                        modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -251,7 +247,7 @@ private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MiniDonut(
                     slices = portfolio.slices.map { it.currentValueCents },
-                    modifier = Modifier.size(120.dp),
+                    modifier = Modifier.size(112.dp),
                 )
                 Spacer(Modifier.width(16.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -359,7 +355,7 @@ private fun calculatorLabel(calculator: String): String = stringResource(
 
 
 /**
- * The portfolio ring: 120 dp across with a 34→56 radius and a 2° gap between
+ * The portfolio ring: 112 dp across with a 34→56 radius and a 2° gap between
  * slices, matching the web's chart exactly. No labels — the key sits beside it.
  */
 @Composable
@@ -369,12 +365,15 @@ private fun MiniDonut(slices: List<Long>, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val stroke = (56f - 34f) / 56f * (size.minDimension / 2f)
         val radius = size.minDimension / 2f - stroke / 2f
-        var start = -90f
+        // Recharts measures angles the way maths does — anticlockwise from three
+        // o'clock — and `Pie` defaults to startAngle 0. Compose's drawArc is the
+        // mirror of that (clockwise, same origin), hence the negated angles.
+        var start = 0f
         slices.forEachIndexed { index, value ->
             val sweep = 360f * (value.toFloat() / total.toFloat())
             drawArc(
                 color = colors[index],
-                startAngle = start + 1f,
+                startAngle = -(start + sweep) + 1f,
                 sweepAngle = (sweep - 2f).coerceAtLeast(0f),
                 useCenter = false,
                 topLeft = Offset(size.width / 2f - radius, size.height / 2f - radius),

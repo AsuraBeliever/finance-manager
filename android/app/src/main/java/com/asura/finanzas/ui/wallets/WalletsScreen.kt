@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.wallets
 
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -37,8 +39,6 @@ import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -53,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -80,6 +81,7 @@ import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.ReorderHandle
+import com.asura.finanzas.ui.components.WebCheckbox
 import com.asura.finanzas.ui.components.rememberReorderState
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
@@ -272,11 +274,9 @@ private fun WalletList(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { onToggleArchived() },
                 ) {
-                    Checkbox(
+                    WebCheckbox(
                         checked = showArchived,
                         onCheckedChange = { onToggleArchived() },
-                        colors = CheckboxDefaults.colors(checkedColor = Broke.colors.accent),
-                        modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -317,7 +317,7 @@ private fun WalletList(
                 WalletCard(
                     wallet, hide, onOpen, onLongPress,
                     pockets = children,
-                    handle = { ReorderHandle(state = reorderState, key = wallet.id) },
+                    handle = { ReorderHandle(state = reorderState, key = wallet.id, onArtwork = true) },
                 )
                 if (children.isNotEmpty()) {
                     // Collapsed until asked for, like the web: a wallet with
@@ -382,7 +382,8 @@ fun WalletCard(
     /** The drag grip, drawn in the corner; a tap anywhere else still opens. */
     handle: @Composable () -> Unit = {},
 ) {
-    val skin = walletSkin(wallet.skin, wallet.color, wallet.categoryName)
+    val skin = walletSkin(wallet.skin, wallet.categoryName)
+    val photo = walletSkinImage(wallet.skin)
 
     // Same pairing the web's WalletCard shows, on figures the server already
     // computed: money in a pocket left the parent through a transfer, so the
@@ -401,9 +402,19 @@ fun WalletCard(
             // Credit-card proportions, the web's aspect-[1.586/1].
             .aspectRatio(1.586f)
             .clip(RoundedCornerShape(16.dp))
-            .background(skin.brush())
+            .drawBehind { drawRect(skin.brushFor(size)) }
             .combinedClickable(onClick = { onOpen(wallet) }, onLongClick = { onLongPress(wallet) }),
     ) {
+        // An imported photo sits under everything, cropped to fill like the
+        // web's `center / cover`.
+        photo?.let {
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
         // Crystalline gloss, then the soft top-left highlight, then the big
         // faint motif — the three layers the web stacks over the skin.
         Box(
@@ -442,6 +453,20 @@ fun WalletCard(
                     .align(Alignment.CenterEnd)
                     .offset(x = 2.dp)
                     .size(150.dp),
+            )
+        }
+        // Legibility scrim over an imported photo, so the figures still read.
+        if (isImageSkin(wallet.skin)) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.18f),
+                            0.38f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.55f),
+                        ),
+                    ),
             )
         }
         // Hairline highlight around the edge (the web's ring-inset white/15).
@@ -520,16 +545,10 @@ fun WalletCard(
             }
         }
 
-        // The grip sits in the bottom corner over a dark pill, exactly where the
-        // web puts it, so it reads on any skin without covering the figures.
-        Box(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .padding(12.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color.Black.copy(alpha = 0.25f))
-                .padding(6.dp),
-        ) {
+        // The grip sits in the bottom corner over its own dark pill (drawn by
+        // the handle itself), exactly where the web puts it, so it reads on any
+        // skin without covering the figures.
+        Box(Modifier.align(Alignment.BottomEnd).padding(12.dp)) {
             handle()
         }
     }

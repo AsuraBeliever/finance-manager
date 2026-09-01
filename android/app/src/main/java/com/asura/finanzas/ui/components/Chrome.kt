@@ -70,25 +70,52 @@ fun MeshBackground(modifier: Modifier = Modifier, content: @Composable () -> Uni
             .fillMaxSize()
             .background(colors.surface)
             .drawBehind {
-                val dx = -0.03f * size.width * drift
-                val dy = 0.02f * size.height * drift
+                // The CSS pseudo-element is `inset: -20%`, i.e. a box 140% of the
+                // viewport in both axes, and the blob positions are percentages of
+                // *that* box — not of the screen.
+                val boxW = size.width * 1.4f
+                val boxH = size.height * 1.4f
+                val boxX = -0.2f * size.width
+                val boxY = -0.2f * size.height
+                // mesh-drift: translate3d(-3%, 2%) scale(1.08), percentages of the
+                // element's own size, the scale taken about its centre.
+                val dx = -0.03f * boxW * drift
+                val dy = 0.02f * boxH * drift
                 val scale = 1f + 0.08f * drift
+                val cx = boxX + boxW / 2f
+                val cy = boxY + boxH / 2f
 
-                fun blob(color: androidx.compose.ui.graphics.Color, fx: Float, fy: Float, r: Float) {
+                fun blob(
+                    color: androidx.compose.ui.graphics.Color,
+                    fx: Float,
+                    fy: Float,
+                    remRadius: Float,
+                    stop: Float,
+                ) {
+                    // `radial-gradient(R at c, color, transparent S)` ramps linearly
+                    // from the colour at the centre to nothing at S of R, so the
+                    // drawn circle is that shorter radius, not R.
+                    val radius = remRadius * 16.dp.toPx() * stop * scale
+                    val center = Offset(
+                        cx + (boxX + boxW * fx - cx) * scale + dx,
+                        cy + (boxY + boxH * fy - cy) * scale + dy,
+                    )
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(color, androidx.compose.ui.graphics.Color.Transparent),
-                            center = Offset(size.width * fx + dx, size.height * fy + dy),
-                            radius = size.width * r * scale,
+                            center = center,
+                            radius = radius,
                         ),
-                        radius = size.width * r * scale,
-                        center = Offset(size.width * fx + dx, size.height * fy + dy),
+                        radius = radius,
+                        center = center,
                     )
                 }
 
-                blob(colors.mesh1, 0.18f, 0.12f, 1.05f)
-                blob(colors.mesh3, 0.85f, 0.08f, 0.95f)
-                blob(colors.mesh2, 0.75f, 0.88f, 1.10f)
+                // In a CSS `background` shorthand the first layer paints on top, so
+                // these go on in reverse of the order they are listed there.
+                blob(colors.mesh2, 0.75f, 0.88f, 40f, 0.62f)
+                blob(colors.mesh3, 0.85f, 0.08f, 34f, 0.60f)
+                blob(colors.mesh1, 0.18f, 0.12f, 38f, 0.60f)
             },
     ) {
         content()

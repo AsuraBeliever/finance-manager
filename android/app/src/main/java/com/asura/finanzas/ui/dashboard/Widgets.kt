@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.Budget
@@ -24,7 +26,8 @@ import com.asura.finanzas.data.DashboardSummary
 import com.asura.finanzas.data.SavingsGoal
 import com.asura.finanzas.data.Subscription
 import com.asura.finanzas.ui.components.Dot
-import com.asura.finanzas.ui.components.DonutChart
+import com.asura.finanzas.ui.components.BreakdownDonut
+import com.asura.finanzas.ui.components.LegendBelowDonut
 import com.asura.finanzas.ui.components.DonutSlice
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.ProgressBar
@@ -87,7 +90,7 @@ fun BreakdownWidget(
     GlassCard(Modifier.fillMaxWidth()) {
         WidgetHeader(title, handle = handle)
         Spacer(Modifier.height(8.dp))
-        DonutChart(
+        BreakdownDonut(
             slices = breakdown.slices.mapIndexed { index, slice ->
                 DonutSlice(
                     // The worker labels the null-category slice "Sin categoría"
@@ -121,17 +124,19 @@ fun ByWalletWidget(
     GlassCard(Modifier.fillMaxWidth()) {
         WidgetHeader(stringResource(R.string.dashboard_by_wallet), handle = handle)
         Spacer(Modifier.height(8.dp))
-        DonutChart(
-            slices = summary.wallets.mapIndexed { index, wallet ->
-                DonutSlice(
-                    label = wallet.name,
-                    valueCents = wallet.balanceMxnCents,
-                    color = parseHexColor(wallet.color) ?: chartColor(index),
-                    formatted = maskIfHidden(formatMoney(wallet.balanceMxnCents), hide),
-                )
-            },
-            centerLabel = stringResource(R.string.dashboard_total),
-            centerValue = maskIfHidden(formatMoney(summary.totalEndMxnCents), hide),
+        LegendBelowDonut(
+            // The web charts only wallets in the black; a card you owe money on
+            // has no slice, and the colours are indexed after that filter.
+            slices = summary.wallets
+                .filter { it.balanceMxnCents > 0 }
+                .mapIndexed { index, wallet ->
+                    DonutSlice(
+                        label = wallet.name,
+                        valueCents = wallet.balanceMxnCents,
+                        color = parseHexColor(wallet.color) ?: chartColor(index),
+                        formatted = maskIfHidden(formatMoney(wallet.balanceMxnCents), hide),
+                    )
+                },
         )
     }
 }
@@ -146,17 +151,17 @@ fun ByInvestmentWidget(
     GlassCard(Modifier.fillMaxWidth()) {
         WidgetHeader(stringResource(R.string.dashboard_by_investment), handle = handle)
         Spacer(Modifier.height(8.dp))
-        DonutChart(
-            slices = summary.investments.mapIndexed { index, slice ->
-                DonutSlice(
-                    label = slice.name,
-                    valueCents = slice.valueMxnCents,
-                    color = chartColor(index),
-                    formatted = maskIfHidden(formatMoney(slice.valueMxnCents), hide),
-                )
-            },
-            centerLabel = stringResource(R.string.dashboard_total),
-            centerValue = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
+        LegendBelowDonut(
+            slices = summary.investments
+                .filter { it.valueMxnCents > 0 }
+                .mapIndexed { index, slice ->
+                    DonutSlice(
+                        label = slice.name,
+                        valueCents = slice.valueMxnCents,
+                        color = chartColor(index),
+                        formatted = maskIfHidden(formatMoney(slice.valueMxnCents), hide),
+                    )
+                },
         )
     }
 }
@@ -182,7 +187,7 @@ fun BudgetWidget(
                 Dot(parseHexColor(budget.color) ?: colors.accent)
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    budget.categoryName ?: stringResource(R.string.budgets_overall),
+                    seedName(budget.categoryName) ?: stringResource(R.string.budgets_overall),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.fgMuted,
                     modifier = Modifier.weight(1f),
@@ -219,28 +224,32 @@ fun GoalsWidget(
             centerCaption = "${stringResource(R.string.goals_of)} " +
                 maskIfHidden(formatMoney(lead.targetCents, lead.currencyCode), hide) +
                 " · ${lead.name}",
+            color = parseHexColor(lead.color),
         )
-        goals.drop(1).take(4).forEach { goal ->
+        // The web lists three runners-up, each in its own colour.
+        goals.drop(1).take(3).forEachIndexed { index, goal ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     goal.name,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                     color = colors.fgMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide) +
                         " ${stringResource(R.string.goals_of)} " +
                         maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                     color = colors.fgSubtle,
                 )
             }
-            Spacer(Modifier.height(6.dp))
-            ProgressBar(goal.progressBps)
+            Spacer(Modifier.height(4.dp))
+            ProgressBar(goal.progressBps, color = parseHexColor(goal.color) ?: chartColor(index + 1))
         }
     }
 }

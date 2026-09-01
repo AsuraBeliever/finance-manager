@@ -277,7 +277,7 @@ fun TransactionsScreen(
             title = {
                 Text(
                     target.description?.takeIf { it.isNotBlank() }
-                        ?: target.categoryName.orEmpty(),
+                        ?: seedName(target.categoryName).orEmpty(),
                     color = Broke.colors.fg,
                 )
             },
