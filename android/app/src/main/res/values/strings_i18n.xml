@@ -605,6 +605,13 @@
     <string name="account_revoke_others">Cerrar las demás sesiones</string>
     <string name="account_unknown_device">Dispositivo desconocido</string>
     <string name="account_desktop_app">App de escritorio</string>
+    <string name="account_moments_ago">hace menos de un minuto</string>
+    <string name="account_minute_ago">hace 1 minuto</string>
+    <string name="account_minutes_ago">hace {n} minutos</string>
+    <string name="account_hour_ago">hace alrededor de 1 hora</string>
+    <string name="account_hours_ago">hace alrededor de {n} horas</string>
+    <string name="account_day_ago">hace 1 día</string>
+    <string name="account_days_ago">hace {n} días</string>
     <string name="update_available">Hay una nueva versión</string>
     <string name="update_action">Actualizar</string>
     <string name="update_updating">Actualizando…</string>

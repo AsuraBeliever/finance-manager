@@ -716,6 +716,13 @@ export const esDict = {
     revokeOthers: "Cerrar las demás sesiones",
     unknownDevice: "Dispositivo desconocido",
     desktopApp: "App de escritorio",
+    momentsAgo: "hace menos de un minuto",
+    minuteAgo: "hace 1 minuto",
+    minutesAgo: "hace {n} minutos",
+    hourAgo: "hace alrededor de 1 hora",
+    hoursAgo: "hace alrededor de {n} horas",
+    dayAgo: "hace 1 día",
+    daysAgo: "hace {n} días",
   },
   update: {
     available: "Hay una nueva versión",

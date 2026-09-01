@@ -1,5 +1,8 @@
 package com.asura.finanzas.ui.subscriptions
 
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.PageHeader
 import androidx.activity.compose.BackHandler
@@ -259,7 +262,7 @@ private fun SubscriptionContent(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SubscriptionCard(
     subscription: Subscription,
@@ -283,8 +286,15 @@ private fun SubscriptionCard(
             .combinedClickable(onClick = {}, onLongClick = { onLongPress(subscription) }),
         padding = 16.dp,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            // The web's badge: a colour tile with the service's initial.
+        // One wrapping row for the lot, as the web lays it out — the four
+        // buttons belong beside the amount, not on a line of their own.
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // The web's badge: a colour tile carrying the service's logo, and
+            // only its initial when there is no logo for the name.
             Box(
                 Modifier
                     .size(40.dp)
@@ -292,17 +302,28 @@ private fun SubscriptionCard(
                     .background(tint),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    subscription.name.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                )
+                val logo = brandIcon(subscription.icon)
+                if (logo != null) {
+                    Icon(
+                        logo,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp),
+                    )
+                } else {
+                    Text(
+                        subscription.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        color = Color.White,
+                    )
+                }
             }
-            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     subscription.name,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    style = MaterialTheme.typography.titleMedium,
                     color = colors.fg,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -318,30 +339,23 @@ private fun SubscriptionCard(
                     color = colors.fgSubtle,
                 )
             }
-            Spacer(Modifier.width(12.dp))
             Text(
                 maskIfHidden(
                     formatMoney(subscription.amountCents, subscription.currencyCode),
                     hide,
                 ),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.titleMedium,
                 color = colors.fg,
             )
-        }
-
-        // Register a payment, pause/resume, edit, delete — the four the web
-        // puts on every row.
-        Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
-        ) {
-            RowAction(Lucide.Receipt, subscription.walletId != null) { onPay(subscription) }
-            RowAction(if (subscription.isActive) Lucide.Pause else Lucide.Play) {
-                onToggle(subscription)
+            // Register a payment, pause/resume, edit, delete.
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                RowAction(Lucide.Receipt, subscription.walletId != null) { onPay(subscription) }
+                RowAction(if (subscription.isActive) Lucide.Pause else Lucide.Play) {
+                    onToggle(subscription)
+                }
+                RowAction(Lucide.Pencil) { onEdit(subscription) }
+                RowAction(Lucide.Trash) { onDelete(subscription) }
             }
-            RowAction(Lucide.Pencil) { onEdit(subscription) }
-            RowAction(Lucide.Trash) { onDelete(subscription) }
         }
     }
 }

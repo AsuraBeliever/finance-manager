@@ -116,6 +116,7 @@ fun HomeScaffold(
                     Tab.Investments -> InvestmentsScreen(repository)
                     Tab.Settings -> SettingsScreen(
                         repository, preferences, appearanceSync, onSignedOut,
+                        onOpenCategories = { moreTarget = MoreDestination.Categories },
                     )
                     Tab.More -> Unit
                 }

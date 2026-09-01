@@ -237,7 +237,12 @@ private fun CategoryList(
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item {
-            BackHeader(stringResource(R.string.categories_title), onBack)
+            // The web labels this one "Volver a ajustes", not a bare "Atrás".
+            BackHeader(
+                stringResource(R.string.categories_title),
+                onBack,
+                backLabel = stringResource(R.string.settings_back),
+            )
             Spacer(Modifier.height(6.dp))
             Text(
                 stringResource(R.string.categories_settings_hint),
@@ -475,17 +480,30 @@ private fun InlineAddCategory(
             placeholder = stringResource(R.string.categories_add_placeholder),
             singleLine = true,
         )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            stringResource(R.string.categories_add),
-            style = MaterialTheme.typography.labelLarge,
-            color = if (name.isBlank()) colors.fgSubtle else colors.accent,
+        Spacer(Modifier.width(8.dp))
+        // A ghost Button with a plus in front, as the web draws it.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
                 .clickable(enabled = name.isNotBlank()) {
                     onCreate(name.trim(), kind, color)
                     name = ""
                 }
-                .padding(8.dp),
-        )
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Icon(
+                Lucide.Plus,
+                contentDescription = null,
+                tint = if (name.isBlank()) colors.fg.copy(alpha = 0.5f) else colors.fg,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                stringResource(R.string.categories_add),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (name.isBlank()) colors.fg.copy(alpha = 0.5f) else colors.fg,
+            )
+        }
     }
 }

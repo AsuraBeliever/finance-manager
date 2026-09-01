@@ -703,6 +703,13 @@ export const en: Dict = {
     revokeOthers: "Sign out other sessions",
     unknownDevice: "Unknown device",
     desktopApp: "Desktop app",
+    momentsAgo: "less than a minute ago",
+    minuteAgo: "1 minute ago",
+    minutesAgo: "{n} minutes ago",
+    hourAgo: "about 1 hour ago",
+    hoursAgo: "about {n} hours ago",
+    dayAgo: "1 day ago",
+    daysAgo: "{n} days ago",
   },
   update: {
     available: "A new version is available",

@@ -62,6 +62,22 @@ object Lucide {
         )
     }
 
+    /** The devices list marks each session with one of these two. */
+    val Monitor by lazy {
+        icon(
+            "M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
+            "M8 21h8",
+            "M12 17v4",
+        )
+    }
+
+    val Smartphone by lazy {
+        icon(
+            "M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z",
+            "M12 18h.01",
+        )
+    }
+
     val CreditCard by lazy {
         icon(
             "M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z",
@@ -157,6 +173,14 @@ object Lucide {
             "M8 14h.01",
             "M12 18h.01",
             "M8 18h.01",
+        )
+    }
+
+    val Tags by lazy {
+        icon(
+            "M13.172 2a2 2 0 0 1 1.414.586l6.71 6.71a2.4 2.4 0 0 1 0 3.408l-4.592 4.592a2.4 2.4 0 0 1-3.408 0l-6.71-6.71A2 2 0 0 1 6 9.172V3a1 1 0 0 1 1-1z",
+            "M2 7v6.172a2 2 0 0 0 .586 1.414l6.71 6.71a2.4 2.4 0 0 0 3.191.193",
+            "M10.5 6a.5 .5 0 1 0 0 1 .5 .5 0 1 0 0-1z",
         )
     }
 

@@ -74,6 +74,8 @@ fun SettingsScreen(
     preferences: AppPreferences,
     appearanceSync: AppearanceSync,
     onSignedOut: () -> Unit,
+    /** Categories live under the planning sheet, which this screen cannot open. */
+    onOpenCategories: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -252,6 +254,46 @@ fun SettingsScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.appearance_manage),
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                    color = colors.accent,
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    Lucide.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.accent,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+        }
+
+        // The web keeps a shortcut to the category manager here as well as in
+        // the planning sheet; the phone only had the sheet.
+        GlassCard(Modifier.fillMaxWidth().clickable { onOpenCategories() }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Lucide.Tags,
+                    contentDescription = null,
+                    tint = colors.fgSubtle,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.categories_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.fg,
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.categories_settings_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fgSubtle,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.categories_manage),
                     style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
                     color = colors.accent,
                 )
@@ -445,18 +487,23 @@ private fun SessionRow(session: SessionInfo, onRevoke: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Icon(
+            if (isMobileDevice(session.userAgent)) Lucide.Smartphone else Lucide.Monitor,
+            contentDescription = null,
+            tint = colors.fgSubtle,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                session.userAgent?.takeIf { it.isNotBlank() }
-                    ?: stringResource(R.string.account_unknown_device),
-                style = MaterialTheme.typography.bodyMedium,
+                deviceLabel(session.userAgent),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                 color = colors.fg,
             )
             Text(
-                session.lastSeenAt?.let {
-                    "${stringResource(R.string.account_last_seen)} $it"
-                } ?: session.createdAt,
-                style = MaterialTheme.typography.labelSmall,
+                stringResource(R.string.account_last_seen) + ": " +
+                    relativeFromUtc(session.lastSeenAt ?: session.createdAt),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = colors.fgSubtle,
             )
         }
