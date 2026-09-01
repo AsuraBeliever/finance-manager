@@ -55,6 +55,7 @@ import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.components.SegStyle
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.SettingRow
 import com.asura.finanzas.ui.seedName
@@ -163,7 +164,7 @@ fun SettingsScreen(
         GlassCard(Modifier.fillMaxWidth()) {
             SettingRow(stringResource(R.string.theme_label)) {
                 SegmentedControl(
-                    accentSelected = true,
+                    style = SegStyle.Theme,
                     // Web order: Light, Dark, Auto.
                     options = listOf(ThemeChoice.Light, ThemeChoice.Dark, ThemeChoice.System),
                     selected = settings.theme,
@@ -177,6 +178,7 @@ fun SettingsScreen(
         GlassCard(Modifier.fillMaxWidth()) {
             SettingRow(stringResource(R.string.settings_language)) {
                 SegmentedControl(
+                    style = SegStyle.Tray,
                     options = Locale.entries,
                     selected = Locale.entries.first { it.tag == settings.locale },
                     label = { it.label },
@@ -214,6 +216,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
             SettingRow(stringResource(R.string.settings_clock), subtle = true) {
                 SegmentedControl(
+                    style = SegStyle.Tray,
                     options = listOf(false, true),
                     selected = settings.clock24,
                     label = {

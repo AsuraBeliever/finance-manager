@@ -73,7 +73,10 @@ val BrokeTypography = Typography(
     ),
     labelLarge = TextStyle(
         fontFamily = HankenGrotesk,
-        fontWeight = FontWeight.SemiBold,
+        // `font-medium`, which is what the web's Button, segmented chips and
+        // transaction amounts all use. SemiBold here ran every label wider than
+        // the browser's, enough that a header stopped fitting on one line.
+        fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 18.sp,
     ),

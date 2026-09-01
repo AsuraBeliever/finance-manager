@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.ui.components.FormSheet
+import com.asura.finanzas.ui.components.SegStyle
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
@@ -50,6 +51,8 @@ import com.asura.finanzas.data.TransactionCategory
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.components.walletLabel
+import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.TimeField
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.seedName
@@ -90,7 +93,18 @@ fun TransactionFormSheet(
     var date by remember { mutableStateOf(LocalDate.now()) }
     // Optional, like the web: a movement without a time falls back to its
     // createdAt rendered in the chosen timezone.
-    var time by remember { mutableStateOf<String?>(null) }
+    // The web opens the form with the current time already in the box, in the
+    // account's timezone; leaving it blank here made the same form look like it
+    // had one field fewer filled in.
+    val timezone = LocalAppSettings.current.timezone
+    var time by remember {
+        mutableStateOf<String?>(
+            runCatching {
+                java.time.LocalTime.now(java.time.ZoneId.of(timezone))
+                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            }.getOrNull(),
+        )
+    }
     // A new expense on a configured credit card can be an MSI purchase: instead
     // of one expense the worker creates a plan and each instalment posts itself
     // on its own statement. Edits never convert to or from MSI.
@@ -117,6 +131,7 @@ fun TransactionFormSheet(
         }
     }
 
+    val requiredError = stringResource(R.string.common_required)
     val isCreditWallet = wallet?.creditCutDay != null
     val msiActive = kind == TxKind.Expense && isCreditWallet && msiEnabled
     val msiMonthsValue = msiMonths.trim().toIntOrNull()
@@ -131,8 +146,10 @@ fun TransactionFormSheet(
         val source = wallet
         val cents = parseAmountToCents(amount)
         if (busy) return
+        // Save stays live, as it does in the browser, where the amount input is
+        // `required` and the form simply refuses to submit with a complaint.
         if (source == null || cents == null || cents <= 0) {
-            error = null
+            error = requiredError
             return
         }
         busy = true
@@ -200,12 +217,13 @@ fun TransactionFormSheet(
     }
 
     val amountCents = parseAmountToCents(amount)
+    // The web's own guard, no stricter: an empty amount is caught on submit,
+    // not by greying the button out — the two forms have to look the same the
+    // moment they open.
     val canSave = !busy &&
         (!msiActive || (description.isNotBlank() && msiMonthsValid)) &&
-        wallet != null &&
-        amountCents != null && amountCents > 0 &&
-        (kind != TxKind.Transfer || (toWallet != null && toWallet?.id != wallet?.id &&
-            (!crossCurrency || parseAmountToCents(amountTo).let { it != null && it > 0 })))
+        wallets.isNotEmpty() &&
+        (kind != TxKind.Transfer || toWallet != null)
 
     // The shared dialog carries the title, the X, the divider and the
     // Cancel/Save pair, so this file is only its fields — same as the web,
@@ -221,6 +239,7 @@ fun TransactionFormSheet(
         run {
             // The web leads with a full-width segmented control, not three pills.
             SegmentedControl(
+                style = SegStyle.Tray,
                 options = listOf(TxKind.Income, TxKind.Expense, TxKind.Transfer),
                 selected = kind,
                 label = {
@@ -244,7 +263,7 @@ fun TransactionFormSheet(
                 ),
                 options = spendable,
                 selected = wallet,
-                optionLabel = { "${it.name} · ${it.currencyCode}" },
+                optionLabel = { walletLabel(it, wallets) },
                 onSelect = { wallet = it },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -254,7 +273,7 @@ fun TransactionFormSheet(
                     label = stringResource(R.string.transactions_to_wallet),
                     options = spendable.filter { it.id != wallet?.id },
                     selected = toWallet,
-                    optionLabel = { "${it.name} · ${it.currencyCode}" },
+                    optionLabel = { walletLabel(it, wallets) },
                     onSelect = { toWallet = it },
                     modifier = Modifier.fillMaxWidth(),
                 )

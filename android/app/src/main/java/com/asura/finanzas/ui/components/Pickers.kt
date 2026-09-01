@@ -1,5 +1,6 @@
 package com.asura.finanzas.ui.components
 
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.background
@@ -36,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.theme.Broke
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.LocalAppSettings
@@ -153,11 +155,13 @@ fun DateField(
 
     // The web shows the date spelled out with a calendar glyph inside the box,
     // and the whole box opens the picker — not a "Pick date" text button.
+    // Spelled out exactly as the web's DateInput writes it. `FormatStyle.LONG`
+    // is close but not the same string in Spanish ("31 de agosto de 2026"),
+    // and the two sat side by side in the same account.
     val shown = remember(value, locale) {
+        val pattern = if (locale.language == "en") "MMMM d, yyyy" else "d 'de' MMMM yyyy"
         runCatching {
-            value.format(
-                DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale),
-            )
+            value.format(DateTimeFormatter.ofPattern(pattern, locale))
         }.getOrDefault(value.toString())
     }
     Box(modifier.clickable { showDialog = true }) {
@@ -223,12 +227,15 @@ fun TimeField(
     var showDialog by remember { mutableStateOf(false) }
     val clock24 = LocalAppSettings.current.clock24
 
-    // Clock glyph then the time, the way the web's TimeInput reads; tapping the
-    // box opens the picker and the little x clears it.
+    // The web's TimeInput: clock glyph, the bare time, and — on a 12-hour
+    // clock — a small AM/PM chip that toggles the meridiem. The time itself
+    // carries no suffix; the chip is the suffix.
+    val parsedNow = value?.let { runCatching { LocalTime.parse(it) }.getOrNull() }
+    val meridiem = if ((parsedNow?.hour ?: 0) < 12) "AM" else "PM"
     Box(modifier.clickable { showDialog = true }) {
         FormField(
             label = label,
-            value = value?.let { formatClock(it, clock24) }.orEmpty(),
+            value = value?.let { bareClock(it, clock24) }.orEmpty(),
             onValueChange = {},
             modifier = Modifier.fillMaxWidth(),
             enabled = false,
@@ -237,19 +244,32 @@ fun TimeField(
                 Icon(
                     Lucide.Clock,
                     contentDescription = null,
-                    tint = Broke.colors.fgMuted,
-                    modifier = Modifier.size(16.dp),
+                    tint = Broke.colors.fgSubtle,
+                    modifier = Modifier.size(15.dp),
                 )
             },
             trailing = {
-                if (value != null) {
-                    Icon(
-                        Lucide.X,
-                        contentDescription = stringResource(R.string.common_clear),
-                        tint = Broke.colors.fgMuted,
+                if (!clock24 && parsedNow != null) {
+                    Text(
+                        meridiem,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        color = Broke.colors.fg,
                         modifier = Modifier
-                            .clickable { onChange(null) }
-                            .size(15.dp),
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Broke.colors.surface)
+                            .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(6.dp))
+                            .clickable {
+                                val shifted = if (parsedNow.hour < 12) {
+                                    parsedNow.plusHours(12)
+                                } else {
+                                    parsedNow.minusHours(12)
+                                }
+                                onChange("%02d:%02d".format(Locale.ROOT, shifted.hour, shifted.minute))
+                            }
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
                     )
                 }
             },
@@ -274,6 +294,11 @@ fun TimeField(
                 }) { Text(stringResource(R.string.common_confirm)) }
             },
             dismissButton = {
+                // Clearing lives here now: the box itself has no x, because the
+                // web's has none either — there you just empty the text.
+                TextButton(onClick = { onChange(null); showDialog = false }) {
+                    Text(stringResource(R.string.common_clear))
+                }
                 TextButton(onClick = { showDialog = false }) {
                     Text(stringResource(R.string.common_cancel))
                 }
@@ -283,11 +308,23 @@ fun TimeField(
     }
 }
 
-/** 'HH:MM' rendered for the chosen clock — 24h verbatim, 12h with am/pm. */
-fun formatClock(hhmm: String, clock24: Boolean): String {
+/**
+ * 'HH:MM' for the chosen clock with no meridiem: 24h verbatim, 12h as "h:mm".
+ * The web's box shows the suffix on its own AM/PM chip, not in the text.
+ */
+fun bareClock(hhmm: String, clock24: Boolean): String {
     val time = runCatching { LocalTime.parse(hhmm) }.getOrNull() ?: return hhmm
     if (clock24) return hhmm
     val h12 = ((time.hour + 11) % 12) + 1
-    val suffix = if (time.hour < 12) "a.m." else "p.m."
-    return "%d:%02d %s".format(Locale.ROOT, h12, time.minute, suffix)
+    return "%d:%02d".format(Locale.ROOT, h12, time.minute)
+}
+
+/**
+ * How a wallet reads inside a picker: `Parent › Name (CODE)`, the web's
+ * `walletLabel`. A pocket and the wallet next to it in the list are otherwise
+ * easy to mix up, and picking the wrong one sends real money somewhere else.
+ */
+fun walletLabel(wallet: Wallet, all: List<Wallet>): String {
+    val parent = wallet.parentWalletId?.let { id -> all.firstOrNull { it.id == id }?.name }
+    return (if (parent != null) "$parent › " else "") + "${wallet.name} (${wallet.currencyCode})"
 }

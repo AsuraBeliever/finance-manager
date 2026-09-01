@@ -35,9 +35,27 @@ import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.theme.Broke
 
 /**
- * The web's segmented control: a dark pill holding the options, the selected
- * one raised. Used for theme, language, clock format and the transaction kind
- * filter.
+ * Which of the web's segmented controls this is. They are not one component
+ * over there — three different shapes grew in three places — and collapsing
+ * them into one here put the wrong tray under half the screens.
+ */
+enum class SegStyle {
+    /** `rounded-lg bg-surface p-1`, chip `rounded-md`, raised on surface-overlay. */
+    Tray,
+
+    /** `rounded-xl bg-surface-overlay p-1 gap-1`, chip `rounded-lg`, raised. */
+    Pill,
+
+    /** The theme switch: bordered on surface, the choice marked in the accent. */
+    Theme,
+
+    /** The simulator's modes: bordered on surface-raised, accent chip. */
+    Modes,
+}
+
+/**
+ * A row of mutually exclusive options in a tray, the way the web draws them.
+ * See [SegStyle] for which shape goes where.
  */
 @Composable
 fun <T> SegmentedControl(
@@ -50,40 +68,59 @@ fun <T> SegmentedControl(
     icon: ((T) -> ImageVector?)? = null,
     /** Split the width evenly, as the web does wherever the row has space. */
     fillEqually: Boolean = false,
-    /**
-     * The theme switch marks its choice in the accent (the web's ThemeToggle);
-     * every other segmented control uses the plain raised chip.
-     */
-    accentSelected: Boolean = false,
+    style: SegStyle = SegStyle.Pill,
 ) {
     val colors = Broke.colors
-    // The web's control: rounded-xl tray, p-1, gap-1; the selected option is a
-    // rounded-lg raised chip with plain foreground text — not accent-coloured.
+    val trayRadius = if (style == SegStyle.Tray || style == SegStyle.Theme) 8.dp else 12.dp
+    val chipRadius = if (style == SegStyle.Tray || style == SegStyle.Theme) 6.dp else 8.dp
+    val tray = when (style) {
+        SegStyle.Tray, SegStyle.Theme -> colors.surface
+        SegStyle.Pill -> colors.surfaceOverlay
+        SegStyle.Modes -> colors.surfaceRaised
+    }
+    val chipGap = if (style == SegStyle.Pill) 4.dp else 0.dp
+    val chipPadding = when (style) {
+        SegStyle.Theme -> 10.dp
+        SegStyle.Modes -> 16.dp
+        else -> 12.dp
+    }
+    val fontSize = if (style == SegStyle.Theme) 12.sp else 14.sp
+    val accentChip = style == SegStyle.Theme || style == SegStyle.Modes
+
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(colors.surface)
+            .clip(RoundedCornerShape(trayRadius))
+            .background(tray)
+            .then(
+                if (style == SegStyle.Theme || style == SegStyle.Modes) {
+                    Modifier.border(1.dp, colors.borderMuted, RoundedCornerShape(trayRadius))
+                } else {
+                    Modifier
+                },
+            )
             // Long labels would otherwise be squeezed until each one wrapped
             // down several lines, blowing the pill up into a tall block.
             .then(if (fillEqually) Modifier else Modifier.horizontalScroll(rememberScrollState()))
             .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(chipGap),
     ) {
         options.forEach { option ->
             val isSelected = option == selected
             Row(
                 modifier = Modifier
                     .then(if (fillEqually) Modifier.weight(1f) else Modifier)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(chipRadius))
                     .background(
                         when {
                             !isSelected -> Color.Transparent
-                            accentSelected -> colors.accentDim.copy(alpha = 0.20f)
+                            style == SegStyle.Theme -> colors.accentDim.copy(alpha = 0.20f)
+                            style == SegStyle.Modes -> colors.accent.copy(alpha = 0.15f)
+                            style == SegStyle.Tray -> colors.surfaceOverlay
                             else -> colors.surfaceRaised
                         },
                     )
                     .clickable { onSelect(option) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = chipPadding, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             ) {
@@ -92,19 +129,28 @@ fun <T> SegmentedControl(
                         it,
                         contentDescription = null,
                         tint = when {
-                            !isSelected -> colors.fgSubtle
-                            accentSelected -> colors.accent
+                            !isSelected -> if (accentChip) colors.fgMuted else colors.fgSubtle
+                            accentChip -> colors.accent
                             else -> colors.fg
                         },
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(15.dp),
                     )
                 }
                 Text(
                     text = label(option),
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontSize = fontSize,
+                        // The tray shape only bolds the chosen option ("text-sm"
+                        // vs "text-sm font-medium"); the others always do.
+                        fontWeight = if (style == SegStyle.Tray && !isSelected) {
+                            androidx.compose.ui.text.font.FontWeight.Normal
+                        } else {
+                            androidx.compose.ui.text.font.FontWeight.Medium
+                        },
+                    ),
                     color = when {
-                        !isSelected -> colors.fgSubtle
-                        accentSelected -> colors.accent
+                        !isSelected -> if (accentChip) colors.fgMuted else colors.fgSubtle
+                        accentChip -> colors.accent
                         else -> colors.fg
                     },
                     textAlign = TextAlign.Center,
@@ -132,7 +178,8 @@ fun PrimaryButton(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (enabled) colors.accentDim else colors.surfaceOverlay)
+            // `disabled:opacity-50` — the same pill, faded, not a grey one.
+            .background(colors.accentDim.copy(alpha = if (enabled) 1f else 0.5f))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -142,14 +189,14 @@ fun PrimaryButton(
             Icon(
                 it,
                 contentDescription = null,
-                tint = if (enabled) Color.White else colors.fgSubtle,
+                tint = Color.White.copy(alpha = if (enabled) 1f else 0.5f),
                 modifier = Modifier.size(16.dp),
             )
         }
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-            color = if (enabled) Color.White else colors.fgSubtle,
+            color = Color.White.copy(alpha = if (enabled) 1f else 0.5f),
         )
     }
 }
@@ -186,7 +233,11 @@ fun OutlineButton(
     }
 }
 
-/** Quiet pill used for the period picker and other secondary chips. */
+/**
+ * The period picker's trigger, and the shape any other quiet chip takes: the
+ * web's `rounded-lg border border-border-muted bg-surface px-3 py-1.5 text-sm`,
+ * with a 15 px glyph in front and a 14 px chevron behind.
+ */
 @Composable
 fun ChipButton(
     text: String,
@@ -198,20 +249,24 @@ fun ChipButton(
     val colors = Broke.colors
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.surfaceOverlay)
-            .border(1.dp, colors.borderMuted, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.surface)
+            .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 11.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         leadingIcon?.let {
-            Icon(it, contentDescription = null, tint = colors.fgMuted, modifier = Modifier.size(17.dp))
+            Icon(it, contentDescription = null, tint = colors.fgSubtle, modifier = Modifier.size(15.dp))
         }
-        Text(text, style = MaterialTheme.typography.labelLarge, color = colors.fg)
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = colors.fg,
+        )
         trailingIcon?.let {
-            Icon(it, contentDescription = null, tint = colors.fgMuted, modifier = Modifier.size(17.dp))
+            Icon(it, contentDescription = null, tint = colors.fgSubtle, modifier = Modifier.size(14.dp))
         }
     }
 }

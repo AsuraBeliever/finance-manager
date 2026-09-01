@@ -7,15 +7,24 @@ import {
   parseISO,
   startOfMonth,
 } from "date-fns";
-import { es as esLocale } from "date-fns/locale";
+import { enUS as enLocale, es as esLocale } from "date-fns/locale";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { inputClass } from "./Field";
 import { es } from "../i18n/es";
+import { useLocale } from "../i18n/store";
 
-const WEEKDAYS = ["L", "M", "M", "J", "V", "S", "D"];
-const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const WEEKDAYS = {
+  es: ["L", "M", "M", "J", "V", "S", "D"],
+  en: ["M", "T", "W", "T", "F", "S", "S"],
+} as const;
+const MONTHS = {
+  es: ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"],
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+} as const;
+/** How each language writes a full date: "31 de agosto 2026" / "August 31, 2026". */
+const LONG_DATE = { es: "d 'de' MMMM yyyy", en: "MMMM d, yyyy" } as const;
 const YEAR_FROM = 1970;
 
 interface DateInputProps {
@@ -33,6 +42,11 @@ interface DateInputProps {
 const POPOVER_W = 288;
 
 export function DateInput({ value, onChange, min }: DateInputProps) {
+  // The calendar used to be written in Spanish whatever the app language was:
+  // month names, weekday initials and the long date all came from a hardcoded
+  // date-fns locale, so the English UI still read "31 de agosto 2026".
+  const lang = useLocale();
+  const dfLocale = lang === "en" ? enLocale : esLocale;
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"days" | "months">("days");
   const selected = value ? parseISO(value) : new Date();
@@ -129,7 +143,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
       >
         <span>
           {value
-            ? format(parseISO(value), "d 'de' MMMM yyyy", { locale: esLocale })
+            ? format(parseISO(value), LONG_DATE[lang], { locale: dfLocale })
             : es.common.pickDate}
         </span>
         <Calendar size={15} className="shrink-0 text-fg-subtle" />
@@ -180,7 +194,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
                 </button>
               </div>
               <div className="grid grid-cols-3 gap-1">
-                {MONTHS.map((m, i) => {
+                {MONTHS[lang].map((m, i) => {
                   const isCurrent =
                     i === view.getMonth() &&
                     view.getFullYear() === (value ? parseISO(value) : new Date()).getFullYear();
@@ -229,7 +243,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
               className="rounded-lg px-2 py-1 text-sm font-medium capitalize hover:bg-surface-raised"
               title={es.common.pickMonthYear}
             >
-              {format(view, "MMMM yyyy", { locale: esLocale })} ▾
+              {format(view, "MMMM yyyy", { locale: dfLocale })} ▾
             </button>
             <button
               type="button"
@@ -241,7 +255,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
           </div>
 
           <div className="grid grid-cols-7 gap-1 text-center">
-            {WEEKDAYS.map((d, i) => (
+            {WEEKDAYS[lang].map((d, i) => (
               <span key={i} className="py-1 text-xs font-medium text-fg-subtle">
                 {d}
               </span>
@@ -289,7 +303,7 @@ export function DateInput({ value, onChange, min }: DateInputProps) {
             }}
             className="mt-2 w-full rounded-lg py-1.5 text-center text-sm text-accent hover:bg-surface-raised"
           >
-            {es.common.today} · {getDate(new Date())} {format(new Date(), "MMM", { locale: esLocale })}
+            {es.common.today} · {getDate(new Date())} {format(new Date(), "MMM", { locale: dfLocale })}
           </button>
           </>
           )}

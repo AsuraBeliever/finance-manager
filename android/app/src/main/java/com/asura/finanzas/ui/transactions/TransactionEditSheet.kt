@@ -25,6 +25,7 @@ import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.components.walletLabel
 import com.asura.finanzas.ui.components.TimeField
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
@@ -144,7 +145,7 @@ private fun SimpleEditSheet(
             label = stringResource(R.string.transactions_wallet),
             options = wallets.filter { !it.isArchived },
             selected = wallet,
-            optionLabel = { "${it.name} · ${it.currencyCode}" },
+            optionLabel = { walletLabel(it, wallets) },
             onSelect = { wallet = it },
             modifier = Modifier.fillMaxWidth(),
         )
@@ -283,7 +284,7 @@ private fun TransferEditSheet(
             label = stringResource(R.string.transactions_from_wallet),
             options = spendable,
             selected = fromWallet,
-            optionLabel = { "${it.name} · ${it.currencyCode}" },
+            optionLabel = { walletLabel(it, wallets) },
             onSelect = { fromWallet = it },
             modifier = Modifier.fillMaxWidth(),
         )
@@ -291,7 +292,7 @@ private fun TransferEditSheet(
             label = stringResource(R.string.transactions_to_wallet),
             options = spendable.filter { it.id != fromWallet?.id },
             selected = toWallet,
-            optionLabel = { "${it.name} · ${it.currencyCode}" },
+            optionLabel = { walletLabel(it, wallets) },
             onSelect = { toWallet = it },
             modifier = Modifier.fillMaxWidth(),
         )

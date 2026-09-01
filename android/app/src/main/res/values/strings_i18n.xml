@@ -179,6 +179,7 @@
     <string name="common_next_year">Año siguiente</string>
     <string name="common_year">Año</string>
     <string name="common_clear">Quitar</string>
+    <string name="common_required">Completa este campo</string>
     <string name="dashboard_title">Resumen</string>
     <string name="dashboard_reset_layout">Restablecer vista</string>
     <string name="dashboard_reorder">Arrastra para reordenar</string>

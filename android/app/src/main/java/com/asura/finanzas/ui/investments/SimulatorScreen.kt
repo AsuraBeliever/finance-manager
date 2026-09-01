@@ -36,6 +36,7 @@ import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.LineChart
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.components.SegStyle
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
@@ -94,6 +95,7 @@ fun SimulatorScreen(
 
         item {
             SegmentedControl(
+                style = SegStyle.Modes,
                 options = SimMode.entries,
                 selected = mode,
                 label = {

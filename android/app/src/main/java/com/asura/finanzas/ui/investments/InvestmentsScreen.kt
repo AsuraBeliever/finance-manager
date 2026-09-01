@@ -148,9 +148,16 @@ private fun InvestmentList(
             // the outlined simulator link, then the primary action.
             PageHeader(stringResource(R.string.investments_title)) {
                 PrivacyToggle()
+                // Four controls do not fit this width laid out at their natural
+                // size. In the browser they are flex children, so they shrink
+                // and let their labels run onto a second line rather than
+                // pushing the last one down to a row of its own; `weight` is
+                // how a FlowRow does the same thing.
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { onToggleClosed() },
+                    modifier = Modifier
+                        .weight(0.72f, fill = false)
+                        .clickable { onToggleClosed() },
                 ) {
                     WebCheckbox(
                         checked = showClosed,
@@ -167,11 +174,13 @@ private fun InvestmentList(
                     text = stringResource(R.string.simulator_open),
                     onClick = onSimulator,
                     leadingIcon = Lucide.Calculator,
+                    modifier = Modifier.weight(1.2f, fill = false),
                 )
                 PrimaryButton(
                     text = stringResource(R.string.investments_new_investment),
                     onClick = onNew,
                     leadingIcon = Lucide.Plus,
+                    modifier = Modifier.weight(1.28f, fill = false),
                 )
             }
         }

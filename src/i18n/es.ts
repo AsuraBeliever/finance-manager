@@ -201,6 +201,7 @@ export const esDict = {
     nextYear: "Año siguiente",
     year: "Año",
     clear: "Quitar",
+    required: "Completa este campo",
   },
   dashboard: {
     title: "Resumen",

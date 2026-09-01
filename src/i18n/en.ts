@@ -195,6 +195,7 @@ export const en: Dict = {
     nextYear: "Next year",
     year: "Year",
     clear: "Clear",
+    required: "Please fill out this field",
   },
   dashboard: {
     title: "Overview",

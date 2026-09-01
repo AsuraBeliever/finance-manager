@@ -456,8 +456,8 @@ private fun TransactionList(
             ChipButton(
                 text = PeriodLabel(period),
                 onClick = onPickPeriod,
-                leadingIcon = Icons.Outlined.CalendarMonth,
-                trailingIcon = Icons.Outlined.ExpandMore,
+                leadingIcon = Lucide.CalendarRange,
+                trailingIcon = Lucide.ChevronDown,
             )
         }
 
@@ -623,6 +623,10 @@ private fun TransactionRow(
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
             color = tint,
         )
+        // The web's `gap-3` sits between every child of the row, this one
+        // included; without it the description column ran twelve dp wider and
+        // wrapped at a different word than the browser.
+        Spacer(Modifier.width(12.dp))
         // The web puts an edit and a delete button on every row; hiding them
         // behind a long press meant the two surfaces did not even offer the
         // same affordances. Fixed-width slot so the amounts stay aligned.
@@ -674,7 +678,12 @@ private fun kindLabel(kind: String): String = when (kind) {
 fun transactionTimeLabel(tx: Transaction): String? {
     val settings = LocalAppSettings.current
     val pattern = if (settings.clock24) "HH:mm" else "h:mm a"
-    val formatter = remember(pattern) { DateTimeFormatter.ofPattern(pattern, Locale.US) }
+    // The language chosen in the app, not the device's: "3:01 PM" in English,
+    // "3:01 p.m." in Spanish, the same string the web writes for the account.
+    val locale = remember(settings.locale) {
+        if (settings.locale.startsWith("en")) Locale.US else Locale.forLanguageTag("es-MX")
+    }
+    val formatter = remember(pattern, locale) { DateTimeFormatter.ofPattern(pattern, locale) }
 
     tx.occurredTime?.takeIf { it.isNotBlank() }?.let { own ->
         return runCatching { LocalTime.parse(own).format(formatter) }.getOrNull() ?: own

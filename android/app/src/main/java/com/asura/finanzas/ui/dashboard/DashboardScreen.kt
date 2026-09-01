@@ -349,7 +349,7 @@ private fun DashboardContent(
                 ChipButton(
                     text = PeriodLabel(period),
                     onClick = onPickPeriod,
-                    leadingIcon = Lucide.Calendar,
+                    leadingIcon = Lucide.CalendarRange,
                     trailingIcon = Lucide.ChevronDown,
                 )
                 // Clears both the phone order and the desktop grid layout, so
