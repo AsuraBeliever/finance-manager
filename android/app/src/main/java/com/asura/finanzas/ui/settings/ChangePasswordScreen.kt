@@ -66,7 +66,7 @@ fun ChangePasswordScreen(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .imePadding()
-            .padding(PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp)),
+            .padding(PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp)),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         BackHeader(stringResource(R.string.account_change_password), onBack)

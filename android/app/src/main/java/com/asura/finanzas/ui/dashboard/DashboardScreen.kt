@@ -741,14 +741,19 @@ private fun NetWorthCard(
             label = stringResource(R.string.nav_wallets),
             amount = maskIfHidden(formatMoney(summary.totalEndMxnCents), hide),
         )
-        Spacer(Modifier.height(6.dp))
-        LegendRow(
-            color = colors.cyan,
-            label = stringResource(R.string.nav_investments),
-            amount = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
-        )
+        if (summary.investmentsTotalMxnCents > 0) {
+            Spacer(Modifier.height(6.dp))
+            LegendRow(
+                color = colors.cyan,
+                label = stringResource(R.string.nav_investments),
+                amount = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
+            )
+        }
 
-        if (trends != null) {
+        // Only when the period actually moved money. A quiet month otherwise
+        // gets a rule and two "$0.00 · −100%" rows saying nothing, which is
+        // why the web gates this block the same way.
+        if (trends != null && (trends.incomeMxnCents > 0 || trends.expenseMxnCents > 0)) {
             Spacer(Modifier.height(16.dp))
             HairLine()
             Spacer(Modifier.height(14.dp))

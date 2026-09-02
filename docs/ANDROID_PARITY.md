@@ -52,6 +52,11 @@ Cosas que salieron de hacer esto y conviene no repetir:
 - Medidas compartidas: tarjetas `rounded-2xl` (16 dp), márgenes de página
   16 dp, botón primario `rounded-lg` px16/py8 sobre `accentDim`, encabezado con
   regla de 4×28 y título de 30 sp cuyas acciones **envuelven**.
+- **El margen de página es 16 dp en TODAS las pantallas.** Media docena se
+  habían quedado en 20 dp, que a ojo no se nota pero deja cada tarjeta 8 dp más
+  angosta que en la web — suficiente para que un nombre de suscripción acabara
+  en «Spotify T…». La forma de detectarlo es medir el borde de la tarjeta en las
+  dos capturas: tiene que caer en el mismo pixel.
 
 Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 
