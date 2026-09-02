@@ -44,6 +44,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.ui.components.Lucide
@@ -477,7 +481,7 @@ fun GoalCard(
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontSize = 24.sp,
                     lineHeight = 28.sp,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    fontWeight = FontWeight.SemiBold,
                 ),
                 color = colors.fg,
             )
@@ -495,16 +499,36 @@ fun GoalCard(
         Spacer(Modifier.height(12.dp))
         val remaining = (goal.targetCents - goal.savedCents).coerceAtLeast(0)
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Two spans, as on the web: the figure carries the accent and the
+            // weight, and what is left to save trails behind it in the subtle
+            // tone. One flat string made the whole line read as one thing.
+            val done = remaining == 0L
             Text(
-                if (remaining == 0L) {
-                    stringResource(R.string.goals_completed)
-                } else {
-                    "${Math.round(goal.progressBps / 100.0)}% · " +
-                        stringResource(R.string.goals_remaining) + " " +
-                        maskIfHidden(formatMoney(remaining, goal.currencyCode), hide)
+                buildAnnotatedString {
+                    withStyle(
+                        SpanStyle(
+                            color = colors.accent,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                    ) {
+                        append(
+                            if (done) {
+                                stringResource(R.string.goals_completed)
+                            } else {
+                                "${Math.round(goal.progressBps / 100.0)}%"
+                            },
+                        )
+                    }
+                    if (!done) {
+                        withStyle(SpanStyle(color = colors.fgSubtle)) {
+                            append(" · ")
+                            append(stringResource(R.string.goals_remaining))
+                            append(" ")
+                            append(maskIfHidden(formatMoney(remaining, goal.currencyCode), hide))
+                        }
+                    }
                 },
                 style = MaterialTheme.typography.labelMedium,
-                color = if (remaining == 0L) colors.positive else colors.fgMuted,
                 modifier = Modifier.weight(1f),
             )
             // Both of these are ghost Buttons on the web — plain foreground on
