@@ -40,6 +40,15 @@ Cosas que salieron de hacer esto y conviene no repetir:
   etiqueta flotante.
 - **Los nombres semilla se traducen** con `seedName()` en toda pantalla que los
   muestre; sin eso salen en español dentro de la app en inglés.
+- **Las gráficas también se copian, no se reinventan.** recharts trae decisiones
+  que se notan de inmediato si Android no las repite: la escala vertical arranca
+  en cero (dominio `[0, 'auto']`), los cortes del eje se redondean al medio de su
+  magnitud (23.5k → 25k, 27.4k → 30k) y la rejilla es punteada `3 3`. Están en
+  `components/SimCharts.kt`.
+- **Un botón que se encoge no se encoge más allá de su palabra más larga.** En
+  flexbox eso es gratis (`min-content`); en Compose hay que pedirlo con
+  `Modifier.width(IntrinsicSize.Min)`. Repartir el ancho con fracciones de
+  `weight` lo aparenta hasta que una traducción no cabe y el texto sale cortado.
 - Medidas compartidas: tarjetas `rounded-2xl` (16 dp), márgenes de página
   16 dp, botón primario `rounded-lg` px16/py8 sobre `accentDim`, encabezado con
   regla de 4×28 y título de 30 sp cuyas acciones **envuelven**.
@@ -120,7 +129,9 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Cerrar / eliminar | `ui/investments` | ✅ |
 | Movimientos: alta, edición y borrado | `InvestmentSheets` | ✅ |
 | Snapshots manuales | `InvestmentSheets` | ✅ |
-| Simulador (proyección · meta · comparar) | `SimulatorScreen` | ✅ |
+| Simulador (proyección · meta · comparar) | `SimulatorScreen` | ✅ los tres modos con sus mismos campos, cifras y gráficas |
+| Gráfica de crecimiento (aportado + intereses apilados) | `components/SimCharts` (`StackedAreaChart`) | ✅ |
+| Gráfica de comparación (una línea por instrumento) | `components/SimCharts` (`MultiLineChart`) | ✅ tasas de CETES y BONDDIA precargadas del catálogo |
 
 ## Planeación
 

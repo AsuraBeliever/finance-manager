@@ -26,7 +26,10 @@ import { CHART_COLORS, POSITIVE, useChartTokens } from "../../lib/palette";
 import type { SimCadence } from "../../lib/types";
 import { es } from "../../i18n/es";
 
-const GOLD = "#c9a14a";
+// The cyan from the shared chart palette. This used to be a literal left
+// over from the old editorial palette, which drew the band in a muted gold
+// no other chart used — and which Android had no way to match.
+const CONTRIBUTED = CHART_COLORS[2];
 type Mode = "project" | "goal" | "compare";
 const CADENCES: SimCadence[] = ["monthly", "biweekly", "weekly", "none"];
 
@@ -130,6 +133,21 @@ function MoneyField({
       )}
     </Field>
   );
+}
+
+/**
+ * One tick per year, thinned so the labels never crowd. Without explicit ticks
+ * recharts samples the months on its own, and since only multiples of 12 get a
+ * label, almost all of them come out blank — at five years the axis ended up
+ * showing nothing but "5a".
+ */
+function yearTicks(months: number): number[] | undefined {
+  const years = Math.floor(months / 12);
+  if (years < 1) return undefined;
+  const stride = Math.max(1, Math.ceil(years / 6));
+  const out: number[] = [];
+  for (let y = stride; y <= years; y += stride) out.push(y * 12);
+  return out;
 }
 
 function Stat({
@@ -276,8 +294,8 @@ function ProjectMode({
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="simContrib" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={GOLD} stopOpacity={0.5} />
-                  <stop offset="100%" stopColor={GOLD} stopOpacity={0.08} />
+                  <stop offset="0%" stopColor={CONTRIBUTED} stopOpacity={0.5} />
+                  <stop offset="100%" stopColor={CONTRIBUTED} stopOpacity={0.08} />
                 </linearGradient>
                 <linearGradient id="simInterest" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={POSITIVE} stopOpacity={0.55} />
@@ -290,6 +308,7 @@ function ProjectMode({
                 stroke={chart.axis}
                 fontSize={11}
                 minTickGap={28}
+                ticks={yearTicks(input.months)}
                 tickFormatter={(m) => (Number(m) % 12 === 0 ? `${Number(m) / 12}a` : "")}
               />
               <YAxis
@@ -311,7 +330,7 @@ function ProjectMode({
                 type="monotone"
                 dataKey="contributed"
                 stackId="1"
-                stroke={GOLD}
+                stroke={CONTRIBUTED}
                 fill="url(#simContrib)"
                 strokeWidth={2}
               />
@@ -326,7 +345,7 @@ function ProjectMode({
             </AreaChart>
           </ResponsiveContainer>
           <div className="mt-3 flex items-center gap-4 text-xs text-fg-subtle">
-            <Legend color={GOLD} label={es.simulator.contributedSeries} />
+            <Legend color={CONTRIBUTED} label={es.simulator.contributedSeries} />
             <Legend color={POSITIVE} label={es.simulator.interestSeries} />
           </div>
         </Card>
@@ -551,6 +570,7 @@ function CompareMode({
                 stroke={chart.axis}
                 fontSize={11}
                 minTickGap={28}
+                ticks={yearTicks(base.months)}
                 tickFormatter={(m) => (Number(m) % 12 === 0 ? `${Number(m) / 12}a` : "")}
               />
               <YAxis

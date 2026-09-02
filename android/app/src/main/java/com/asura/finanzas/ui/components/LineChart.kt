@@ -237,7 +237,7 @@ fun LineChart(
  * ends so nothing hangs off the chart — what recharts does with its ticks.
  */
 @Composable
-private fun AxisLabels(labels: List<Pair<String, Float>>) {
+internal fun AxisLabels(labels: List<Pair<String, Float>>) {
     Layout(
         content = {
             labels.forEach { (text, _) ->

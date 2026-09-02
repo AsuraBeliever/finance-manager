@@ -3,6 +3,7 @@ package com.asura.finanzas.ui.investments
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -151,12 +152,17 @@ private fun InvestmentList(
                 // Four controls do not fit this width laid out at their natural
                 // size. In the browser they are flex children, so they shrink
                 // and let their labels run onto a second line rather than
-                // pushing the last one down to a row of its own; `weight` is
-                // how a FlowRow does the same thing.
+                // pushing the last one down to a row of its own.
+                //
+                // `IntrinsicSize.Min` is that behaviour exactly: a flex item
+                // will not shrink past its min-content width, which for a label
+                // is its longest word. Hand-picked `weight` fractions used to
+                // stand in for this, and being a few dp short left the primary
+                // action reading "New investmen".
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .weight(0.72f, fill = false)
+                        .width(IntrinsicSize.Min)
                         .clickable { onToggleClosed() },
                 ) {
                     WebCheckbox(
@@ -174,13 +180,13 @@ private fun InvestmentList(
                     text = stringResource(R.string.simulator_open),
                     onClick = onSimulator,
                     leadingIcon = Lucide.Calculator,
-                    modifier = Modifier.weight(1.2f, fill = false),
+                    modifier = Modifier.width(IntrinsicSize.Min),
                 )
                 PrimaryButton(
                     text = stringResource(R.string.investments_new_investment),
                     onClick = onNew,
                     leadingIcon = Lucide.Plus,
-                    modifier = Modifier.weight(1.28f, fill = false),
+                    modifier = Modifier.width(IntrinsicSize.Min),
                 )
             }
         }
