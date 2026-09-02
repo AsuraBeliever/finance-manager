@@ -52,6 +52,12 @@ fun AppRoot(
         }
     }
 
+    // Whichever way a session ends — the button, or one revoked from another
+    // device — the numbers it left behind go with it.
+    LaunchedEffect(state) {
+        if (state == AuthState.SignedOut) repository.forgetReads()
+    }
+
     // Keyed on the state, not on Unit: this has to run both when the app opens
     // with a session already stored and right after someone signs in. Keying it
     // to first composition only meant a fresh sign-in kept the device's

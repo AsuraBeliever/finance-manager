@@ -72,6 +72,21 @@ class BrokeRepository(
         return rpc.json.decodeFromJsonElement(User.serializer(), element)
     }
 
+    /**
+     * Drop everything this device remembers about what the account contains,
+     * without touching the outbox — those are captures the user made and has
+     * not sent yet, and they are not ours to throw away.
+     *
+     * Called on **every** road out of a session, not just the sign-out button:
+     * a session revoked from another device also lands on the login screen, and
+     * if the next person to sign in here is somebody else, they must not see a
+     * frame of the previous account's figures.
+     */
+    suspend fun forgetReads() {
+        queries.clear()
+        cache.invalidateReads()
+    }
+
     suspend fun logout() {
         runCatching { rpc.post("/api/auth/logout", JsonObject(emptyMap())) }
         cookieJar.clear()
