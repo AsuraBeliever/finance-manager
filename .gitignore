@@ -41,3 +41,6 @@ worker/.dev.vars
 
 # Claude Code local tooling (not part of the app)
 .claude/
+
+# Capturas del barrido de paridad (docs/ANDROID_PARITY_SWEEP.md)
+parity-shots/

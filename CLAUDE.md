@@ -106,4 +106,4 @@ cd android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
 
 ## Docs
 
-`docs/PLAN.md` (plan + checklist) · `docs/ARCHITECTURE.md` (capas, catálogo de comandos RPC, dev local) · `docs/DATA_MODEL.md` (SQL canónico de D1) · `docs/INVESTMENTS.md` (fórmulas: Nu cajita ACT/360 compuesto diario, CETES ACT/360 + ISR) · `docs/ROADMAP.md` · `docs/DECISIONS.md` (ADRs).
+`docs/PLAN.md` (plan + checklist) · `docs/ARCHITECTURE.md` (capas, catálogo de comandos RPC, dev local) · `docs/DATA_MODEL.md` (SQL canónico de D1) · `docs/INVESTMENTS.md` (fórmulas: Nu cajita ACT/360 compuesto diario, CETES ACT/360 + ISR) · `docs/ROADMAP.md` · `docs/DECISIONS.md` (ADRs) · `docs/ANDROID_PARITY.md` (paridad web↔APK) · `docs/ANDROID_PARITY_SWEEP.md` (plan del barrido visual pendiente).

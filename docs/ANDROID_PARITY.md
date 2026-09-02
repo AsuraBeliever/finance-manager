@@ -63,6 +63,11 @@ Cosas que salieron de hacer esto y conviene no repetir:
   en «Spotify T…». La forma de detectarlo es medir el borde de la tarjeta en las
   dos capturas: tiene que caer en el mismo pixel.
 
+**Barrido pendiente:** la tabla de abajo dice qué existe en las dos; que se
+*vea* igual está comprobado pantalla por pantalla sólo en las principales.
+El plan para cerrar el resto (formularios y pantallas de detalle) está en
+[`ANDROID_PARITY_SWEEP.md`](ANDROID_PARITY_SWEEP.md).
+
 Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 
 ## Sesión
