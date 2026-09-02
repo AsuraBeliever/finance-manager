@@ -69,10 +69,11 @@ import com.asura.finanzas.ui.theme.Broke
 fun InvestmentsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     val (key, reload) = rememberReloadKey()
     var showClosed by remember { mutableStateOf(false) }
-    val state by loadSynced(key to showClosed) { repository.investments(includeClosed = showClosed) }
-    val portfolio by produceState<Portfolio?>(initialValue = null, key) {
-        value = runCatching { repository.portfolio().value }.getOrNull()
+    val state by loadSynced("investments" to showClosed, refetch = key) {
+        repository.investments(includeClosed = showClosed)
     }
+    val portfolioState by loadSynced("portfolio", refetch = key) { repository.portfolio() }
+    val portfolio = (portfolioState as? Load.Ready)?.data
 
     var openId by remember { mutableStateOf<Long?>(null) }
     var creating by remember { mutableStateOf(false) }

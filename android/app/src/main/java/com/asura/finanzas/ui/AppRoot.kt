@@ -18,6 +18,7 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.SessionCookieJar
 import com.asura.finanzas.data.UnauthorizedException
 import com.asura.finanzas.ui.auth.LoginScreen
+import com.asura.finanzas.ui.components.ProvideQueryCache
 import com.asura.finanzas.ui.home.HomeScaffold
 import com.asura.finanzas.ui.theme.Broke
 
@@ -76,13 +77,17 @@ fun AppRoot(
                 repository = repository,
                 onSignedIn = { state = AuthState.SignedIn },
             )
-            AuthState.SignedIn -> HomeScaffold(
-                repository = repository,
-                preferences = preferences,
-                appearanceSync = appearanceSync,
-                outbox = outbox,
-                onSignedOut = { state = AuthState.SignedOut },
-            )
+            // Above the tabs on purpose: the cache has to outlive the screen
+            // you just left, which is the whole point of it.
+            AuthState.SignedIn -> ProvideQueryCache(repository.queries) {
+                HomeScaffold(
+                    repository = repository,
+                    preferences = preferences,
+                    appearanceSync = appearanceSync,
+                    outbox = outbox,
+                    onSignedOut = { state = AuthState.SignedOut },
+                )
+            }
         }
     }
 }

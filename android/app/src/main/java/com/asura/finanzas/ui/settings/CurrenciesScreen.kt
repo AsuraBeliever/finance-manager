@@ -56,7 +56,7 @@ fun CurrenciesScreen(
     modifier: Modifier = Modifier,
 ) {
     val (key, reload) = rememberReloadKey()
-    val state by loadSynced(key) { repository.exchangeRates() }
+    val state by loadSynced("exchangeRates", refetch = key) { repository.exchangeRates() }
     val scope = rememberCoroutineScope()
 
     // Which currency is being pinned by hand, if any. MXN is excluded: the

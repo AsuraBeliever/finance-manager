@@ -70,7 +70,7 @@ fun BudgetsScreen(
     modifier: Modifier = Modifier,
 ) {
     val (key, reload) = rememberReloadKey()
-    val state by loadSynced(key) { repository.budgets() }
+    val state by loadSynced("budgets", refetch = key) { repository.budgets() }
     val scope = rememberCoroutineScope()
 
     var creating by remember { mutableStateOf(false) }

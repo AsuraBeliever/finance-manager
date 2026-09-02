@@ -80,7 +80,7 @@ fun SubscriptionsScreen(
     modifier: Modifier = Modifier,
 ) {
     val (key, reload) = rememberReloadKey()
-    val state by loadSynced(key) { repository.subscriptions() }
+    val state by loadSynced("subscriptions", refetch = key) { repository.subscriptions() }
     val scope = rememberCoroutineScope()
 
     var creating by remember { mutableStateOf(false) }

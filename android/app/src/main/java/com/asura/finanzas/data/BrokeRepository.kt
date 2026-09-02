@@ -27,6 +27,13 @@ class BrokeRepository(
     private val outbox: Outbox,
 ) {
 
+    /**
+     * What each read last returned, so leaving a tab and coming back repaints
+     * at once instead of starting over. Lives here so it dies with the session,
+     * like every other piece of the user's data.
+     */
+    val queries = QueryCache()
+
     // ---- session ----
 
     suspend fun login(email: String, password: String): User {
@@ -69,6 +76,7 @@ class BrokeRepository(
         runCatching { rpc.post("/api/auth/logout", JsonObject(emptyMap())) }
         cookieJar.clear()
         cache.clear()
+        queries.clear()
         outbox.clear()
     }
 

@@ -79,7 +79,7 @@ fun CategoriesScreen(
     modifier: Modifier = Modifier,
 ) {
     val (key, reload) = rememberReloadKey()
-    val state by loadSynced(key) { repository.manageCategories() }
+    val state by loadSynced("categories", refetch = key) { repository.manageCategories() }
     val scope = rememberCoroutineScope()
 
     var editing by remember { mutableStateOf<TransactionCategory?>(null) }

@@ -26,6 +26,7 @@ app/src/main/java/com/asura/finanzas/
     Rpc.kt             POST /api/rpc/<command>; mirrors src/lib/api.ts
     SessionCookieJar   persists the one session cookie so the phone stays signed in
     JsonCache.kt       last-synced response per screen, for opening without signal
+    QueryCache.kt      the same responses in memory, so a tab switch is instant
     BrokeRepository    the app's only door to the backend
     Models.kt          wire shapes; mirror src/lib/types.ts
   ui/
@@ -45,11 +46,28 @@ The worker's CSRF check only validates `Origin` when the header is present
 authenticates with the same cookie flow as the browser. Nothing was relaxed
 server-side to make this work.
 
+## Reads
+
+`loadSynced` is the app's `useQuery`. A read is named by a **query key**, and
+whatever that key returned last is painted immediately while the request runs
+behind it — the web's `staleTime: 0`. That is what keeps changing tabs instant:
+Compose throws the screen away when you leave it, but `QueryCache` keeps its
+data for the session, so coming back never spins for something already read.
+Only a key nobody has read yet starts on a spinner.
+
+Two rules when adding one: give it a key no other screen uses (a collision
+would hand one screen another's type), and put in that key everything the
+answer depends on — the period, the filters. Bump `refetch` to read again
+without dropping what is on screen, which is what a reload after a capture
+does. A refetch that fails leaves the page alone.
+
 ## Offline
 
-Today: reads fall back to the last synced copy when the request never reaches
-the server, behind a visible "sin conexión" marker — the same deal the web app's
-persisted query cache makes. Writes are still online-only.
+Reads fall back to the last synced copy when the request never reaches the
+server, behind a visible "sin conexión" marker — the same deal the web app's
+persisted query cache makes. That fallback lives inside the repository, so it
+still applies to the background refetch: the figures stay up and the marker
+appears under them. Writes are still online-only.
 
 Full offline capture is not built yet. When it is, the server already supports
 the hard half: `add_income` / `add_expense` / `add_transfer` accept a `clientId`

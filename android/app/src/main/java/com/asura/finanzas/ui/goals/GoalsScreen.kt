@@ -90,7 +90,7 @@ fun GoalsScreen(
     modifier: Modifier = Modifier,
 ) {
     val (key, reload) = rememberReloadKey()
-    val state by loadSynced(key) { repository.savingsGoals() }
+    val state by loadSynced("goals", refetch = key) { repository.savingsGoals() }
     val scope = rememberCoroutineScope()
 
     var creating by remember { mutableStateOf(false) }
@@ -101,9 +101,8 @@ fun GoalsScreen(
     var confirmUse by remember { mutableStateOf<SavingsGoal?>(null) }
     var confirmConvert by remember { mutableStateOf<SavingsGoal?>(null) }
     // Only to name the source wallet in the confirmation; failing is harmless.
-    val wallets by produceState(initialValue = emptyList<Wallet>(), key) {
-        value = runCatching { repository.wallets().value }.getOrDefault(emptyList())
-    }
+    val walletsState by loadSynced("wallets" to false, refetch = key) { repository.wallets() }
+    val wallets = (walletsState as? Load.Ready)?.data ?: emptyList()
     val walletName = { id: Long? -> wallets.firstOrNull { it.id == id }?.name }
 
     when (val current = state) {

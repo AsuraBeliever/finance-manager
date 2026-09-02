@@ -113,16 +113,19 @@ fun DashboardScreen(
         }.getOrDefault(emptyList())
     }
     // Only needed to name each drill-down row's currency; failing is harmless.
-    val walletsForDrill by produceState(initialValue = emptyList<Wallet>(), key) {
-        value = runCatching { repository.wallets().value }.getOrDefault(emptyList())
-    }
+    // Shares the wallets tab's cache entry, the way two web pages reading
+    // `["wallets"]` share one query.
+    val walletsState by loadSynced("wallets" to false, refetch = key) { repository.wallets() }
+    val walletsForDrill = (walletsState as? Load.Ready)?.data ?: emptyList()
 
-    val summaryState by loadSynced(key to period) { repository.dashboard() }
-    val trendsState by loadSynced(key to period) { repository.spendingTrends(period.toJson()) }
-    val expenseState by loadSynced(key to period) {
+    val summaryState by loadSynced("dashboard" to period, refetch = key) { repository.dashboard() }
+    val trendsState by loadSynced("trends" to period, refetch = key) {
+        repository.spendingTrends(period.toJson())
+    }
+    val expenseState by loadSynced("breakdownExpense" to period, refetch = key) {
         repository.categoryBreakdown("expense", period.toJson())
     }
-    val incomeState by loadSynced(key to period) {
+    val incomeState by loadSynced("breakdownIncome" to period, refetch = key) {
         repository.categoryBreakdown("income", period.toJson())
     }
 
@@ -131,16 +134,17 @@ fun DashboardScreen(
     val incomeBreakdown = (incomeState as? Load.Ready)?.data
 
     // The planning widgets are extras on this screen: if one fails to load the
-    // dashboard still renders without it, same as the web.
-    val budgets by produceState<List<Budget>>(emptyList(), key, period) {
-        value = runCatching { repository.budgets().value }.getOrDefault(emptyList())
+    // dashboard still renders without it, same as the web. They read the same
+    // keys as their own screens, so opening Goals and coming back costs
+    // nothing — and none of them depends on the period.
+    val budgetsState by loadSynced("budgets", refetch = key) { repository.budgets() }
+    val goalsState by loadSynced("goals", refetch = key) { repository.savingsGoals() }
+    val subscriptionsState by loadSynced("subscriptions", refetch = key) {
+        repository.subscriptions()
     }
-    val goals by produceState<List<SavingsGoal>>(emptyList(), key, period) {
-        value = runCatching { repository.savingsGoals().value }.getOrDefault(emptyList())
-    }
-    val subscriptions by produceState<SubscriptionList?>(null, key, period) {
-        value = runCatching { repository.subscriptions().value }.getOrNull()
-    }
+    val budgets = (budgetsState as? Load.Ready)?.data ?: emptyList()
+    val goals = (goalsState as? Load.Ready)?.data ?: emptyList()
+    val subscriptions = (subscriptionsState as? Load.Ready)?.data
 
     when (val current = summaryState) {
         is Load.Loading -> LoadingBox(modifier)

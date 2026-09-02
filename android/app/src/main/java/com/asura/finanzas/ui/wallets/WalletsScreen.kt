@@ -94,7 +94,9 @@ import kotlinx.coroutines.launch
 fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     val (key, reload) = rememberReloadKey()
     var showArchived by remember { mutableStateOf(false) }
-    val state by loadSynced(key to showArchived) { repository.wallets(showArchived) }
+    val state by loadSynced("wallets" to showArchived, refetch = key) {
+        repository.wallets(showArchived)
+    }
     val scope = rememberCoroutineScope()
 
     var editing by remember { mutableStateOf<Wallet?>(null) }

@@ -45,6 +45,11 @@ Cosas que salieron de hacer esto y conviene no repetir:
   en cero (dominio `[0, 'auto']`), los cortes del eje se redondean al medio de su
   magnitud (23.5k → 25k, 27.4k → 30k) y la rejilla es punteada `3 3`. Están en
   `components/SimCharts.kt`.
+- **Cambiar de pestaña no vuelve a cargar.** La web guarda cada respuesta en
+  TanStack Query y repinta al instante mientras revalida; en Compose la pantalla
+  se destruye al salir de su pestaña, así que sin un caché propio cada regreso
+  era un spinner de dos segundos. Eso es `data/QueryCache.kt` + `loadSynced`.
+  Toda lectura nueva va por ahí, con su propia llave.
 - **Un botón que se encoge no se encoge más allá de su palabra más larga.** En
   flexbox eso es gratis (`min-content`); en Compose hay que pedirlo con
   `Modifier.width(IntrinsicSize.Min)`. Repartir el ancho con fracciones de

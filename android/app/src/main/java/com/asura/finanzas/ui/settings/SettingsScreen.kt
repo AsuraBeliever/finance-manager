@@ -53,6 +53,7 @@ import com.asura.finanzas.data.User
 import com.asura.finanzas.data.WalletCategory
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.GlassCard
+import com.asura.finanzas.ui.components.loadCached
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.SegStyle
@@ -87,13 +88,16 @@ fun SettingsScreen(
     var showPassword by remember { mutableStateOf(false) }
     var reloadSessions by remember { mutableStateOf(0) }
 
-    val user by produceState<User?>(null) { value = runCatching { repository.me() }.getOrNull() }
-    val walletCategories by produceState<List<WalletCategory>>(emptyList()) {
-        value = runCatching { repository.walletCategories() }.getOrDefault(emptyList())
-    }
-    val sessions by produceState<List<SessionInfo>>(emptyList(), reloadSessions) {
-        value = runCatching { repository.sessions() }.getOrDefault(emptyList())
-    }
+    val user = loadCached<User?>("me", fallback = null) { repository.me() }
+    val walletCategories = loadCached(
+        "walletCategories",
+        fallback = emptyList<WalletCategory>(),
+    ) { repository.walletCategories() }
+    val sessions = loadCached(
+        "sessions",
+        refetch = reloadSessions,
+        fallback = emptyList<SessionInfo>(),
+    ) { repository.sessions() }
 
     // The device's zones, with the current pick first so it is always listable —
     // the same guarantee `listTimezones()` makes on the web.

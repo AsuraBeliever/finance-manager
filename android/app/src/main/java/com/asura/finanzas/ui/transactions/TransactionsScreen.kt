@@ -65,6 +65,7 @@ import com.asura.finanzas.ui.components.ChipButton
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.EmptyState
+import com.asura.finanzas.ui.components.loadCached
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.ErrorBox
@@ -163,9 +164,11 @@ fun TransactionsScreen(
 
     // Includes the reserved categories a capture form would not offer, because a
     // movement may already be filed under one.
-    val filterCategories by produceState(initialValue = emptyList<TransactionCategory>(), key) {
-        value = runCatching { repository.filterCategories() }.getOrDefault(emptyList())
-    }
+    val filterCategories = loadCached(
+        "filterCategories",
+        refetch = key,
+        fallback = emptyList<TransactionCategory>(),
+    ) { repository.filterCategories() }
 
     // "Todo el tiempo" drops the date filter entirely rather than asking for the
     // allTime window — this is a ledger, so a movement dated in the future has
@@ -173,7 +176,10 @@ fun TransactionsScreen(
     // unfiltered list hit the offline cache, which keys on period == null.
     val periodFilter = period.takeIf { it != Period.AllTime }?.toJson()
 
-    val state by loadSynced(listOf(key, filter, wallet?.id, category?.id, period)) {
+    val state by loadSynced(
+        listOf("transactions", filter, wallet?.id, category?.id, period),
+        refetch = key,
+    ) {
         repository.transactions(
             walletId = wallet?.id,
             kind = filter.wire,
@@ -181,9 +187,10 @@ fun TransactionsScreen(
             period = periodFilter,
         )
     }
-    val wallets by produceState(initialValue = emptyList<Wallet>(), key) {
-        value = runCatching { repository.wallets().value }.getOrDefault(emptyList())
-    }
+    // Shares the wallets tab's entry, so the picker is filled the moment the
+    // screen appears.
+    val walletsState by loadSynced("wallets" to false, refetch = key) { repository.wallets() }
+    val wallets = (walletsState as? Load.Ready)?.data ?: emptyList()
 
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Transaction?>(null) }
@@ -192,14 +199,14 @@ fun TransactionsScreen(
     var editingApartado by remember { mutableStateOf<Transaction?>(null) }
 
     // Totals only exist for a single-sided kind; the API rejects them otherwise.
-    val totals by produceState<TxTotals?>(null, key, filter, wallet?.id, category?.id, period) {
-        value = filter.wire
+    val totals = loadCached<TxTotals?>(
+        listOf("txTotals", filter, wallet?.id, category?.id, period),
+        refetch = key,
+        fallback = null,
+    ) {
+        filter.wire
             ?.takeIf { it == "income" || it == "expense" }
-            ?.let {
-                runCatching {
-                    repository.transactionTotals(it, wallet?.id, category?.id, periodFilter)
-                }.getOrNull()
-            }
+            ?.let { repository.transactionTotals(it, wallet?.id, category?.id, periodFilter) }
     }
     val scope = rememberCoroutineScope()
 
