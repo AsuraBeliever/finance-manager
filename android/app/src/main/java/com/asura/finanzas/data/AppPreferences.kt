@@ -48,6 +48,15 @@ class AppPreferences(private val context: Context) {
     private val appearanceStampKey = androidx.datastore.preferences.core.longPreferencesKey(
         "appearance_updated_at",
     )
+    /** The dashboard's date window, as the JSON the RPC takes. The web keeps
+     *  the same thing in localStorage, so it survives leaving the screen. */
+    private val dashboardPeriodKey = stringPreferencesKey("dashboard_period")
+
+    val dashboardPeriod: Flow<String?> = context.prefsDataStore.data.map { it[dashboardPeriodKey] }
+
+    suspend fun setDashboardPeriod(json: String) {
+        context.prefsDataStore.edit { it[dashboardPeriodKey] = json }
+    }
 
     val settings: Flow<AppSettings> = context.prefsDataStore.data.map { prefs ->
         AppSettings(

@@ -28,7 +28,11 @@ import com.asura.finanzas.R
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.theme.Broke
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.LocalDate
@@ -58,6 +62,31 @@ sealed interface Period {
             put("kind", "range"); put("from", from.toString()); put("to", to.toString())
         }
         is AllTime -> buildJsonObject { put("kind", "allTime") }
+    }
+
+    companion object {
+        /**
+         * Reads back what `toJson` wrote — the same shape the web keeps in
+         * localStorage, so a period chosen on either surface reads the same.
+         * Anything unrecognisable falls back to the current month.
+         */
+        fun fromJson(text: String?): Period {
+            val json = text?.let {
+                runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull()
+            } ?: return CurrentMonth
+            fun str(key: String) = json[key]?.jsonPrimitive?.contentOrNull
+            fun int(key: String) = json[key]?.jsonPrimitive?.content?.toIntOrNull()
+            return runCatching {
+                when (str("kind")) {
+                    "lastMonths" -> LastMonths(int("months") ?: 3)
+                    "month" -> Month(int("year")!!, int("month")!!)
+                    "day" -> Day(LocalDate.parse(str("date")!!))
+                    "range" -> Range(LocalDate.parse(str("from")!!), LocalDate.parse(str("to")!!))
+                    "allTime" -> AllTime
+                    else -> CurrentMonth
+                }
+            }.getOrDefault(CurrentMonth)
+        }
     }
 }
 

@@ -59,7 +59,12 @@ import com.asura.finanzas.ui.investments.InvestmentsScreen
 import com.asura.finanzas.ui.more.MoreDestination
 import com.asura.finanzas.ui.more.MoreSheet
 import com.asura.finanzas.ui.settings.SettingsScreen
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.theme.Broke
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import com.asura.finanzas.ui.transactions.TransactionsScreen
 import com.asura.finanzas.ui.wallets.WalletsScreen
 
@@ -87,6 +92,13 @@ fun HomeScaffold(
     // sheet, which is what these two together reproduce.
     var moreTarget by remember { mutableStateOf<MoreDestination?>(null) }
     var moreOpen by remember { mutableStateOf(false) }
+    // The dashboard's date window lives here, not inside the tab: switching
+    // tabs tears the screen down, and the web remembers the choice.
+    val scope = rememberCoroutineScope()
+    var dashboardPeriod by remember { mutableStateOf<Period>(Period.CurrentMonth) }
+    LaunchedEffect(Unit) {
+        dashboardPeriod = Period.fromJson(preferences.dashboardPeriod.first())
+    }
 
     MeshBackground {
       Box(Modifier.fillMaxSize()) {
@@ -103,6 +115,11 @@ fun HomeScaffold(
                 when (tab) {
                     Tab.Dashboard -> DashboardScreen(
                         repository = repository,
+                        period = dashboardPeriod,
+                        onPeriodChange = { chosen ->
+                            dashboardPeriod = chosen
+                            scope.launch { preferences.setDashboardPeriod(chosen.toJson().toString()) }
+                        },
                         onViewAll = { target ->
                             moreTarget = when (target) {
                                 DashboardTarget.Budgets -> MoreDestination.Budgets
