@@ -223,16 +223,18 @@ fun LoginScreen(
                     else R.string.auth_show_password,
                 )
                 Icon(
-            imageVector = if (showPassword) {
+                    imageVector = if (showPassword) {
                         Icons.Outlined.VisibilityOff
                     } else {
                         Icons.Outlined.Visibility
                     },
-            contentDescription = label,
-            tint = colors.fgSubtle,
-            modifier = Modifier
+                    contentDescription = label,
+                    tint = colors.fgSubtle,
+                    modifier = Modifier
                         .clickable { showPassword = !showPassword }
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = 12.dp)
+                        // `size={17}` on the web's eye.
+                        .size(17.dp),
                 )
             },
         )
@@ -259,7 +261,10 @@ fun LoginScreen(
         Spacer(Modifier.height(16.dp))
         Button(
             onClick = { submit() },
-            enabled = !busy && email.isNotBlank() && password.isNotBlank(),
+            // The web leaves this live with the fields empty — the browser's
+            // own required-field check is what stops the submit — so it reads
+            // as the call to action, not a grey slab. `submit()` ignores blanks.
+            enabled = !busy,
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.buttonColors(containerColor = colors.accentDim),
             contentPadding = PaddingValues(horizontal = 16.dp),
