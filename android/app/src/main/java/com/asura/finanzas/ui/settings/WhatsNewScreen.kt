@@ -12,10 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,8 +36,8 @@ import com.asura.finanzas.R
 import com.asura.finanzas.data.AppPreferences
 import com.asura.finanzas.ui.components.isNewerVersion
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.BackHeader
-import com.asura.finanzas.ui.components.GlassCard
+import com.asura.finanzas.ui.components.Lucide
+import com.asura.finanzas.ui.components.PlainSheet
 import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.theme.Broke
@@ -114,93 +115,69 @@ fun WhatsNewAuto(preferences: AppPreferences) {
         scope.launch { preferences.markChangelogSeen(current) }
     }
 
-    AlertDialog(
-        onDismissRequest = { close() },
-        containerColor = colors.surfaceOverlay,
-        title = { Text(stringResource(R.string.whats_new_title), color = colors.fg) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                entries.forEach { entry ->
-                    Row {
-                        Text(
-                            "v${entry.version}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.fg,
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        MicroLabel(entry.date, color = colors.fgSubtle)
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    val lines = if (locale == "en") entry.en else entry.es
-                    lines.forEach { line ->
-                        Row(Modifier.padding(bottom = 8.dp)) {
-                            Text("•", color = colors.accent)
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                line,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.fgMuted,
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { close() }) {
-                Text(stringResource(R.string.common_close), color = colors.fgMuted)
-            }
-        },
-    )
+    PlainSheet(title = stringResource(R.string.whats_new_title), onDismiss = { close() }) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            entries.forEach { entry -> ChangelogEntryBlock(entry, locale) }
+        }
+    }
+}
+
+/**
+ * One release: version, date, and its lines. The web draws the same block in
+ * the modal and nowhere else, so both places here share it.
+ */
+@Composable
+private fun ChangelogEntryBlock(entry: ChangelogEntry, locale: String) {
+    val colors = Broke.colors
+    Row {
+        Text(
+            "v${entry.version}",
+            style = MaterialTheme.typography.titleMedium,
+            color = colors.fg,
+        )
+        Spacer(Modifier.width(10.dp))
+        MicroLabel(entry.date, color = colors.fgSubtle)
+    }
+    Spacer(Modifier.height(10.dp))
+    val lines = if (locale == "en") entry.en else entry.es
+    lines.forEach { line ->
+        Row(Modifier.padding(bottom = 8.dp)) {
+            // The web marks each line with a sparkles glyph, not a bullet.
+            Icon(
+                Lucide.Sparkles,
+                contentDescription = null,
+                tint = colors.accent,
+                modifier = Modifier.padding(top = 3.dp).size(14.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                line,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.fgMuted,
+            )
+        }
+    }
+    Spacer(Modifier.height(8.dp))
 }
 
 @Composable
-fun WhatsNewScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun WhatsNewDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val locale = LocalAppSettings.current.locale
-    val colors = Broke.colors
 
     val entries by produceState<List<ChangelogEntry>?>(initialValue = null) {
         value = readChangelog(context)
     }
 
-    val list = entries
-    if (list == null) {
-        LoadingBox(modifier)
-        return
-    }
-
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item { BackHeader(stringResource(R.string.whats_new_title), onBack) }
-
-        items(list, key = { it.version }) { entry ->
-            GlassCard(Modifier.fillMaxWidth()) {
-                Row {
-                    Text(
-                        "v${entry.version}",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colors.fg,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    MicroLabel(entry.date, color = colors.fgSubtle)
-                }
-                Spacer(Modifier.height(10.dp))
-                val lines = if (locale == "en") entry.en else entry.es
-                lines.forEach { line ->
-                    Row(Modifier.padding(bottom = 8.dp)) {
-                        Text("•", color = colors.accent)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            line,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.fgMuted,
-                        )
-                    }
-                }
+    // The web opens this as a modal over the settings page — the same one it
+    // pops after an update — not as a page of its own.
+    PlainSheet(title = stringResource(R.string.whats_new_title), onDismiss = onDismiss) {
+        val list = entries
+        if (list == null) {
+            LoadingBox()
+        } else {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                list.forEach { entry -> ChangelogEntryBlock(entry, locale) }
             }
         }
     }

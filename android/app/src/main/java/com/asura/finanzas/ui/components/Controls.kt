@@ -317,17 +317,26 @@ fun WebCheckbox(
     }
 }
 
-/** Circular tinted badge behind a small icon (the transaction row's kind mark). */
+/**
+ * Circular badge behind a small icon (the transaction row's kind mark). The
+ * web fills it with the flat `bg-surface-overlay` and tints only the glyph; a
+ * wash of the tint itself turned pink on the lighter surface of a dialog.
+ */
 @Composable
-fun IconBadge(icon: ImageVector, tint: Color, modifier: Modifier = Modifier) {
+fun IconBadge(
+    icon: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 42.dp,
+) {
     Box(
         modifier = modifier
-            .size(42.dp)
+            .size(size)
             .clip(RoundedCornerShape(percent = 50))
-            .background(tint.copy(alpha = 0.14f)),
+            .background(Broke.colors.surfaceOverlay),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.48f))
     }
 }
 

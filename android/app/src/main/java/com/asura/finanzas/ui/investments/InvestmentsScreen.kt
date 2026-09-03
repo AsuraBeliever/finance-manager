@@ -38,7 +38,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.OutlineButton
 import com.asura.finanzas.R
@@ -319,7 +324,30 @@ private fun InvestmentCard(investment: Investment, hide: Boolean, onOpen: (Inves
     val colors = Broke.colors
 
     GlassCard(Modifier.fillMaxWidth().clickable { onOpen(investment) }) {
-        Text(investment.name, style = MaterialTheme.typography.titleMedium, color = colors.fg)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                investment.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fg,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            // A closed investment wears a pill up here, not a word appended to
+            // the caption — the web puts it at the end of the name's row.
+            if (investment.isClosed) {
+                Spacer(Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.investments_closed),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    color = colors.fgSubtle,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(colors.surfaceOverlay)
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+        }
         Spacer(Modifier.height(8.dp))
         Text(
             maskIfHidden(formatMoney(investment.currentValueCents, investment.currencyCode), hide),
@@ -329,10 +357,12 @@ private fun InvestmentCard(investment: Investment, hide: Boolean, onOpen: (Inves
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.AutoMirrored.Outlined.TrendingUp,
+                // Losing money points down, as on the web; the same arrow in
+                // red read as a gain at a glance.
+                if (investment.gainCents >= 0) Lucide.TrendingUp else Lucide.TrendingDown,
                 contentDescription = null,
                 tint = if (investment.gainCents >= 0) colors.accent else colors.danger,
-                modifier = Modifier.width(18.dp),
+                modifier = Modifier.size(14.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
@@ -344,17 +374,35 @@ private fun InvestmentCard(investment: Investment, hide: Boolean, onOpen: (Inves
         Spacer(Modifier.height(6.dp))
         Text(
             listOfNotNull(
-                calculatorLabel(investment.calculator),
+                // A crypto holding says how much of the coin it is, not that it
+                // is crypto — the amount is the useful part (web: `cryptoSub`).
+                if (investment.calculator == "crypto") {
+                    cryptoHolding(investment.paramsJson) ?: calculatorLabel(investment.calculator)
+                } else {
+                    calculatorLabel(investment.calculator)
+                },
                 investment.maturityDate?.let {
                     "${stringResource(R.string.investments_maturity)}: $it"
                 },
-                if (investment.isClosed) stringResource(R.string.investments_closed) else null,
             ).joinToString(" · "),
             style = MaterialTheme.typography.labelSmall,
             color = colors.fgSubtle,
         )
     }
 }
+
+/**
+ * "0.05 BTC" out of a crypto holding's stored params, or null when they do not
+ * parse. Quantity is a count, not money — no cents arithmetic here.
+ */
+private fun cryptoHolding(paramsJson: String): String? = runCatching {
+    val params = Json.parseToJsonElement(paramsJson).jsonObject
+    val quantity = params["quantity_e8"]!!.jsonPrimitive.long
+    val symbol = params["symbol"]!!.jsonPrimitive.content
+    val whole = quantity / 100_000_000
+    val frac = (quantity % 100_000_000).toString().padStart(8, '0').trimEnd('0')
+    (if (frac.isEmpty()) "$whole" else "$whole.$frac") + " " + symbol
+}.getOrNull()
 
 /** The calculator's display name, from the shared dictionary. */
 @Composable

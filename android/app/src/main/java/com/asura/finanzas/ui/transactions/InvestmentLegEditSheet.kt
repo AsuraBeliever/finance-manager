@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.transactions
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
@@ -13,6 +15,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.components.FieldHint
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
@@ -24,7 +29,6 @@ import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.PickerField
-import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
@@ -82,7 +86,7 @@ fun InvestmentLegEditSheet(
     val canSave = !busy && detail != null && cents != null && cents > 0
 
     FormSheet(
-        title = stringResource(R.string.investments_movements),
+        title = stringResource(R.string.investments_movement_edit_title),
         busy = busy,
         error = error,
         canSave = canSave,
@@ -112,17 +116,22 @@ fun InvestmentLegEditSheet(
         detail?.let { loaded ->
             Text(
                 loaded.investmentName,
-                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+                    .copy(fontSize = 14.sp),
                 color = colors.fgMuted,
             )
         }
-        SegmentedControl(
+        // A labelled picker, not a segmented control: the web asks for the kind
+        // here the same way it asks for a wallet, and the two nouns are what it
+        // offers ("Contribution" / "Withdrawal"), not the verbs.
+        PickerField(
+            label = stringResource(R.string.investments_movement_kind),
             options = listOf("deposit", "withdrawal"),
             selected = kind,
-            label = {
+            optionLabel = {
                 stringResource(
-                    if (it == "deposit") R.string.investments_deposit
-                    else R.string.investments_withdrawal,
+                    if (it == "deposit") R.string.investments_deposit_noun
+                    else R.string.investments_withdrawal_noun,
                 )
             },
             onSelect = { kind = it },
@@ -133,21 +142,35 @@ fun InvestmentLegEditSheet(
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            suffix = detail?.currencyCode.orEmpty(),
         )
         DateField(
             label = stringResource(R.string.investments_movement_date),
             value = date,
             onChange = { date = it },
-        )
-        PickerField(
-            label = stringResource(R.string.investments_movement_wallet),
-            options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
-            selected = wallet,
-            optionLabel = { it?.name ?: noneLabel },
-            onSelect = { wallet = it },
-            emptyLabel = noneLabel,
             modifier = Modifier.fillMaxWidth(),
         )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            PickerField(
+                label = stringResource(R.string.investments_movement_wallet),
+                options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
+                selected = wallet,
+                optionLabel = { w -> w?.let { "${it.name} (${it.currencyCode})" } ?: noneLabel },
+                onSelect = { wallet = it },
+                emptyLabel = noneLabel,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            // What picking a wallet actually does, spelled out as on the web.
+            if (wallet != null) {
+                FieldHint(
+                    stringResource(
+                        if (kind == "withdrawal") {
+                            R.string.investments_movement_wallet_withdrawal_hint
+                        } else {
+                            R.string.investments_movement_wallet_deposit_hint
+                        },
+                    ),
+                )
+            }
+        }
     }
 }

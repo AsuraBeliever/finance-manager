@@ -4,6 +4,10 @@
         <item name="android:windowBackground">@color/background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- The web's modal overlay is `bg-black/70 backdrop-blur-sm`; the
+             platform's default dim is light enough to read the page through
+             it. Dialog windows inherit this from the activity theme. -->
+        <item name="android:backgroundDimAmount">0.7</item>
     </style>
 
     <!-- Android 12+ draws this while the process starts; before that,

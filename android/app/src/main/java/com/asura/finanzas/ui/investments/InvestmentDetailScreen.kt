@@ -50,6 +50,9 @@ import com.asura.finanzas.data.InvestmentMovement
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.LoadingBox
@@ -71,7 +74,7 @@ fun InvestmentDetailScreen(
 ) {
     var detail by remember { mutableStateOf<InvestmentDetail?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
-    var addingMovement by remember { mutableStateOf(false) }
+    var addingMovement by remember { mutableStateOf<String?>(null) }
     var addingSnapshot by remember { mutableStateOf(false) }
     var simulating by remember { mutableStateOf(false) }
     var actions by remember { mutableStateOf(false) }
@@ -94,7 +97,7 @@ fun InvestmentDetailScreen(
         repository = repository,
         detail = current,
         onBack = onBack,
-        onAddMovement = { addingMovement = true },
+        onAddMovement = { addingMovement = it },
         onAddSnapshot = { addingSnapshot = true },
         onSimulate = { simulating = true },
         onEdit = { editingInvestment = true },
@@ -119,12 +122,13 @@ fun InvestmentDetailScreen(
         return
     }
 
-    if (addingMovement) {
+    addingMovement?.let { kind ->
         InvestmentMovementSheet(
             repository = repository,
             investment = current,
-            onDismiss = { addingMovement = false },
-            onSaved = { addingMovement = false; reloadKey++ },
+            defaultKind = kind,
+            onDismiss = { addingMovement = null },
+            onSaved = { addingMovement = null; reloadKey++ },
         )
     }
 
@@ -233,7 +237,8 @@ private fun DetailContent(
     repository: BrokeRepository,
     detail: InvestmentDetail,
     onBack: () -> Unit,
-    onAddMovement: () -> Unit,
+    /** "deposit" or "withdrawal": the sheet opens on the one that was asked for. */
+    onAddMovement: (String) -> Unit,
     onAddSnapshot: () -> Unit,
     onSimulate: () -> Unit,
     onEdit: () -> Unit,
@@ -362,6 +367,13 @@ private fun DetailContent(
                             )
                         }
                     }
+                    // The zoom and the what-if toggle are one group on the web,
+                    // so they wrap together instead of the toggle dropping to a
+                    // line of its own.
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                     // Horizon stepper, the web's zoom control.
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -406,6 +418,7 @@ private fun DetailContent(
                         onClick = onSimulate,
                         leadingIcon = Lucide.SlidersHorizontal,
                     )
+                    }
                 }
 
                 val points = projection?.projection.orEmpty().ifEmpty { detail.projection }
@@ -430,36 +443,72 @@ private fun DetailContent(
             }
         }
 
-        if (detail.movements.isNotEmpty()) {
+        // Contributions and withdrawals, on every calculator but the manual one
+        // — and always, empty or not: hiding it hid the only way in to log the
+        // first one. The web's `movements` section, empty line and all.
+        if (detail.calculator != "manual") {
             item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                MicroLabel(
-                    stringResource(R.string.investments_movements),
-                    Modifier.weight(1f),
-                )
-                DetailAction(Lucide.ArrowDownLeft, stringResource(R.string.investments_deposit)) {
-                    onAddMovement()
+                // One card with its heading and its rows inside, the web's
+                // `section`: a stack of little cards read as a different page.
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.investments_movements),
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            color = colors.fg,
+                            modifier = Modifier.weight(1f),
+                        )
+                        DetailAction(
+                            Lucide.ArrowDownLeft,
+                            stringResource(R.string.investments_deposit),
+                            colors.accent,
+                        ) { onAddMovement("deposit") }
+                        Spacer(Modifier.width(8.dp))
+                        DetailAction(
+                            Lucide.ArrowUpRight,
+                            stringResource(R.string.investments_withdrawal),
+                            colors.danger,
+                        ) { onAddMovement("withdrawal") }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    if (detail.movements.isEmpty()) {
+                        Text(
+                            stringResource(R.string.investments_movements_empty),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = colors.fgSubtle,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    } else {
+                        detail.movements.forEachIndexed { index, movement ->
+                            if (index > 0) HairLine()
+                            MovementRow(movement, detail.currencyCode, hide, onMovementLongPress)
+                        }
+                    }
                 }
-                Spacer(Modifier.width(12.dp))
-                DetailAction(
-                    Lucide.ArrowUpRight,
-                    stringResource(R.string.investments_withdrawal),
-                    colors.danger,
-                ) { onAddMovement() }
-            }
-        }
-            items(detail.movements, key = { it.id }) { movement ->
-                MovementRow(movement, detail.currencyCode, hide, onMovementLongPress)
             }
         }
 
-        if (detail.snapshots.isNotEmpty()) {
+        // Snapshots are the manual calculator's whole story — there the value
+        // only moves because someone wrote it down — so the section lives and
+        // dies with it, exactly as on the web.
+        if (detail.calculator == "manual") {
             item {
                 Spacer(Modifier.height(4.dp))
-                MicroLabel(stringResource(R.string.investments_snapshots))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    MicroLabel(
+                        stringResource(R.string.investments_snapshots),
+                        Modifier.weight(1f),
+                    )
+                    DetailAction(Lucide.Plus, stringResource(R.string.investments_add_snapshot)) {
+                        onAddSnapshot()
+                    }
+                }
             }
             items(detail.snapshots, key = { "s-${it.id}" }) { snapshot ->
                 GlassCard(Modifier.fillMaxWidth(), padding = 14.dp) {
@@ -483,36 +532,51 @@ private fun MovementRow(
 ) {
     val colors = Broke.colors
     val deposit = movement.kind == "deposit"
-    GlassCard(
-        Modifier
+    // The web's row: a round badge with the arrow, the noun, the date beside it
+    // — not under it — and the amount at the far end. Edit and delete are a
+    // long press here, where the web has two buttons that appear on hover.
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = { onLongPress(movement) }),
-        padding = 14.dp,
+            .combinedClickable(onClick = {}, onLongClick = { onLongPress(movement) })
+            .padding(vertical = 8.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(
-                        if (deposit) R.string.investments_deposit_noun
-                        else R.string.investments_withdrawal_noun,
-                    ),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colors.fg,
-                )
-                Text(
-                    movement.occurredAt,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgSubtle,
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            Text(
-                (if (deposit) "+" else "−") +
-                    maskIfHidden(formatMoney(movement.amountCents, currencyCode), hide),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (deposit) colors.accent else colors.danger,
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(colors.surfaceOverlay),
+        ) {
+            Icon(
+                if (deposit) Lucide.ArrowDownLeft else Lucide.ArrowUpRight,
+                contentDescription = null,
+                tint = if (deposit) colors.accent else colors.danger,
+                modifier = Modifier.size(13.dp),
             )
         }
+        Text(
+            stringResource(
+                if (deposit) R.string.investments_deposit_noun
+                else R.string.investments_withdrawal_noun,
+            ),
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = colors.fg,
+        )
+        Text(
+            movement.occurredAt,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = colors.fgSubtle,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            (if (deposit) "+" else "−") +
+                maskIfHidden(formatMoney(movement.amountCents, currencyCode), hide),
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = if (deposit) colors.accent else colors.danger,
+        )
     }
 }
 

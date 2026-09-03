@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.components.FormField
+import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
@@ -644,6 +645,26 @@ private fun kindLabel(kind: String): String = when (kind) {
 }
 
 /**
+ * What the edit form's time box starts with: 'HH:MM' in 24 h, from the
+ * movement's own time or — when it has none — from the insert stamp in the
+ * account's timezone. The web's `timeInputValue`; without it the box opens
+ * empty on a movement the list shows a time for.
+ */
+@Composable
+fun transactionTimeValue(tx: Transaction): String? {
+    val settings = LocalAppSettings.current
+    tx.occurredTime?.takeIf { it.isNotBlank() }?.let { return it }
+    val created = tx.createdAt ?: return null
+    return runCatching {
+        LocalDateTime
+            .parse(created.replace(" ", "T"))
+            .atZone(ZoneId.of("UTC"))
+            .withZoneSameInstant(ZoneId.of(settings.timezone))
+            .format(DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT))
+    }.getOrNull()
+}
+
+/**
  * The time shown next to a movement: its own wall-clock time when it has one,
  * otherwise the insert stamp converted to local time — the web's
  * `transactionTime`. Honours the 12/24 h setting.
@@ -740,16 +761,16 @@ private fun ApartadoEditSheet(
                 if (transaction.kind == "reserve") R.string.transactions_reserved
                 else R.string.transactions_released,
             ) + " · " + transaction.description.orEmpty(),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
             color = Broke.colors.fgMuted,
         )
-        FormField(
+        // Money is money: the same box as every other amount in the app, with
+        // its `$` and its type-from-the-right behaviour, as on the web.
+        MoneyField(
             label = stringResource(R.string.transactions_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         DateField(
             label = stringResource(R.string.transactions_date),

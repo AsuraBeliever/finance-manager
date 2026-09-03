@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FieldHint
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
@@ -69,16 +70,18 @@ fun ChangePasswordScreen(
             .padding(PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp)),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        BackHeader(stringResource(R.string.account_change_password), onBack)
+        BackHeader(
+            stringResource(R.string.account_change_password),
+            onBack,
+            // "Back to settings", the wording the web's link uses here.
+            backLabel = stringResource(R.string.settings_back),
+        )
 
-        GlassCard(Modifier.fillMaxWidth()) {
-            Text(
-                stringResource(R.string.account_password_change_note),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.fgMuted,
-            )
-        }
-
+        // The web keeps the whole form — fields, note and button — inside one
+        // card; loose fields with the note floated to the top read as a
+        // different screen.
+        GlassCard(Modifier.fillMaxWidth(), padding = 20.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         FormField(
             label = stringResource(R.string.account_current_password),
             value = current,
@@ -107,6 +110,8 @@ fun ChangePasswordScreen(
             visualTransformation = PasswordVisualTransformation(),
         )
 
+        FieldHint(stringResource(R.string.account_password_change_note))
+
         error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.danger) }
         if (done) {
             Text(
@@ -116,12 +121,13 @@ fun ChangePasswordScreen(
             )
         }
 
-        Spacer(Modifier.height(4.dp))
         if (busy) {
             CircularProgressIndicator(color = colors.accent, strokeWidth = 2.dp)
         } else {
             PrimaryButton(
-                text = stringResource(R.string.common_save),
+                // The web's button says what it does, and is only as wide as
+                // its label.
+                text = stringResource(R.string.account_change_password),
                 enabled = canSave,
                 onClick = {
                     if (next != confirm) {
@@ -144,8 +150,9 @@ fun ChangePasswordScreen(
                             }
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
             )
+        }
+        }
         }
     }
 }

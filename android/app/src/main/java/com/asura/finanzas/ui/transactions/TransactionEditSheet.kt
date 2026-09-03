@@ -1,5 +1,8 @@
 package com.asura.finanzas.ui.transactions
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
@@ -13,6 +16,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FieldHint
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
@@ -94,7 +99,8 @@ private fun SimpleEditSheet(
                 .getOrDefault(LocalDate.now()),
         )
     }
-    var time by remember { mutableStateOf(transaction.occurredTime) }
+    val startingTime = transactionTimeValue(transaction)
+    var time by remember { mutableStateOf(startingTime) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -154,8 +160,26 @@ private fun SimpleEditSheet(
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            suffix = wallet?.currencyCode.orEmpty(),
         )
+        // Date and time share a row, in this order, exactly as the web form
+        // lays them out — this is the same modal there, not a second one.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            DateField(
+                label = stringResource(R.string.transactions_date),
+                value = date,
+                onChange = { date = it },
+                modifier = Modifier.weight(1f),
+            )
+            TimeField(
+                label = stringResource(R.string.transactions_time),
+                value = time,
+                onChange = { time = it },
+                modifier = Modifier.weight(1f),
+            )
+        }
         PickerField(
             label = stringResource(R.string.transactions_category),
             options = listOf<TransactionCategory?>(null) + categories,
@@ -171,16 +195,6 @@ private fun SimpleEditSheet(
             onValueChange = { description = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-        )
-        DateField(
-            label = stringResource(R.string.transactions_date),
-            value = date,
-            onChange = { date = it },
-        )
-        TimeField(
-            label = stringResource(R.string.transactions_time),
-            value = time,
-            onChange = { time = it },
         )
     }
 }
@@ -215,6 +229,9 @@ private fun TransferEditSheet(
 
     val genericError = stringResource(R.string.common_error)
     val offlineError = stringResource(R.string.offline_banner)
+    // The pair carries no insert stamp; the leg that was tapped does, and it is
+    // the same movement, so an untimed transfer falls back to it as on the web.
+    val startingTime = transactionTimeValue(transaction)
 
     // Prefill from the pair, not from the single leg that was tapped.
     LaunchedEffect(transaction.id) {
@@ -228,7 +245,7 @@ private fun TransferEditSheet(
                 description = loaded.description.orEmpty()
                 date = runCatching { LocalDate.parse(loaded.occurredAt.take(10)) }
                     .getOrDefault(LocalDate.now())
-                time = loaded.occurredTime
+                time = loaded.occurredTime ?: startingTime
             }
             .onFailure {
                 error = if (it is NetworkException) offlineError else it.message ?: genericError
@@ -294,6 +311,7 @@ private fun TransferEditSheet(
             selected = toWallet,
             optionLabel = { walletLabel(it, wallets) },
             onSelect = { toWallet = it },
+            emptyLabel = stringResource(R.string.transactions_pick_to_wallet_hint),
             modifier = Modifier.fillMaxWidth(),
         )
         MoneyField(
@@ -301,16 +319,37 @@ private fun TransferEditSheet(
             value = amountFrom,
             onValueChange = { amountFrom = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            suffix = fromWallet?.currencyCode.orEmpty(),
         )
-        if (crossCurrency) {
-            MoneyField(
-                label = stringResource(R.string.transactions_amount_received),
-                value = amountTo,
-                onValueChange = { amountTo = it; error = null },
-                modifier = Modifier.fillMaxWidth(),
-                suffix = toWallet?.currencyCode.orEmpty(),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            DateField(
+                label = stringResource(R.string.transactions_date),
+                value = date,
+                onChange = { date = it },
+                modifier = Modifier.weight(1f),
             )
+            TimeField(
+                label = stringResource(R.string.transactions_time),
+                value = time,
+                onChange = { time = it },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (crossCurrency) {
+            // The currency rides in the label, as on the web — a suffix inside
+            // the box is a different control — and the note hangs off the box.
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                MoneyField(
+                    label = stringResource(R.string.transactions_amount_received) +
+                        " (" + toWallet?.currencyCode.orEmpty() + ")",
+                    value = amountTo,
+                    onValueChange = { amountTo = it; error = null },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                FieldHint(stringResource(R.string.transactions_transfer_hint))
+            }
         }
         FormField(
             label = stringResource(R.string.transactions_description),
@@ -318,16 +357,6 @@ private fun TransferEditSheet(
             onValueChange = { description = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-        )
-        DateField(
-            label = stringResource(R.string.transactions_date),
-            value = date,
-            onChange = { date = it },
-        )
-        TimeField(
-            label = stringResource(R.string.transactions_time),
-            value = time,
-            onChange = { time = it },
         )
     }
 }

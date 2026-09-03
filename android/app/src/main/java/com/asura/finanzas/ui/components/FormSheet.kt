@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.components
 
+import android.os.Build
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,16 +25,41 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.theme.Broke
+
+/**
+ * The web's overlay is `bg-black/70 backdrop-blur-sm`: the dim comes from
+ * `android:backgroundDimAmount` in the theme, but the blur has to be asked for
+ * on the dialog's own window — a theme attribute never reaches it. Without it
+ * the page underneath stays legible through the scrim and the two apps read
+ * differently at a glance. No-op before Android 12 and on devices that have
+ * blurs turned off (battery saver, low-end): the dim alone still holds up.
+ */
+@Composable
+fun DialogBlurBehind(radius: Dp = 10.dp) {
+    val view = LocalView.current
+    val px = with(LocalDensity.current) { radius.roundToPx() }
+    LaunchedEffect(view, px) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return@LaunchedEffect
+        val window = (view.parent as? DialogWindowProvider)?.window ?: return@LaunchedEffect
+        window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        window.attributes = window.attributes.also { it.blurBehindRadius = px }
+    }
+}
 
 /**
  * The form every create/edit screen opens.
@@ -64,6 +91,7 @@ fun FormSheet(
         // it well short of the web's.
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        DialogBlurBehind()
         Column(
             modifier = Modifier
                 .padding(16.dp)
@@ -187,6 +215,7 @@ fun PlainSheet(
 ) {
     val colors = Broke.colors
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        DialogBlurBehind()
         Column(
             modifier = Modifier
                 .padding(16.dp)
@@ -246,6 +275,7 @@ fun ConfirmDialog(
         containerColor = colors.surfaceOverlay,
         title = { Text(title, color = colors.fg) },
         text = {
+            DialogBlurBehind()
             Text(
                 message,
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),

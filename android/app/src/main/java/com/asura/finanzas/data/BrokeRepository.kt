@@ -145,9 +145,9 @@ class BrokeRepository(
 
     // ---- reads ----
 
-    suspend fun dashboard(): Synced<DashboardSummary> =
+    suspend fun dashboard(period: JsonObject): Synced<DashboardSummary> =
         cached("dashboard", DashboardSummary.serializer()) {
-            rpc.call("get_dashboard_summary")
+            rpc.call("get_dashboard_summary", buildJsonObject { put("period", period) })
         }
 
     suspend fun savingsGoals(): Synced<List<SavingsGoal>> =
@@ -703,6 +703,23 @@ class BrokeRepository(
                 put("rateToMxnMicros", rateToMxnMicros)
             },
         )
+        cache.invalidateReads()
+    }
+
+    /**
+     * The latest published rate for a Banxico series, so the form can fill the
+     * rate in instead of asking someone to look it up. The web's
+     * `fetchBanxicoRate`.
+     */
+    suspend fun banxicoRate(kind: String): BanxicoRate =
+        rpc.json.decodeFromJsonElement(
+            BanxicoRate.serializer(),
+            rpc.call("fetch_banxico_rate", buildJsonObject { put("kind", kind) }),
+        )
+
+    /** Pulls prices/rates right after adding something that needs one (crypto). */
+    suspend fun refreshMarketData() {
+        rpc.call("refresh_market_data_cmd")
         cache.invalidateReads()
     }
 

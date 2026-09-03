@@ -125,9 +125,10 @@ fun SettingsScreen(
         return
     }
 
+
+    // A modal over the settings page, as on the web — not a page of its own.
     if (showWhatsNew) {
-        WhatsNewScreen(onBack = { showWhatsNew = false }, modifier = modifier)
-        return
+        WhatsNewDialog(onDismiss = { showWhatsNew = false })
     }
 
     if (showPassword) {

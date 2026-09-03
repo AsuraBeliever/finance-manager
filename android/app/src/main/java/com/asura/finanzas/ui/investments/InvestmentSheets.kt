@@ -2,6 +2,9 @@ package com.asura.finanzas.ui.investments
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +30,9 @@ import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.components.FieldHint
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -44,10 +50,12 @@ fun InvestmentMovementSheet(
     onSaved: () -> Unit,
     /** Null adds a movement; non-null edits that one in place. */
     existing: InvestmentMovement? = null,
+    /** Which kind a fresh sheet opens on — the web asks before opening it. */
+    defaultKind: String = "deposit",
 ) {
     val scope = rememberCoroutineScope()
     var wallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
-    var kind by remember { mutableStateOf(existing?.kind ?: "deposit") }
+    var kind by remember { mutableStateOf(existing?.kind ?: defaultKind) }
     var amount by remember {
         mutableStateOf(
             existing?.amountCents?.let { formatMoney(it, withSymbol = false) }.orEmpty(),
@@ -119,38 +127,59 @@ fun InvestmentMovementSheet(
             }
         },
     ) {
-        SegmentedControl(
+        Text(
+            investment.name,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = Broke.colors.fgMuted,
+        )
+        // A labelled picker with the two nouns, the way the web asks for it.
+        PickerField(
+            label = stringResource(R.string.investments_movement_kind),
             options = listOf("deposit", "withdrawal"),
             selected = kind,
-            label = {
+            optionLabel = {
                 stringResource(
-                    if (it == "deposit") R.string.investments_deposit
-                    else R.string.investments_withdrawal,
+                    if (it == "deposit") R.string.investments_deposit_noun
+                    else R.string.investments_withdrawal_noun,
                 )
             },
             onSelect = { kind = it },
+            modifier = Modifier.fillMaxWidth(),
         )
         MoneyField(
             label = stringResource(R.string.investments_movement_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            suffix = investment.currencyCode,
         )
         DateField(
             label = stringResource(R.string.investments_movement_date),
             value = date,
             onChange = { date = it },
-        )
-        PickerField(
-            label = stringResource(R.string.investments_movement_wallet),
-            options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
-            selected = wallet,
-            optionLabel = { it?.name ?: noneLabel },
-            onSelect = { wallet = it },
-            emptyLabel = noneLabel,
             modifier = Modifier.fillMaxWidth(),
         )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            PickerField(
+                label = stringResource(R.string.investments_movement_wallet),
+                options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
+                selected = wallet,
+                optionLabel = { w -> w?.let { "${it.name} (${it.currencyCode})" } ?: noneLabel },
+                onSelect = { wallet = it },
+                emptyLabel = noneLabel,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (wallet != null) {
+                FieldHint(
+                    stringResource(
+                        if (kind == "withdrawal") {
+                            R.string.investments_movement_wallet_withdrawal_hint
+                        } else {
+                            R.string.investments_movement_wallet_deposit_hint
+                        },
+                    ),
+                )
+            }
+        }
     }
 }
 

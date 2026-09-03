@@ -19,6 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.maskIfHidden
+import com.asura.finanzas.ui.components.FieldHint
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import androidx.compose.foundation.border
@@ -26,6 +29,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -41,6 +46,7 @@ import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.components.SegStyle
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.WebCheckbox
 import com.asura.finanzas.ui.formatMoney
@@ -75,21 +81,25 @@ fun GoalFormSheet(
         )
     }
     var cadence by remember { mutableStateOf(existing?.cadence ?: "monthly") }
-    var color by remember { mutableStateOf(existing?.color) }
+    // A new goal opens on the first chart colour, as the web form does; leaving
+    // it unset showed a colour row with nothing chosen.
+    var color by remember { mutableStateOf(existing?.color ?: "#a855f7") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     val genericError = stringResource(R.string.common_error)
     val offlineError = stringResource(R.string.offline_banner)
-    val noneLabel = stringResource(R.string.goals_apartado_none)
 
     LaunchedEffect(Unit) {
         wallets = runCatching { repository.wallets().value }.getOrDefault(emptyList())
+        // Every goal reserves from a wallet — the web made it mandatory when
+        // goals became apartados — so it opens on one instead of on "none".
         wallet = wallets.firstOrNull { it.id == existing?.linkedWalletId }
+            ?: wallets.firstOrNull { !it.isArchived }
     }
 
     val cents = parseAmountToCents(target)
-    val canSave = !busy && name.isNotBlank() && cents != null && cents > 0
+    val canSave = !busy && name.isNotBlank() && cents != null && cents > 0 && wallet != null
 
     FormSheet(
         title = stringResource(
@@ -139,6 +149,7 @@ fun GoalFormSheet(
         Column {
             FieldLabel(stringResource(R.string.goals_kind_label))
             SegmentedControl(
+                style = SegStyle.Tray,
                 options = listOf("purchase", "fund"),
                 selected = kind,
                 label = {
@@ -184,22 +195,14 @@ fun GoalFormSheet(
         Column {
             PickerField(
                 label = stringResource(R.string.goals_apartado_wallet),
-                options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
+                options = wallets.filter { !it.isArchived },
                 selected = wallet,
-                optionLabel = { it?.name ?: noneLabel },
+                optionLabel = { "${it.name} (${it.currencyCode})" },
                 onSelect = { wallet = it },
-                emptyLabel = noneLabel,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(
-                    if (wallet == null) R.string.goals_apartado_none_hint
-                    else R.string.goals_apartado_hint,
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = Broke.colors.fgSubtle,
-            )
+            FieldHint(stringResource(R.string.goals_apartado_hint))
         }
 
         // The deadline is a bordered card with a checkbox, as on the web.
@@ -273,11 +276,31 @@ fun ContributeSheet(
     val scope = rememberCoroutineScope()
     var amount by remember { mutableStateOf("") }
     var release by remember { mutableStateOf(false) }
+    var wallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     val genericError = stringResource(R.string.common_error)
     val offlineError = stringResource(R.string.offline_banner)
+    val hide = LocalAppSettings.current.hideBalances
+
+    LaunchedEffect(goal.id) {
+        wallets = runCatching { repository.wallets().value }.getOrDefault(emptyList())
+    }
+
+    // The wallet the goal reserves from, and what is free to reserve in it —
+    // the same two figures the web puts above the amount.
+    val apartadoWallet = goal.linkedWalletId?.let { id -> wallets.firstOrNull { it.id == id } }
+    val availableCents = apartadoWallet?.let { it.balanceCents - it.reservedCents }
+    // Only a goal with something in it can give any back.
+    val canRelease = goal.savedCents > 0
+    // What is missing to cover this period; once covered, the next period's share.
+    val suggested = if (!release) {
+        goal.plan?.let { if (it.periodMissingCents > 0) it.periodMissingCents else it.perPeriodCents }
+            ?: 0L
+    } else {
+        0L
+    }
 
     val cents = parseAmountToCents(amount)
     val canSave = !busy && cents != null && cents > 0
@@ -308,19 +331,78 @@ fun ContributeSheet(
         },
     ) {
         SegmentedControl(
-            options = listOf(false, true),
+            style = SegStyle.Tray,
+            // Release only shows once there is something to give back, as on
+            // the web — an empty goal has nothing to release.
+            options = if (canRelease) listOf(false, true) else listOf(false),
             selected = release,
             label = {
                 stringResource(if (it) R.string.goals_release_tab else R.string.goals_reserve_tab)
             },
             onSelect = { release = it },
+            modifier = Modifier.fillMaxWidth(),
+            fillEqually = true,
         )
+
+        // Where the money comes from and how much of it there is; on release,
+        // how much is reserved to give back.
+        val context = when {
+            !release && apartadoWallet != null && availableCents != null ->
+                stringResource(R.string.goals_apartado_of) + " " + apartadoWallet.name + " · " +
+                    stringResource(R.string.goals_available) + " " +
+                    maskIfHidden(
+                        formatMoney(availableCents, apartadoWallet.currencyCode),
+                        hide,
+                    )
+            release ->
+                stringResource(R.string.goals_reserved_label) + " " +
+                    maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide)
+            else -> null
+        }
+        context?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                color = Broke.colors.fgMuted,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Broke.colors.surfaceOverlay)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+
         MoneyField(
             label = stringResource(R.string.goals_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
-            suffix = goal.currencyCode,
+        )
+
+        // One tap fills in what this period asks for.
+        if (suggested > 0) {
+            Text(
+                stringResource(R.string.goals_suggested_chip) + " " +
+                    maskIfHidden(formatMoney(suggested, goal.currencyCode), hide),
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp),
+                color = Broke.colors.accent,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Broke.colors.accent.copy(alpha = 0.1f))
+                    .clickable { amount = formatMoney(suggested, withSymbol = false) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
+
+        FieldHint(
+            stringResource(
+                when {
+                    !release && apartadoWallet != null -> R.string.goals_reserve_hint
+                    !release -> R.string.goals_reserve_track_hint
+                    apartadoWallet != null -> R.string.goals_release_hint
+                    else -> R.string.goals_release_track_hint
+                },
+            ),
         )
     }
 }

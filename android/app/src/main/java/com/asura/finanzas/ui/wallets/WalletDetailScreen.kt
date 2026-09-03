@@ -161,9 +161,11 @@ fun WalletDetailScreen(
     ) {
         item {
             BackHandler(onBack = onBack)
-            PageHeader(current.name)
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            // The three actions are the header's, not a row under it: the web
+            // hands them to `PageHeader` as `actions`, so they ride the title's
+            // line and only drop below when the name is long enough to push
+            // them off it.
+            PageHeader(current.name, actionGap = 8.dp) {
                 Action(Icons.Outlined.Edit, stringResource(R.string.common_edit)) { onEdit(current) }
                 Action(
                     Icons.Outlined.Archive,
@@ -394,13 +396,23 @@ private fun Action(
     onClick: () -> Unit,
 ) {
     val colors = Broke.colors
+    // The web's ghost `Button`: `rounded-lg px-4 py-2 text-sm` with a 15 px
+    // glyph and `gap-2`. Without its padding the three sat visibly tighter
+    // together than the same three on the web.
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clickable(onClick = onClick).padding(vertical = 4.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = tint ?: colors.fgMuted, modifier = Modifier.width(20.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, color = tint ?: colors.fg)
+        Icon(icon, contentDescription = null, tint = tint ?: colors.fgMuted, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+            color = tint ?: colors.fg,
+        )
     }
 }
 

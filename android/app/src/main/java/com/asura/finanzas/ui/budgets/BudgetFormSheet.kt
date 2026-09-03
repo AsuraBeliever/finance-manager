@@ -22,6 +22,7 @@ import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.TransactionCategory
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
 import kotlinx.coroutines.launch
@@ -82,7 +83,7 @@ fun BudgetFormSheet(
             label = stringResource(R.string.budgets_category),
             options = listOf<TransactionCategory?>(null) + categories,
             selected = category,
-            optionLabel = { it?.name ?: overallLabel },
+            optionLabel = { c -> c?.let { seedName(it.name, it.isSystem) } ?: overallLabel },
             onSelect = { category = it },
             // Editing an existing budget keeps its category: the upsert is
             // keyed by it, so changing it would create a second budget.

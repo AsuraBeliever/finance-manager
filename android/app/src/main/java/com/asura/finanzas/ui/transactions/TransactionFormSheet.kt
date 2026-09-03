@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.transactions
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -21,7 +25,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -37,10 +40,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.SegStyle
 import com.asura.finanzas.ui.components.SegmentedControl
+import com.asura.finanzas.ui.components.WebCheckbox
+import com.asura.finanzas.ui.components.FieldHint
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
@@ -292,6 +299,9 @@ fun TransactionFormSheet(
                     selected = toWallet,
                     optionLabel = { walletLabel(it, wallets) },
                     onSelect = { toWallet = it },
+                    // Nothing is picked to start with, and an empty box says
+                    // nothing; the web puts the hint in the closed select.
+                    emptyLabel = stringResource(R.string.transactions_pick_to_wallet_hint),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -323,13 +333,74 @@ fun TransactionFormSheet(
             }
 
             if (crossCurrency) {
-                MoneyField(
-                    label = stringResource(R.string.transactions_amount_received) +
-                        " (" + toWallet?.currencyCode.orEmpty() + ")",
-                    value = amountTo,
-                    onValueChange = { amountTo = it; error = null },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    MoneyField(
+                        label = stringResource(R.string.transactions_amount_received) +
+                            " (" + toWallet?.currencyCode.orEmpty() + ")",
+                        value = amountTo,
+                        onValueChange = { amountTo = it; error = null },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    FieldHint(stringResource(R.string.transactions_transfer_hint))
+                }
+            }
+
+            // Buying to months on a credit card. The web puts this between the
+            // date and the category — the category below is what the monthly
+            // charges file under — inside a bordered box, ticked with a
+            // checkbox, and asks for the months in a half-width field.
+            if (kind == TxKind.Expense && isCreditWallet) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { msiEnabled = !msiEnabled },
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        // The app's own tick box, drawn like the browser's:
+                        // Material's is a different shape and 20 dp wide.
+                        WebCheckbox(
+                            checked = msiEnabled,
+                            onCheckedChange = { msiEnabled = it },
+                            boxSize = 16.dp,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.credit_msi_toggle),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                                color = colors.fg,
+                            )
+                            FieldHint(stringResource(R.string.credit_msi_toggle_hint))
+                        }
+                    }
+
+                    if (msiActive) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            FormField(
+                                label = stringResource(R.string.credit_msi_months),
+                                value = msiMonths,
+                                onValueChange = { msiMonths = it.filter { c -> c.isDigit() }.take(2) },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                isError = msiMonths.isNotBlank() && !msiMonthsValid,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            )
+                            Spacer(Modifier.weight(1f))
+                        }
+                        MsiPreview(repository, wallet, amountCents, msiMonthsValue, date, msiMonthsValid)
+                    }
+                }
             }
 
             if (kind != TxKind.Transfer) {
@@ -351,40 +422,6 @@ fun TransactionFormSheet(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-
-            if (kind == TxKind.Expense && isCreditWallet) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.credit_msi_toggle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.fg,
-                        )
-                        Text(
-                            stringResource(R.string.credit_msi_toggle_hint),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.fgSubtle,
-                        )
-                    }
-                    Switch(checked = msiEnabled, onCheckedChange = { msiEnabled = it })
-                }
-            }
-
-            if (msiActive) {
-                FormField(
-                    label = stringResource(R.string.credit_msi_months),
-                    value = msiMonths,
-                    onValueChange = { msiMonths = it.filter { c -> c.isDigit() }.take(2) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = msiMonths.isNotBlank() && !msiMonthsValid,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
-                MsiPreview(repository, wallet, amountCents, msiMonthsValue, date, msiMonthsValid)
-            }
 
         }
     }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import com.asura.finanzas.ui.components.ColorPicker
 import com.asura.finanzas.ui.components.FieldLabel
 import com.asura.finanzas.ui.components.FormSheet
+import com.asura.finanzas.ui.components.SegStyle
 import com.asura.finanzas.ui.components.SegmentedControl
 import kotlinx.coroutines.launch
 
@@ -79,6 +80,7 @@ fun CategoryFormSheet(
         )
         if (existing == null) {
             SegmentedControl(
+                style = SegStyle.Tray,
                 options = listOf("expense", "income"),
                 selected = kind,
                 label = {

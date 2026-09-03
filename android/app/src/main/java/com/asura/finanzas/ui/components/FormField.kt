@@ -145,6 +145,17 @@ fun FormField(
     }
 }
 
+/** The small muted note the web hangs under a control (`text-xs text-fg-subtle`). */
+@Composable
+fun FieldHint(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+        color = Broke.colors.fgSubtle,
+        modifier = modifier,
+    )
+}
+
 /** The small muted caption the web puts above every control. */
 @Composable
 fun FieldLabel(text: String, modifier: Modifier = Modifier) {

@@ -471,6 +471,13 @@ data class TransferDetail(
     val occurredTime: String? = null,
 )
 
+/** A published Banxico rate: basis points and the day it was published. */
+@Serializable
+data class BanxicoRate(
+    val rateBps: Long,
+    val date: String,
+)
+
 @Serializable
 data class TransactionCategory(
     val id: Long,

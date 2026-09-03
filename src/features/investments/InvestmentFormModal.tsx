@@ -383,7 +383,10 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
             >
               <RefreshCw size={13} className={banxico.isPending ? "animate-spin" : ""} />
               {calculator === "cetes"
-                ? `${es.investments.banxicoCetes} (${plazo} días)`
+                ? // The term is a number of days by definition ("Term (days)"
+                  // above); spelling the unit out here hardcoded a Spanish word
+                  // into the English UI.
+                  `${es.investments.banxicoCetes} (${plazo})`
                 : es.investments.banxicoObjetivo}
             </button>
             {rateInfo && <p className="mt-1 text-xs text-fg-subtle">{rateInfo}</p>}

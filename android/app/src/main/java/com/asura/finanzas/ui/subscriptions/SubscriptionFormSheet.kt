@@ -30,6 +30,7 @@ import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
@@ -62,9 +63,15 @@ fun SubscriptionFormSheet(
     }
     var wallet by remember { mutableStateOf<Wallet?>(null) }
     var category by remember { mutableStateOf<TransactionCategory?>(null) }
+    // A subscription can be charged in a currency of its own — the wallet is
+    // only where the payment gets logged, and it may not even have one.
+    var currencyCode by remember { mutableStateOf(existing?.currencyCode ?: "MXN") }
+    var currencies by remember { mutableStateOf(listOf("MXN")) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var color by remember { mutableStateOf(existing?.color) }
+    // New subscriptions open on the first chart colour, like the web form
+    // (picking a brand logo overwrites it with the brand's own).
+    var color by remember { mutableStateOf(existing?.color ?: "#a855f7") }
 
     val genericError = stringResource(R.string.common_error)
     val offlineError = stringResource(R.string.offline_banner)
@@ -75,6 +82,9 @@ fun SubscriptionFormSheet(
         wallets = runCatching { repository.wallets().value }.getOrDefault(emptyList())
         categories = runCatching { repository.transactionCategories("expense") }
             .getOrDefault(emptyList())
+        currencies = runCatching { repository.currencies().map { it.code } }
+            .getOrDefault(emptyList())
+            .ifEmpty { listOf("MXN") }
         wallet = wallets.firstOrNull { it.id == existing?.walletId }
         category = categories.firstOrNull { it.id == existing?.categoryId }
     }
@@ -100,7 +110,7 @@ fun SubscriptionFormSheet(
                         id = existing?.id,
                         name = name,
                         amountCents = cents ?: 0,
-                        currencyCode = wallet?.currencyCode ?: existing?.currencyCode ?: "MXN",
+                        currencyCode = currencyCode,
                         cadence = cadence,
                         nextChargeDate = nextCharge.toString(),
                         walletId = wallet?.id,
@@ -137,13 +147,13 @@ fun SubscriptionFormSheet(
                 onValueChange = { amount = it; error = null },
                 modifier = Modifier.weight(1f),
             )
-            FormField(
+            PickerField(
                 label = stringResource(R.string.investments_currency),
-                value = wallet?.currencyCode ?: existing?.currencyCode ?: "MXN",
-                onValueChange = {},
+                options = currencies,
+                selected = currencyCode,
+                optionLabel = { it },
+                onSelect = { currencyCode = it },
                 modifier = Modifier.weight(1f),
-                enabled = false,
-                readOnly = true,
             )
         }
 
@@ -185,7 +195,7 @@ fun SubscriptionFormSheet(
             label = stringResource(R.string.subscriptions_category),
             options = listOf<TransactionCategory?>(null) + categories,
             selected = category,
-            optionLabel = { it?.name ?: noneLabel },
+            optionLabel = { c -> c?.let { seedName(it.name, it.isSystem) } ?: noneLabel },
             onSelect = { category = it },
             emptyLabel = noneLabel,
             modifier = Modifier.fillMaxWidth(),

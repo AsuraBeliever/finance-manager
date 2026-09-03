@@ -33,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.ui.components.FormSheet
+import com.asura.finanzas.ui.components.FieldHint
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import androidx.compose.foundation.border
@@ -48,6 +49,7 @@ import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.data.WalletCategory
 import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.WebCheckbox
 import com.asura.finanzas.ui.parseAmountToCents
@@ -169,6 +171,7 @@ fun WalletFormSheet(
                 onValueChange = { name = it; error = null },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                placeholder = stringResource(R.string.wallets_name_placeholder),
             )
 
             // Web order: name, what it nests under (with its hint), then the
@@ -181,15 +184,15 @@ fun WalletFormSheet(
                 selected = parent,
                 optionLabel = { it?.name ?: parentNone },
                 onSelect = { parent = it },
+                // Nothing picked is not nothing: it is "a wallet of its own".
+                emptyLabel = parentNone,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text(
+            FieldHint(
                 stringResource(
                     if (parent == null) R.string.wallets_parent_none_hint
                     else R.string.wallets_parent_hint,
                 ),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
             )
 
             Row(
@@ -200,7 +203,9 @@ fun WalletFormSheet(
                     label = stringResource(R.string.wallets_category),
                     options = categories,
                     selected = category,
-                    optionLabel = { it.name },
+                    // Seed rows are stored in Spanish; the picker shows them in
+                    // the app's language, as every other list does.
+                    optionLabel = { seedName(it.name, it.isSystem).orEmpty() },
                     onSelect = { category = it },
                     modifier = Modifier.weight(1f),
                 )
@@ -208,7 +213,7 @@ fun WalletFormSheet(
                     label = stringResource(R.string.wallets_currency),
                     options = currencies,
                     selected = currency,
-                    optionLabel = { "${it.code} · ${it.name}" },
+                    optionLabel = { "${it.code} — " + seedName(it.name).orEmpty() },
                     onSelect = { currency = it },
                     // Currency is fixed once there are movements.
                     enabled = existing == null,
