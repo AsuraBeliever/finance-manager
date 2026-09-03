@@ -49,10 +49,14 @@ export interface GridItemSpec {
   h: number;
   minW?: number;
   minH?: number;
-  /** Fixed pixel height for the phone stack. Needed by chart widgets (their
-   *  ResponsiveContainer needs a definite height) and by the one widget meant to
-   *  scroll (expense-by-category). Omit for content widgets, which grow to fit. */
+  /** Fixed pixel height for the phone stack. Needed by chart widgets, whose
+   *  ResponsiveContainer needs a definite height. Omit for content widgets,
+   *  which grow to fit. */
   mobileHeight?: number;
+  /** Ceiling for the phone stack: the widget grows to fit and scrolls inside
+   *  once it would pass this. A fixed height here would leave dead space
+   *  under a short list, which is what expense-by-category usually is. */
+  mobileMaxHeight?: number;
   node: ReactNode;
 }
 
@@ -93,6 +97,7 @@ function PhoneCard({ item }: { item: GridItemSpec }) {
         transform: CSS.Transform.toString(transform),
         transition,
         ...(item.mobileHeight ? { height: item.mobileHeight } : {}),
+        ...(item.mobileMaxHeight ? { maxHeight: item.mobileMaxHeight } : {}),
       }}
       className={`group/cell relative ${isDragging ? "z-10 opacity-75" : ""}`}
     >

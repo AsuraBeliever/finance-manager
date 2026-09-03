@@ -308,7 +308,9 @@ export function DashboardPage() {
       h: 5,
       // The one widget allowed to scroll on the phone: the category list can be
       // long, so cap its height and let it scroll instead of growing the page.
-      mobileHeight: 340,
+      // A cap, not a fixed height — three categories left 120 px of nothing
+      // under the donut.
+      mobileMaxHeight: 340,
       node: (
         <BreakdownWidget kind="expense" title={es.dashboard.expenseByCategory} period={period} />
       ),

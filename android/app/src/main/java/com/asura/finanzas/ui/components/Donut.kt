@@ -3,6 +3,15 @@ package com.asura.finanzas.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -136,7 +145,13 @@ fun BreakdownDonut(
             }
         }
 
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // The card that hosts this is capped in height on the phone, the way
+        // the web caps its own; a long category list scrolls here rather than
+        // being cut off at the card's edge.
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             slices.forEachIndexed { index, slice ->
                 Row(
                     modifier = Modifier
@@ -286,16 +301,32 @@ fun RingGauge(
                 style = Stroke(width = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
             )
         }
+        // The hollow the label has to live in. The web sizes its centre block
+        // to the same width.
+        val hollow = 103.dp
+        val hollowPx = with(LocalDensity.current) { hollow.toPx() }
+        // The web's `FitText`: rather than cut "$2,000.00" off at the ring, it
+        // shrinks the line until it fits.
+        var scale by remember(centerValue) { mutableFloatStateOf(1f) }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(103.dp),
+            modifier = Modifier.width(hollow),
         ) {
             Text(
                 centerValue,
                 style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp),
                 color = colors.fg,
                 maxLines = 1,
+                softWrap = false,
+                onTextLayout = { layout ->
+                    val width = layout.size.width.toFloat()
+                    scale = if (width > hollowPx && width > 0f) hollowPx / width else 1f
+                },
+                modifier = Modifier
+                    .wrapContentWidth(unbounded = true)
+                    .graphicsLayer { scaleX = scale; scaleY = scale },
             )
+            Spacer(Modifier.height(2.dp))
             Text(
                 centerCaption,
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.2.sp),

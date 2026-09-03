@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -82,7 +83,9 @@ fun BreakdownWidget(
     /** Tapping a slice drills into the movements behind it. */
     onSlice: ((CategorySlice) -> Unit)? = null,
 ) {
-    GlassCard(Modifier.fillMaxWidth()) {
+    // The web caps this one on the phone (`mobileMaxHeight`) and lets a long
+    // category list scroll inside instead of growing the page.
+    GlassCard(Modifier.fillMaxWidth().heightIn(max = 340.dp)) {
         WidgetHeader(title)
         BreakdownDonut(
             slices = breakdown.slices.mapIndexed { index, slice ->
