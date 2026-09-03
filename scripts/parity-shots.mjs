@@ -5,7 +5,9 @@
 //   node scripts/parity-shots.mjs wallets goals   # only these
 //
 // Env: BASE (default http://localhost:8787), OUT (default ./parity-shots),
-// EMAIL, PASSWORD, LOCALE (default en-US), PERIOD_HINT.
+// EMAIL, PASSWORD, LOCALE (default en-US), PERIOD ("YYYY-MM" pins the
+// dashboard to that month — the widgets that need movement do not render at
+// all in an empty one).
 //
 // One login for the whole run on purpose: the worker rate-limits sign-ins, and
 // logging in per screen trips it half way through.
@@ -33,10 +35,57 @@ const SCREENS = [
   { name: "wallets", route: "/#/carteras", steps: 3 },
   { name: "wallet-form", route: "/#/carteras", open: [/new wallet|nueva cartera/i], steps: 3 },
   { name: "wallet-detail", route: "/#/carteras", open: [{ css: "a[href*='/carteras/']" }], steps: 4 },
+  // A credit card: the detail grows the statement panel and the MSI plans.
+  {
+    name: "wallet-detail-card",
+    route: "/#/carteras",
+    open: [{ css: "a[href*='/carteras/']:has-text('Tarjeta Test A')" }],
+    steps: 5,
+  },
   { name: "tx", route: "/#/transacciones", steps: 3 },
   { name: "tx-form", route: "/#/transacciones", open: [/new transaction|nuevo movimiento/i], steps: 3 },
+  {
+    name: "tx-form-expense",
+    route: "/#/transacciones",
+    open: [/new transaction|nuevo movimiento/i, /^expense$|^gasto$/i],
+    steps: 3,
+  },
+  {
+    name: "tx-form-transfer",
+    route: "/#/transacciones",
+    open: [/new transaction|nuevo movimiento/i, /^transfer$|^transferencia$/i],
+    steps: 3,
+  },
+  // An expense on a credit card: the months-without-interest box appears.
+  {
+    name: "tx-form-msi",
+    route: "/#/transacciones",
+    open: [
+      /new transaction|nuevo movimiento/i,
+      /^expense$|^gasto$/i,
+      { css: "select", option: "Tarjeta Test A (MXN)" },
+      { css: "input[type=checkbox]" },
+    ],
+    steps: 3,
+  },
+  // The pencil on the first row. Which row it is does not matter for layout,
+  // but the first one in the test account is a plain expense.
+  { name: "tx-edit", route: "/#/transacciones", open: [{ css: "button[aria-label='Edit'],button[aria-label='Editar']" }], steps: 2 },
   { name: "inv", route: "/#/inversiones", steps: 3 },
   { name: "inv-form", route: "/#/inversiones", open: [/new investment|nueva inversión/i], steps: 3 },
+  // The form behind one catalogue entry (each kind asks for its own fields).
+  {
+    name: "inv-form-cetes",
+    route: "/#/inversiones",
+    open: [/new investment|nueva inversión/i, { css: "button:has-text('CETES 91')" }],
+    steps: 3,
+  },
+  {
+    name: "inv-form-nu",
+    route: "/#/inversiones",
+    open: [/new investment|nueva inversión/i, { css: "button:has-text('Nu Box')" }],
+    steps: 3,
+  },
   {
     name: "inv-detail",
     route: "/#/inversiones",
@@ -47,6 +96,17 @@ const SCREENS = [
   { name: "simulator", route: "/#/inversiones/simulador", steps: 3 },
   { name: "goals", route: "/#/metas", steps: 3 },
   { name: "goal-form", route: "/#/metas", open: [/new goal|nueva meta/i], steps: 3 },
+  // Reserving into a goal, and the breakdown a category row opens on the
+  // dashboard (needs PERIOD set to a month that has movement).
+  { name: "goal-contribute", route: "/#/metas", open: [/^add$|^aportar$/i], steps: 2 },
+  {
+    name: "category-detail",
+    route: "/#/",
+    // The first row of the spending-by-category legend, whatever it is called
+    // in the account being shot.
+    open: [{ css: "ul li button:has(span.rounded-full)" }],
+    steps: 2,
+  },
   { name: "budgets", route: "/#/presupuestos", steps: 2 },
   { name: "budget-form", route: "/#/presupuestos", open: [/new limit|nuevo límite/i], steps: 2 },
   { name: "subs", route: "/#/suscripciones", steps: 3 },
@@ -55,6 +115,22 @@ const SCREENS = [
   { name: "settings", route: "/#/ajustes", steps: 4 },
   { name: "appearance", route: "/#/apariencia", steps: 4 },
   { name: "password", route: "/#/ajustes/contrasena", steps: 1 },
+  // Not a route on the web: a modal opened from Settings.
+  {
+    name: "whats-new",
+    route: "/#/ajustes",
+    open: [/see the changes|ver los cambios|what's new|novedades/i],
+    steps: 3,
+  },
+  // Signed out: shot before the run logs in.
+  { name: "login", route: "/#/", steps: 1, anon: true },
+  {
+    name: "signup",
+    route: "/#/",
+    open: [/no account\? sign up|no tienes cuenta\? regístrate/i],
+    steps: 2,
+    anon: true,
+  },
 ];
 
 const wanted = process.argv.slice(2);
@@ -80,8 +156,31 @@ const ctx = await browser.newContext({
   // browser renders light and the two are not comparable.
   colorScheme: "dark",
 });
+// The dashboard period lives in localStorage, so it is set before the app
+// boots rather than driven through the picker.
+const PERIOD = process.env.PERIOD;
+if (PERIOD) {
+  const [year, month] = PERIOD.split("-").map(Number);
+  await ctx.addInitScript(
+    ([key, value]) => localStorage.setItem(key, value),
+    ["finanzas.dashboard.period", JSON.stringify({ kind: "month", year, month })],
+  );
+}
+
 const page = await ctx.newPage();
 
+await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+
+// Signed-out screens have to be shot before the session exists.
+for (const screen of screens.filter((s) => s.anon)) {
+  try {
+    await shoot(screen);
+    console.log(`${screen.name}  ok`);
+  } catch (err) {
+    console.log(`${screen.name}  FAILED  ${err.message.split("\n")[0]}`);
+  }
+}
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await page.waitForSelector('input[type="email"]', { timeout: 30000 });
 await page.fill('input[type="email"]', EMAIL);
@@ -93,7 +192,7 @@ await Promise.all([
 await page.waitForTimeout(2500);
 await dismissWhatsNew();
 
-for (const screen of screens) {
+for (const screen of screens.filter((s) => !s.anon)) {
   try {
     await shoot(screen);
     console.log(`${screen.name}  ok`);
@@ -119,10 +218,19 @@ async function shoot({ name, route, steps = 1, open = [] }) {
   await dismissWhatsNew();
 
   for (const target of open) {
+    // Once a modal is up, look inside it: the page underneath usually has a
+    // button by the same name (the "Expense" filter tab vs the "Expense" tab
+    // of the form), and clicking the covered one just times out.
+    const overlay = page.locator("div.fixed.inset-0.z-50").first();
+    const root = (await overlay.count()) ? overlay : page;
     const locator = target.css
-      ? page.locator(target.css).first()
-      : page.getByRole("button", { name: target }).first();
-    await locator.click();
+      ? root.locator(target.css).first()
+      : root.getByRole("button", { name: target }).first();
+    // `{ css, option }` picks a value in a <select> instead of clicking it —
+    // some states only exist once a particular wallet is chosen (a credit card
+    // is what makes the MSI box appear).
+    if (target.option) await locator.selectOption({ label: target.option });
+    else await locator.click();
     // Some of these fetch on open — the investment form waits on Banxico — so
     // settle on the network, or the shot is of a spinner. The first pause is
     // not padding: `networkidle` resolves instantly if asked before the
