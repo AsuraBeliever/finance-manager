@@ -10,8 +10,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -145,13 +143,7 @@ fun BreakdownDonut(
             }
         }
 
-        // The card that hosts this is capped in height on the phone, the way
-        // the web caps its own; a long category list scrolls here rather than
-        // being cut off at the card's edge.
-        Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             slices.forEachIndexed { index, slice ->
                 Row(
                     modifier = Modifier

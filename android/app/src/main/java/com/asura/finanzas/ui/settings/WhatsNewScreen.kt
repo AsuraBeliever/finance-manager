@@ -2,8 +2,6 @@ package com.asura.finanzas.ui.settings
 
 import android.content.Context
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -116,9 +114,10 @@ fun WhatsNewAuto(preferences: AppPreferences) {
     }
 
     PlainSheet(title = stringResource(R.string.whats_new_title), onDismiss = { close() }) {
-        Column(Modifier.verticalScroll(rememberScrollState())) {
-            entries.forEach { entry -> ChangelogEntryBlock(entry, locale) }
-        }
+        // No scrolling column here: `PlainSheet` already scrolls its content,
+        // and a second one inside it is handed an infinite height, which
+        // Compose refuses — it took the app down on the update notice.
+        entries.forEach { entry -> ChangelogEntryBlock(entry, locale) }
     }
 }
 
@@ -176,9 +175,7 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
         if (list == null) {
             LoadingBox()
         } else {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                list.forEach { entry -> ChangelogEntryBlock(entry, locale) }
-            }
+            list.forEach { entry -> ChangelogEntryBlock(entry, locale) }
         }
     }
 }
