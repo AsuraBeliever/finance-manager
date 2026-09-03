@@ -36,9 +36,12 @@ fun PrivacyToggle(modifier: Modifier = Modifier) {
             if (hidden) R.string.dashboard_show_balance else R.string.dashboard_hide_balance,
         ),
         tint = Broke.colors.fgSubtle,
+        // 15 px glyph in a `p-1` box, as on the web. Small for a touch
+        // target, but a taller button pushes down everything under it in the
+        // card, and the web's row height is the one being matched.
         modifier = modifier
-            .size(34.dp)
+            .size(23.dp)
             .clickable { scope.launch { preferences.setHideBalances(!hidden) } }
-            .padding(6.dp),
+            .padding(4.dp),
     )
 }

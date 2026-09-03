@@ -163,6 +163,9 @@ fun PageHeader(
             )
         }
         FlowRow(
+            // `items-end`: the actions sit on the title's baseline, not at the
+            // top of its line box.
+            modifier = Modifier.align(Alignment.Bottom),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(actionGap),
             content = actions,
@@ -193,12 +196,28 @@ fun GlassCard(
     )
 }
 
-/** All-caps, letter-spaced micro label ("NET WORTH", "POCKETS · 2"). */
+/**
+ * All-caps, letter-spaced micro label ("NET WORTH", "POCKETS · 2") — the web's
+ * `.eyebrow`, whose 0.18em on an 11.2px face is the 2 sp default here. The
+ * web also has a second, barely-tracked variant (`tracking-wide`, 0.025em) for
+ * the labels that sit right on top of a figure; those pass `letterSpacing`.
+ */
 @Composable
-fun MicroLabel(text: String, modifier: Modifier = Modifier, color: androidx.compose.ui.graphics.Color? = null) {
+fun MicroLabel(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: androidx.compose.ui.graphics.Color? = null,
+    letterSpacing: androidx.compose.ui.unit.TextUnit = 2.sp,
+) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.6.sp, fontSize = 11.sp),
+        style = MaterialTheme.typography.labelSmall.copy(
+            letterSpacing = letterSpacing,
+            fontSize = 11.sp,
+            // Compose's own leading would sit the glyphs ~8 px lower than the
+            // browser's line box does, which throws off every gap below.
+            lineHeight = 15.sp,
+        ),
         color = color ?: Broke.colors.fgMuted,
         modifier = modifier,
     )

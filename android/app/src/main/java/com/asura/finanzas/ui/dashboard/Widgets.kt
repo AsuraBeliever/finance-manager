@@ -42,18 +42,16 @@ import com.asura.finanzas.ui.theme.Broke
 /**
  * Card title with an optional "View all" affordance, as on the web.
  *
- * The drag handle is a slot in this row rather than something laid over the
- * card, because the corner it would cover is exactly where "View all" lives.
+ * The end padding is the web's `pr-7`: it keeps "View all" clear of the drag
+ * grip, which floats in the card's corner rather than sitting in this row. The
+ * trailing gap is the header's own `mb-4`, so every widget spaces its content
+ * the same way.
  */
 @Composable
-private fun WidgetHeader(
-    title: String,
-    onViewAll: (() -> Unit)? = null,
-    handle: (@Composable () -> Unit)? = null,
-) {
+private fun WidgetHeader(title: String, onViewAll: (() -> Unit)? = null) {
     val colors = Broke.colors
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(end = 28.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -71,11 +69,8 @@ private fun WidgetHeader(
                 modifier = Modifier.padding(start = 12.dp).clickable { onViewAll() },
             )
         }
-        if (handle != null) {
-            Spacer(Modifier.width(8.dp))
-            handle()
-        }
     }
+    Spacer(Modifier.height(16.dp))
 }
 
 /** Spending vs income split by category — the web's BreakdownWidget. */
@@ -86,11 +81,9 @@ fun BreakdownWidget(
     hide: Boolean,
     /** Tapping a slice drills into the movements behind it. */
     onSlice: ((CategorySlice) -> Unit)? = null,
-    handle: (@Composable () -> Unit)? = null,
 ) {
     GlassCard(Modifier.fillMaxWidth()) {
-        WidgetHeader(title, handle = handle)
-        Spacer(Modifier.height(8.dp))
+        WidgetHeader(title)
         BreakdownDonut(
             slices = breakdown.slices.mapIndexed { index, slice ->
                 DonutSlice(
@@ -120,11 +113,9 @@ fun BreakdownWidget(
 fun ByWalletWidget(
     summary: DashboardSummary,
     hide: Boolean,
-    handle: (@Composable () -> Unit)? = null,
 ) {
     GlassCard(Modifier.fillMaxWidth()) {
-        WidgetHeader(stringResource(R.string.dashboard_by_wallet), handle = handle)
-        Spacer(Modifier.height(8.dp))
+        WidgetHeader(stringResource(R.string.dashboard_by_wallet))
         LegendBelowDonut(
             // The web charts only wallets in the black; a card you owe money on
             // has no slice, and the colours are indexed after that filter.
@@ -147,11 +138,9 @@ fun ByWalletWidget(
 fun ByInvestmentWidget(
     summary: DashboardSummary,
     hide: Boolean,
-    handle: (@Composable () -> Unit)? = null,
 ) {
     GlassCard(Modifier.fillMaxWidth()) {
-        WidgetHeader(stringResource(R.string.dashboard_by_investment), handle = handle)
-        Spacer(Modifier.height(8.dp))
+        WidgetHeader(stringResource(R.string.dashboard_by_investment))
         LegendBelowDonut(
             slices = summary.investments
                 .filter { it.valueMxnCents > 0 }
@@ -172,13 +161,11 @@ fun ByInvestmentWidget(
 fun BudgetWidget(
     budgets: List<Budget>,
     hide: Boolean,
-    handle: (@Composable () -> Unit)? = null,
     onViewAll: () -> Unit,
 ) {
     val colors = Broke.colors
     GlassCard(Modifier.fillMaxWidth()) {
-        WidgetHeader(stringResource(R.string.budgets_spending_limit), onViewAll, handle)
-        Spacer(Modifier.height(10.dp))
+        WidgetHeader(stringResource(R.string.budgets_spending_limit), onViewAll)
         budgets.take(6).forEach { budget ->
             val over = budget.spentMxnCents > budget.limitCents
             Row(
@@ -211,14 +198,13 @@ fun BudgetWidget(
 fun GoalsWidget(
     goals: List<SavingsGoal>,
     hide: Boolean,
-    handle: (@Composable () -> Unit)? = null,
     onViewAll: () -> Unit,
 ) {
     val colors = Broke.colors
     val lead = goals.firstOrNull() ?: return
 
     GlassCard(Modifier.fillMaxWidth()) {
-        WidgetHeader(stringResource(R.string.goals_title), onViewAll, handle)
+        WidgetHeader(stringResource(R.string.goals_title), onViewAll)
         RingGauge(
             progressBps = lead.progressBps,
             centerValue = maskIfHidden(formatMoney(lead.savedCents, lead.currencyCode), hide),
@@ -261,7 +247,6 @@ fun SubscriptionsWidget(
     subscriptions: List<Subscription>,
     monthlyTotalMxnCents: Long,
     hide: Boolean,
-    handle: (@Composable () -> Unit)? = null,
     onViewAll: () -> Unit,
 ) {
     val colors = Broke.colors
@@ -269,8 +254,7 @@ fun SubscriptionsWidget(
     if (active.isEmpty()) return
 
     GlassCard(Modifier.fillMaxWidth()) {
-        WidgetHeader(stringResource(R.string.subscriptions_title), onViewAll, handle)
-        Spacer(Modifier.height(6.dp))
+        WidgetHeader(stringResource(R.string.subscriptions_title), onViewAll)
         Text(
             "${stringResource(R.string.subscriptions_monthly_total)}: " +
                 maskIfHidden(formatMoney(monthlyTotalMxnCents), hide),

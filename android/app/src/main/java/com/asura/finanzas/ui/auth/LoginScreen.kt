@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -128,7 +129,7 @@ fun LoginScreen(
             .systemBarsPadding()
             .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 28.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -139,7 +140,7 @@ fun LoginScreen(
             Box(
                 Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(
                         Brush.linearGradient(listOf(colors.accent, colors.accentDim)),
                     ),
@@ -154,10 +155,11 @@ fun LoginScreen(
                 color = colors.fg,
             )
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(32.dp))
 
-        // The form lives in a card, heading included — same as the web.
-        GlassCard(Modifier.fillMaxWidth(), padding = 22.dp) {
+        // The form lives in a card, heading included — same as the web, whose
+        // `gap-4` is the 16 dp between every row below.
+        GlassCard(Modifier.fillMaxWidth(), padding = 24.dp) {
         Text(
             text = stringResource(
                 if (registering) R.string.auth_register_title else R.string.auth_login_title,
@@ -196,7 +198,7 @@ fun LoginScreen(
             imeAction = ImeAction.Next,
             ),
         )
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(16.dp))
 
         FormField(
             label = stringResource(R.string.auth_password),
@@ -236,7 +238,7 @@ fun LoginScreen(
         )
 
         if (registering) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.auth_password_hint),
                 style = MaterialTheme.typography.labelSmall,
@@ -246,7 +248,7 @@ fun LoginScreen(
         }
 
         if (error != null) {
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(16.dp))
             Text(
                 text = error!!,
                 style = MaterialTheme.typography.bodyMedium,
@@ -254,12 +256,14 @@ fun LoginScreen(
             )
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
         Button(
             onClick = { submit() },
             enabled = !busy && email.isNotBlank() && password.isNotBlank(),
-            colors = ButtonDefaults.buttonColors(containerColor = colors.accent),
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = colors.accentDim),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().height(36.dp),
         ) {
             if (busy) {
                 CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.height(20.dp))
@@ -273,14 +277,14 @@ fun LoginScreen(
             }
         }
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
             text = stringResource(
                 if (registering) R.string.auth_switch_to_login
                 else R.string.auth_switch_to_register,
             ),
             style = MaterialTheme.typography.labelLarge,
-            color = colors.accentBright,
+            color = colors.fgMuted,
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
@@ -303,8 +307,8 @@ private fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .height(38.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(Color.White)
             .clickable(enabled = enabled, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,

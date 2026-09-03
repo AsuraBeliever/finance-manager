@@ -31,6 +31,7 @@ import com.asura.finanzas.data.Transaction
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.HairLine
+import com.asura.finanzas.ui.components.PlainSheet
 import com.asura.finanzas.ui.components.IconBadge
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.formatMoney
@@ -84,11 +85,10 @@ fun CategoryDetailDialog(
         seedName(target.name).orEmpty()
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = colors.surfaceOverlay,
-        title = { Text(title, color = colors.fg) },
-        text = {
+    // The web opens this as one of its own modals — titled card, X, hairline —
+    // not as a platform alert with a Close button under it.
+    PlainSheet(title = title, onDismiss = onDismiss) {
+        run {
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -137,13 +137,8 @@ fun CategoryDetailDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_close), color = colors.fgMuted)
-            }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -166,6 +161,8 @@ private fun CategoryDetailRow(
         IconBadge(
             if (income) Icons.Outlined.CallReceived else Icons.Outlined.CallMade,
             tint = tint,
+            // `h-7 w-7` here, smaller than the one the movements list uses.
+            size = 28.dp,
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {

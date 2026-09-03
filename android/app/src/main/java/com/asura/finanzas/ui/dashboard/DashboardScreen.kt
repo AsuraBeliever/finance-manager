@@ -94,11 +94,14 @@ enum class DashboardTarget { Budgets, Goals, Subscriptions }
 fun DashboardScreen(
     repository: BrokeRepository,
     onViewAll: (DashboardTarget) -> Unit,
+    /** Held above the tabs so it survives leaving the screen, as the web's
+     *  localStorage-backed period does. */
+    period: Period,
+    onPeriodChange: (Period) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val (key, reload) = rememberReloadKey()
     val scope = rememberCoroutineScope()
-    var period by remember { mutableStateOf<Period>(Period.CurrentMonth) }
     var showPeriod by remember { mutableStateOf(false) }
     // Which breakdown slice is open, as (kind, target).
     var drillInto by remember { mutableStateOf<Pair<String, CategoryDetailTarget>?>(null) }
@@ -118,7 +121,9 @@ fun DashboardScreen(
     val walletsState by loadSynced("wallets" to false, refetch = key) { repository.wallets() }
     val walletsForDrill = (walletsState as? Load.Ready)?.data ?: emptyList()
 
-    val summaryState by loadSynced("dashboard" to period, refetch = key) { repository.dashboard() }
+    val summaryState by loadSynced("dashboard" to period, refetch = key) {
+        repository.dashboard(period.toJson())
+    }
     val trendsState by loadSynced("trends" to period, refetch = key) {
         repository.spendingTrends(period.toJson())
     }
@@ -211,7 +216,7 @@ fun DashboardScreen(
         PeriodPickerDialog(
             selected = period,
             // Parameters are edited inline, so a pick applies without closing.
-            onSelect = { period = it },
+            onSelect = onPeriodChange,
             onDismiss = { showPeriod = false },
             allowAll = true,
         )
@@ -250,50 +255,48 @@ private fun DashboardContent(
     // means the same widget on both clients and the defaults line up.
     val available = buildList<DashWidget> {
         add(
-            DashWidget("networth") { handle ->
-                NetWorthCard(summary, trends, netStart, netEnd, hide, handle)
+            DashWidget("networth") {
+                NetWorthCard(summary, trends, netStart, netEnd, hide)
             },
         )
         if (trends != null && trends.buckets.isNotEmpty()) {
-            add(DashWidget("flow") { handle -> FlowCard(trends, handle) })
+            add(DashWidget("flow") { FlowCard(trends) })
         }
         if (budgets.isNotEmpty()) {
             add(
-                DashWidget("budget") { handle ->
-                    BudgetWidget(budgets, hide, handle) { onViewAll(DashboardTarget.Budgets) }
+                DashWidget("budget") {
+                    BudgetWidget(budgets, hide) { onViewAll(DashboardTarget.Budgets) }
                 },
             )
         }
         expenseBreakdown?.takeIf { it.slices.isNotEmpty() }?.let { breakdown ->
             add(
-                DashWidget("breakdownExpense") { handle ->
+                DashWidget("breakdownExpense") {
                     BreakdownWidget(
                         stringResource(R.string.dashboard_expense_by_category),
                         breakdown,
                         hide,
                         onSlice = { onSlice("expense", it) },
-                        handle = handle,
                     )
                 },
             )
         }
         incomeBreakdown?.takeIf { it.slices.isNotEmpty() }?.let { breakdown ->
             add(
-                DashWidget("breakdownIncome") { handle ->
+                DashWidget("breakdownIncome") {
                     BreakdownWidget(
                         stringResource(R.string.dashboard_income_by_category),
                         breakdown,
                         hide,
                         onSlice = { onSlice("income", it) },
-                        handle = handle,
                     )
                 },
             )
         }
         if (goals.isNotEmpty()) {
             add(
-                DashWidget("goals") { handle ->
-                    GoalsWidget(goals, hide, handle) { onViewAll(DashboardTarget.Goals) }
+                DashWidget("goals") {
+                    GoalsWidget(goals, hide) { onViewAll(DashboardTarget.Goals) }
                 },
             )
         }
@@ -301,21 +304,21 @@ private fun DashboardContent(
         // browsing a quiet month drops the card instead of showing an empty one.
         subscriptions?.takeIf { list -> list.subscriptions.any { it.chargedInPeriod } }?.let { list ->
             add(
-                DashWidget("subscriptions") { handle ->
-                    SubscriptionsWidget(list.subscriptions, list.monthlyTotalMxnCents, hide, handle) {
+                DashWidget("subscriptions") {
+                    SubscriptionsWidget(list.subscriptions, list.monthlyTotalMxnCents, hide) {
                         onViewAll(DashboardTarget.Subscriptions)
                     }
                 },
             )
         }
         if (summary.wallets.isNotEmpty()) {
-            add(DashWidget("byWallet") { handle -> ByWalletWidget(summary, hide, handle) })
+            add(DashWidget("byWallet") { ByWalletWidget(summary, hide) })
         }
         if (summary.investments.isNotEmpty()) {
-            add(DashWidget("byInvestment") { handle -> ByInvestmentWidget(summary, hide, handle) })
+            add(DashWidget("byInvestment") { ByInvestmentWidget(summary, hide) })
         }
         if (trends != null && (trends.incomeMxnCents > 0 || trends.expenseMxnCents > 0)) {
-            add(DashWidget("flowRange") { handle -> FlowRangeCard(trends, hide, handle) })
+            add(DashWidget("flowRange") { FlowRangeCard(trends, hide) })
         }
     }
 
@@ -410,9 +413,15 @@ private fun DashboardContent(
                         .zIndex(if (dragging) 1f else 0f)
                         .graphicsLayer { translationY = if (dragging) reorderState.offsetY else 0f },
                 ) {
-                    // The grip goes in the card's own header row, next to
-                    // "View all", so nothing inside the widget gets covered.
-                    widget.content { ReorderHandle(state = reorderState, key = key) }
+                    widget.content()
+                    // The grip floats over the card's top-right corner, the
+                    // web's `absolute right-2.5 top-2.5`. Every widget header
+                    // keeps that corner clear, so it covers nothing.
+                    ReorderHandle(
+                        state = reorderState,
+                        key = key,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+                    )
                 }
             }
         }
@@ -617,8 +626,10 @@ private fun ChartLegend(color: androidx.compose.ui.graphics.Color, label: String
         )
         Text(
             label,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-            color = Broke.colors.fgMuted,
+            // Recharts writes each series' name in the series' own colour, at
+            // the card's base size — muted grey read as a caption, not a key.
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+            color = color,
             modifier = Modifier.padding(start = 6.dp),
         )
     }
@@ -676,11 +687,11 @@ private fun Bar(value: Long, max: Long, color: androidx.compose.ui.graphics.Colo
 /**
  * One draggable card on the overview. The key is the web's widget key, so the
  * order saved on the account means the same thing in both clients. The card
- * draws the drag handle it is given inside its own header.
+ * is drawn as its own card.
  */
 private class DashWidget(
     val key: String,
-    val content: @Composable (handle: @Composable () -> Unit) -> Unit,
+    val content: @Composable () -> Unit,
 )
 
 /**
@@ -703,23 +714,25 @@ private fun NetWorthCard(
     netStart: Long,
     netEnd: Long,
     hide: Boolean,
-    handle: @Composable () -> Unit,
 ) {
     val colors = Broke.colors
-    GlassCard(Modifier.fillMaxWidth()) {
+    // `p-6` on the web, not the `p-5` most cards use.
+    GlassCard(Modifier.fillMaxWidth(), padding = 24.dp) {
         // The eye lives here, beside the eyebrow, exactly as on the web — not
         // up in the page header.
         Row(verticalAlignment = Alignment.CenterVertically) {
             MicroLabel(stringResource(R.string.dashboard_net_worth))
             Spacer(Modifier.width(8.dp))
             PrivacyToggle()
-            Spacer(Modifier.weight(1f))
-            handle()
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(9.dp))
 
-        MicroLabel(stringResource(R.string.dashboard_period_start), color = colors.fgSubtle)
-        Spacer(Modifier.height(4.dp))
+        MicroLabel(
+            stringResource(R.string.dashboard_period_start),
+            color = colors.fgSubtle,
+            letterSpacing = 0.3.sp,
+        )
+        Spacer(Modifier.height(2.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 maskIfHidden(formatMoney(netStart), hide),
@@ -734,12 +747,16 @@ private fun NetWorthCard(
             )
         }
 
-        Spacer(Modifier.height(14.dp))
-        MicroLabel(stringResource(R.string.dashboard_period_end), color = colors.fgSubtle)
-        Spacer(Modifier.height(2.dp))
-        HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 40.sp)
+        Spacer(Modifier.height(13.dp))
+        MicroLabel(
+            stringResource(R.string.dashboard_period_end),
+            color = colors.fgSubtle,
+            letterSpacing = 0.3.sp,
+        )
+        // `text-4xl` — 36 px, not the 40 sp the other heroes use.
+        HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 36.sp)
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
         LegendRow(
             color = colors.accent,
             label = stringResource(R.string.nav_wallets),
@@ -758,9 +775,9 @@ private fun NetWorthCard(
         // gets a rule and two "$0.00 · −100%" rows saying nothing, which is
         // why the web gates this block the same way.
         if (trends != null && (trends.incomeMxnCents > 0 || trends.expenseMxnCents > 0)) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(18.dp))
             HairLine()
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(16.dp))
             FlowRow(
                 label = stringResource(R.string.dashboard_incomes),
                 amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
@@ -782,16 +799,15 @@ private fun NetWorthCard(
 
 /** Income and expenses bucket by bucket — the web's "flow" widget. */
 @Composable
-private fun FlowCard(trends: SpendingTrends, handle: @Composable () -> Unit) {
+private fun FlowCard(trends: SpendingTrends) {
     GlassCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 stringResource(R.string.dashboard_flow),
                 style = MaterialTheme.typography.titleLarge,
                 color = Broke.colors.fg,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).padding(end = 28.dp),
             )
-            handle()
         }
         Spacer(Modifier.height(16.dp))
         FlowChart(trends)
@@ -807,7 +823,6 @@ private fun FlowCard(trends: SpendingTrends, handle: @Composable () -> Unit) {
 private fun FlowRangeCard(
     trends: SpendingTrends,
     hide: Boolean,
-    handle: @Composable () -> Unit,
 ) {
     val colors = Broke.colors
     // Same rounded scale as the bucket chart, so both charts on the overview
@@ -821,9 +836,8 @@ private fun FlowRangeCard(
                 stringResource(R.string.dashboard_income_vs_expense),
                 style = MaterialTheme.typography.titleLarge,
                 color = colors.fg,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).padding(end = 28.dp),
             )
-            handle()
         }
         Spacer(Modifier.height(20.dp))
 
