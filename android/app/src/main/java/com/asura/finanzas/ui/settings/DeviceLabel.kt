@@ -19,6 +19,7 @@ import java.time.ZoneId
 fun deviceLabel(userAgent: String?): String {
     val unknown = stringResource(R.string.account_unknown_device)
     val desktopApp = stringResource(R.string.account_desktop_app)
+    val androidApp = stringResource(R.string.account_android_app)
     if (userAgent.isNullOrBlank()) return unknown
 
     val os = when {
@@ -41,6 +42,8 @@ fun deviceLabel(userAgent: String?): String {
     }
     // WebKitGTK (the Tauri desktop shell) reports Linux + Safari.
     if (os == "Linux" && browser == "Safari") return "Linux · $desktopApp"
+    // This app is not a browser; it signs its own UA (see `Rpc`).
+    if (userAgent.contains("Finanzas/")) return "Android · $androidApp"
     if (os != null && browser != null) return "$os · $browser"
     return os ?: browser ?: unknown
 }

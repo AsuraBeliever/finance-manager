@@ -605,6 +605,7 @@
     <string name="account_revoke_others">Sign out other sessions</string>
     <string name="account_unknown_device">Unknown device</string>
     <string name="account_desktop_app">Desktop app</string>
+    <string name="account_android_app">Android app</string>
     <string name="account_moments_ago">less than a minute ago</string>
     <string name="account_minute_ago">1 minute ago</string>
     <string name="account_minutes_ago">{n} minutes ago</string>

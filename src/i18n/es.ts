@@ -716,6 +716,7 @@ export const esDict = {
     revokeOthers: "Cerrar las demás sesiones",
     unknownDevice: "Dispositivo desconocido",
     desktopApp: "App de escritorio",
+    androidApp: "App de Android",
     momentsAgo: "hace menos de un minuto",
     minuteAgo: "hace 1 minuto",
     minutesAgo: "hace {n} minutos",

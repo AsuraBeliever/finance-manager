@@ -34,6 +34,8 @@ export function deviceLabel(ua: string | null): string {
   if (os === "Linux" && browser === "Safari") {
     return `Linux · ${es.account.desktopApp}`;
   }
+  // The Android app is not a browser; it signs its own UA.
+  if (/Finanzas\//.test(ua)) return `Android · ${es.account.androidApp}`;
   if (os && browser) return `${os} · ${browser}`;
   return os ?? browser ?? es.account.unknownDevice;
 }

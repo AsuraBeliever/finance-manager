@@ -41,8 +41,20 @@ class RpcClient(cookieJar: SessionCookieJar) {
         encodeDefaults = true
     }
 
+    // Without this every session from the phone lands in the account's device
+    // list as "Unknown device": OkHttp's default UA says nothing, and both
+    // clients read that list with the same parser (`deviceLabel`).
+    private val userAgent =
+        "Finanzas/${BuildConfig.VERSION_NAME} (Android ${android.os.Build.VERSION.RELEASE}; " +
+            "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL})"
+
     private val http = OkHttpClient.Builder()
         .cookieJar(cookieJar)
+        .addInterceptor { chain ->
+            chain.proceed(
+                chain.request().newBuilder().header("User-Agent", userAgent).build(),
+            )
+        }
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()

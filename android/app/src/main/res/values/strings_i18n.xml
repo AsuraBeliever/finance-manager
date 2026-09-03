@@ -605,6 +605,7 @@
     <string name="account_revoke_others">Cerrar las demás sesiones</string>
     <string name="account_unknown_device">Dispositivo desconocido</string>
     <string name="account_desktop_app">App de escritorio</string>
+    <string name="account_android_app">App de Android</string>
     <string name="account_moments_ago">hace menos de un minuto</string>
     <string name="account_minute_ago">hace 1 minuto</string>
     <string name="account_minutes_ago">hace {n} minutos</string>
