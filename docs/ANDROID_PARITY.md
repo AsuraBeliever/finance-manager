@@ -62,11 +62,47 @@ Cosas que salieron de hacer esto y conviene no repetir:
   angosta que en la web — suficiente para que un nombre de suscripción acabara
   en «Spotify T…». La forma de detectarlo es medir el borde de la tarjeta en las
   dos capturas: tiene que caer en el mismo pixel.
+- **El marco puede coincidir y el interior no.** La tarjeta de patrimonio caía
+  en el pixel exacto por fuera y por dentro tenía 20 dp de relleno donde la web
+  usa `p-6` (24), la cifra a 40 sp donde la web usa `text-4xl` (36) y el
+  interletrado del eyebrow en dos etiquetas que la web deja casi sin tracking.
+  Medir el renglón, no el borde: la altura y la posición de cada bloque de
+  texto dentro de la tarjeta.
+- **El relleno de tarjeta no es uno solo.** La web mezcla `p-4`, `p-5` y `p-6`;
+  `GlassCard` trae 20 dp (el `p-5` de la mayoría) y las excepciones lo pasan.
+- **La manija de arrastre flota en la esquina, no ocupa lugar.** En la web es
+  `absolute right-2.5 top-2.5` sobre la tarjeta, y el encabezado deja esa
+  esquina libre con `pr-7`. Meterla en el renglón del título subía 9 px todo lo
+  de abajo, en cada widget del panel. El encabezado también trae siempre su
+  `mb-4`; no lo pone cada widget por su cuenta.
+- **El interlineado de Compose no es el del navegador.** Con el `lineHeight` de
+  Material, una etiqueta chica se sienta ~8 px más abajo que en la web, y ese
+  desfase se hereda hacia abajo. Donde importe, fijarlo.
+- **Lo que no cabe, la web lo encoge; no lo corta.** El centro del anillo de una
+  meta pasa por `FitText`: si «$2,000.00» no entra en el hueco, baja de tamaño.
+  Con `maxLines = 1` y sin más, Compose lo cortaba en «$2,000.».
+- **Nunca anidar `verticalScroll` dentro de una hoja que ya desplaza.** Compose
+  mide el de adentro con altura infinita y lanza en tiempo de ejecución: eso
+  tumbaba la app entera al abrir «Novedades», que es justo lo primero que se ve
+  después de actualizar.
+- **Una captura tomada demasiado pronto miente.** El `ResponsiveContainer` de
+  recharts dibuja la gráfica con el tamaño que midió, y si se le fotografía a
+  media maquetación sale aplastada — una dona completa parecía media dona, y
+  «arreglarla» habría roto la que estaba bien. Ante una diferencia de forma,
+  volver a capturar antes de creerla.
 
-**Barrido pendiente:** la tabla de abajo dice qué existe en las dos; que se
-*vea* igual está comprobado pantalla por pantalla sólo en las principales.
-El plan para cerrar el resto (formularios y pantallas de detalle) está en
-[`ANDROID_PARITY_SWEEP.md`](ANDROID_PARITY_SWEEP.md).
+**Estado del barrido:** cerrado. Se comparó pantalla por pantalla, en oscuro y
+en claro, con capturas medidas; el método y el orden que se siguió quedan en
+[`ANDROID_PARITY_SWEEP.md`](ANDROID_PARITY_SWEEP.md) por si hay que repetirlo.
+Diferencias conocidas que se dejaron a propósito:
+
+- En **Apariencia**, «Se reescala a 128 px…» cae al lado del botón en el APK y
+  debajo en la web. Misma regla de acomodo (`flex-wrap` ↔ `FlowRow`); difieren
+  por unos pixeles de ancho de glifo justo en el punto de corte.
+- El **desglose por categoría** se desplaza por dentro en la web cuando la lista
+  es muy larga; en el APK la tarjeta crece. Para cualquier lista que quepa en
+  pantalla se ven igual, y una columna desplazable ahí dentro es justo lo que
+  tumba la app (ver arriba).
 
 Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 

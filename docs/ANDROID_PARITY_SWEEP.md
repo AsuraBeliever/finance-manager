@@ -1,61 +1,21 @@
-# Plan: cerrar la paridad visual del APK
+# Barrido de paridad visual del APK
 
-Escrito el 2026-09-02, al final de la sesión de `feat/android-apk`.
+Escrito el 2026-09-02 como plan; **cerrado el 2026-09-02**. Se queda porque el
+método sirve para la próxima vez, no porque falte trabajo: el estado vigente
+vive en [`ANDROID_PARITY.md`](ANDROID_PARITY.md).
 
-**Para retomarlo basta decir «ejecuta el plan de paridad».** Todo lo que hace
-falta está aquí: el estado real, el orden, el método y los comandos.
+Se comparó pantalla por pantalla contra la web al ancho del teléfono, midiendo
+capturas: panel (con el periodo puesto en un mes con movimiento, para que se
+dibujen los widgets que dependen de él), carteras, movimientos, inversiones,
+simulador, metas, presupuestos, suscripciones, categorías, ajustes, los
+formularios de alta y edición de todo lo anterior, las dos pantallas de
+detalle, el desglose de una categoría, entrar y crear cuenta, cambiar
+contraseña, novedades, monedas y la bandeja de salida. Después se repitió el
+recorrido en modo claro.
 
-El objetivo es acabar la frase que abre `ANDROID_PARITY.md`: web y Android son
-la misma app. Hoy lo son en features; falta terminar de comprobarlo pantalla por
-pantalla, sobre todo en formularios y pantallas de detalle.
-
----
-
-## Estado real (qué está comprobado y qué no)
-
-Comprobado midiendo capturas lado a lado, no de memoria:
-
-| Pantalla | Estado |
-|---|---|
-| Panel / Overview (tarjeta de patrimonio, presupuestos, metas, donas) | ✅ comparada |
-| Carteras (lista) | ✅ comparada |
-| Movimientos (lista, filtros, tray de tipo) | ✅ comparada |
-| Inversiones (encabezado, resumen de portafolio, lista) | ✅ comparada |
-| Simulador (los tres modos, ambas gráficas) | ✅ comparada |
-| Metas (lista) | ✅ comparada |
-| Presupuestos | ✅ comparada |
-| Suscripciones (lista) | ✅ comparada |
-| Categorías | ✅ comparada |
-| Ajustes | ✅ comparada |
-| Apariencia | 🟡 parcial — ver «pendiente conocido» |
-
-**Sin comparar todavía** — esto es el trabajo:
-
-- Detalle de cartera (+ panel de tarjeta de crédito, plan MSI)
-- Detalle de inversión (+ proyección, movimientos, snapshots)
-- Alta/edición de movimiento, incluida transferencia y compra a MSI
-- Edición de la pata de un movimiento de inversión, y de una aportación a meta
-- Alta/edición de cartera
-- Alta/edición de meta, y aportar a una meta
-- Alta/edición de presupuesto
-- Alta/edición de suscripción
-- Alta/edición de categoría
-- Detalle de una categoría desde el panel (el diálogo de desglose)
-- Login y alta de cuenta
-- Cambiar contraseña, Monedas, Novedades
-- Panel de la bandeja de salida (outbox)
-- Los widgets del panel que sólo aparecen cuando el periodo tiene movimiento:
-  gráfica de flujo, desgloses por categoría, «ingresos vs gastos»
-
-Modo claro: sólo revisado en simulador, metas y suscripciones. Falta el resto.
-
-### Pendiente conocido (encontrado y no arreglado)
-
-En **Apariencia**, el texto «Se reescala a 128 px. Sustituye al ícono.» queda al
-lado del botón de subir imagen en el APK y debajo de él en la web. Las dos usan
-la misma regla de acomodo (`flex-wrap` ↔ `FlowRow`); difieren por unos pixeles
-de ancho de glifo justo en el punto de corte. Decidir en su momento: forzar el
-salto en Android, o dejarlo. No vale la pena forzarlo si nada más se nota aquí.
+Lo que salió está en los commits de la rama `feat/android-apk`; lo que conviene
+recordar, en la lista de «cosas que conviene no repetir» de `ANDROID_PARITY.md`.
+Lo que se dejó a propósito, en «diferencias conocidas» del mismo archivo.
 
 ---
 
@@ -95,10 +55,16 @@ Cuenta de prueba: `alan@test.mx` / `test1234`. El teléfono (S25U) se conecta po
 ### Capturar la web
 
 ```sh
-npm run shots:web                     # las 20 pantallas
-npm run shots:web -- wallet-detail    # sólo una
-OUT=/tmp/shots npm run shots:web      # a otra carpeta (default ./parity-shots)
+npm run shots:web                          # las 30 y pico pantallas
+npm run shots:web -- wallet-detail         # sólo una
+OUT=/tmp/shots npm run shots:web           # a otra carpeta (default ./parity-shots)
+PERIOD=2026-08 npm run shots:web -- home   # fija el mes del panel
+SCHEME=light npm run shots:web             # el tema claro
 ```
+
+`PERIOD` importa más de lo que parece: con el mes corriente vacío, la gráfica de
+flujo, los dos desgloses y «ingresos vs gastos» no se dibujan y no hay nada que
+comparar.
 
 `scripts/parity-shots.mjs` entra una sola vez (el worker limita los intentos de
 login: entrar por pantalla lo tumba a media corrida), abre los modales que hacen
