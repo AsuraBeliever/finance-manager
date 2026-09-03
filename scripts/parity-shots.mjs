@@ -5,7 +5,8 @@
 //   node scripts/parity-shots.mjs wallets goals   # only these
 //
 // Env: BASE (default http://localhost:8787), OUT (default ./parity-shots),
-// EMAIL, PASSWORD, LOCALE (default en-US), PERIOD ("YYYY-MM" pins the
+// EMAIL, PASSWORD, LOCALE (default en-US), SCHEME ("light" to shoot the light
+// theme; dark otherwise), PERIOD ("YYYY-MM" pins the
 // dashboard to that month — the widgets that need movement do not render at
 // all in an empty one).
 //
@@ -153,8 +154,9 @@ const ctx = await browser.newContext({
   hasTouch: true,
   locale: process.env.LOCALE ?? "en-US",
   // The phone is in dark mode and the account theme is "auto"; without this the
-  // browser renders light and the two are not comparable.
-  colorScheme: "dark",
+  // browser renders light and the two are not comparable. `SCHEME=light` (with
+  // `cmd uimode night no` on the phone) shoots the other half of the sweep.
+  colorScheme: process.env.SCHEME === "light" ? "light" : "dark",
 });
 // The dashboard period lives in localStorage, so it is set before the app
 // boots rather than driven through the picker.

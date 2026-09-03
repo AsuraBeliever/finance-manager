@@ -11,6 +11,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.asura.finanzas.data.AppPreferences
 import com.asura.finanzas.data.AppearanceSync
 import com.asura.finanzas.data.Outbox
@@ -69,6 +72,19 @@ fun AppRoot(
         runCatching { appearanceSync.pull() }
         // Anything captured without signal goes out as soon as we are back.
         runCatching { repository.flushOutbox() }
+    }
+
+    // …and again every time the app comes back to the front. The queue's own
+    // copy promises the entries "send on their own when you reconnect", and
+    // signing in once a session is what used to be the only thing that emptied
+    // it: capture something in a dead spot, walk back into signal without ever
+    // closing the app, and it would sit there.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner, state) {
+        if (state != AuthState.SignedIn) return@LaunchedEffect
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            runCatching { repository.flushOutbox() }
+        }
     }
 
     Box(
