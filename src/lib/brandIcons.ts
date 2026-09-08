@@ -80,7 +80,9 @@ interface Entry {
 
 // Ordered: more specific names first (e.g. "apple music" before "apple") so the
 // first keyword hit wins.
-const ENTRIES: Entry[] = [
+// Exported so the Android generator can emit the same table (see
+// scripts/gen-android-strings.mjs); nothing else should read it directly.
+export const ENTRIES: Entry[] = [
   { icon: siApplemusic, keywords: ["apple music"] },
   { icon: siAppletv, keywords: ["apple tv"] },
   { icon: siApplearcade, keywords: ["apple arcade"] },

@@ -14,12 +14,18 @@
 
 Finanzas is a personal finance manager: track your wallets, income and expenses,
 budgets, savings goals, subscriptions and investments — multi‑currency, with MXN
-as the base. It runs as a fast web app (PWA) you can install on any device, and as
-a native desktop app for Windows and Linux.
+as the base. It runs as a fast web app (PWA) you can install on any device, as an
+Android app, and as a native desktop app for Windows and Linux.
 
 ## 📲 Install
 
-### On the web (any device — recommended)
+### Android
+
+Download the `.apk` from the **[Releases page →](https://github.com/AsuraBeliever/finance-manager/releases/latest)**
+and open it. Android will ask you to allow installs from your browser — that's the
+normal prompt for an app that doesn't come from the Play Store.
+
+### On the web (any device)
 
 1. Open **[finanzas.aseth.workers.dev](https://finanzas.aseth.workers.dev)** in Chrome, Edge or another Chromium browser.
 2. Click **Install app** (in the address bar, or inside the app under *Settings → Install app*).
@@ -49,12 +55,13 @@ Download the latest installer from the **[Releases page →](https://github.com/
 - Dashboard: net worth, monthly flow, spending breakdown and trends
 - Budgets, savings goals and recurring subscriptions
 - Investment tracking (Nu, CETES and more) with exchange‑rate‑aware valuations
-- Installable PWA **and** native desktop app; your data syncs across every device
+- Installable PWA, **Android app** and native desktop app; your data syncs across every device
 
 ## 🛠️ Built with
 
 Rust on **Cloudflare Workers** + **D1** (all money math lives in Rust), a **React 19**
-PWA frontend, and a **Tauri 2** desktop shell. Money is stored as integer cents.
+PWA frontend, a **Tauri 2** desktop shell and a native **Kotlin + Jetpack Compose**
+Android client. Money is stored as integer cents.
 Architecture, data model and investment formulas live in [`docs/`](docs/PLAN.md).
 
 ## 📄 License

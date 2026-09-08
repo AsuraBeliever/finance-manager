@@ -12,6 +12,32 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.39.0",
+    date: "2026-09-07",
+    es: [
+      "Ya hay app nativa de Android: en la página de versiones de GitHub ahora sale un archivo .apk. Lo descargas, lo abres y se instala como cualquier otra app, con su ícono en tu pantalla de inicio — ya no hace falta el «Agregar a pantalla de inicio» del navegador.",
+      "Sus pantallas son de Android de verdad, no la página web metida en una ventana: se ve y se mueve como una app del sistema.",
+      "Trae todo lo que ya tienes en la web: el panel con sus widgets, tus carteras, tus movimientos, las inversiones con su simulador, metas, presupuestos, suscripciones, categorías, tus tarjetas de crédito con sus meses sin intereses y los ajustes. Nada se quedó del otro lado.",
+      "Entras con tu correo o con tu cuenta de Google, y también puedes crear tu cuenta desde el teléfono.",
+      "Sin señal la app abre con tus últimos números y además te deja capturar: lo que anotes se guarda en una bandeja de salida y se manda solo en cuanto vuelve el internet.",
+      "El orden en que acomodas los widgets del panel en el teléfono es el mismo que ves en la web, y al revés: es un solo acomodo para tu cuenta.",
+      "En Ajustes hay una pantalla de monedas para ver, actualizar o fijar a mano tus tipos de cambio. Por ahora está solo en la app.",
+      "En la web también: el desglose por categoría ya no deja un hueco debajo de la dona cuando tienes pocas categorías, el simulador etiqueta todos los años de la proyección en vez de uno solo, y tu teléfono ya aparece con su nombre en la lista de sesiones en lugar de «Dispositivo desconocido».",
+      "Ojo: a diferencia de la web y la computadora, la app de Android sí necesita que descargues la versión nueva cuando salga. La app te avisa en cuanto hay una.",
+    ],
+    en: [
+      "There's a native Android app now: the GitHub releases page includes an .apk file. Download it, open it, and it installs like any other app, with its own icon on your home screen — no more \"Add to Home Screen\" from the browser.",
+      "Its screens are real Android screens, not the web page inside a window: it looks and moves like a system app.",
+      "It has everything you already have on the web: the dashboard and its widgets, your wallets, your movements, investments with their simulator, goals, budgets, subscriptions, categories, your credit cards with their interest-free monthly plans, and settings. Nothing was left behind.",
+      "You can sign in with your email or with your Google account, and you can create your account from the phone too.",
+      "With no signal the app opens with your last synced numbers and also lets you record: whatever you enter is kept in an outbox and sent on its own as soon as you're back online.",
+      "The order you arrange the dashboard widgets in on your phone is the same one you see on the web, and the other way around: it's a single arrangement for your account.",
+      "Settings has a currencies screen to review, refresh, or hand-set your exchange rates. For now it's only in the app.",
+      "On the web too: the category breakdown no longer leaves a gap under the donut when you have few categories, the simulator labels every year of the projection instead of just one, and your phone now shows up by name in the sessions list instead of \"Unknown device\".",
+      "Note: unlike the web and desktop, the Android app does need you to download the new version when one ships. The app tells you as soon as there is one.",
+    ],
+  },
+  {
     version: "2.38.0",
     date: "2026-08-22",
     es: [

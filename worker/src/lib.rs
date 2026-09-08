@@ -25,6 +25,9 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .get_async("/api/auth/me", auth::me)
         .get_async("/api/auth/google/start", auth::google::start)
         .get_async("/api/auth/google/callback", auth::google::callback)
+        // Native clients cannot use the redirect flow: the cookie would land in
+        // the browser, not in the app's HTTP client.
+        .post_async("/api/auth/google/token", auth::google::token_sign_in)
         .get_async("/api/auth/sessions", auth::sessions)
         .post_async("/api/auth/revoke_session", auth::revoke_session)
         .post_async(

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the PWA manifest's background_color / theme_color (vite.config.ts). -->
+    <color name="background">#0b0a16</color>
+    <!-- Adaptive-icon backdrop: the flat color inside public/icon-512.png, so the
+         launcher icon reads the same as the PWA's. -->
+    <color name="icon_background">#0f1115</color>
+</resources>

@@ -288,7 +288,7 @@ function SubscriptionFormModal({
               className={inputClass}
               value={name}
               onChange={(e) => onNameChange(e.target.value)}
-              placeholder="Ej. Spotify, Netflix…"
+              placeholder={es.subscriptions.namePlaceholder}
             />
           </div>
         </Field>

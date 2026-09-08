@@ -15,11 +15,18 @@
 Finanzas es un gestor de finanzas personales: controla tus carteras, ingresos y
 gastos, presupuestos, metas de ahorro, suscripciones e inversiones — multimoneda,
 con MXN como base. Funciona como app web (PWA) que puedes instalar en cualquier
-dispositivo, y como app de escritorio nativa para Windows y Linux.
+dispositivo, como app de Android, y como app de escritorio nativa para Windows y
+Linux.
 
 ## 📲 Instalación
 
-### En la web (cualquier dispositivo — recomendado)
+### Android
+
+Descarga el `.apk` desde la **[página de versiones →](https://github.com/AsuraBeliever/finance-manager/releases/latest)**
+y ábrelo. Android te va a pedir permiso para instalar desde el navegador — es el
+aviso normal para una app que no viene de la Play Store.
+
+### En la web (cualquier dispositivo)
 
 1. Abre **[finanzas.aseth.workers.dev](https://finanzas.aseth.workers.dev)** en Chrome, Edge u otro navegador Chromium.
 2. Pulsa **Instalar app** (en la barra de direcciones, o dentro de la app en *Ajustes → Instalar app*).
@@ -50,12 +57,13 @@ Descarga el instalador más reciente desde la **[página de versiones →](https
 - Panel: patrimonio, flujo mensual, desglose de gastos y tendencias
 - Presupuestos, metas de ahorro y suscripciones recurrentes
 - Inversiones (Nu, CETES y más) valuadas con tipos de cambio
-- PWA instalable **y** app de escritorio nativa; tus datos se sincronizan en todos tus dispositivos
+- PWA instalable, **app de Android** y app de escritorio nativa; tus datos se sincronizan en todos tus dispositivos
 
 ## 🛠️ Hecho con
 
 Rust sobre **Cloudflare Workers** + **D1** (toda la aritmética de dinero vive en
-Rust), un frontend PWA en **React 19** y un shell de escritorio en **Tauri 2**.
+Rust), un frontend PWA en **React 19**, un shell de escritorio en **Tauri 2** y una
+app nativa de Android en **Kotlin + Jetpack Compose**.
 El dinero se guarda en centavos enteros. La arquitectura, el modelo de datos y las
 fórmulas de inversión están en [`docs/`](docs/PLAN.md).
 

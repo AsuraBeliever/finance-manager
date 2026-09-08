@@ -26,6 +26,11 @@ npm run dev                                  # (opcional) Vite con HMR; /api se 
 cd worker && npx wrangler deploy             # publica worker + dist/
 cd worker && npx wrangler tail               # logs (cron, errores)
 npm run tauri dev                            # shell de escritorio
+
+# Android (app NATIVA Kotlin/Compose contra el mismo /api/rpc) — ver android/README.md
+cd android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
+                                             # JDK 17-21 (el 26 no le sirve a AGP 8.7);
+                                             # assembleRelease firma con $BROKE_KEYSTORE
 ```
 
 ## Arquitectura (resumen — detalle en docs/ARCHITECTURE.md)
@@ -51,6 +56,20 @@ npm run tauri dev                            # shell de escritorio
   actualiza web + iPhone + escritorio a la vez (no se recompila el binario salvo
   cambios nativos en `src-tauri/`). Aviso de versión nueva in-app vía
   `registerType: "prompt"` + `src/features/update/UpdateBanner.tsx`.
+- **Android es la excepción**: `android/` es una app NATIVA (Kotlin + Compose)
+  que dibuja sus propias pantallas y consume el mismo `/api/rpc` con la misma
+  cookie de sesión. El backend NO tiene endpoints propios para Android.
+  Detalle en `android/README.md`.
+- 🔴 **REGLA DE PARIDAD (no negociable, pedida por el usuario 2026-08-26):
+  web y Android son la MISMA app.** Todo lo que existe en la web existe en el
+  APK, y TODO cambio de producto de aquí en adelante se implementa en las dos
+  superficies **en el mismo commit/branch**. Nunca dejar Android atrás «para
+  después»: si una feature no se puede portar en el momento, no se mergea. Un
+  release sin su cambio de Android no está terminado. Checklist de paridad y
+  estado: `docs/ANDROID_PARITY.md` — actualizarlo en cada feature.
+- En Android el dinero tampoco se calcula en el cliente: `Money.kt` sólo formatea
+  centavos. Si aparece aritmética de dinero en Kotlin, va mal — eso es de
+  `finanzas-core`.
 - El service worker de la PWA JAMÁS cachea `/api/*`.
 - No multiplicar centavos×micros en SQL (números D1 → JS f64): esa aritmética
   va en Rust con i128 intermedio.
@@ -62,6 +81,8 @@ npm run tauri dev                            # shell de escritorio
 - Strings de UI SOLO en `src/i18n/` (bilingüe es/en); nada hardcodeado en componentes. `es.ts` es la forma canónica (`esDict`); al agregar una clave, agrégala también en `en.ts`. Los componentes importan `es` (un proxy al idioma activo) y usan `es.x`; el idioma se cambia en Ajustes (`src/i18n/store.ts`) y el router se remonta al cambiar. OJO: textos a nivel de módulo (fuera de un componente) quedan congelados al idioma inicial — defínelos dentro del componente.
 - **Cambios de esquema**: solo vía migración nueva en `worker/migrations/*.sql` + actualizar `docs/DATA_MODEL.md`.
 - **Calculadoras de inversión nuevas**: implementar `InvestmentCalculator` en finanzas-core + registry + tests + cargar su `CalcContext` en ambos loaders (worker y src-tauri) + form; guía en `docs/INVESTMENTS.md`.
+- **Toda feature nueva se entrega en web Y en Android**, en el mismo branch, con
+  su entrada en `docs/ANDROID_PARITY.md`. Ver la regla de paridad arriba.
 - Git: conventional commits. TODO cambio de producto (cualquier `feat`, o una serie
   de commits relacionados) se desarrolla en branch `feat/<nombre>` y llega a `main`
   SOLO vía release: commit `chore(release)` (bump en `package.json` + entrada en
@@ -74,7 +95,7 @@ npm run tauri dev                            # shell de escritorio
 ## Estado actual
 
 - **v2.0.0 (feat/mobile)**: migración a la nube — PWA + Workers (workers-rs) +
-  D1 multiusuario. La DB local `~/.local/share/com.asura.finanzas/finanzas.db`
+  D1 multiusuario. La DB local `~/.local/share/com.aseth.finanzas/finanzas.db`
   es respaldo de solo lectura post-migración: NUNCA borrarla ni escribirla.
   Migración de datos: `scripts/migrate_to_d1.py` (checksums antes/después).
 - Antes — v1.6.x escritorio: BONDDIA con precio oficial + serie histórica,
@@ -85,4 +106,4 @@ npm run tauri dev                            # shell de escritorio
 
 ## Docs
 
-`docs/PLAN.md` (plan + checklist) · `docs/ARCHITECTURE.md` (capas, catálogo de comandos RPC, dev local) · `docs/DATA_MODEL.md` (SQL canónico de D1) · `docs/INVESTMENTS.md` (fórmulas: Nu cajita ACT/360 compuesto diario, CETES ACT/360 + ISR) · `docs/ROADMAP.md` · `docs/DECISIONS.md` (ADRs).
+`docs/PLAN.md` (plan + checklist) · `docs/ARCHITECTURE.md` (capas, catálogo de comandos RPC, dev local) · `docs/DATA_MODEL.md` (SQL canónico de D1) · `docs/INVESTMENTS.md` (fórmulas: Nu cajita ACT/360 compuesto diario, CETES ACT/360 + ISR) · `docs/ROADMAP.md` · `docs/DECISIONS.md` (ADRs) · `docs/ANDROID_PARITY.md` (paridad web↔APK) · `docs/ANDROID_PARITY_SWEEP.md` (plan del barrido visual pendiente).

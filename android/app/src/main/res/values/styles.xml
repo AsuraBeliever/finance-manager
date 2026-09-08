@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Broke" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- The web's modal overlay is `bg-black/70 backdrop-blur-sm`; the
+             platform's default dim is light enough to read the page through
+             it. Dialog windows inherit this from the activity theme. -->
+        <item name="android:backgroundDimAmount">0.7</item>
+    </style>
+
+    <!-- Android 12+ draws this while the process starts; before that,
+         core-splashscreen backports the same look. -->
+    <style name="Theme.Broke.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Broke</item>
+    </style>
+</resources>

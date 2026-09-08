@@ -1,9 +1,10 @@
-name: Release desktop apps
+name: Release apps
 
-# Build the Tauri desktop shell for Windows and Linux and attach the installers
-# to a GitHub Release whenever a version tag is pushed. The desktop app is a thin
-# native window that loads the deployed PWA, so these installers rarely change —
-# they only need a rebuild when src-tauri/ changes or to cut a fresh download.
+# Build the installable shells — Tauri for Windows/Linux, a Trusted Web Activity
+# APK for Android — and attach them to a GitHub Release whenever a version tag is
+# pushed. Every shell is a thin native window onto the deployed PWA, so they
+# rarely change: they only need a rebuild when src-tauri/ or android/ changes, or
+# to cut a fresh download. Product changes reach users through `wrangler deploy`.
 on:
   push:
     tags:
@@ -65,8 +66,11 @@ jobs:
           releaseName: "Broke ${{ github.ref_name }}"
           releaseBody: |
             ## English
-            Broke desktop app installers.
+            Broke installers.
 
+            - **Android:** download the `.apk` and open it. Android will ask you to
+              allow installs from your browser — that is expected for an app that
+              does not come from the Play Store.
             - **Windows:** download the `.msi` (or the `.exe` setup).
             - **Linux (any distro):** `.AppImage` — make it executable and run it.
             - **Debian/Ubuntu/Mint:** `.deb` · **Fedora/openSUSE:** `.rpm`.
@@ -74,8 +78,11 @@ jobs:
             The web app is always at https://finanzas.aseth.workers.dev
 
             ## Español
-            Instaladores de la app de escritorio de Broke.
+            Instaladores de Broke.
 
+            - **Android:** descarga el `.apk` y ábrelo. Android te va a pedir
+              permiso para instalar desde el navegador — es normal en una app que
+              no viene de la Play Store.
             - **Windows:** descarga el `.msi` (o el instalador `.exe`).
             - **Linux (cualquier distro):** `.AppImage` — dale permiso de ejecución y ábrelo.
             - **Debian/Ubuntu/Mint:** `.deb` · **Fedora/openSUSE:** `.rpm`.
@@ -83,3 +90,72 @@ jobs:
             La app web siempre está en https://finanzas.aseth.workers.dev
           releaseDraft: false
           prerelease: false
+
+  # The Android app is a native Kotlin/Compose client against the same /api/rpc
+  # backend — it is the one shell that must be rebuilt for product changes. Runs
+  # after the desktop job so the GitHub Release already exists to upload into.
+  android:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload the APK to the release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set. Without it the APK"
+            echo "::error::builds unsigned, and Android refuses to install it."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/broke-release.jks"
+
+      - name: Build signed APK
+        working-directory: android
+        env:
+          BROKE_KEYSTORE: ${{ runner.temp }}/broke-release.jks
+          BROKE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BROKE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: ./gradlew assembleRelease
+
+      - name: Name the APK after the version
+        id: apk
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          APK="Broke_${VERSION}_android.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK"
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the APK to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: gh release upload "$TAG" "${{ steps.apk.outputs.path }}" --clobber
+
+      # On a manual run there is no release to upload into; keep the APK as a
+      # workflow artifact so the build can still be tested from the Actions tab.
+      - name: Keep the APK as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: broke-android-apk
+          path: ${{ steps.apk.outputs.path }}
+
+      - name: Delete the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/broke-release.jks"

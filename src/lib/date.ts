@@ -1,5 +1,14 @@
 import { format } from "date-fns";
+import { getLocale } from "../i18n/store";
 import type { Clock } from "./timeFormat";
+
+/** The BCP-47 tag to format with: the language chosen in the app, not the one
+ *  the browser happens to run in. Passing `undefined` to Intl meant a movement
+ *  read "3:01 PM" in one client and "3:01 p.m." in another on the same
+ *  account — the Android app has no browser locale to fall back on. */
+function intlLocale(): string {
+  return getLocale() === "en" ? "en-US" : "es-MX";
+}
 
 /** Intl options for a time in the chosen clock format. */
 function timeOpts(clock: Clock): Intl.DateTimeFormatOptions {
@@ -35,7 +44,7 @@ export function formatTime(time: string | null | undefined, clock: Clock): strin
   if (Number.isNaN(h) || Number.isNaN(m)) return "";
   const d = new Date();
   d.setHours(h, m, 0, 0);
-  return d.toLocaleTimeString(undefined, timeOpts(clock));
+  return d.toLocaleTimeString(intlLocale(), timeOpts(clock));
 }
 
 /** A SQLite UTC timestamp ("YYYY-MM-DD HH:MM:SS") → locale time in the given
@@ -49,7 +58,7 @@ export function formatUtcTime(
   if (!utc) return "";
   const d = new Date(utc.replace(" ", "T") + "Z");
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString(undefined, { timeZone: tz, ...timeOpts(clock) });
+  return d.toLocaleTimeString(intlLocale(), { timeZone: tz, ...timeOpts(clock) });
 }
 
 /** The time to show for a movement: its own edited wall-clock time when set,
@@ -91,5 +100,5 @@ export function formatDayMonth(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
   if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
-  return d.toLocaleDateString(undefined, opts);
+  return d.toLocaleDateString(intlLocale(), opts);
 }

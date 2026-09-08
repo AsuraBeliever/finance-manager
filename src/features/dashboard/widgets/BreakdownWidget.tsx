@@ -40,10 +40,16 @@ export function BreakdownWidget({
     );
   }
 
+  // The worker labels the null-category slice "Sin categoría" regardless of
+  // locale, so the name only travels for real categories: the uncategorized
+  // bucket is named here, where the dictionary is.
+  const sliceName = (s: { categoryId: number | null; name: string }) =>
+    s.categoryId === null ? es.dashboard.uncategorized : seedName(s.name);
+
   const total = data.totalMxnCents;
   const colorFor = (i: number, c: string | null) => c ?? CHART_COLORS[i % CHART_COLORS.length];
   const donut = data.slices.map((s, i) => ({
-    name: s.name,
+    name: sliceName(s),
     value: s.mxnCents / 100,
     color: colorFor(i, s.color),
   }));
@@ -85,7 +91,7 @@ export function BreakdownWidget({
                 <button
                   type="button"
                   onClick={() =>
-                    setDetail({ categoryId: s.categoryId, name: s.name, mxnCents: s.mxnCents })
+                    setDetail({ categoryId: s.categoryId, name: sliceName(s), mxnCents: s.mxnCents })
                   }
                   className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-sm transition-colors hover:bg-surface-overlay"
                 >
@@ -93,7 +99,7 @@ export function BreakdownWidget({
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: colorFor(i, s.color) }}
                   />
-                  <span className="truncate text-fg-muted">{seedName(s.name)}</span>
+                  <span className="truncate text-fg-muted">{sliceName(s)}</span>
                   <span className="ml-auto tabular-nums text-fg">
                     {money(s.mxnCents)}
                   </span>

@@ -5,7 +5,7 @@ Esquema canónico de SQLite **en Cloudflare D1**. Cualquier cambio se hace
 migrations apply finanzas`) y se refleja aquí.
 
 > El esquema histórico del escritorio (`src-tauri/src/db/mod.rs`) quedó
-> congelado: `~/.local/share/com.asura.finanzas/finanzas.db` es el respaldo de
+> congelado: `~/.local/share/com.aseth.finanzas/finanzas.db` es el respaldo de
 > solo lectura previo a la migración a la nube (2026-06). No recibe cambios.
 
 ## Multiusuario (v2.0.0)
