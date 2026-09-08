@@ -95,7 +95,7 @@ cd android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
 ## Estado actual
 
 - **v2.0.0 (feat/mobile)**: migración a la nube — PWA + Workers (workers-rs) +
-  D1 multiusuario. La DB local `~/.local/share/com.asura.finanzas/finanzas.db`
+  D1 multiusuario. La DB local `~/.local/share/com.aseth.finanzas/finanzas.db`
   es respaldo de solo lectura post-migración: NUNCA borrarla ni escribirla.
   Migración de datos: `scripts/migrate_to_d1.py` (checksums antes/después).
 - Antes — v1.6.x escritorio: BONDDIA con precio oficial + serie histórica,
