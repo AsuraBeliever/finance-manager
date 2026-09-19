@@ -235,3 +235,45 @@ crece hacia adelante.
 Residuo conocido: el paso hacia adelante sí usa la tasa vigente para días
 anteriores al primer registro (`forward_schedule`), porque negarse a cotizarlos
 dejaría sin pagar a una cartera semanal cuyo periodo abrió antes de la tabla.
+
+## 2026-09-19 — La reconciliación de rendimiento abre y cierra en cortes de pago
+
+La corrección del 2026-08-22 funcionaba en carteras de abono **diario** (la
+Cajita Turbo nunca produjo un ajuste falso) y se desmoronaba en cualquier otra
+cadencia. Klar (semanal, 3.00%, ancla 2026-06-17) acumuló un «Ajuste de
+rendimiento» por día durante ocho días seguidos, alternando signo.
+
+Dos errores independientes, y los dos se alimentaban entre sí:
+
+1. **La ventana abría a media semana.** `start` era
+   `max(primera tasa conocida, last_paid - 30 días)` — una fecha cualquiera. Un
+   pago semanal es **una** transacción fechada en el corte, así que una ventana
+   que abre a mitad de periodo pesa el abono completo contra sólo los días de
+   ese periodo que caen adentro. En Klar la ventana abría el 2026-08-22 y
+   contaba los 21¢ fechados el 26 contra 4 de sus 7 días: faltante fantasma de
+   −9¢ (test `a_weekly_wallet_paid_correctly_reconciles_to_zero`, que fija ese
+   −9 como el valor que el bug producía).
+2. **El ajuste se fechaba HOY**, fuera de la ventana `(start, last_paid]` de la
+   que se había calculado. Con `last_paid` en el pasado (normal en una cartera
+   semanal: entre corte y corte hay 6 días), la corrección de ayer era invisible
+   para `posted` hoy, así que la misma diferencia se volvía a anotar — una fila
+   por día. Cuando el cursor por fin alcanzaba esas fechas, las contaba **todas
+   de golpe**, el signo se volteaba y empezaba la devolución, también una por
+   día. Oscilación permanente.
+
+Ahora `reconcile_window_start` camina la cadencia desde `yield_anchor_date`
+—igual que el paso hacia adelante— y devuelve el corte más viejo que no quede
+antes del piso; y el ajuste se fecha **en el corte que corrige**, con
+`client_id` `yield-fix:<cartera>:<corte>`. Así la corrección cae dentro de su
+propia ventana, la corrida siguiente la lee de vuelta en `posted` y el pase
+cierra en cero. Es exactamente lo que ya pasaba en las carteras diarias, donde
+el corte *es* el día y por eso el bug nunca se vio: un mismo sistema para todas
+las cadencias.
+
+La reconciliación también corre contra el cursor que acaba de dejar el devengo,
+no contra el que se leyó al entrar: el periodo que cerró en esta misma corrida
+es el más propenso a que le falte un movimiento capturado tarde.
+
+Descartado: ampliar la ventana hasta hoy. Los días entre el último corte y hoy
+todavía no se pagan (Klar los abona el siguiente miércoles), así que incluirlos
+adelantaría interés no devengado.

@@ -126,6 +126,39 @@ pub fn accrued_interest_scheduled(
     interest_total
 }
 
+/// How many payout periods the boundary walk will step through before giving
+/// up. A daily wallet running for 50 years stays well inside this.
+const MAX_PERIODS: usize = 20_000;
+
+/// Where the reconciliation window may open: the oldest payout cut that is not
+/// older than `floor` and still leaves at least one closed period to re-check,
+/// walking the cadence from `anchor` exactly the way the forward pass does.
+/// `None` when there is nothing to reconcile.
+///
+/// The window **must** open on a cut, and that is the whole point of this
+/// function. A payout is one transaction dated at the end of its period — a
+/// weekly wallet credits its seven days in a single posting — so a window that
+/// opens mid-period weighs a *whole* payout against only the days of that
+/// period that fall inside it, and reports a shortfall that was never real.
+/// With a 30-day floor landing on an arbitrary date, that phantom difference
+/// reappears on every single run: this is what turns a healthy weekly wallet
+/// into a string of daily «ajustes de rendimiento» that never settle.
+pub fn reconcile_window_start(
+    frequency: &str,
+    anchor: NaiveDate,
+    last_paid: NaiveDate,
+    floor: NaiveDate,
+) -> Option<NaiveDate> {
+    let mut cut = anchor;
+    for _ in 0..MAX_PERIODS {
+        if cut >= floor {
+            return (cut < last_paid).then_some(cut);
+        }
+        cut = next_period_end(frequency, cut)?;
+    }
+    None
+}
+
 /// What the wallet is still owed (positive) or was overpaid (negative) across
 /// the days in `[start, end)`, given `posted` — the interest actually credited
 /// for those days.
@@ -141,6 +174,10 @@ pub fn accrued_interest_scheduled(
 /// `(start, end]`** while `start_balance` is the closing balance **at `start`**
 /// and `txns` are the external movements in `(start, end]`. Feeding in the
 /// wrong boundary silently pays a day too much or too little.
+///
+/// Both ends must also sit on payout cuts — use [`reconcile_window_start`] to
+/// pick `start` — or a period's whole payout gets weighed against a fraction of
+/// its days.
 pub fn reconciliation_delta(
     start_balance: i64,
     txns: &[(NaiveDate, i64)],
@@ -419,6 +456,142 @@ mod tests {
         assert_eq!(honest, 776);
         // Repainting all three days at 13% would pay 388 × 3 instead.
         assert_eq!(repainted, 1_164);
+    }
+
+    #[test]
+    fn reconcile_window_opens_on_a_payout_cut() {
+        // Klar: weekly, anchored 2026-06-17, paid through 2026-09-16, and the
+        // rate history only starts on 2026-08-22. The window may not open on
+        // the 22nd — that is a Saturday mid-period — it has to fall forward to
+        // the next cut, 2026-08-26.
+        assert_eq!(
+            reconcile_window_start("weekly", d("2026-06-17"), d("2026-09-16"), d("2026-08-22")),
+            Some(d("2026-08-26"))
+        );
+        // A floor that already sits on a cut is kept as-is.
+        assert_eq!(
+            reconcile_window_start("weekly", d("2026-06-17"), d("2026-09-16"), d("2026-08-26")),
+            Some(d("2026-08-26"))
+        );
+        // Daily wallets have a cut every day, so the floor always survives.
+        assert_eq!(
+            reconcile_window_start("daily", d("2026-07-31"), d("2026-09-19"), d("2026-08-22")),
+            Some(d("2026-08-22"))
+        );
+        // Nothing closed to re-check yet.
+        assert_eq!(
+            reconcile_window_start("weekly", d("2026-06-17"), d("2026-08-26"), d("2026-08-26")),
+            None
+        );
+        assert_eq!(
+            reconcile_window_start("yearly", d("2026-06-17"), d("2026-09-16"), d("2026-08-22")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_weekly_wallet_paid_correctly_reconciles_to_zero() {
+        // The regression this pass exists to prevent. A weekly wallet credits
+        // seven days in ONE posting dated at the cut, so a window that opened
+        // mid-period (the old `last_paid - 30 days`) compared a full payout
+        // against a fraction of its days and "found" a shortfall every run —
+        // which is how Klar collected a daily «Ajuste de rendimiento».
+        //
+        // Real numbers: $334.73 at 3.00% pays 21¢ a week. Anchored 2026-06-17
+        // and paid through 2026-09-16, with the rate history starting on the
+        // 22nd of August.
+        let rates = [(d("2026-08-22"), 300)];
+        let anchor = d("2026-06-17");
+        let last_paid = d("2026-09-16");
+
+        // Replay the forward pass from the anchor so `posted` is exactly what
+        // the cron would have credited, cut by cut.
+        let mut balance = 33_473;
+        let mut cuts = Vec::new();
+        let mut cut = anchor;
+        while cut < last_paid {
+            let end = next_period_end("weekly", cut).unwrap();
+            let paid = accrued_interest(balance, &[], cut, end, 300);
+            balance += paid;
+            cuts.push((cut, end, paid));
+            cut = end;
+        }
+        assert!(cuts.iter().all(|(_, _, paid)| *paid == 21));
+
+        let floor = d("2026-08-22");
+        let start = reconcile_window_start("weekly", anchor, last_paid, floor).unwrap();
+        assert_eq!(start, d("2026-08-26"));
+
+        // Balance at the cut, and the payouts dated inside (start, last_paid].
+        let start_balance = 33_473
+            + cuts
+                .iter()
+                .filter(|(_, end, _)| *end <= start)
+                .map(|(_, _, paid)| paid)
+                .sum::<i64>();
+        let posted: i64 = cuts
+            .iter()
+            .filter(|(_, end, _)| *end > start && *end <= last_paid)
+            .map(|(_, _, paid)| paid)
+            .sum();
+        assert_eq!(
+            reconciliation_delta(start_balance, &[], posted, start, last_paid, &rates),
+            0
+        );
+
+        // And the old, unaligned window is what used to lie: opening on the
+        // 22nd counts the whole 21¢ payout of the 26th against only four of
+        // its seven days.
+        let bad_start = floor;
+        let bad_balance = 33_473
+            + cuts
+                .iter()
+                .filter(|(_, end, _)| *end <= bad_start)
+                .map(|(_, _, paid)| paid)
+                .sum::<i64>();
+        let bad_posted: i64 = cuts
+            .iter()
+            .filter(|(_, end, _)| *end > bad_start && *end <= last_paid)
+            .map(|(_, _, paid)| paid)
+            .sum();
+        assert_eq!(
+            reconciliation_delta(bad_balance, &[], bad_posted, bad_start, last_paid, &rates),
+            -9
+        );
+    }
+
+    #[test]
+    fn a_weekly_wallet_still_pays_a_movement_captured_late() {
+        // Aligning the window must not cost us the repair it exists for. Klar
+        // again: a $200.00 deposit dated 2026-09-04 was typed in days later,
+        // so the payout of the 9th was computed without it and came out 21¢
+        // instead of the 26¢ it owed.
+        let rates = [(d("2026-08-22"), 300)];
+        let start = d("2026-08-26"); // the aligned cut
+        let last_paid = d("2026-09-16");
+        let late = [(d("2026-09-04"), 20_000)];
+
+        // Balance at the 26th, then the three payouts the cron actually made:
+        // 21¢ on 09-02 and 09-09 (blind to the deposit) and 28¢ on 09-16.
+        let start_balance = 33_683;
+        let posted = 21 + 21 + 28;
+
+        let owed = reconciliation_delta(start_balance, &late, posted, start, last_paid, &rates);
+        assert_eq!(owed, 5);
+
+        // Paying it dated at the cut lands inside the window, so the next run
+        // sees it and settles on zero instead of posting it again.
+        assert_eq!(
+            reconciliation_delta(
+                start_balance,
+                &late,
+                posted + owed,
+                start,
+                last_paid,
+                &rates
+            ),
+            0
+        );
     }
 
     #[test]
