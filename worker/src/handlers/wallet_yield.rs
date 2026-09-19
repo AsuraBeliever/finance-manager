@@ -15,11 +15,17 @@
 //! silently never earn the yield it was owed. Priced off `wallet_yield_rates`
 //! (migration 0036) so past days keep their own rate instead of being repainted
 //! with today's.
+//!
+//! That correction is itself a posting the next run has to be able to read
+//! back, so it is dated at the payout cut it repairs and the window it is
+//! computed from opens on a cut too — both invariants live in `reconcile_one`,
+//! and getting either wrong is what made a weekly wallet accumulate one
+//! «Ajuste de rendimiento» per day forever.
 
 use chrono::{Duration, NaiveDate};
 use finanzas_core::error::AppResult;
 use finanzas_core::wallet_yield::{
-    accrued_interest_scheduled, next_period_end, reconciliation_delta,
+    accrued_interest_scheduled, next_period_end, reconcile_window_start, reconciliation_delta,
 };
 use serde::Deserialize;
 use worker::D1Database;
@@ -36,6 +42,7 @@ struct YieldWalletRow {
     id: i64,
     yield_rate_bps: i64,
     yield_frequency: String,
+    yield_anchor_date: String,
     yield_last_paid_date: String,
 }
 
@@ -144,7 +151,7 @@ async fn period_txns(
 pub async fn accrue_yield(db: &D1Database) -> AppResult<()> {
     let wallets: Vec<YieldWalletRow> = all(
         db,
-        "SELECT id, yield_rate_bps, yield_frequency, yield_last_paid_date
+        "SELECT id, yield_rate_bps, yield_frequency, yield_anchor_date, yield_last_paid_date
          FROM wallets
          WHERE yield_rate_bps IS NOT NULL AND yield_rate_bps > 0
            AND yield_frequency IS NOT NULL AND yield_anchor_date IS NOT NULL
@@ -176,10 +183,17 @@ pub async fn accrue_yield(db: &D1Database) -> AppResult<()> {
                 continue;
             }
         };
-        if let Err(e) = accrue_one(db, &w, &rates, interest_cat, today).await {
-            worker::console_warn!("yield accrual failed for wallet {}: {e}", w.id);
-        }
-        if let Err(e) = reconcile_one(db, &w, &rates, interest_cat, today).await {
+        // Reconcile against the cursor the forward pass just left behind, not
+        // the stale one we read above: the period that closed on this very run
+        // is the one most likely to be missing a movement typed in late.
+        let last_paid = match accrue_one(db, &w, &rates, interest_cat, today).await {
+            Ok(last_paid) => last_paid,
+            Err(e) => {
+                worker::console_warn!("yield accrual failed for wallet {}: {e}", w.id);
+                continue;
+            }
+        };
+        if let Err(e) = reconcile_one(db, &w, &rates, interest_cat, last_paid).await {
             worker::console_warn!("yield reconcile failed for wallet {}: {e}", w.id);
         }
     }
@@ -204,7 +218,7 @@ async fn accrue_one(
     rates: &[(NaiveDate, i64)],
     interest_cat: Option<i64>,
     today: NaiveDate,
-) -> AppResult<()> {
+) -> AppResult<NaiveDate> {
     let schedule = forward_schedule(rates, w.yield_rate_bps);
     let mut last_paid =
         NaiveDate::parse_from_str(&w.yield_last_paid_date, "%Y-%m-%d").unwrap_or(today);
@@ -254,7 +268,7 @@ async fn accrue_one(
         }
         last_paid = period_end;
     }
-    Ok(())
+    Ok(last_paid)
 }
 
 /// Sum of the interest we have already posted inside `(start, end]`, ignoring
@@ -305,7 +319,20 @@ pub async fn record_yield_rate(db: &D1Database, wallet_id: i64, rate_bps: i64) -
 /// late, an amount corrected, a transaction deleted — leaves the wallet
 /// permanently off. Here the whole window is recomputed from the real
 /// transactions at their historical rates and the gap is posted as one
-/// adjustment dated today, which is also where it starts compounding.
+/// adjustment.
+///
+/// Two invariants keep this from turning into the daily churn it used to be:
+///
+/// 1. **The window opens on a payout cut.** A payout is one transaction dated
+///    at the end of its period, so a window opening mid-period weighs a whole
+///    payout against a fraction of its days. See `reconcile_window_start`.
+/// 2. **The correction is dated at the cut it corrects**, never at `today`.
+///    Dated today it fell *outside* the very window it was computed from, so
+///    the next run could not see it, recomputed the same gap and posted it
+///    again — one row a day for a weekly wallet, until the cursor finally
+///    caught up and counted them all at once, flipping the sign and starting
+///    the claw-back the other way. Dated at the cut it lands inside the window,
+///    the next run reads it back through `posted`, and the pass settles on zero.
 ///
 /// Bounded to days we can actually price: `wallet_yield_rates` is the floor, so
 /// a wallet whose rate changed before the table existed is left alone rather
@@ -315,19 +342,21 @@ async fn reconcile_one(
     w: &YieldWalletRow,
     rates: &[(NaiveDate, i64)],
     interest_cat: Option<i64>,
-    today: NaiveDate,
+    last_paid: NaiveDate,
 ) -> AppResult<()> {
     let Some(&(earliest, _)) = rates.first() else {
         return Ok(()); // no priced history yet — nothing safe to recompute
     };
-    let last_paid = NaiveDate::parse_from_str(&w.yield_last_paid_date, "%Y-%m-%d").unwrap_or(today);
-    let start = earliest.max(last_paid - Duration::days(RECONCILE_DAYS));
-    if start >= last_paid {
+    let Ok(anchor) = NaiveDate::parse_from_str(&w.yield_anchor_date, "%Y-%m-%d") else {
         return Ok(());
-    }
+    };
+    let floor = earliest.max(last_paid - Duration::days(RECONCILE_DAYS));
+    let Some(start) = reconcile_window_start(&w.yield_frequency, anchor, last_paid, floor) else {
+        return Ok(()); // no closed period inside the priced window
+    };
 
     let (start_s, end_s) = (start.to_string(), last_paid.to_string());
-    let client_id = format!("yield-fix:{}:{}", w.id, today);
+    let client_id = format!("yield-fix:{}:{}", w.id, end_s);
 
     // Both sides must line up on the same window — see reconciliation_delta:
     // balance AT start, external movements and postings in (start, last_paid].
@@ -336,9 +365,9 @@ async fn reconcile_one(
     let posted = posted_yield(db, w.id, &start_s, &end_s, &client_id).await?;
     let diff = reconciliation_delta(start_balance, &txns, posted, start, last_paid, rates);
 
-    // Rewrite today's adjustment from scratch instead of adding to it: the cron
-    // runs three times a day, and each run must land on the same number rather
-    // than stack corrections on top of each other.
+    // Rewrite this cut's adjustment from scratch instead of adding to it: the
+    // cron runs three times a day and the wallet keeps being edited, so every
+    // run must land on the same single number rather than stack corrections.
     let mut stmts = vec![stmt(
         db,
         "DELETE FROM transactions WHERE client_id = ?1",
@@ -361,14 +390,7 @@ async fn reconcile_one(
             "INSERT INTO transactions
                (wallet_id, kind, amount_cents, category_id, occurred_at, client_id, description)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'Ajuste de rendimiento')",
-            jsv![
-                w.id,
-                kind,
-                amount,
-                interest_cat,
-                today.to_string(),
-                client_id
-            ],
+            jsv![w.id, kind, amount, interest_cat, end_s, client_id],
         )?);
     }
     batch(db, stmts).await?;

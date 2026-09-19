@@ -12,6 +12,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.39.1",
+    date: "2026-09-19",
+    es: [
+      "Las carteras que generan rendimiento ya no se llenan de «Ajuste de rendimiento» todos los días. El cálculo revisaba los últimos 30 días cortando a media semana, así que comparaba el pago completo de una semana contra unos cuantos de sus días y «encontraba» una diferencia que no existía; encima anotaba la corrección con la fecha de hoy, fuera del periodo que estaba revisando, de modo que al día siguiente no la veía y la volvía a anotar.",
+      "Ahora la revisión abre y cierra justo en tus fechas de pago, y la corrección se guarda en la fecha del corte que corrige: si todo está bien no se anota nada, y si faltó algo se anota una sola vez.",
+      "Esto vale igual para cualquier cadencia: las carteras de abono diario (como una cajita de Nu) ya se comportaban bien y siguen igual; las semanales, quincenales y mensuales ahora usan exactamente el mismo sistema.",
+      "Sigue funcionando lo importante: si capturas un depósito con fecha de hace unos días, la cartera cobra el rendimiento que le tocaba por esos días, y si borras un movimiento se devuelve.",
+    ],
+    en: [
+      "Yield-bearing wallets no longer pile up a «Yield adjustment» every single day. The check re-derived the last 30 days starting mid-week, so it weighed a whole week's payout against just a few of its days and \"found\" a gap that was never there; worse, it filed the correction under today's date, outside the period it had just checked, so the next run couldn't see it and filed it again.",
+      "The check now opens and closes exactly on your payout dates, and the correction is stored on the date of the cut it repairs: when everything is right nothing is written, and when something was missed it's written once.",
+      "This holds for every cadence: wallets paid daily (like a Nu cajita) already behaved and are unchanged; weekly, biweekly, and monthly ones now use exactly the same system.",
+      "What matters still works: record a deposit dated a few days back and the wallet earns the yield it was owed for those days, and deleting a movement gives it back.",
+    ],
+  },
+  {
     version: "2.39.0",
     date: "2026-09-07",
     es: [
