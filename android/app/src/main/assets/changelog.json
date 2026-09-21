@@ -1,5 +1,31 @@
 [
   {
+    "version": "2.40.0",
+    "date": "2026-09-21",
+    "es": [
+      "La app de Android ya puede configurar tus tarjetas de crédito: día de corte, días para pagar, límite y anualidad. Antes esos campos sólo existían en la web, así que una tarjeta creada desde el teléfono se quedaba sin panel de deuda.",
+      "Y algo más serio: hasta ahora, editar cualquier cosa de una tarjeta desde el teléfono —aunque sólo le cambiaras el nombre— le borraba el día de corte, el límite y la anualidad, y con eso desaparecía su panel. Ya no.",
+      "Al crear una cartera con rendimiento, el teléfono ya te deja elegir cada cuándo se abona (diario, semanal, quincenal o mensual). Antes siempre lo guardaba como diario sin preguntar.",
+      "En el teléfono, al transferir dinero a una tarjeta ahora te dice cuánto te falta del último corte y hasta cuándo tienes para pagarlo; y al elegir a dónde va el dinero, tus apartados salen agrupados arriba.",
+      "En el detalle de una inversión, el botón de simular abre las aportaciones sobre esa misma gráfica en vez de mandarte al simulador general, una inversión cerrada se puede volver a abrir, y si es de criptomonedas se ve cuánto tienes.",
+      "El panel del teléfono muestra el desglose por moneda cuando tienes más de una, avisa si a alguna le falta tipo de cambio, y dice algo sensato cuando la cuenta todavía está vacía.",
+      "Borrar un presupuesto, una suscripción o una categoría ahora pregunta antes, como en la web. Y al borrar la parte de un movimiento de inversión, te avisa que se va también la aportación.",
+      "Arreglado: en formularios largos el botón de Guardar podía quedar por debajo del borde de la pantalla, sin manera de alcanzarlo.",
+      "Arreglado: las cantidades en dólares se veían pegadas al código («USD1,200.00»), y un par de textos de la app salían en español aunque la tuvieras en inglés."
+    ],
+    "en": [
+      "The Android app can now set up your credit cards: cut-off day, days to pay, limit and annual fee. Those fields only existed on the web before, so a card created on the phone never got its debt panel.",
+      "And something worse: until now, editing anything about a card from the phone — even just renaming it — wiped its cut-off day, limit and annual fee, and its panel went with them. Not any more.",
+      "When you create a yield-bearing wallet, the phone now lets you pick how often it pays out (daily, weekly, biweekly or monthly). It used to save everything as daily without asking.",
+      "On the phone, transferring money to a card now tells you what's left on your last statement and by when to pay it; and when you pick where the money goes, your pockets come grouped at the top.",
+      "On an investment's page, the simulate button now opens contributions on that same chart instead of sending you to the general simulator, a closed investment can be reopened, and a crypto one shows how much you hold.",
+      "The phone's overview breaks the total down by currency when you hold more than one, flags any without an exchange rate, and says something sensible when the account is still empty.",
+      "Deleting a budget, a subscription or a category now asks first, as it does on the web. And deleting the wallet side of an investment move warns you that the contribution goes with it.",
+      "Fixed: on long forms the Save button could end up below the edge of the screen, with no way to reach it.",
+      "Fixed: dollar amounts ran into their currency code (\"USD1,200.00\"), and a couple of the app's own texts showed up in Spanish even with the app set to English."
+    ]
+  },
+  {
     "version": "2.39.1",
     "date": "2026-09-19",
     "es": [
