@@ -1,7 +1,9 @@
 package com.asura.finanzas.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,9 +26,34 @@ fun ProgressBar(
     over: Boolean = false,
     /** A goal paints its bar in its own colour, as on the web. */
     color: androidx.compose.ui.graphics.Color? = null,
+    /**
+     * Draw the rail as this many separate pips instead of one bar — how the web
+     * shows an MSI plan, one pip per instalment. Ignored above 0 pips only.
+     */
+    segments: Int? = null,
 ) {
     val colors = Broke.colors
     val fraction = (progressBps / 10_000f).coerceIn(0f, 1f)
+    val fill = if (over) colors.danger else color ?: colors.accent
+
+    if (segments != null && segments > 0) {
+        val filled = Math.round(fraction * segments)
+        Row(
+            modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            repeat(segments) { i ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (i < filled) fill else colors.surfaceOverlay),
+                )
+            }
+        }
+        return
+    }
 
     Box(
         modifier
@@ -42,12 +69,7 @@ fun ProgressBar(
                 .clip(RoundedCornerShape(5.dp))
                 // A flat fill, like the web's: the gradient here read as a
                 // different control next to the same bar in the browser.
-                .background(
-                    when {
-                        over -> colors.danger
-                        else -> color ?: colors.accent
-                    },
-                ),
+                .background(fill),
         )
     }
 }

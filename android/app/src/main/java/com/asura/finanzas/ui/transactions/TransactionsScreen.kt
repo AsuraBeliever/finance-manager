@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
+import com.asura.finanzas.data.TX_LIST_LIMIT
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.Outbox
@@ -73,6 +75,9 @@ import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.IconBadge
+import com.asura.finanzas.ui.components.MicroLabel
+import com.asura.finanzas.ui.text
+import androidx.compose.ui.text.style.TextAlign
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.OfflineNotice
@@ -472,10 +477,21 @@ private fun TransactionList(
         totals?.let { summary -> item { TransactionTotal(summary, hide, filter.wire == "income") } }
 
         if (shown.isEmpty()) {
+            // "Nothing matches" is a different message from "nothing here yet",
+            // and telling them apart is the whole point: with a filter on, an
+            // empty list is about the filter, not the account.
+            val filtered = wallet != null || filter.wire != null ||
+                category != null || period != Period.AllTime
             item {
                 EmptyState(
-                    stringResource(R.string.transactions_empty_title),
-                    stringResource(R.string.transactions_empty_description),
+                    stringResource(
+                        if (filtered) R.string.transactions_no_match_title
+                        else R.string.transactions_empty_title,
+                    ),
+                    stringResource(
+                        if (filtered) R.string.transactions_no_match_description
+                        else R.string.transactions_empty_description,
+                    ),
                 )
             }
         } else {
@@ -487,6 +503,19 @@ private fun TransactionList(
                     onEdit = onEdit,
                     onDelete = onDelete,
                 )
+            }
+            // Counted on the raw list, not the folded one: the server capped
+            // rows, and a transfer costs two of them.
+            if (transactions.size >= TX_LIST_LIMIT) {
+                item {
+                    Text(
+                        text(R.string.transactions_list_capped, "n" to TX_LIST_LIMIT),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        color = colors.fgSubtle,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
@@ -820,35 +849,83 @@ fun TransactionListCard(
 @Composable
 fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
     val colors = Broke.colors
-    GlassCard(Modifier.fillMaxWidth(), padding = 16.dp) {
+    // One currency reads in its own money; a mix reads in MXN, with each
+    // currency's real figure spelled out underneath so nothing looks invented.
+    val single = totals.byCurrency.singleOrNull()
+    // Not a GlassCard: the web gives this one `rounded-xl` and `px-4 py-3`,
+    // a notch tighter and less round than the cards around it.
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surfaceRaised)
+            .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(
-                stringResource(
-                    if (income) R.string.transactions_total_income
-                    else R.string.transactions_total_expense,
-                ),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                color = colors.fgMuted,
-            )
-            Text(
-                maskIfHidden(formatMoney(totals.totalMxnCents), hide),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
-            )
-        }
-        if (totals.byCurrency.size > 1) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                totals.byCurrency.joinToString(" · ") {
-                    maskIfHidden(formatMoney(it.cents, it.currencyCode), hide)
-                },
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                color = colors.fgSubtle,
-            )
+            // The web aligns the label and the count on one baseline
+            // (`items-baseline`); centring drops the count to the middle of the
+            // taller left column instead.
+            Column(Modifier.weight(1f).alignByBaseline()) {
+                // Not MicroLabel: its defaults are the dashboard's wider
+                // `text-[0.7rem]` eyebrow. This one is `text-xs tracking-wide`.
+                Text(
+                    stringResource(
+                        if (income) R.string.transactions_total_income
+                        else R.string.transactions_total_expense,
+                    ).uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 12.sp,
+                        letterSpacing = 0.3.sp,
+                    ),
+                    color = colors.fgSubtle,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    maskIfHidden(
+                        if (single != null) formatMoney(single.cents, single.currencyCode)
+                        else formatMoney(totals.totalMxnCents),
+                        hide,
+                    ),
+                    // `text-2xl font-semibold` in the body face — this one is
+                    // not `font-display`, unlike the dashboard's heroes.
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 24.sp,
+                        lineHeight = 30.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    // Income in the accent, expense in the danger colour, as on
+                    // the web — the figure is the whole point of the card.
+                    color = if (income) colors.accent else colors.danger,
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.alignByBaseline(),
+            ) {
+                Text(
+                    if (totals.count == 1L) stringResource(R.string.dashboard_movement_one)
+                    else text(R.string.dashboard_movements_count, "n" to totals.count),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    color = colors.fgSubtle,
+                )
+                if (single == null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        stringResource(R.string.transactions_total_converted) + " · " +
+                            totals.byCurrency.joinToString(" · ") {
+                                maskIfHidden(formatMoney(it.cents, it.currencyCode), hide) +
+                                    " " + it.currencyCode
+                            },
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        color = colors.fgSubtle,
+                        textAlign = TextAlign.End,
+                    )
+                }
+            }
         }
     }
 }

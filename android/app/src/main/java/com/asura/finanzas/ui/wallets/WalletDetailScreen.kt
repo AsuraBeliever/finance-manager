@@ -79,6 +79,8 @@ import com.asura.finanzas.ui.components.formatBps
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
+import com.asura.finanzas.data.TX_LIST_LIMIT
+import androidx.compose.ui.text.style.TextAlign
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
@@ -112,6 +114,8 @@ fun WalletDetailScreen(
     var allWallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
     var reloadKey by remember { mutableStateOf(0) }
     var addingMsi by remember { mutableStateOf(false) }
+    // Non-null while the "delete this MSI plan?" confirmation is up.
+    var deletingMsi by remember { mutableStateOf<MsiPlan?>(null) }
     // Non-null while the "pay the card" form is up.
     var paying by remember { mutableStateOf<CreditCardSummary?>(null) }
     // The schedule the server confirmed, shown once after saving: nothing
@@ -198,15 +202,13 @@ fun WalletDetailScreen(
             item {
                 CreditPanel(
                     summary = summary,
+                    currency = current.currencyCode,
                     hide = hide,
                     onPay = { paying = summary },
                     onAddPlan = { addingMsi = true },
-                    onDeletePlan = { plan ->
-                        scope.launch {
-                            runCatching { repository.deleteMsiPlan(plan.id) }
-                            reloadKey++
-                        }
-                    },
+                    // Deleting a plan also deletes the instalments it already
+                    // posted, so it asks first — the web does too.
+                    onDeletePlan = { deletingMsi = it },
                 )
             }
         }
@@ -261,7 +263,9 @@ fun WalletDetailScreen(
                 trailingIcon = Lucide.ChevronDown,
             )
         }
-        totals?.let { summary -> item { TransactionTotal(summary, hide) } }
+        totals?.let { summary ->
+            item { TransactionTotal(summary, hide, income = txKind.wire == "income") }
+        }
         if (movements.isNotEmpty()) {
             item {
                 TransactionListCard(
@@ -273,6 +277,17 @@ fun WalletDetailScreen(
                     // Every row here belongs to this wallet already.
                     showWallet = false,
                 )
+            }
+            if (movements.size >= TX_LIST_LIMIT) {
+                item {
+                    Text(
+                        text(R.string.transactions_list_capped, "n" to TX_LIST_LIMIT),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        color = colors.fgSubtle,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
@@ -351,6 +366,21 @@ fun WalletDetailScreen(
                 }
             },
             onDismiss = { deletingTx = null },
+        )
+    }
+
+    deletingMsi?.let { plan ->
+        ConfirmDialog(
+            title = stringResource(R.string.credit_msi_delete_title),
+            message = stringResource(R.string.credit_msi_delete_message),
+            onConfirm = {
+                deletingMsi = null
+                scope.launch {
+                    runCatching { repository.deleteMsiPlan(plan.id) }
+                    reloadKey++
+                }
+            },
+            onDismiss = { deletingMsi = null },
         )
     }
 
@@ -521,6 +551,9 @@ private fun BalanceCard(
 @Composable
 private fun CreditPanel(
     summary: CreditCardSummary,
+    // Every figure below is in the card's own money, as on the web — a card in
+    // dollars was reading as pesos.
+    currency: String,
     hide: Boolean,
     onPay: () -> Unit,
     onAddPlan: () -> Unit,
@@ -562,7 +595,7 @@ private fun CreditPanel(
         Spacer(Modifier.height(14.dp))
         MicroLabel(stringResource(R.string.credit_debt))
         Text(
-            maskIfHidden(formatMoney(summary.debtCents), hide),
+            maskIfHidden(formatMoney(summary.debtCents, currency), hide),
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -572,7 +605,7 @@ private fun CreditPanel(
         if (summary.pendingMsiCents > 0) {
             Text(
                 "${stringResource(R.string.credit_msi_pending_total)}: " +
-                    maskIfHidden(formatMoney(summary.pendingMsiCents), hide),
+                    maskIfHidden(formatMoney(summary.pendingMsiCents, currency), hide),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = colors.fgSubtle,
             )
@@ -614,10 +647,10 @@ private fun CreditPanel(
             Text(
                 stringResource(R.string.credit_statement) + " (" +
                     text(R.string.credit_statement_of, "date" to formatDayMonth(st.cutDate)) +
-                    "): " + maskIfHidden(formatMoney(st.balanceCents), hide) +
+                    "): " + maskIfHidden(formatMoney(st.balanceCents, currency), hide) +
                     if (st.paidCents > 0 && st.balanceCents > 0) {
                         " · " + stringResource(R.string.credit_paid_so_far) + ": " +
-                            maskIfHidden(formatMoney(st.paidCents), hide)
+                            maskIfHidden(formatMoney(st.paidCents, currency), hide)
                     } else {
                         ""
                     },
@@ -626,7 +659,7 @@ private fun CreditPanel(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                statementLine(st, hide),
+                statementLine(st, currency, hide),
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
@@ -647,11 +680,11 @@ private fun CreditPanel(
                     "${Math.round(fraction * 100)}% · " + text(
                         R.string.credit_utilization_of,
                         "used" to maskIfHidden(
-                            formatMoney(summary.debtCents + summary.pendingMsiCents),
+                            formatMoney(summary.debtCents + summary.pendingMsiCents, currency),
                             hide,
                         ),
                         "limit" to maskIfHidden(
-                            formatMoney(summary.creditLimitCents ?: 0),
+                            formatMoney(summary.creditLimitCents ?: 0, currency),
                             hide,
                         ),
                     ),
@@ -725,21 +758,21 @@ private fun CreditPanel(
         }
         summary.msiPlans.forEach { plan ->
             Spacer(Modifier.height(8.dp))
-            MsiRow(plan, hide) { onDeletePlan(plan) }
+            MsiRow(plan, currency, hide) { onDeletePlan(plan) }
         }
     }
 }
 
 /** What the statement box says, branch for branch as the web writes it. */
 @Composable
-private fun statementLine(st: CreditStatement, hide: Boolean): String = when {
+private fun statementLine(st: CreditStatement, currency: String, hide: Boolean): String = when {
     st.balanceCents == 0L -> stringResource(R.string.credit_no_statement_debt)
     st.remainingCents == 0L -> stringResource(R.string.credit_statement_paid)
     st.daysToDue < 0 -> text(R.string.credit_overdue_by, "days" to -st.daysToDue)
     st.daysToDue == 0 -> stringResource(R.string.credit_due_today)
     else -> text(
         R.string.credit_pay_by,
-        "amount" to maskIfHidden(formatMoney(st.remainingCents), hide),
+        "amount" to maskIfHidden(formatMoney(st.remainingCents, currency), hide),
         "date" to formatDayMonth(st.dueDate),
     )
 }
@@ -760,7 +793,7 @@ private fun usageColor(fraction: Float) = when {
 }
 
 @Composable
-private fun MsiRow(plan: MsiPlan, hide: Boolean, onDelete: () -> Unit) {
+private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () -> Unit) {
     val colors = Broke.colors
     Column(
         Modifier
@@ -777,9 +810,12 @@ private fun MsiRow(plan: MsiPlan, hide: Boolean, onDelete: () -> Unit) {
                 modifier = Modifier.weight(1f),
             )
             Text(
-                maskIfHidden(formatMoney(plan.monthlyCents), hide) + "/mo",
+                text(
+                    R.string.credit_msi_monthly,
+                    "amount" to maskIfHidden(formatMoney(plan.monthlyCents, currency), hide),
+                ),
                 style = MaterialTheme.typography.labelLarge,
-                color = colors.fg,
+                color = colors.fgMuted,
             )
             Spacer(Modifier.width(10.dp))
             Icon(
@@ -797,19 +833,37 @@ private fun MsiRow(plan: MsiPlan, hide: Boolean, onDelete: () -> Unit) {
             } else {
                 0L
             },
+            // One pip per instalment while they still fit; past two years the
+            // web falls back to a plain bar, and so does this.
+            segments = plan.months.takeIf { it in 1..24 },
         )
-        plan.nextChargeDate?.let { date ->
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text(
-                    R.string.credit_msi_next_charge,
-                    "amount" to maskIfHidden(formatMoney(plan.nextChargeCents ?: 0), hide),
-                    "date" to date,
+
+        // "3 of 12 instalments · next one on the 5th", or "· paid off" once the
+        // last instalment has been billed. The web keeps it as one line.
+        val done = plan.billedMonths >= plan.months
+        Spacer(Modifier.height(6.dp))
+        val progress = text(
+            R.string.credit_msi_progress,
+            "billed" to plan.billedMonths,
+            "months" to plan.months,
+        )
+        val tail = when {
+            done -> stringResource(R.string.credit_msi_done)
+            plan.nextChargeDate != null -> text(
+                R.string.credit_msi_next_charge,
+                "amount" to maskIfHidden(
+                    formatMoney(plan.nextChargeCents ?: 0, currency),
+                    hide,
                 ),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
+                "date" to formatDayMonth(plan.nextChargeDate),
             )
+            else -> null
         }
+        Text(
+            if (tail != null) "$progress · $tail" else progress,
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.fgSubtle,
+        )
     }
 }
 
