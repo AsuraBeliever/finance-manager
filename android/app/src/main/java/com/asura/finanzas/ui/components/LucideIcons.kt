@@ -311,6 +311,14 @@ object Lucide {
         )
     }
 
+    /** Same body as [Lock] with the shackle swung open — lucide's `lock-open`. */
+    val LockOpen by lazy {
+        icon(
+            "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z",
+            "M7 11V7a5 5 0 0 1 9.9-1",
+        )
+    }
+
     val ZoomIn by lazy {
         icon("M21 21l-4.34-4.34", "M17 11a6 6 0 1 1-12 0 6 6 0 1 1 12 0z", "M8 11h6", "M11 8v6")
     }

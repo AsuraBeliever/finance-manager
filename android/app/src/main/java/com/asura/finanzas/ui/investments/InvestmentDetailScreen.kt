@@ -41,6 +41,13 @@ import androidx.compose.ui.draw.clip
 import com.asura.finanzas.ui.components.Lucide
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.border
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import androidx.compose.ui.graphics.Color
+import com.asura.finanzas.ui.components.MoneyField
+import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.data.InvestmentProjection
 import com.asura.finanzas.ui.components.OutlineButton
 import com.asura.finanzas.R
@@ -48,6 +55,7 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.InvestmentDetail
 import com.asura.finanzas.data.InvestmentMovement
 import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
 import androidx.compose.foundation.background
@@ -76,11 +84,13 @@ fun InvestmentDetailScreen(
     var reloadKey by remember { mutableStateOf(0) }
     var addingMovement by remember { mutableStateOf<String?>(null) }
     var addingSnapshot by remember { mutableStateOf(false) }
-    var simulating by remember { mutableStateOf(false) }
-    var actions by remember { mutableStateOf(false) }
     var movementActions by remember { mutableStateOf<InvestmentMovement?>(null) }
     var editingMovement by remember { mutableStateOf<InvestmentMovement?>(null) }
     var editingInvestment by remember { mutableStateOf(false) }
+    // Non-null while a "delete this?" confirmation is up. The web asks before
+    // either deletion; the phone was doing both on a single tap.
+    var deletingInvestment by remember { mutableStateOf(false) }
+    var deletingMovement by remember { mutableStateOf<InvestmentMovement?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(investmentId, reloadKey) {
@@ -99,28 +109,18 @@ fun InvestmentDetailScreen(
         onBack = onBack,
         onAddMovement = { addingMovement = it },
         onAddSnapshot = { addingSnapshot = true },
-        onSimulate = { simulating = true },
         onEdit = { editingInvestment = true },
-        onClose = {
+        onToggleClosed = {
             scope.launch {
-                runCatching { repository.closeInvestment(investmentId, closed = true) }
+                runCatching { repository.closeInvestment(investmentId, !current.isClosed) }
                 reloadKey++
             }
         },
-        onDelete = {
-            scope.launch {
-                runCatching { repository.deleteInvestment(investmentId) }
-                onBack()
-            }
-        },
+        // Deleting takes its snapshots with it, so it asks first.
+        onDelete = { deletingInvestment = true },
         onMovementLongPress = { movementActions = it },
         modifier = modifier,
     )
-
-    if (simulating) {
-        SimulatorScreen(repository = repository, onBack = { simulating = false })
-        return
-    }
 
     addingMovement?.let { kind ->
         InvestmentMovementSheet(
@@ -157,10 +157,7 @@ fun InvestmentDetailScreen(
                     }
                     DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
                         movementActions = null
-                        scope.launch {
-                            runCatching { repository.deleteInvestmentMovement(movement.id) }
-                            reloadKey++
-                        }
+                        deletingMovement = movement
                     }
                 }
             },
@@ -190,44 +187,33 @@ fun InvestmentDetailScreen(
         )
     }
 
-    if (actions) {
-        AlertDialog(
-            onDismissRequest = { actions = false },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(current.name, color = Broke.colors.fg) },
-            text = {
-                Column {
-                    DialogAction(stringResource(R.string.common_edit)) {
-                        actions = false
-                        editingInvestment = true
-                    }
-                    DialogAction(stringResource(R.string.investments_add_snapshot)) {
-                        actions = false
-                        addingSnapshot = true
-                    }
-                    if (!current.isClosed) {
-                        DialogAction(stringResource(R.string.investments_close)) {
-                            actions = false
-                            scope.launch {
-                                runCatching { repository.closeInvestment(current.id, !current.isClosed) }
-                                reloadKey++
-                            }
-                        }
-                    }
-                    DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
-                        actions = false
-                        scope.launch {
-                            runCatching { repository.deleteInvestment(current.id) }
-                            onBack()
-                        }
-                    }
+    if (deletingInvestment) {
+        ConfirmDialog(
+            title = stringResource(R.string.investments_delete_confirm_title),
+            message = stringResource(R.string.investments_delete_confirm),
+            onConfirm = {
+                deletingInvestment = false
+                scope.launch {
+                    runCatching { repository.deleteInvestment(investmentId) }
+                    onBack()
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { actions = false }) {
-                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
+            onDismiss = { deletingInvestment = false },
+        )
+    }
+
+    deletingMovement?.let { movement ->
+        ConfirmDialog(
+            title = stringResource(R.string.investments_movement_delete_title),
+            message = stringResource(R.string.investments_movement_delete_confirm),
+            onConfirm = {
+                deletingMovement = null
+                scope.launch {
+                    runCatching { repository.deleteInvestmentMovement(movement.id) }
+                    reloadKey++
                 }
             },
+            onDismiss = { deletingMovement = null },
         )
     }
 }
@@ -240,9 +226,8 @@ private fun DetailContent(
     /** "deposit" or "withdrawal": the sheet opens on the one that was asked for. */
     onAddMovement: (String) -> Unit,
     onAddSnapshot: () -> Unit,
-    onSimulate: () -> Unit,
     onEdit: () -> Unit,
-    onClose: () -> Unit,
+    onToggleClosed: () -> Unit,
     onDelete: () -> Unit,
     onMovementLongPress: (InvestmentMovement) -> Unit,
     modifier: Modifier = Modifier,
@@ -251,9 +236,25 @@ private fun DetailContent(
     val hide = LocalAppSettings.current.hideBalances
     // Horizon in years, as the web's zoom control sets it.
     var years by remember { mutableStateOf(5) }
+    // The what-if: money added on a cadence, projected onto this same chart.
+    // Typing an amount is what arms it, not the toggle — the toggle only opens
+    // the controls, exactly as on the web.
+    var simEnabled by remember { mutableStateOf(false) }
+    var simContribution by remember { mutableStateOf("") }
+    var simCadence by remember { mutableStateOf("monthly") }
+    val simContributionCents = if (simEnabled) parseAmountToCents(simContribution) ?: 0 else 0
+    val simActive = simContributionCents > 0
+
     var projection by remember { mutableStateOf<InvestmentProjection?>(null) }
-    LaunchedEffect(detail.id, years) {
-        projection = runCatching { repository.projectInvestment(detail.id, years * 12) }.getOrNull()
+    LaunchedEffect(detail.id, years, simContributionCents, simCadence) {
+        projection = runCatching {
+            repository.projectInvestment(
+                detail.id,
+                years * 12,
+                contributionCents = simContributionCents,
+                cadence = if (simActive) simCadence else "none",
+            )
+        }.getOrNull()
     }
 
     LazyColumn(
@@ -283,7 +284,15 @@ private fun DetailContent(
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 DetailAction(Lucide.Pencil, stringResource(R.string.common_edit)) { onEdit() }
-                DetailAction(Lucide.Lock, stringResource(R.string.investments_close)) { onClose() }
+                // One button that flips both ways, as on the web: an open
+                // padlock to reopen, a closed one to close.
+                DetailAction(
+                    if (detail.isClosed) Lucide.LockOpen else Lucide.Lock,
+                    stringResource(
+                        if (detail.isClosed) R.string.investments_reopen
+                        else R.string.investments_close,
+                    ),
+                ) { onToggleClosed() }
                 DetailAction(
                     Lucide.Trash,
                     stringResource(R.string.common_delete),
@@ -321,20 +330,27 @@ private fun DetailContent(
                     maskIfHidden(formatMoney(detail.netInvestedCents, detail.currencyCode), hide),
                     modifier = Modifier.weight(1f),
                 )
-                StatBox(
-                    stringResource(R.string.investments_start_date),
-                    detail.startDate,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        detail.maturityDate?.let { maturity ->
-            item {
-                StatBox(
-                    stringResource(R.string.investments_maturity),
-                    maturity,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                // The web spends this last box on whichever fact the
+                // instrument actually has: how much crypto is held, else the
+                // maturity date, else the start date. Never two of them.
+                val crypto = cryptoHolding(detail)
+                when {
+                    crypto != null -> StatBox(
+                        stringResource(R.string.investments_quantity),
+                        crypto,
+                        modifier = Modifier.weight(1f),
+                    )
+                    detail.maturityDate != null -> StatBox(
+                        stringResource(R.string.investments_maturity),
+                        detail.maturityDate,
+                        modifier = Modifier.weight(1f),
+                    )
+                    else -> StatBox(
+                        stringResource(R.string.investments_start_date),
+                        detail.startDate,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
@@ -415,9 +431,60 @@ private fun DetailContent(
                     }
                     OutlineButton(
                         text = stringResource(R.string.investments_projection_sim_toggle),
-                        onClick = onSimulate,
+                        onClick = { simEnabled = !simEnabled },
                         leadingIcon = Lucide.SlidersHorizontal,
+                        active = simEnabled,
                     )
+                    }
+                }
+
+                if (simEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        MoneyField(
+                            label = stringResource(R.string.investments_projection_contribution),
+                            value = simContribution,
+                            onValueChange = { simContribution = it },
+                            modifier = Modifier.weight(1f),
+                        )
+                        PickerField(
+                            label = stringResource(R.string.simulator_cadence),
+                            options = SIM_CADENCES,
+                            selected = simCadence,
+                            optionLabel = { stringResource(simCadenceLabel(it)) },
+                            onSelect = { simCadence = it },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
+                // Only once there is money to add: with nothing typed these
+                // three would just restate the plain projection.
+                if (simActive) {
+                    projection?.let { p ->
+                        Spacer(Modifier.height(16.dp))
+                        // One column at phone width — the web's grid only goes
+                        // to three from `sm:` up.
+                        MiniStat(
+                            stringResource(R.string.investments_projection_final),
+                            maskIfHidden(formatMoney(p.finalValueCents, detail.currencyCode), hide),
+                            colors.accent,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        MiniStat(
+                            stringResource(R.string.investments_projection_contributed),
+                            maskIfHidden(formatMoney(p.contributedCents, detail.currencyCode), hide),
+                            colors.fg,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        MiniStat(
+                            stringResource(R.string.investments_projection_interest),
+                            maskIfHidden(formatMoney(p.interestCents, detail.currencyCode), hide),
+                            colors.cyan,
+                        )
                     }
                 }
 
@@ -675,3 +742,61 @@ private fun niceStep(raw: Double): Double {
     }
     return step * magnitude
 }
+
+/** Cadences the what-if offers, in the web's order. */
+private val SIM_CADENCES = listOf("monthly", "biweekly", "weekly", "none")
+
+private fun simCadenceLabel(cadence: String): Int = when (cadence) {
+    "biweekly" -> R.string.simulator_cadence_options_biweekly
+    "weekly" -> R.string.simulator_cadence_options_weekly
+    "none" -> R.string.simulator_cadence_options_none
+    else -> R.string.simulator_cadence_options_monthly
+}
+
+/**
+ * One figure of the what-if, the web's `MiniStat`: a bordered tile with a small
+ * caption over a coloured amount. Not `GlassCard` — the web uses a plain
+ * `bg-surface` box here, one step flatter than the cards around it.
+ */
+@Composable
+private fun MiniStat(label: String, value: String, color: Color) {
+    val colors = Broke.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surface)
+            .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
+            .padding(12.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+            color = colors.fgSubtle,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            value,
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 18.sp),
+            color = color,
+        )
+    }
+}
+
+/**
+ * "0.75 BTC" for a crypto holding, or null for anything else. The quantity is
+ * stored as e8 units in the calculator's own params — read, not computed.
+ */
+private fun cryptoHolding(detail: InvestmentDetail): String? {
+    if (detail.calculator != "crypto") return null
+    return runCatching {
+        val params = rpcJson.parseToJsonElement(detail.paramsJson).jsonObject
+        val e8 = params["quantity_e8"]!!.jsonPrimitive.long
+        val symbol = params["symbol"]!!.jsonPrimitive.content
+        // Trailing zeros off, as JS's Number#toString gives it.
+        val amount = java.math.BigDecimal(e8).movePointLeft(8).stripTrailingZeros()
+        "${amount.toPlainString()} $symbol"
+    }.getOrNull()
+}
+
+private val rpcJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
