@@ -211,24 +211,35 @@ fun OutlineButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     leadingIcon: ImageVector? = null,
+    /** Pressed-in look for a toggle: the web's `border-accent/40 bg-accent/15`. */
+    active: Boolean = false,
 ) {
     val colors = Broke.colors
+    val tint = if (active) colors.accent else colors.fgMuted
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+            .then(
+                if (active) Modifier.background(colors.accent.copy(alpha = 0.15f))
+                else Modifier,
+            )
+            .border(
+                1.dp,
+                if (active) colors.accent.copy(alpha = 0.4f) else colors.borderMuted,
+                RoundedCornerShape(8.dp),
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         leadingIcon?.let {
-            Icon(it, contentDescription = null, tint = colors.fgMuted, modifier = Modifier.size(16.dp))
+            Icon(it, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
         }
         Text(
             text,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-            color = colors.fgMuted,
+            color = tint,
         )
     }
 }

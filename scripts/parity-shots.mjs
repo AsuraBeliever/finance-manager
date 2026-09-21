@@ -6,9 +6,14 @@
 //
 // Env: BASE (default http://localhost:8787), OUT (default ./parity-shots),
 // EMAIL, PASSWORD, LOCALE (default en-US), SCHEME ("light" to shoot the light
-// theme; dark otherwise), PERIOD ("YYYY-MM" pins the
+// theme; dark otherwise), CARD (the credit card's name in this account),
+// PERIOD ("YYYY-MM" pins the
 // dashboard to that month — the widgets that need movement do not render at
 // all in an empty one).
+//
+// `wrangler dev` serves the `dist/` it read at startup: rebuild the web and it
+// will keep serving the old asset hashes until it is restarted, and every shot
+// comes back blank.
 //
 // One login for the whole run on purpose: the worker rate-limits sign-ins, and
 // logging in per screen trips it half way through.
@@ -19,6 +24,9 @@ const BASE = process.env.BASE ?? "http://localhost:8787";
 const OUT = process.env.OUT ?? "parity-shots";
 const EMAIL = process.env.EMAIL ?? "alan@test.mx";
 const PASSWORD = process.env.PASSWORD ?? "test1234";
+// The credit card to shoot the card-specific screens against. Those screens
+// only exist on a wallet that has a cut day, and the name differs per account.
+const CARD = process.env.CARD ?? "Tarjeta Test A";
 
 // The S25U reports 720×1560 at density 280, which is this viewport at this
 // scale. Anything else and the two images cannot be laid on top of each other.
@@ -35,15 +43,35 @@ const SCREENS = [
   { name: "home", route: "/#/", steps: 4 },
   { name: "wallets", route: "/#/carteras", steps: 3 },
   { name: "wallet-form", route: "/#/carteras", open: [/new wallet|nueva cartera/i], steps: 3 },
+  // The card settings only exist under the credit-card category, and the yield
+  // block only once its checkbox is on — both are off by default.
+  {
+    name: "wallet-form-credit",
+    route: "/#/carteras",
+    open: [
+      /new wallet|nueva cartera/i,
+      // Second select in the modal: the first is "pocket of".
+      { css: "select >> nth=1", option: "Credit card" },
+      { css: "input[type=checkbox]" },
+    ],
+    steps: 4,
+  },
   { name: "wallet-detail", route: "/#/carteras", open: [{ css: "a[href*='/carteras/']" }], steps: 4 },
   // A credit card: the detail grows the statement panel and the MSI plans.
   {
     name: "wallet-detail-card",
     route: "/#/carteras",
-    open: [{ css: "a[href*='/carteras/']:has-text('Tarjeta Test A')" }],
+    open: [{ css: `a[href*='/carteras/']:has-text('${CARD}')` }],
     steps: 5,
   },
   { name: "tx", route: "/#/transacciones", steps: 3 },
+  // The totals card only renders under a single-kind filter.
+  {
+    name: "tx-expense",
+    route: "/#/transacciones",
+    open: [/^expense$|^gasto$/i],
+    steps: 3,
+  },
   { name: "tx-form", route: "/#/transacciones", open: [/new transaction|nuevo movimiento/i], steps: 3 },
   {
     name: "tx-form-expense",
@@ -64,7 +92,7 @@ const SCREENS = [
     open: [
       /new transaction|nuevo movimiento/i,
       /^expense$|^gasto$/i,
-      { css: "select", option: "Tarjeta Test A (MXN)" },
+      { css: "select", option: `${CARD} (MXN)` },
       { css: "input[type=checkbox]" },
     ],
     steps: 3,

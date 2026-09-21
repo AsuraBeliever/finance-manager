@@ -55,6 +55,7 @@ import com.asura.finanzas.ui.components.BackHeader
 import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
+import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.PrimaryButton
@@ -84,6 +85,9 @@ fun CategoriesScreen(
 
     var editing by remember { mutableStateOf<TransactionCategory?>(null) }
     var actionsFor by remember { mutableStateOf<TransactionCategory?>(null) }
+    // Hiding a seed row or deleting a user one asks first, as the web does;
+    // restoring a hidden one is harmless and goes straight through.
+    var deleting by remember { mutableStateOf<TransactionCategory?>(null) }
 
     when (val current = state) {
         is Load.Loading -> LoadingBox(modifier)
@@ -96,12 +100,13 @@ fun CategoriesScreen(
             // The eye hides a category or restores it — the same single action
             // the web's row button offers.
             onToggleHidden = { target ->
-                scope.launch {
-                    runCatching {
-                        if (target.isHidden) repository.restoreCategory(target.id)
-                        else repository.deleteCategory(target.id)
+                if (target.isHidden) {
+                    scope.launch {
+                        runCatching { repository.restoreCategory(target.id) }
+                        reload()
                     }
-                    reload()
+                } else {
+                    deleting = target
                 }
             },
             // Order is kept per kind, exactly like the web's two sortable lists.
@@ -161,10 +166,7 @@ fun CategoriesScreen(
                             Broke.colors.danger,
                         ) {
                             actionsFor = null
-                            scope.launch {
-                                runCatching { repository.deleteCategory(target.id) }
-                                reload()
-                            }
+                            deleting = target
                         }
                     }
                 }
@@ -174,6 +176,29 @@ fun CategoriesScreen(
                     Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
                 }
             },
+        )
+    }
+
+    deleting?.let { target ->
+        ConfirmDialog(
+            title = stringResource(R.string.categories_delete_confirm_title),
+            // A seed row is only ever hidden — it comes back with "restore" —
+            // so it gets the gentler wording, exactly as on the web.
+            message = stringResource(
+                if (target.isSystem) R.string.categories_hide_confirm_message
+                else R.string.categories_delete_confirm_message,
+            ),
+            confirmLabel = stringResource(
+                if (target.isSystem) R.string.categories_hide else R.string.categories_delete,
+            ),
+            onConfirm = {
+                deleting = null
+                scope.launch {
+                    runCatching { repository.deleteCategory(target.id) }
+                    reload()
+                }
+            },
+            onDismiss = { deleting = null },
         )
     }
 }
@@ -255,20 +280,16 @@ private fun CategoryList(
             item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
         }
 
-        if (categories.isEmpty()) {
-            item {
-                EmptyState(
-                    stringResource(R.string.categories_title),
-                    stringResource(R.string.categories_settings_hint),
-                )
-            }
-        }
-
         // Both sections always render: the add row lives inside each one, so an
         // empty kind still needs somewhere to add to — same as the web's cards.
         item { Spacer(Modifier.height(16.dp)) }
         item {
             SectionTop(stringResource(R.string.categories_income))
+        }
+        // The web writes "no categories yet" inside the section that is
+        // empty, not once for the screen: each kind has its own add row.
+        if (income.isEmpty()) {
+            item { SectionBody { EmptyLine(stringResource(R.string.categories_empty)) } }
         }
         itemsIndexed(income, key = { _, it -> "i-${it.id}" }) { index, category ->
             SectionBody {
@@ -291,6 +312,11 @@ private fun CategoryList(
         item { Spacer(Modifier.height(16.dp)) }
         item {
             SectionTop(stringResource(R.string.categories_expense))
+        }
+        // The web writes "no categories yet" inside the section that is
+        // empty, not once for the screen: each kind has its own add row.
+        if (expense.isEmpty()) {
+            item { SectionBody { EmptyLine(stringResource(R.string.categories_empty)) } }
         }
         itemsIndexed(expense, key = { _, it -> "e-${it.id}" }) { index, category ->
             SectionBody {
@@ -506,4 +532,15 @@ private fun InlineAddCategory(
             )
         }
     }
+}
+
+/** The one-line "nothing here yet" the web puts inside an empty section. */
+@Composable
+private fun EmptyLine(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+        color = Broke.colors.fgSubtle,
+        modifier = Modifier.padding(vertical = 8.dp),
+    )
 }

@@ -13,6 +13,13 @@ import kotlinx.serialization.json.putJsonObject
 data class Synced<T>(val value: T, val fromCache: Boolean)
 
 /**
+ * How many movements a list asks for at once — `TX_LIST_LIMIT` in
+ * `src/lib/api.ts`. A list that comes back this long is probably cut short,
+ * and says so; the totals beside it still count everything.
+ */
+const val TX_LIST_LIMIT = 100
+
+/**
  * The app's one door to the backend. Screens ask for domain objects; this class
  * decides whether that means a network call or the last-synced copy.
  *
@@ -427,7 +434,7 @@ class BrokeRepository(
         }
 
     suspend fun transactions(
-        limit: Int = 100,
+        limit: Int = TX_LIST_LIMIT,
         walletId: Long? = null,
         kind: String? = null,
         categoryId: Long? = null,
@@ -741,6 +748,13 @@ class BrokeRepository(
         yieldRateBps: Long?,
         yieldFrequency: String?,
         parentWalletId: Long?,
+        // Credit-card settings. The server rewrites all four on every update —
+        // an omitted field reads as null and clears the stored one — so the
+        // caller must pass what the card already has, not just what changed.
+        creditCutDay: Long?,
+        creditDueDays: Long?,
+        creditLimitCents: Long?,
+        creditAnniversary: String?,
     ) {
         val body = buildJsonObject {
             id?.let { put("id", it) }
@@ -754,6 +768,10 @@ class BrokeRepository(
             yieldRateBps?.let { put("yieldRateBps", it) }
             yieldFrequency?.let { put("yieldFrequency", it) }
             parentWalletId?.let { put("parentWalletId", it) }
+            creditCutDay?.let { put("creditCutDay", it) }
+            creditDueDays?.let { put("creditDueDays", it) }
+            creditLimitCents?.let { put("creditLimitCents", it) }
+            creditAnniversary?.let { put("creditAnniversary", it) }
         }
         rpc.call(if (id == null) "create_wallet" else "update_wallet", body)
         cache.invalidateReads()

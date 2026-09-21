@@ -50,6 +50,7 @@ import com.asura.finanzas.ui.components.SegStyle
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.WebCheckbox
 import com.asura.finanzas.ui.formatMoney
+import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
@@ -282,6 +283,10 @@ fun ContributeSheet(
 
     val genericError = stringResource(R.string.common_error)
     val offlineError = stringResource(R.string.offline_banner)
+    val releaseTooMuch = text(
+        R.string.goals_release_too_much,
+        "amount" to formatMoney(goal.savedCents, goal.currencyCode),
+    )
     val hide = LocalAppSettings.current.hideBalances
 
     LaunchedEffect(goal.id) {
@@ -315,18 +320,28 @@ fun ContributeSheet(
             if (release) R.string.goals_release_action else R.string.goals_reserve_action,
         ),
         onSave = {
-            busy = true
-            error = null
-            scope.launch {
-                // The sign is the whole instruction to the server: negative
-                // releases. The clamp at zero is its job, not ours.
-                val signed = if (release) -(cents ?: 0) else (cents ?: 0)
-                runCatching { repository.contributeToGoal(goal.id, signed) }
-                    .onSuccess { onSaved() }
-                    .onFailure {
-                        error = if (it is NetworkException) offlineError else it.message ?: genericError
-                        busy = false
-                    }
+            // Giving back more than was set aside is the one case worth naming
+            // before the round trip, the way the web names it.
+            if (release && (cents ?: 0) > goal.savedCents) {
+                error = releaseTooMuch
+            } else {
+                busy = true
+                error = null
+                scope.launch {
+                    // The sign is the whole instruction to the server: negative
+                    // releases. The clamp at zero is its job, not ours.
+                    val signed = if (release) -(cents ?: 0) else (cents ?: 0)
+                    runCatching { repository.contributeToGoal(goal.id, signed) }
+                        .onSuccess { onSaved() }
+                        .onFailure {
+                            error = if (it is NetworkException) {
+                                offlineError
+                            } else {
+                                it.message ?: genericError
+                            }
+                            busy = false
+                        }
+                }
             }
         },
     ) {

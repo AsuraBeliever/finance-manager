@@ -253,18 +253,21 @@ fun SubscriptionsWidget(
     onViewAll: () -> Unit,
 ) {
     val colors = Broke.colors
-    val active = subscriptions.filter { it.isActive }
-    if (active.isEmpty()) return
+    // Only the ones actually charged in the selected period — this widget is
+    // about the period, not the catalogue. The Subscriptions screen is where
+    // every active one is listed.
+    val charged = subscriptions.filter { it.chargedInPeriod }
+    if (charged.isEmpty()) return
 
     GlassCard(Modifier.fillMaxWidth()) {
         WidgetHeader(stringResource(R.string.subscriptions_title), onViewAll)
         Text(
-            "${stringResource(R.string.subscriptions_monthly_total)}: " +
+            "${stringResource(R.string.subscriptions_charged_in_period)}: " +
                 maskIfHidden(formatMoney(monthlyTotalMxnCents), hide),
             style = MaterialTheme.typography.labelSmall,
             color = colors.fgSubtle,
         )
-        active.take(6).forEach { subscription ->
+        charged.take(5).forEach { subscription ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,

@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.components
 
+import com.asura.finanzas.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -72,6 +74,9 @@ fun <T> loadSynced(
 ): State<Load<T>> {
     val cache = LocalQueryCache.current
     val id = queryKey.toString()
+    // Resolved here: the effect below is not a composable scope, and a
+    // hardcoded fallback would stay Spanish in the English app.
+    val genericError = stringResource(R.string.common_error)
 
     val state = remember(id) {
         mutableStateOf<Load<T>>(
@@ -87,7 +92,7 @@ fun <T> loadSynced(
             },
             onFailure = {
                 if (state.value !is Load.Ready) {
-                    state.value = Load.Failed(it.message ?: "Algo salió mal")
+                    state.value = Load.Failed(it.message ?: genericError)
                 }
             },
         )
@@ -147,7 +152,7 @@ fun ErrorBox(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier
             color = Broke.colors.fgMuted,
         )
         TextButton(onClick = onRetry) {
-            Text("Reintentar", color = Broke.colors.accentBright)
+            Text(stringResource(R.string.offline_retry), color = Broke.colors.accentBright)
         }
     }
 }

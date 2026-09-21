@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.asura.finanzas.BuildConfig
 import com.asura.finanzas.R
@@ -172,10 +173,15 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     // pops after an update — not as a page of its own.
     PlainSheet(title = stringResource(R.string.whats_new_title), onDismiss = onDismiss) {
         val list = entries
-        if (list == null) {
-            LoadingBox()
-        } else {
-            list.forEach { entry -> ChangelogEntryBlock(entry, locale) }
+        when {
+            list == null -> LoadingBox()
+            // Says so rather than opening on a blank sheet, as the web does.
+            list.isEmpty() -> Text(
+                stringResource(R.string.whats_new_empty),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = Broke.colors.fgSubtle,
+            )
+            else -> list.forEach { entry -> ChangelogEntryBlock(entry, locale) }
         }
     }
 }
