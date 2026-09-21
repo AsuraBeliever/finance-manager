@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -97,6 +99,11 @@ fun FormSheet(
                 .padding(16.dp)
                 .widthIn(max = 448.dp)
                 .fillMaxWidth()
+                // The web's `max-h-[90dvh]`. Without a cap the card grows to
+                // whatever its fields need and the Save button ends up below
+                // the screen, unreachable however far the body is scrolled —
+                // which is exactly what a long form (a credit card) hits.
+                .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.9f)
                 .clip(RoundedCornerShape(16.dp))
                 .background(colors.surfaceOverlay)
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
@@ -268,6 +275,8 @@ fun ConfirmDialog(
     message: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    /** The web's `confirmLabel`: not every confirmation is a deletion. */
+    confirmLabel: String = stringResource(R.string.common_delete),
 ) {
     val colors = Broke.colors
     androidx.compose.material3.AlertDialog(
@@ -284,7 +293,7 @@ fun ConfirmDialog(
         },
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.common_delete), color = colors.danger)
+                Text(confirmLabel, color = colors.danger)
             }
         },
         dismissButton = {
