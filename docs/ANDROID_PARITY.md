@@ -130,6 +130,53 @@ Dos cosas más que sólo se ven probando, no mirando:
   la entrada de 2.39.1 porque aquel release tocó `src/lib/changelog.ts` y no
   regeneró el asset: «Novedades» nunca mostró esa versión en el teléfono.
 
+## Tercer barrido (2026-09-21): medir, no mirar
+
+Los dos barridos anteriores cerraron en «se ve igual». Este se hizo midiendo
+cada pantalla con las dos superficies sobre **la misma cuenta** —el APK del
+emulador apuntando a `10.0.2.2:8787`, y Playwright con la cookie de sesión que
+el APK guarda en `files/datastore/broke_session.preferences_pb`— y a la métrica
+exacta del emulador (448×997 dp @3× = 1344×2991). Salieron 17 diferencias que
+el ojo no había cazado. Lo que conviene recordar:
+
+- **`Typography()` sin `bodySmall` ni `labelMedium` deja Roboto.** Material
+  rellena lo que no declares, y `FieldLabel`/`FieldHint` los usan: todas las
+  etiquetas y pistas de todos los formularios salían en otra fuente y con la
+  tracking de Material. Si se agrega un rol tipográfico, decláralo en
+  `BrokeTypography`, no sólo en `rememberBrokeTypography`.
+- **En un teléfono los controles de la web miden 16 px, no 14.** `index.css`
+  los sube con `@media (pointer: coarse)` para que Safari no haga zoom al
+  enfocar. Copiar `text-sm` dejaba cada valor 14% más chico que en el navegador.
+  La excepción es la caja de fecha, que es un `<button>` y sí se queda en 14.
+- **`enabled = false` no significa «no se escribe», significa «apagado».** La
+  fecha y la hora se veían como placeholder por eso; lo que hacía falta era
+  `readOnly` y el color del texto puesto a mano.
+- **Una barra de recharts mide su banda, no un ancho fijo.** La banda es el
+  área de trazo entre el número de cubos, y `barCategoryGap` deja el 10% libre
+  **a cada lado**. Y el área de trazo no llega a los bordes de la tarjeta:
+  `<YAxis width={40}>` más el `margin` de 5 por lado. Con 5 dp fijos el APK
+  dibujaba pelos donde la web dibujaba columnas.
+- **Un helper compartido no es el que usan las pantallas.** `ConfirmDialog`
+  estaba bien copiado y casi nadie lo llamaba: había 17 `AlertDialog` sueltos.
+  Al cambiar un componente de chrome, hay que barrer quién lo usa de verdad.
+- **`SpaceBetween` no reserva el `gap`.** El encabezado de la web envuelve
+  cuando título + 12 px + acciones no caben; un `FlowRow` con `SpaceBetween`
+  sólo mide los dos bloques, así que Movimientos quedaba en un renglón aquí y
+  en dos allá. El truco es llevar el hueco como padding del primer bloque.
+- **Los estados vacíos son una tarjeta, no un par de textos**, y hay que
+  comprobar que existan: el detalle de cartera sin movimientos no dibujaba
+  nada, porque el `if (isNotEmpty)` no tenía `else`.
+- **`rounded-sm` de Tailwind v4 son 4 px**, no 2. Toda la escala está corrida
+  respecto de v3.
+- **El signo de un delta se decide en `>= 0`, no en `> 0`.** Una ganancia de
+  cero se escribe `+$0.00` en la web.
+- **Un color copiado puede estar copiado al revés.** En el detalle de inversión
+  el «Rendimiento» iba en acento y la línea de proyección en verde; el APK los
+  tenía intercambiados. Comparar valores RGB, no impresiones.
+- **El tema era el único ajuste de cuenta que el teléfono no compartía.** La
+  web hace `setSetting("theme", …)` e hidrata al entrar; ahora `AppearanceSync`
+  también.
+
 Diferencias conocidas que se dejaron a propósito:
 
 - En **Apariencia**, «Se reescala a 128 px…» cae al lado del botón en el APK y
