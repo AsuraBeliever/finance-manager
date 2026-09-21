@@ -60,6 +60,11 @@ fun LineChart(
     ticks: List<String> = emptyList(),
     /** One date per point; the axis picks a few of these to label. */
     dates: List<String> = emptyList(),
+    /**
+     * Stroke colour. The web switches the projection to its own gold while a
+     * what-if is on, so the simulated curve is not mistaken for the real one.
+     */
+    color: androidx.compose.ui.graphics.Color? = null,
 ) {
     val colors = Broke.colors
     if (values.size < 2) return
@@ -169,7 +174,7 @@ fun LineChart(
                         }
                     }
 
-                    drawPath(path = line, color = colors.accent, style = Stroke(width = 2.dp.toPx()))
+                    drawPath(path = line, color = color ?: colors.accent, style = Stroke(width = 2.dp.toPx()))
                     if (split < values.lastIndex) {
                         val forecast = Path().apply {
                             moveTo(pointAt(split).x, pointAt(split).y)
@@ -180,7 +185,7 @@ fun LineChart(
                         }
                         drawPath(
                             path = forecast,
-                            color = colors.accent,
+                            color = color ?: colors.accent,
                             style = Stroke(
                                 width = 2.dp.toPx(),
                                 pathEffect = PathEffect.dashPathEffect(

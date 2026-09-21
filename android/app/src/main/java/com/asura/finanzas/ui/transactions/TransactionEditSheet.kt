@@ -48,7 +48,7 @@ private val Transaction.isTransfer: Boolean
  * withdrawal: the investment is not a wallet, so there is no sibling leg. It
  * needs the investment's own editor, because the amount has to move on both.
  */
-private val Transaction.isInvestmentLeg: Boolean
+val Transaction.isInvestmentLeg: Boolean
     get() = isTransfer && transferGroupId == null
 
 /**

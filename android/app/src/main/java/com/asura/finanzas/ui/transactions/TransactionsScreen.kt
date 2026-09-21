@@ -331,8 +331,16 @@ fun TransactionsScreen(
             text = {
                 Text(
                     stringResource(
-                        if (target.isApartado) R.string.transactions_apartado_delete_confirm
-                        else R.string.transactions_delete_confirm,
+                        when {
+                            target.isApartado ->
+                                R.string.transactions_apartado_delete_confirm
+                            // Deleting the wallet leg of an investment move takes
+                            // the contribution with it — they are one operation,
+                            // and the web says so before you agree.
+                            target.isInvestmentLeg ->
+                                R.string.transactions_delete_investment_leg_confirm
+                            else -> R.string.transactions_delete_confirm
+                        },
                     ),
                 )
             },

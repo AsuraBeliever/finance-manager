@@ -280,20 +280,16 @@ private fun CategoryList(
             item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
         }
 
-        if (categories.isEmpty()) {
-            item {
-                EmptyState(
-                    stringResource(R.string.categories_title),
-                    stringResource(R.string.categories_settings_hint),
-                )
-            }
-        }
-
         // Both sections always render: the add row lives inside each one, so an
         // empty kind still needs somewhere to add to — same as the web's cards.
         item { Spacer(Modifier.height(16.dp)) }
         item {
             SectionTop(stringResource(R.string.categories_income))
+        }
+        // The web writes "no categories yet" inside the section that is
+        // empty, not once for the screen: each kind has its own add row.
+        if (income.isEmpty()) {
+            item { SectionBody { EmptyLine(stringResource(R.string.categories_empty)) } }
         }
         itemsIndexed(income, key = { _, it -> "i-${it.id}" }) { index, category ->
             SectionBody {
@@ -316,6 +312,11 @@ private fun CategoryList(
         item { Spacer(Modifier.height(16.dp)) }
         item {
             SectionTop(stringResource(R.string.categories_expense))
+        }
+        // The web writes "no categories yet" inside the section that is
+        // empty, not once for the screen: each kind has its own add row.
+        if (expense.isEmpty()) {
+            item { SectionBody { EmptyLine(stringResource(R.string.categories_empty)) } }
         }
         itemsIndexed(expense, key = { _, it -> "e-${it.id}" }) { index, category ->
             SectionBody {
@@ -531,4 +532,15 @@ private fun InlineAddCategory(
             )
         }
     }
+}
+
+/** The one-line "nothing here yet" the web puts inside an empty section. */
+@Composable
+private fun EmptyLine(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+        color = Broke.colors.fgSubtle,
+        modifier = Modifier.padding(vertical = 8.dp),
+    )
 }

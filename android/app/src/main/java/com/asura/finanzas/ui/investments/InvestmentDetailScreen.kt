@@ -504,6 +504,9 @@ private fun DetailContent(
                         maxLabel = maskIfHidden(formatMoney(hi, detail.currencyCode), hide),
                         forecastFrom = points.indexOfLast { it.date <= today }.takeIf { it >= 0 },
                         ticks = if (hide) emptyList() else axisTicks(lo, hi),
+                        // The web's SIM_GOLD while the what-if is on: a
+                        // simulated curve should not look like the real one.
+                        color = if (simActive) Color(0xFFC9A14A) else null,
                         dates = points.map { it.date },
                     )
                 }

@@ -142,6 +142,7 @@ fun TransactionFormSheet(
     val needsDescription = stringResource(R.string.credit_msi_needs_description)
     val invalidMonths = stringResource(R.string.credit_msi_invalid_months)
     val pickToWallet = stringResource(R.string.transactions_pick_to_wallet)
+    val invalidAmount = stringResource(R.string.transactions_invalid_amount)
 
     // Income and expense have separate category sets, same as the web form.
     LaunchedEffect(kind) {
@@ -171,8 +172,14 @@ fun TransactionFormSheet(
         if (busy) return
         // Save stays live, as it does in the browser, where the amount input is
         // `required` and the form simply refuses to submit with a complaint.
-        if (source == null || cents == null || cents <= 0) {
+        // The browser splits that complaint in two and so does this: an empty
+        // box is "fill this in", a box with 0 or junk in it is "bad amount".
+        if (source == null || amount.isBlank()) {
             error = requiredError
+            return
+        }
+        if (cents == null || cents <= 0) {
+            error = invalidAmount
             return
         }
         // Same complaint the web throws, and for the same two cases.

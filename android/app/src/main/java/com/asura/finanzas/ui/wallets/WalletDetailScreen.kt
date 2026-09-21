@@ -410,8 +410,13 @@ fun WalletDetailScreen(
                 }
             },
             confirmButton = {
+                // "Understood", not "Close": this is an acknowledgement of a
+                // schedule that was just created, which is how the web words it.
                 TextButton(onClick = { savedMsi = null }) {
-                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
+                    Text(
+                        stringResource(R.string.credit_understood),
+                        color = Broke.colors.accent,
+                    )
                 }
             },
         )
