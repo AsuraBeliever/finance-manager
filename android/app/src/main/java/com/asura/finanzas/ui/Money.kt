@@ -19,7 +19,10 @@ fun formatMoney(cents: Long, currencyCode: String = "MXN", withSymbol: Boolean =
         maximumFractionDigits = 2
         minimumFractionDigits = 2
     }
-    val text = format.format(amount)
+    // A currency with no symbol in es-MX prints its ISO code as the prefix, and
+    // Java runs it straight into the digits ("USD1,200.00") where the browser's
+    // Intl separates them ("USD 1,200.00"). The web is the reference, so match it.
+    val text = format.format(amount).replace(Regex("(?<=\\p{L})(?=\\d)"), " ")
     return if (withSymbol) text else text.replace(Regex("[^0-9.,\\-]"), "").trim()
 }
 

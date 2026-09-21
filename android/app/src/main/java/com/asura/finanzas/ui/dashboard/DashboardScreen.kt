@@ -6,6 +6,10 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+// Aliased: this file already has its own FlowRow — the income/expense line of
+// the net-worth card — which has nothing to do with the layout one.
+import androidx.compose.foundation.layout.FlowRow as ComposeFlowRow
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -65,6 +69,7 @@ import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.ChipButton
 import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.ErrorBox
+import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.HeroAmount
@@ -386,6 +391,18 @@ private fun DashboardContent(
 
         if (fromCache) {
             item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
+        }
+
+        // Nothing to summarise yet: the web swaps every widget for one line
+        // saying so, rather than a column of empty cards and $0.00 donuts.
+        if (summary.wallets.isEmpty() && summary.investmentsTotalMxnCents == 0L) {
+            item {
+                EmptyState(
+                    stringResource(R.string.dashboard_empty_title),
+                    stringResource(R.string.dashboard_empty_description),
+                )
+            }
+            return@LazyColumn
         }
 
         // The rates warning is not one of the web's grid widgets, so it stays
@@ -793,6 +810,44 @@ private fun NetWorthCard(
                 trendBps = trends.expenseTrendBps,
                 upIsGood = false,
             )
+        }
+
+        // With a single currency the consolidated figure above already says
+        // everything; the web only breaks it out past that, and flags the ones
+        // whose MXN conversion is a guess.
+        if (summary.byCurrency.size > 1) {
+            Spacer(Modifier.height(12.dp))
+            ComposeFlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                summary.byCurrency.forEach { sub ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            sub.currencyCode,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = 14.sp,
+                                fontFamily = FontFamily.Monospace,
+                            ),
+                            color = colors.fg,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            maskIfHidden(formatMoney(sub.balanceCents, sub.currencyCode), hide),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            color = colors.fgMuted,
+                        )
+                        if (!sub.hasRate) {
+                            Text(
+                                " · " + stringResource(R.string.dashboard_no_rate),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                                color = colors.danger,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
