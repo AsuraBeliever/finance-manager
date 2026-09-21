@@ -57,6 +57,7 @@ import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
+import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.PrimaryButton
@@ -86,6 +87,8 @@ fun SubscriptionsScreen(
     var creating by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Subscription?>(null) }
     var actionsFor by remember { mutableStateOf<Subscription?>(null) }
+    // Deleting asks first, as it does in the browser.
+    var deleting by remember { mutableStateOf<Subscription?>(null) }
 
     when (val current = state) {
         is Load.Loading -> LoadingBox(modifier)
@@ -167,10 +170,7 @@ fun SubscriptionsScreen(
                     }
                     DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
                         actionsFor = null
-                        scope.launch {
-                            runCatching { repository.deleteSubscription(target.id) }
-                            reload()
-                        }
+                        deleting = target
                     }
                 }
             },
@@ -179,6 +179,21 @@ fun SubscriptionsScreen(
                     Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
                 }
             },
+        )
+    }
+
+    deleting?.let { target ->
+        ConfirmDialog(
+            title = stringResource(R.string.common_delete),
+            message = stringResource(R.string.subscriptions_delete_confirm),
+            onConfirm = {
+                deleting = null
+                scope.launch {
+                    runCatching { repository.deleteSubscription(target.id) }
+                    reload()
+                }
+            },
+            onDismiss = { deleting = null },
         )
     }
 }

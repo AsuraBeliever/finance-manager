@@ -55,6 +55,7 @@ import com.asura.finanzas.ui.components.BackHeader
 import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
+import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.PrimaryButton
@@ -84,6 +85,9 @@ fun CategoriesScreen(
 
     var editing by remember { mutableStateOf<TransactionCategory?>(null) }
     var actionsFor by remember { mutableStateOf<TransactionCategory?>(null) }
+    // Hiding a seed row or deleting a user one asks first, as the web does;
+    // restoring a hidden one is harmless and goes straight through.
+    var deleting by remember { mutableStateOf<TransactionCategory?>(null) }
 
     when (val current = state) {
         is Load.Loading -> LoadingBox(modifier)
@@ -96,12 +100,13 @@ fun CategoriesScreen(
             // The eye hides a category or restores it — the same single action
             // the web's row button offers.
             onToggleHidden = { target ->
-                scope.launch {
-                    runCatching {
-                        if (target.isHidden) repository.restoreCategory(target.id)
-                        else repository.deleteCategory(target.id)
+                if (target.isHidden) {
+                    scope.launch {
+                        runCatching { repository.restoreCategory(target.id) }
+                        reload()
                     }
-                    reload()
+                } else {
+                    deleting = target
                 }
             },
             // Order is kept per kind, exactly like the web's two sortable lists.
@@ -161,10 +166,7 @@ fun CategoriesScreen(
                             Broke.colors.danger,
                         ) {
                             actionsFor = null
-                            scope.launch {
-                                runCatching { repository.deleteCategory(target.id) }
-                                reload()
-                            }
+                            deleting = target
                         }
                     }
                 }
@@ -174,6 +176,29 @@ fun CategoriesScreen(
                     Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
                 }
             },
+        )
+    }
+
+    deleting?.let { target ->
+        ConfirmDialog(
+            title = stringResource(R.string.categories_delete_confirm_title),
+            // A seed row is only ever hidden — it comes back with "restore" —
+            // so it gets the gentler wording, exactly as on the web.
+            message = stringResource(
+                if (target.isSystem) R.string.categories_hide_confirm_message
+                else R.string.categories_delete_confirm_message,
+            ),
+            confirmLabel = stringResource(
+                if (target.isSystem) R.string.categories_hide else R.string.categories_delete,
+            ),
+            onConfirm = {
+                deleting = null
+                scope.launch {
+                    runCatching { repository.deleteCategory(target.id) }
+                    reload()
+                }
+            },
+            onDismiss = { deleting = null },
         )
     }
 }

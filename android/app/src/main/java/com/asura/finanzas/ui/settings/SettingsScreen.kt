@@ -392,15 +392,34 @@ fun SettingsScreen(
                 stringResource(R.string.whats_new_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = colors.fg,
-                modifier = Modifier.clickable { showWhatsNew = true },
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.whats_new_settings_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.fgSubtle,
-                modifier = Modifier.clickable { showWhatsNew = true },
             )
+            Spacer(Modifier.height(10.dp))
+            // The web puts the way in on its own accent link with a chevron,
+            // rather than leaving the heading quietly tappable.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { showWhatsNew = true },
+            ) {
+                Text(
+                    stringResource(R.string.whats_new_view),
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                    color = colors.accent,
+                )
+                Icon(
+                    Lucide.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.accent,
+                    modifier = Modifier.padding(start = 2.dp).size(15.dp),
+                )
+            }
             Spacer(Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
