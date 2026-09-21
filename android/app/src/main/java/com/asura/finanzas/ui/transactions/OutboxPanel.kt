@@ -13,10 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,6 +31,7 @@ import com.asura.finanzas.data.Outbox
 import com.asura.finanzas.data.OutboxItem
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.theme.Broke
@@ -74,7 +71,7 @@ fun OutboxPanel(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.Outlined.CloudOff,
+                Lucide.CloudOff,
                 contentDescription = null,
                 tint = colors.warning,
                 modifier = Modifier.size(16.dp),
@@ -118,7 +115,7 @@ fun OutboxPanel(
                 }
                 if (item.status == "error") {
                     Icon(
-                        Icons.Outlined.Refresh,
+                        Lucide.RotateCw,
                         contentDescription = stringResource(R.string.offline_retry),
                         tint = colors.fgMuted,
                         modifier = Modifier
@@ -132,7 +129,7 @@ fun OutboxPanel(
                     )
                 }
                 Icon(
-                    Icons.Outlined.Delete,
+                    Lucide.Trash,
                     contentDescription = stringResource(R.string.offline_discard),
                     tint = colors.fgMuted,
                     modifier = Modifier

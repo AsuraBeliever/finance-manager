@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CallMade
-import androidx.compose.material.icons.outlined.CallReceived
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,6 +27,7 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Transaction
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.PlainSheet
 import com.asura.finanzas.ui.components.IconBadge
@@ -159,7 +157,7 @@ private fun CategoryDetailRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconBadge(
-            if (income) Icons.Outlined.CallReceived else Icons.Outlined.CallMade,
+            if (income) Lucide.ArrowDownLeft else Lucide.ArrowUpRight,
             tint = tint,
             // `h-7 w-7` here, smaller than the one the movements list uses.
             size = 28.dp,

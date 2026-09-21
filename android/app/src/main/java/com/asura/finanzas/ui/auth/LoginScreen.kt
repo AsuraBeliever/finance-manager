@@ -24,10 +24,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
+import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.GlassCard
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -224,9 +222,9 @@ fun LoginScreen(
                 )
                 Icon(
                     imageVector = if (showPassword) {
-                        Icons.Outlined.VisibilityOff
+                        Lucide.EyeOff
                     } else {
-                        Icons.Outlined.Visibility
+                        Lucide.Eye
                     },
                     contentDescription = label,
                     tint = colors.fgSubtle,
