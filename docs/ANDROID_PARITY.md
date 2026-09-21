@@ -94,6 +94,42 @@ Cosas que salieron de hacer esto y conviene no repetir:
 **Estado del barrido:** cerrado. Se comparó pantalla por pantalla, en oscuro y
 en claro, con capturas medidas; el método y el orden que se siguió quedan en
 [`ANDROID_PARITY_SWEEP.md`](ANDROID_PARITY_SWEEP.md) por si hay que repetirlo.
+
+## Lo que el barrido visual no alcanzó a ver
+
+Aquel barrido comparaba **pantallas**, y por eso dio todo por bueno: lo que se
+le escapó fueron controles que no estaban y acciones que no existían, no
+pixeles. Un segundo barrido **funcional** (2026-09-20) los encontró cruzando
+tres cosas contra el código:
+
+1. Los 77 comandos de `worker/src/rpc.rs` contra los que llama cada cliente.
+2. Los campos que cada formulario manda en el cuerpo del comando.
+3. Las 625 llaves de `strings_i18n.xml` contra las que el Kotlin referencia de
+   verdad (`grep -rhoE 'R\.string\.[a-z0-9_]+'`). Eran 128 sin usar; quitando
+   las legítimamente web-only (`install_*`, los `aria-label`) y las muertas en
+   el propio diccionario, cada una de las que quedaba era un hueco.
+
+**Esa tercera comprobación es la que conviene repetir**, y es barata. Una llave
+generada que nadie usa es, casi siempre, algo que la web dice y el APK no.
+
+Lo peor que salió no era una feature faltante sino **pérdida de datos**:
+`update_wallet` reescribe los cuatro campos de tarjeta en cada guardado, y el
+APK no los mandaba, así que renombrar una tarjeta desde el teléfono le borraba
+el día de corte, el límite y la anualidad — y con el corte en NULL el panel de
+la tarjeta desaparecía. La regla que sale de ahí: **un comando que reescribe
+todo obliga al cliente a mandar todo**, incluso lo que esa pantalla no edita.
+
+Dos cosas más que sólo se ven probando, no mirando:
+
+- **El diálogo de un formulario necesita tope de altura.** La web le pone
+  `max-h-[90dvh]` y el cuerpo desplaza por dentro; el `Column` de Compose no
+  tenía tope, así que en cuanto el formulario creció (el de tarjeta) el par
+  Cancelar/Guardar quedó por debajo de la pantalla, inalcanzable por mucho que
+  se desplazara. Está en `FormSheet`.
+- **El generador hay que correrlo en cada release.** `changelog.json` venía sin
+  la entrada de 2.39.1 porque aquel release tocó `src/lib/changelog.ts` y no
+  regeneró el asset: «Novedades» nunca mostró esa versión en el teléfono.
+
 Diferencias conocidas que se dejaron a propósito:
 
 - En **Apariencia**, «Se reescala a 128 px…» cae al lado del botón en el APK y
@@ -103,6 +139,15 @@ Diferencias conocidas que se dejaron a propósito:
   es muy larga; en el APK la tarjeta crece. Para cualquier lista que quepa en
   pantalla se ven igual, y una columna desplazable ahí dentro es justo lo que
   tumba la app (ver arriba).
+- **Las pistas (`FieldHint`) van ~4 px CSS más arriba que en la web**, que les
+  da `mt-1`. El desfase se acumula dentro de un bloque largo (unos 18 px CSS al
+  final del de tarjeta de crédito). Está así en **todos** los formularios del
+  APK desde el primer barrido; corregirlo es una línea en `FieldHint`, pero
+  mueve las 18 pantallas que ya se firmaron, así que se deja hasta que haya
+  ganas de volver a medirlas todas.
+- **Los pips vacíos de un plan MSI casi no se ven**, porque el hueco y el fondo
+  del renglón son los dos `surface-overlay`. Es un rasgo de la web, reproducido
+  a propósito: se comprobó con captura lado a lado.
 
 Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 
@@ -123,6 +168,8 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Web | Android | Estado |
 |---|---|---|
 | Patrimonio + efectivo + inversiones | `ui/dashboard` | ✅ |
+| Subtotal por moneda bajo el patrimonio (>1 divisa) | `ui/dashboard` (`NetWorthCard`) | ✅ marca las que no tienen tipo de cambio |
+| Estado vacío (sin carteras ni inversiones) | `ui/dashboard` | ✅ |
 | Selector de periodo (`PeriodPicker`) | `components/PeriodPicker` | ✅ |
 | Lista de carteras con saldo | `ui/dashboard` | ✅ |
 | Donas «por cartera» y «por inversión» | `ui/dashboard/Widgets` | ✅ |
@@ -132,7 +179,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Widget desglose por categoría (dona gasto + ingreso) | `ui/dashboard/Widgets` + `CategoryDetailDialog` | ✅ |
 | Widget de presupuestos («límite de gasto») | `ui/dashboard/Widgets` | ✅ |
 | Widget de metas (anillo + barras) | `ui/dashboard/Widgets` | ✅ |
-| Widget de suscripciones | `ui/dashboard/Widgets` | ✅ |
+| Widget de suscripciones (sólo lo cobrado en el periodo) | `ui/dashboard/Widgets` | ✅ |
 | «Ver todo» de cada widget lleva a su pantalla | `ui/dashboard/Widgets` | ✅ |
 | Reordenar widgets + «Restablecer vista» | `ui/dashboard` ↔ `components/DashboardGrid` | ✅ mismo ajuste `dashboardOrder` |
 | Ocultar saldos (`PrivacyToggle`) | `ui/settings` + todas las cifras | ✅ |
@@ -145,10 +192,13 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Reordenar (`reorderWallets`) | `components/Reorder` (asa de arrastre) | ✅ |
 | Detalle de cartera + sus movimientos | `WalletDetailScreen` | ✅ |
 | Crear / editar cartera | `WalletFormSheet` | ✅ |
+| Rendimiento: tasa **y cadencia** (diario/semanal/quincenal/mensual) | `WalletFormSheet` | ✅ |
+| Datos de tarjeta: corte, días para pagar, límite, anualidad | `WalletFormSheet` (`CreditCardSection`) | ✅ |
+| «Deuda actual» en vez de «Saldo inicial» en una tarjeta | `WalletFormSheet` | ✅ el signo se voltea al guardar |
 | Archivar / eliminar | mantener presionada la tarjeta | ✅ |
 | Convertir meta en cartera | `ui/goals` (mantener presionada la meta) | ✅ |
 | Panel de tarjeta de crédito (corte, por pagar, utilización) | `WalletDetailScreen` | ✅ |
-| Planes MSI | `WalletDetailScreen` + `MsiPlanSheet` | ✅ |
+| Planes MSI (avance, mensualidad, «Liquidado ✓», borrar con confirmación) | `WalletDetailScreen` + `MsiPlanSheet` | ✅ |
 | Skins / colores de cartera | `ui/wallets/WalletSkins` | ✅ catálogo + `grad:` |
 
 ## Movimientos
@@ -157,10 +207,14 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 |---|---|---|
 | Lista (con las dos patas de una transferencia plegadas en un renglón) | `ui/transactions` | ✅ |
 | Filtros (cartera, tipo, categoría, periodo) | `ui/transactions` | ✅ |
-| Total de lo filtrado (`sumTransactions`) | `ui/transactions` | ✅ |
+| Total de lo filtrado (`sumTransactions`) | `ui/transactions` | ✅ con conteo y desglose por moneda |
+| Aviso de lista truncada a 100 | `ui/transactions` + `WalletDetailScreen` | ✅ |
+| «Sin resultados» distinto de «sin movimientos» | `ui/transactions` | ✅ |
 | Alta de ingreso | `TransactionFormSheet` | ✅ |
 | Alta de gasto | `TransactionFormSheet` | ✅ |
 | Alta de transferencia (incl. multimoneda) | `TransactionFormSheet` | ✅ |
+| Destino agrupado: «X y sus apartados» / «Otras carteras» | `TransactionFormSheet` + `PickerField(optionGroup)` | ✅ |
+| Al pagar una tarjeta, cuánto debes y para cuándo | `TransactionFormSheet` | ✅ |
 | Hora del movimiento (`occurredTime`) | `components/TimeField` | ✅ |
 | Editar movimiento (incl. transferencias) | `TransactionEditSheet` | ✅ |
 | Editar la pata de un movimiento de inversión desde la lista | `InvestmentLegEditSheet` | ✅ |
@@ -176,8 +230,10 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Lista + valuación | `ui/investments` | ✅ |
 | Resumen de portafolio (2×2 + dona) | `ui/investments` | ✅ |
 | Detalle + proyección | `ui/investments` + `components/LineChart` | ✅ |
+| What-if en la propia gráfica (aportación + cadencia + 3 cifras) | `InvestmentDetailScreen` | ✅ el botón ya no manda al simulador aparte |
+| Cantidad y símbolo en una inversión de cripto | `InvestmentDetailScreen` | ✅ |
 | Crear / editar desde el catálogo (tasa Banxico en vivo) | `NewInvestmentSheet` | ✅ |
-| Cerrar / eliminar | `ui/investments` | ✅ |
+| Cerrar / **reabrir** / eliminar (con confirmación) | `ui/investments` | ✅ un solo botón que alterna, como la web |
 | Movimientos: alta, edición y borrado | `InvestmentSheets` | ✅ |
 | Snapshots manuales | `InvestmentSheets` | ✅ |
 | Simulador (proyección · meta · comparar) | `SimulatorScreen` | ✅ los tres modos con sus mismos campos, cifras y gráficas |
@@ -189,9 +245,9 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Web | Android | Estado |
 |---|---|---|
 | Metas: lista, crear, editar, aportar/liberar, borrar, reordenar, plan con fecha | `ui/goals` | ✅ |
-| Presupuestos: lista, fijar, editar, borrar | `ui/budgets` | ✅ |
-| Suscripciones: lista, crear, editar, pagar, pausar, borrar | `ui/subscriptions` | ✅ |
-| Categorías: lista, crear, renombrar, borrar/ocultar, restaurar, reordenar | `ui/categories` | ✅ |
+| Presupuestos: lista, fijar, editar, borrar | `ui/budgets` | ✅ borrar confirma |
+| Suscripciones: lista, crear, editar, pagar, pausar, borrar | `ui/subscriptions` | ✅ borrar confirma |
+| Categorías: lista, crear, renombrar, borrar/ocultar, restaurar, reordenar | `ui/categories` | ✅ ocultar/borrar confirma, con el mensaje que toca |
 
 ## Ajustes
 
@@ -205,7 +261,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Formato de reloj 12/24 h | `ui/settings` + lista de movimientos | ✅ |
 | Categorías de cartera | `ui/settings` | ✅ (solo lectura, igual que la web) |
 | Monedas y tipos de cambio | `ui/settings/CurrenciesScreen` | ✅ ver, refrescar y fijar a mano — **la web no tiene esta pantalla** |
-| Novedades (changelog in-app) | `WhatsNewScreen` (asset **generado**) | ✅ |
+| Novedades (changelog in-app) | `WhatsNewScreen` (asset **generado**) | ✅ con enlace «Ver novedades» y estado vacío |
 | Aviso de versión nueva | `components/UpdateNotice` | ✅ avisa; instalar el APK sigue siendo manual |
 
 ## Transversal
@@ -216,7 +272,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Ocultar saldos (preferencia) | `ui/settings` | ✅ |
 | Caché offline de lectura | `JsonCache` | ✅ |
 | Banner «sin conexión» | `OfflineNotice` | ✅ |
-| Formato de dinero por moneda | `Money.kt` | ✅ |
+| Formato de dinero por moneda | `Money.kt` | ✅ con el espacio tras el código ISO, como `Intl` |
 | Paleta y tipografía «neon glass» | `ui/theme` | ✅ |
 
 ## Nota: login con Google en Android
