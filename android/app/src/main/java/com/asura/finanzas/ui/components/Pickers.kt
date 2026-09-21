@@ -71,6 +71,12 @@ fun <T> PickerField(
     enabled: Boolean = true,
     /** Shown when nothing is selected — e.g. "All wallets" for a filter. */
     emptyLabel: String = "",
+    /**
+     * The web's `<optgroup>`: the heading an option belongs under, or null for
+     * an ungrouped one. A heading is drawn when it changes from the option
+     * above, so the list must already be sorted by group.
+     */
+    optionGroup: (@Composable (T) -> String?)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val colors = Broke.colors
@@ -118,7 +124,23 @@ fun <T> PickerField(
                 onDismissRequest = { expanded = false },
                 containerColor = colors.surfaceOverlay,
             ) {
+                var lastGroup: String? = null
                 options.forEach { option ->
+                    val group = optionGroup?.invoke(option)
+                    if (group != null && group != lastGroup) {
+                        Text(
+                            group,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                            color = colors.fgSubtle,
+                            modifier = Modifier.padding(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = 10.dp,
+                                bottom = 4.dp,
+                            ),
+                        )
+                    }
+                    lastGroup = group
                     DropdownMenuItem(
                         text = {
                             Text(

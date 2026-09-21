@@ -47,6 +47,10 @@ import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.SegStyle
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.WebCheckbox
+import com.asura.finanzas.data.CreditCardSummary
+import com.asura.finanzas.ui.text
+import com.asura.finanzas.ui.formatMoney
+import com.asura.finanzas.ui.wallets.formatDayMonth
 import com.asura.finanzas.ui.components.FieldHint
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
@@ -137,6 +141,7 @@ fun TransactionFormSheet(
     val offlineError = stringResource(R.string.offline_banner)
     val needsDescription = stringResource(R.string.credit_msi_needs_description)
     val invalidMonths = stringResource(R.string.credit_msi_invalid_months)
+    val pickToWallet = stringResource(R.string.transactions_pick_to_wallet)
 
     // Income and expense have separate category sets, same as the web form.
     LaunchedEffect(kind) {
@@ -168,6 +173,11 @@ fun TransactionFormSheet(
         // `required` and the form simply refuses to submit with a complaint.
         if (source == null || cents == null || cents <= 0) {
             error = requiredError
+            return
+        }
+        // Same complaint the web throws, and for the same two cases.
+        if (kind == TxKind.Transfer && (toWallet == null || toWallet?.id == source.id)) {
+            error = pickToWallet
             return
         }
         busy = true
@@ -238,10 +248,12 @@ fun TransactionFormSheet(
     // The web's own guard, no stricter: an empty amount is caught on submit,
     // not by greying the button out — the two forms have to look the same the
     // moment they open.
+    // A missing destination is caught on submit with a message, not by greying
+    // Save out — the web leaves the button live and complains, and the two
+    // forms have to look the same the moment they open.
     val canSave = !busy &&
         (!msiActive || (description.isNotBlank() && msiMonthsValid)) &&
-        wallets.isNotEmpty() &&
-        (kind != TxKind.Transfer || toWallet != null)
+        wallets.isNotEmpty()
 
     // The shared dialog carries the title, the X, the divider and the
     // Cancel/Save pair, so this file is only its fields — same as the web,
@@ -293,17 +305,66 @@ fun TransactionFormSheet(
             )
 
             if (kind == TxKind.Transfer) {
+                // Moving money between a wallet and its own pockets is the
+                // common case, so the web lifts that family to the top of the
+                // list under its own heading and files the rest under "other".
+                val fromRootId = wallet?.let { it.parentWalletId ?: it.id }
+                val destinations = spendable.filter { it.id != wallet?.id }
+                val sameFamily = { w: Wallet ->
+                    fromRootId != null && (w.id == fromRootId || w.parentWalletId == fromRootId)
+                }
+                val family = destinations.filter(sameFamily)
+                val others = destinations.filterNot(sameFamily)
+                val familyLabel = text(
+                    R.string.transactions_to_wallet_same_family,
+                    "wallet" to wallets.firstOrNull { it.id == fromRootId }?.name.orEmpty(),
+                )
+                val othersLabel = stringResource(R.string.transactions_to_wallet_others)
+
                 PickerField(
                     label = stringResource(R.string.transactions_to_wallet),
-                    options = spendable.filter { it.id != wallet?.id },
+                    options = family + others,
                     selected = toWallet,
                     optionLabel = { walletLabel(it, wallets) },
                     onSelect = { toWallet = it },
                     // Nothing is picked to start with, and an empty box says
                     // nothing; the web puts the hint in the closed select.
                     emptyLabel = stringResource(R.string.transactions_pick_to_wallet_hint),
+                    // With no pockets to lift up it is one flat list, as it was.
+                    optionGroup = if (family.isEmpty()) null else {
+                        { w -> if (sameFamily(w)) familyLabel else othersLabel }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // Paying a card: say what the last statement still owes and by
+                // when, so the amount is not a guess. Every figure comes from
+                // get_credit_card_summary; nothing is worked out here.
+                toWallet?.takeIf { it.creditCutDay != null }?.let { card ->
+                    val summary by produceState<CreditCardSummary?>(null, card.id) {
+                        value = runCatching { repository.creditCardSummary(card.id) }.getOrNull()
+                    }
+                    summary?.let { s ->
+                        FieldHint(
+                            when {
+                                s.statement.remainingCents > 0 -> text(
+                                    R.string.credit_pay_context,
+                                    "amount" to formatMoney(
+                                        s.statement.remainingCents,
+                                        card.currencyCode,
+                                    ),
+                                    "date" to formatDayMonth(s.statement.dueDate),
+                                )
+                                // Statement clear but the running cycle already
+                                // owes (an MSI instalment, a fresh purchase).
+                                s.debtCents > 0 -> text(
+                                    R.string.credit_pay_context_debt,
+                                    "debt" to formatMoney(s.debtCents, card.currencyCode),
+                                )
+                                else -> stringResource(R.string.credit_pay_context_paid)
+                            },
+                        )
+                    }
+                }
             }
 
             MoneyField(
