@@ -256,6 +256,7 @@ private fun SubscriptionContent(
         if (data.subscriptions.isEmpty()) {
             item {
                 EmptyState(
+                    Lucide.CreditCard,
                     stringResource(R.string.subscriptions_empty_title),
                     stringResource(R.string.subscriptions_empty_description),
                 )

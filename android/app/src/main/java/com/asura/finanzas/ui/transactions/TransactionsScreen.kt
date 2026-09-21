@@ -21,14 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.CompareArrows
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.CallMade
-import androidx.compose.material.icons.outlined.CallReceived
-import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
@@ -52,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
@@ -317,54 +310,37 @@ fun TransactionsScreen(
     }
 
     pendingDelete?.let { target ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = {
-                Text(
-                    stringResource(
-                        if (target.isApartado) R.string.transactions_apartado_delete_title
-                        else R.string.transactions_delete_confirm_title,
-                    ),
-                )
-            },
-            text = {
-                Text(
-                    stringResource(
-                        when {
-                            target.isApartado ->
-                                R.string.transactions_apartado_delete_confirm
-                            // Deleting the wallet leg of an investment move takes
-                            // the contribution with it — they are one operation,
-                            // and the web says so before you agree.
-                            target.isInvestmentLeg ->
-                                R.string.transactions_delete_investment_leg_confirm
-                            else -> R.string.transactions_delete_confirm
-                        },
-                    ),
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingDelete = null
-                    scope.launch {
-                        runCatching {
-                            // An apartado row carries the contribution id negated.
-                            if (target.isApartado) {
-                                repository.deleteGoalContribution(-target.id)
-                            } else {
-                                repository.deleteTransaction(target.id)
-                            }
+        ConfirmDialog(
+            title = stringResource(
+                if (target.isApartado) R.string.transactions_apartado_delete_title
+                else R.string.transactions_delete_confirm_title,
+            ),
+            message = stringResource(
+                when {
+                    target.isApartado -> R.string.transactions_apartado_delete_confirm
+                    // Deleting the wallet leg of an investment move takes the
+                    // contribution with it — they are one operation, and the
+                    // web says so before you agree.
+                    target.isInvestmentLeg ->
+                        R.string.transactions_delete_investment_leg_confirm
+                    else -> R.string.transactions_delete_confirm
+                },
+            ),
+            onConfirm = {
+                pendingDelete = null
+                scope.launch {
+                    runCatching {
+                        // An apartado row carries the contribution id negated.
+                        if (target.isApartado) {
+                            repository.deleteGoalContribution(-target.id)
+                        } else {
+                            repository.deleteTransaction(target.id)
                         }
-                        reload()
                     }
-                }) { Text(stringResource(R.string.common_delete), color = Broke.colors.danger) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) {
-                    Text(stringResource(R.string.common_cancel))
+                    reload()
                 }
             },
+            onDismiss = { pendingDelete = null },
         )
     }
 }
@@ -410,7 +386,7 @@ private fun TransactionList(
                 PrimaryButton(
                     text = stringResource(R.string.transactions_new_transaction),
                     onClick = onNew,
-                    leadingIcon = Icons.Outlined.Add,
+                    leadingIcon = Lucide.Plus,
                 )
             }
         }
@@ -492,6 +468,7 @@ private fun TransactionList(
                 category != null || period != Period.AllTime
             item {
                 EmptyState(
+                    Lucide.ArrowLeftRight,
                     stringResource(
                         if (filtered) R.string.transactions_no_match_title
                         else R.string.transactions_empty_title,

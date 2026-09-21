@@ -30,14 +30,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -68,6 +60,7 @@ import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.seedName
+import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.ErrorBox
@@ -197,25 +190,17 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     }
 
     confirmDelete?.let { target ->
-        AlertDialog(
-            onDismissRequest = { confirmDelete = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(stringResource(R.string.wallets_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.wallets_delete_confirm_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = null
-                    scope.launch {
-                        runCatching { repository.deleteWallet(target.id) }
-                        reload()
-                    }
-                }) { Text(stringResource(R.string.common_delete), color = Broke.colors.danger) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = null }) {
-                    Text(stringResource(R.string.common_cancel))
+        ConfirmDialog(
+            title = stringResource(R.string.wallets_delete_confirm_title),
+            message = stringResource(R.string.wallets_delete_confirm_message),
+            onConfirm = {
+                confirmDelete = null
+                scope.launch {
+                    runCatching { repository.deleteWallet(target.id) }
+                    reload()
                 }
             },
+            onDismiss = { confirmDelete = null },
         )
     }
 }
@@ -290,7 +275,7 @@ private fun WalletList(
                 PrimaryButton(
                     text = stringResource(R.string.wallets_new_wallet),
                     onClick = onNew,
-                    leadingIcon = Icons.Outlined.Add,
+                    leadingIcon = Lucide.Plus,
                 )
             }
         }
@@ -302,6 +287,7 @@ private fun WalletList(
         if (roots.isEmpty()) {
             item {
                 EmptyState(
+                    Lucide.Wallet,
                     stringResource(R.string.wallets_empty_title),
                     stringResource(R.string.wallets_empty_description),
                 )
@@ -335,7 +321,7 @@ private fun WalletList(
                             .padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
                     ) {
                         Icon(
-                            Icons.Outlined.ExpandMore,
+                            Lucide.ChevronDown,
                             contentDescription = null,
                             tint = Broke.colors.fgSubtle,
                             modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = turn },

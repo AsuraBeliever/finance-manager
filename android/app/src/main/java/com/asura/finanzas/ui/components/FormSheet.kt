@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -86,6 +87,53 @@ fun FormSheet(
     fields: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = Broke.colors
+    ModalCard(title = title, onDismiss = onDismiss) {
+        fields()
+
+        error?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.danger,
+            )
+        }
+
+        Spacer(Modifier.height(2.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (busy) {
+                CircularProgressIndicator(
+                    color = colors.accent,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                GhostButton(stringResource(R.string.common_cancel), onDismiss)
+                PrimaryButton(text = saveLabel, onClick = onSave, enabled = canSave)
+            }
+        }
+    }
+}
+
+/**
+ * The web's `<Modal>`: the card every dialog in the app is built out of, so a
+ * confirmation and a form share one shape instead of the confirmation
+ * borrowing Material's.
+ *
+ * Metrics from `src/components/Modal.tsx`: max-w-md, rounded-2xl, a hairline
+ * border, header px-5 py-4 over a divider, body px-5 py-4, `max-h-[90dvh]`.
+ */
+@Composable
+fun ModalCard(
+    title: String,
+    onDismiss: () -> Unit,
+    bodySpacing: Dp = 14.dp,
+    body: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = Broke.colors
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -141,35 +189,9 @@ fun FormSheet(
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(bodySpacing),
             ) {
-                fields()
-
-                error?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                        color = colors.danger,
-                    )
-                }
-
-                Spacer(Modifier.height(2.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (busy) {
-                        CircularProgressIndicator(
-                            color = colors.accent,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    } else {
-                        GhostButton(stringResource(R.string.common_cancel), onDismiss)
-                        PrimaryButton(text = saveLabel, onClick = onSave, enabled = canSave)
-                    }
-                }
+                body()
             }
         }
     }
@@ -268,7 +290,13 @@ fun PlainSheet(
 }
 
 
-/** Yes/no confirmation, the web's `ConfirmDialog`. */
+/**
+ * Yes/no confirmation, the web's `ConfirmDialog`.
+ *
+ * Its own modal, not Material's `AlertDialog`: that one is narrower, has no
+ * title bar or X, drops the red badge and turns the destructive action into a
+ * text button — four tells at once on the dialog the app shows most.
+ */
 @Composable
 fun ConfirmDialog(
     title: String,
@@ -279,27 +307,37 @@ fun ConfirmDialog(
     confirmLabel: String = stringResource(R.string.common_delete),
 ) {
     val colors = Broke.colors
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = colors.surfaceOverlay,
-        title = { Text(title, color = colors.fg) },
-        text = {
-            DialogBlurBehind()
+    ModalCard(title = title, onDismiss = onDismiss) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(colors.danger.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Lucide.TriangleAlert,
+                    contentDescription = null,
+                    tint = colors.danger,
+                    modifier = Modifier.size(17.dp),
+                )
+            }
             Text(
                 message,
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                color = colors.fgMuted,
+                color = colors.fg,
+                modifier = Modifier.padding(top = 6.dp),
             )
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onConfirm) {
-                Text(confirmLabel, color = colors.danger)
-            }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_cancel), color = colors.fgMuted)
-            }
-        },
-    )
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GhostButton(stringResource(R.string.common_cancel), onDismiss)
+            DangerButton(text = confirmLabel, onClick = onConfirm)
+        }
+    }
 }

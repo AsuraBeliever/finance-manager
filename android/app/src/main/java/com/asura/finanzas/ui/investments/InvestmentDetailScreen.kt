@@ -315,7 +315,9 @@ private fun DetailContent(
                 StatBox(
                     stringResource(R.string.investments_gain),
                     maskIfHidden(formatDelta(detail.gainCents, detail.currencyCode), hide),
-                    valueColor = if (detail.gainCents >= 0) colors.positive else colors.danger,
+                    // The web paints this one with `text-accent`, not the
+                    // green it uses for a positive figure elsewhere.
+                    valueColor = if (detail.gainCents >= 0) colors.accent else colors.danger,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -506,7 +508,9 @@ private fun DetailContent(
                         ticks = if (hide) emptyList() else axisTicks(lo, hi),
                         // The web's SIM_GOLD while the what-if is on: a
                         // simulated curve should not look like the real one.
-                        color = if (simActive) Color(0xFFC9A14A) else null,
+                        // Otherwise `POSITIVE`, the green the web strokes the
+                        // projection with — not the accent.
+                        color = if (simActive) Color(0xFFC9A14A) else colors.positive,
                         dates = points.map { it.date },
                     )
                 }

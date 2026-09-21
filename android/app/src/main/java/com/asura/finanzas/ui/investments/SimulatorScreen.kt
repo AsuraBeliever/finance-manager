@@ -532,7 +532,7 @@ private fun InstrumentRow(inst: Instrument, onRate: (String) -> Unit) {
         Spacer(
             Modifier
                 .size(10.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .clip(RoundedCornerShape(4.dp))
                 .background(inst.color),
         )
         Text(
@@ -599,7 +599,7 @@ private fun CompareResult(
                     Spacer(
                         Modifier
                             .size(8.dp)
-                            .clip(RoundedCornerShape(2.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(inst.color),
                     )
                     Text(

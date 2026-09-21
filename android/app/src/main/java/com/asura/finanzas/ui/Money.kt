@@ -30,14 +30,16 @@ fun formatMoney(cents: Long, currencyCode: String = "MXN", withSymbol: Boolean =
 fun formatMoneyWithCode(cents: Long, currencyCode: String): String =
     "${formatMoney(cents, currencyCode)} $currencyCode"
 
-/** Signed, for deltas: "+$120.00" / "−$120.00" (true minus, not a hyphen). */
+/**
+ * Signed, for deltas: "+$120.00" / "−$120.00" (true minus, not a hyphen).
+ *
+ * Zero carries the plus, like the web: every caller branches on
+ * `gainCents >= 0`, so a flat position reads "+$0.00" in green there and has
+ * to read the same here.
+ */
 fun formatDelta(cents: Long, currencyCode: String = "MXN"): String {
     val body = formatMoney(kotlin.math.abs(cents), currencyCode)
-    return when {
-        cents > 0 -> "+$body"
-        cents < 0 -> "−$body"
-        else -> body
-    }
+    return if (cents < 0) "−$body" else "+$body"
 }
 
 /**

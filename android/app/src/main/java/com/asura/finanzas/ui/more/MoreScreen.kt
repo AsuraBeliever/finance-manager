@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,7 +40,17 @@ enum class MoreDestination(val labelRes: Int, val icon: ImageVector) {
     Goals(R.string.nav_goals, Lucide.PiggyBank),
     Budgets(R.string.nav_budgets, Lucide.Target),
     Subscriptions(R.string.nav_subscriptions, Lucide.CreditCard),
-    Categories(R.string.categories_title, Icons.Outlined.Category),
+    Categories(R.string.categories_title, Lucide.Tags),
+    ;
+
+    companion object {
+        /**
+         * What the sheet lists — the web's `planningItems`, which is three.
+         * Categories is reachable, but from Ajustes, the one door the web
+         * gives it; listing it here too made the phone's menu a row longer.
+         */
+        val Planning = listOf(Goals, Budgets, Subscriptions)
+    }
 }
 
 /**
@@ -94,7 +102,7 @@ fun MoreSheet(onDismiss: () -> Unit, onOpen: (MoreDestination) -> Unit) {
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
             )
             Column(Modifier.padding(horizontal = 8.dp)) {
-                MoreDestination.entries.forEach { entry ->
+                MoreDestination.Planning.forEach { entry ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

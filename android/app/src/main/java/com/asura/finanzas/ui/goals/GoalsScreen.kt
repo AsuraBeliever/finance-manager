@@ -1,5 +1,6 @@
 package com.asura.finanzas.ui.goals
 
+import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.PageHeader
 import androidx.activity.compose.BackHandler
@@ -191,106 +192,72 @@ fun GoalsScreen(
 
     confirmUse?.let { target ->
         val hide = LocalAppSettings.current.hideBalances
-        AlertDialog(
-            onDismissRequest = { confirmUse = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(stringResource(R.string.goals_buy)) },
-            text = {
-                Text(
-                    if (target.linkedWalletId != null) {
-                        text(
-                            R.string.goals_use_confirm_apartado,
-                            "amount" to maskIfHidden(
-                                formatMoney(target.savedCents, target.currencyCode),
-                                hide,
-                            ),
-                            "wallet" to walletName(target.linkedWalletId).orEmpty(),
-                        )
-                    } else {
-                        stringResource(R.string.goals_use_confirm_track)
-                    },
+        ConfirmDialog(
+            title = stringResource(R.string.goals_buy),
+            message = if (target.linkedWalletId != null) {
+                text(
+                    R.string.goals_use_confirm_apartado,
+                    "amount" to maskIfHidden(
+                        formatMoney(target.savedCents, target.currencyCode),
+                        hide,
+                    ),
+                    "wallet" to walletName(target.linkedWalletId).orEmpty(),
                 )
+            } else {
+                stringResource(R.string.goals_use_confirm_track)
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmUse = null
-                    scope.launch {
-                        runCatching { repository.useGoal(target.id) }
-                        reload()
-                    }
-                }) { Text(stringResource(R.string.goals_buy), color = Broke.colors.accent) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmUse = null }) {
-                    Text(stringResource(R.string.common_cancel))
+            confirmLabel = stringResource(R.string.goals_buy),
+            onConfirm = {
+                confirmUse = null
+                scope.launch {
+                    runCatching { repository.useGoal(target.id) }
+                    reload()
                 }
             },
+            onDismiss = { confirmUse = null },
         )
     }
 
     confirmConvert?.let { target ->
         val hide = LocalAppSettings.current.hideBalances
-        AlertDialog(
-            onDismissRequest = { confirmConvert = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(stringResource(R.string.goals_convert_to_wallet)) },
-            text = {
-                Text(
-                    text(
-                        R.string.goals_convert_moves,
-                        "amount" to maskIfHidden(
-                            formatMoney(target.savedCents, target.currencyCode),
-                            hide,
-                        ),
-                    ),
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmConvert = null
-                    scope.launch {
-                        // No style overrides: the new wallet keeps the goal's
-                        // own name and colour, which is the web's default too.
-                        runCatching {
-                            repository.convertGoalToWallet(target.id, null, target.color, null)
-                        }
-                        reload()
+        ConfirmDialog(
+            title = stringResource(R.string.goals_convert_to_wallet),
+            message = text(
+                R.string.goals_convert_moves,
+                "amount" to maskIfHidden(
+                    formatMoney(target.savedCents, target.currencyCode),
+                    hide,
+                ),
+            ),
+            confirmLabel = stringResource(R.string.goals_convert_to_wallet),
+            onConfirm = {
+                confirmConvert = null
+                scope.launch {
+                    // No style overrides: the new wallet keeps the goal's own
+                    // name and colour, which is the web's default too.
+                    runCatching {
+                        repository.convertGoalToWallet(target.id, null, target.color, null)
                     }
-                }) {
-                    Text(
-                        stringResource(R.string.goals_convert_to_wallet),
-                        color = Broke.colors.accent,
-                    )
+                    reload()
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { confirmConvert = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+            onDismiss = { confirmConvert = null },
         )
     }
 
     confirmDelete?.let { target ->
-        AlertDialog(
-            onDismissRequest = { confirmDelete = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(target.name) },
-            text = { Text(stringResource(R.string.goals_delete_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = null
-                    scope.launch {
-                        runCatching { repository.deleteGoal(target.id) }
-                        reload()
-                    }
-                }) { Text(stringResource(R.string.common_delete), color = Broke.colors.danger) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = null }) {
-                    Text(stringResource(R.string.common_cancel))
+        ConfirmDialog(
+            // "Delete", the way the web titles it — not the goal's own name.
+            title = stringResource(R.string.common_delete),
+            message = stringResource(R.string.goals_delete_confirm),
+            onConfirm = {
+                confirmDelete = null
+                scope.launch {
+                    runCatching { repository.deleteGoal(target.id) }
+                    reload()
                 }
             },
+            onDismiss = { confirmDelete = null },
         )
     }
 }
@@ -320,7 +287,9 @@ private fun GoalList(
     }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val firstRow = 1 + (if (fromCache) 1 else 0) + (if (goals.isEmpty()) 1 else 0)
+    // header + offline banner? + empty state? + the reorder hint, which is
+    // always drawn.
+    val firstRow = 2 + (if (fromCache) 1 else 0) + (if (goals.isEmpty()) 1 else 0)
     val reorderState = rememberReorderState(
         listState = listState,
         scope = scope,
@@ -345,14 +314,6 @@ private fun GoalList(
                     leadingIcon = Lucide.Plus,
                 )
             }
-            if (goals.size > 1) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.goals_reorder_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Broke.colors.fgSubtle,
-                )
-            }
         }
 
         if (fromCache) {
@@ -362,10 +323,22 @@ private fun GoalList(
         if (goals.isEmpty()) {
             item {
                 EmptyState(
+                    Lucide.PiggyBank,
                     stringResource(R.string.goals_empty_title),
                     stringResource(R.string.goals_empty_description),
                 )
             }
+        }
+
+        // Always, and under the empty state — that is where the web prints it,
+        // and hiding it below two goals meant the line simply was not there on
+        // a screen where the web showed it.
+        item {
+            Text(
+                stringResource(R.string.goals_reorder_hint),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = Broke.colors.fgSubtle,
+            )
         }
 
         itemsIndexed(ordered, key = { _, it -> it.id }) { _, goal ->

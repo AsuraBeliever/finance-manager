@@ -193,6 +193,7 @@ private fun BudgetList(
         if (budgets.isEmpty()) {
             item {
                 EmptyState(
+                    Lucide.Wallet,
                     stringResource(R.string.budgets_empty_title),
                     stringResource(R.string.budgets_empty_description),
                 )

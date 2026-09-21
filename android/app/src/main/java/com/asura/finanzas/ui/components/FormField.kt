@@ -21,6 +21,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
@@ -55,6 +57,27 @@ import com.asura.finanzas.ui.theme.Broke
  *
  * Pass a blank `label` where the web shows the control on its own.
  */
+
+/**
+ * The type size inside a form control — input, select or textarea.
+ *
+ * 16 sp, not the 14 sp of `text-sm`: the web bumps every control to 16 px on a
+ * touch device (`@media (pointer: coarse)` in `index.css`) so iOS Safari stops
+ * auto-zooming on focus. A phone therefore never sees the 14 px version, and
+ * matching `text-sm` here left every value in the app visibly smaller than the
+ * same value in the browser.
+ */
+val ControlFontSize = 16.sp
+
+/**
+ * …and the size for a control the web does not build out of an input.
+ *
+ * That rule lists `input, select, textarea`; the date box is a `<button>`
+ * wearing `inputClass`, so it keeps `text-sm`. Bumping it too clipped
+ * "September 21, 2026" mid-year.
+ */
+val ButtonControlFontSize = 14.sp
+
 @Composable
 fun FormField(
     label: String,
@@ -63,6 +86,13 @@ fun FormField(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     enabled: Boolean = true,
+    /**
+     * Colour of the value. `enabled = false` otherwise greys it out, which
+     * is wrong for a box that only looks disabled because you pick its
+     * value from a dialog (date, time): the web draws those in the plain
+     * foreground, and greyed they read as an unfilled placeholder.
+     */
+    valueColor: androidx.compose.ui.graphics.Color? = null,
     singleLine: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
@@ -76,6 +106,14 @@ fun FormField(
     leading: @Composable (() -> Unit)? = null,
     /** Drawn inside the box after the text. */
     trailing: @Composable (() -> Unit)? = null,
+    /**
+     * Focus handle for a field the form opens on — the web's `autoFocus`.
+     * It has to reach the text field itself; `modifier` lands on the row
+     * around it, where a focus request does nothing.
+     */
+    focusRequester: FocusRequester? = null,
+    /** Overridable for a control the web does not build out of an input. */
+    fontSize: androidx.compose.ui.unit.TextUnit = ControlFontSize,
 ) {
     val colors = Broke.colors
     val interaction = remember { MutableInteractionSource() }
@@ -96,11 +134,13 @@ fun FormField(
             keyboardActions = keyboardActions,
             visualTransformation = visualTransformation,
             textStyle = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 14.sp,
-                color = if (enabled) colors.fg else colors.fgSubtle,
+                fontSize = fontSize,
+                color = valueColor ?: if (enabled) colors.fg else colors.fgSubtle,
             ),
             cursorBrush = SolidColor(colors.accent),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .let { if (focusRequester != null) it.focusRequester(focusRequester) else it },
             decorationBox = { inner ->
                 Row(
                     modifier = Modifier
@@ -125,7 +165,8 @@ fun FormField(
                         if (value.isEmpty() && placeholder.isNotBlank()) {
                             Text(
                                 placeholder,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                                style = MaterialTheme.typography.bodyMedium
+                                    .copy(fontSize = ControlFontSize),
                                 color = colors.fgSubtle,
                             )
                         }
@@ -134,7 +175,8 @@ fun FormField(
                     if (suffix.isNotBlank()) {
                         Text(
                             suffix,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            style = MaterialTheme.typography.bodyMedium
+                                .copy(fontSize = ControlFontSize),
                             color = colors.fgSubtle,
                         )
                     }
@@ -184,6 +226,7 @@ fun MoneyField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     suffix: String = "",
+    focusRequester: FocusRequester? = null,
 ) {
     val cents = value.toBigDecimalOrNull()?.movePointRight(2)?.toLong()
     val display = cents?.let { groupCents(it) }.orEmpty()
@@ -200,6 +243,7 @@ fun MoneyField(
             )
         },
         modifier = modifier,
+        focusRequester = focusRequester,
         placeholder = "0.00",
         singleLine = true,
         suffix = suffix,
@@ -207,7 +251,7 @@ fun MoneyField(
         leading = {
             Text(
                 "$",
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = ControlFontSize),
                 color = Broke.colors.fgSubtle,
             )
         },

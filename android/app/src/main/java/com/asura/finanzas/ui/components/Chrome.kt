@@ -23,10 +23,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,8 +35,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -145,7 +148,15 @@ fun PageHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            // The header's `gap-3`. `SpaceBetween` alone never reserves it, so
+            // the actions rode the title's line at widths where flexbox had
+            // already wrapped them — Movimientos was one line here and two in
+            // the browser. Carried as end padding, it counts towards the wrap
+            // and is swallowed by the free space when they do fit.
+            modifier = Modifier.padding(end = 12.dp),
+        ) {
             // Same tab and title metrics as the web's PageHeader: a 4×28 rule
             // in the "gold" accent (cyan here) and a 1.9rem display title.
             Box(
@@ -287,26 +298,82 @@ fun Dot(color: androidx.compose.ui.graphics.Color, size: androidx.compose.ui.uni
     )
 }
 
-/** Centred placeholder text for empty lists. */
+/**
+ * The web's `EmptyState`: a dashed card with an accent badge above the title.
+ *
+ * It was two bare centred texts here, which on a screen with nothing else on
+ * it read as a page that had failed to load rather than one with nothing in
+ * it yet. Every measurement is the web's — `rounded-2xl`, `py-16`, `gap-3`, a
+ * 56 px badge on `accent-dim/15` inside a `ring-1 ring-accent/20`, and a
+ * 1 px dashed border whose 3 dp/2 dp rhythm is what the browser draws.
+ */
 @Composable
-fun EmptyState(title: String, description: String, modifier: Modifier = Modifier) {
+fun EmptyState(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
+    val colors = Broke.colors
+    val shape = RoundedCornerShape(16.dp)
     Column(
-        modifier = modifier.fillMaxWidth().padding(vertical = 40.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(colors.surfaceRaised.copy(alpha = 0.4f))
+            .drawBehind {
+                val stroke = 1.dp.toPx()
+                drawRoundRect(
+                    color = colors.borderMuted,
+                    topLeft = Offset(stroke / 2, stroke / 2),
+                    size = androidx.compose.ui.geometry.Size(
+                        size.width - stroke,
+                        size.height - stroke,
+                    ),
+                    cornerRadius = CornerRadius(16.dp.toPx()),
+                    style = Stroke(
+                        width = stroke,
+                        pathEffect = PathEffect.dashPathEffect(
+                            floatArrayOf(3.dp.toPx(), 2.dp.toPx()),
+                        ),
+                    ),
+                )
+            }
+            .padding(vertical = 64.dp, horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(shape)
+                .background(colors.accentDim.copy(alpha = 0.15f))
+                .border(1.dp, colors.accent.copy(alpha = 0.2f), shape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = colors.accent,
+                modifier = Modifier.size(24.dp),
+            )
+        }
         Text(
             title,
-            style = MaterialTheme.typography.titleMedium,
-            color = Broke.colors.fg,
+            style = MaterialTheme.typography.titleLarge,
+            color = colors.fg,
             textAlign = TextAlign.Center,
         )
-        Text(
-            description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Broke.colors.fgMuted,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 6.dp),
-        )
+        if (description.isNotBlank()) {
+            Text(
+                description,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fgSubtle,
+                textAlign = TextAlign.Center,
+                // `max-w-sm`, so a long line breaks before the card edge.
+                modifier = Modifier.widthIn(max = 384.dp),
+            )
+        }
     }
 }
 
@@ -334,7 +401,7 @@ fun BackHeader(
                 .padding(vertical = 6.dp, horizontal = 2.dp),
         ) {
             Icon(
-                Icons.AutoMirrored.Outlined.ArrowBack,
+                Lucide.ArrowLeft,
                 contentDescription = null,
                 tint = colors.fgMuted,
                 modifier = Modifier.size(20.dp),

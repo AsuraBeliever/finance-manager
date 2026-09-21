@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,10 +33,6 @@ import com.asura.finanzas.ui.components.rememberReorderState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -91,6 +88,19 @@ import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
 
 private val rpcJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+/** The line box of a chart's axis tick (`labelSmall`), used to centre it. */
+private val TICK_LABEL_HEIGHT = 16.dp
+
+// The plot box recharts lays out, which is what decides how fat a bar is: a
+// band is the plot divided by the number of buckets. Letting the chart run to
+// the card's own edges made the band a fifth wider here than in the browser.
+/** `<YAxis width={40}>` — the strip the tick labels live in. */
+private val AXIS_WIDTH = 40.dp
+/** Of that strip, what stays clear between the label and the axis line. */
+private val AXIS_TICK_GAP = 9.dp
+/** Recharts' default `margin` of 5 on every side. */
+private val CHART_MARGIN = 5.dp
 
 /** Where a widget's "View all" sends you. */
 enum class DashboardTarget { Budgets, Goals, Subscriptions }
@@ -398,6 +408,7 @@ private fun DashboardContent(
         if (summary.wallets.isEmpty() && summary.investmentsTotalMxnCents == 0L) {
             item {
                 EmptyState(
+                    Lucide.LayoutDashboard,
                     stringResource(R.string.dashboard_empty_title),
                     stringResource(R.string.dashboard_empty_description),
                 )
@@ -557,8 +568,15 @@ private fun FlowChart(trends: SpendingTrends) {
     Row(modifier = Modifier.fillMaxWidth().height(170.dp)) {
         // Vertical scale, hidden with the balances like every other figure.
         if (!hide) {
+            // Each tick label sits centred on its gridline, as in the browser.
+            // Spacing five labels inside the plot's own 150 dp instead drops the
+            // top one half a line, and a full-height bar then overshoots it.
             Column(
-                modifier = Modifier.height(150.dp),
+                modifier = Modifier
+                    .padding(start = CHART_MARGIN)
+                    .width(AXIS_WIDTH - AXIS_TICK_GAP)
+                    .height(150.dp + TICK_LABEL_HEIGHT)
+                    .offset(y = -TICK_LABEL_HEIGHT / 2),
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.End,
             ) {
@@ -570,7 +588,7 @@ private fun FlowChart(trends: SpendingTrends) {
                     )
                 }
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(AXIS_TICK_GAP))
         }
 
         // The chart draws its axes as hairlines; without them the bars floated.
@@ -583,6 +601,7 @@ private fun FlowChart(trends: SpendingTrends) {
         Row(
             modifier = Modifier
                 .weight(1f)
+                .padding(end = CHART_MARGIN)
                 .drawBehind {
                     val y = size.height - axisLabelHeight.toPx()
                     drawLine(
@@ -592,7 +611,6 @@ private fun FlowChart(trends: SpendingTrends) {
                         strokeWidth = 1.dp.toPx(),
                     )
                 },
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             buckets.forEach { bucket ->
@@ -601,13 +619,20 @@ private fun FlowChart(trends: SpendingTrends) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Bottom,
                 ) {
+                    // A bar is as wide as its share of the band, not a fixed
+                    // sliver: recharts keeps `barCategoryGap` — 10% of the
+                    // band at *each* end — clear and splits the rest between
+                    // the two series, so with few buckets the bars are fat.
+                    // Pinning them to 5 dp drew hairlines where the web drew
+                    // columns. (`FlowRangeCard` reads 0.55 for the same reason:
+                    // one band at `barCategoryGap="22%"`.)
                     Row(
-                        modifier = Modifier.height(150.dp),
+                        modifier = Modifier.fillMaxWidth(0.8f).height(150.dp),
                         verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Bar(bucket.incomeMxnCents, max, colors.positive)
-                        Bar(bucket.expenseMxnCents, max, colors.danger)
+                        Bar(bucket.incomeMxnCents, max, colors.positive, Modifier.weight(1f))
+                        Bar(bucket.expenseMxnCents, max, colors.danger, Modifier.weight(1f))
                     }
                     Text(
                         bucketLabel(bucket.key, trends.bucketUnit),
@@ -689,14 +714,25 @@ private fun bucketLabel(key: String, unit: String): String {
     }
 }
 
+/**
+ * One series' bar inside a bucket. The caller sizes it across (a share of the
+ * band); here it only takes its share of the 150 dp plot, so a bar worth the
+ * top tick reaches that tick exactly — the way it does in the browser. Only
+ * the top corners are rounded, `radius={[3, 3, 0, 0]}` on the web.
+ */
 @Composable
-private fun Bar(value: Long, max: Long, color: androidx.compose.ui.graphics.Color) {
+private fun Bar(
+    value: Long,
+    max: Long,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
     val fraction = (value.toFloat() / max.toFloat()).coerceIn(0f, 1f)
     Box(
-        Modifier
-            .width(5.dp)
-            .height((130 * fraction).dp.coerceAtLeast(if (value > 0) 3.dp else 0.dp))
-            .clip(RoundedCornerShape(3.dp))
+        modifier
+            .fillMaxHeight(fraction)
+            .heightIn(min = if (value > 0) 2.dp else 0.dp)
+            .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
             .background(color),
     )
 }
@@ -757,7 +793,7 @@ private fun NetWorthCard(
                 color = colors.fgMuted,
             )
             Icon(
-                Icons.AutoMirrored.Filled.ArrowForward,
+                Lucide.ArrowRight,
                 contentDescription = null,
                 tint = colors.fgSubtle,
                 modifier = Modifier.padding(start = 12.dp).size(20.dp),
@@ -774,18 +810,31 @@ private fun NetWorthCard(
         HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 36.sp)
 
         Spacer(Modifier.height(12.dp))
-        LegendRow(
-            color = colors.accent,
-            label = stringResource(R.string.nav_wallets),
-            amount = maskIfHidden(formatMoney(summary.totalEndMxnCents), hide),
-        )
-        if (summary.investmentsTotalMxnCents > 0) {
-            Spacer(Modifier.height(6.dp))
+        // One wrapping line with a middle dot between the two, the web's
+        // `flex flex-wrap gap-x-2`. Stacking them in a column read as two
+        // separate facts and dropped the separator the web draws.
+        ComposeFlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             LegendRow(
-                color = colors.cyan,
-                label = stringResource(R.string.nav_investments),
-                amount = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
+                color = colors.accent,
+                label = stringResource(R.string.nav_wallets),
+                amount = maskIfHidden(formatMoney(summary.totalEndMxnCents), hide),
             )
+            if (summary.investmentsTotalMxnCents > 0) {
+                Text(
+                    "\u00B7",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    color = colors.borderMuted,
+                )
+                LegendRow(
+                    color = colors.cyan,
+                    label = stringResource(R.string.nav_investments),
+                    amount = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
+                )
+            }
         }
 
         // Only when the period actually moved money. A quiet month otherwise
@@ -900,8 +949,15 @@ private fun FlowRangeCard(
         // left, hairline axes, and the legend underneath, expenses first.
         Row(modifier = Modifier.fillMaxWidth().height(170.dp)) {
             if (!hide) {
+                // Each tick label sits centred on its gridline, as in the browser.
+                // Spacing five labels inside the plot's own 150 dp instead drops the
+                // top one half a line, and a full-height bar then overshoots it.
                 Column(
-                    modifier = Modifier.height(150.dp),
+                    modifier = Modifier
+                        .padding(start = CHART_MARGIN)
+                        .width(AXIS_WIDTH - AXIS_TICK_GAP)
+                        .height(150.dp + TICK_LABEL_HEIGHT)
+                        .offset(y = -TICK_LABEL_HEIGHT / 2),
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.End,
                 ) {
@@ -913,7 +969,7 @@ private fun FlowRangeCard(
                         )
                     }
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(AXIS_TICK_GAP))
             }
 
             Box(
@@ -925,6 +981,7 @@ private fun FlowRangeCard(
             Box(
                 modifier = Modifier
                     .weight(1f)
+                    .padding(end = CHART_MARGIN)
                     .height(150.dp)
                     .drawBehind {
                         drawLine(

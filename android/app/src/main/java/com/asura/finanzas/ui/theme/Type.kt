@@ -99,6 +99,29 @@ val BrokeTypography = Typography(
         fontSize = 12.sp,
         lineHeight = 16.sp,
     ),
+    // The three below are easy to forget because nothing in this file reads
+    // them — but `FieldLabel` (labelMedium) and `FieldHint` (bodySmall) do, on
+    // every form in the app. Left unset they keep Material's defaults, which
+    // means Roboto *and* its 0.4–0.5 sp tracking: side by side with the
+    // browser the labels were a different face and ran wider.
+    labelMedium = TextStyle(
+        fontFamily = HankenGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+    ),
+    bodySmall = TextStyle(
+        fontFamily = HankenGrotesk,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+    ),
+    displayMedium = TextStyle(
+        fontFamily = Sora,
+        fontWeight = FontWeight.Medium,
+        fontSize = 40.sp,
+        lineHeight = 46.sp,
+    ),
 )
 
 // ---- user-selectable type pairings ----

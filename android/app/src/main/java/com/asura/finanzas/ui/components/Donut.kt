@@ -220,7 +220,7 @@ fun LegendBelowDonut(slices: List<DonutSlice>, modifier: Modifier = Modifier) {
                     Box(
                         Modifier
                             .size(10.dp)
-                            .clip(RoundedCornerShape(2.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(slice.color),
                     )
                     Text(

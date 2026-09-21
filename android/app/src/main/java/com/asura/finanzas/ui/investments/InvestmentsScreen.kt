@@ -208,6 +208,7 @@ private fun InvestmentList(
         if (shown.isEmpty()) {
             item {
                 EmptyState(
+                    Lucide.TrendingUp,
                     stringResource(R.string.investments_empty_title),
                     stringResource(R.string.investments_empty_description),
                 )
@@ -278,7 +279,7 @@ private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
                             Box(
                                 Modifier
                                     .size(10.dp)
-                                    .clip(RoundedCornerShape(2.dp))
+                                    .clip(RoundedCornerShape(4.dp))
                                     .background(chartColor(index)),
                             )
                             Spacer(Modifier.width(6.dp))
