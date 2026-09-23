@@ -62,6 +62,7 @@ import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 
 @Composable
@@ -259,14 +260,14 @@ private fun BudgetCard(
                 maskIfHidden(formatMoney(budget.spentMxnCents), hide) + " " +
                     stringResource(R.string.goals_of) + " " +
                     maskIfHidden(formatMoney(budget.limitCents), hide),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp).tabular(),
                 color = colors.fgMuted,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 stringResource(if (over) R.string.budgets_over else R.string.budgets_remaining) +
                     ": " + maskIfHidden(formatMoney(remaining), hide),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp).tabular(),
                 color = if (over) colors.danger else colors.accent,
             )
         }

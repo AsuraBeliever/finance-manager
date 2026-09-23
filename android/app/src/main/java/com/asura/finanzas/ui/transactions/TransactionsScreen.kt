@@ -89,6 +89,8 @@ import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.TrackingWide
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -609,7 +611,7 @@ private fun TransactionRow(
                 ) + " → " + maskIfHidden(formatMoney(toLeg.amountCents), hide)
                 else -> maskIfHidden(formatMoney(tx.amountCents), hide)
             },
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp).tabular(),
             color = tint,
         )
         // The web's `gap-3` sits between every child of the row, this one
@@ -864,7 +866,8 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                     ).uppercase(),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 12.sp,
-                        letterSpacing = 0.3.sp,
+                        letterSpacing = TrackingWide,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
                     ),
                     color = colors.fgSubtle,
                 )
@@ -881,7 +884,7 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                         fontSize = 24.sp,
                         lineHeight = 30.sp,
                         fontWeight = FontWeight.SemiBold,
-                    ),
+                    ).tabular(),
                     // Income in the accent, expense in the danger colour, as on
                     // the web — the figure is the whole point of the card.
                     color = if (income) colors.accent else colors.danger,
@@ -905,7 +908,7 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                                 maskIfHidden(formatMoney(it.cents, it.currencyCode), hide) +
                                     " " + it.currencyCode
                             },
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                         color = colors.fgSubtle,
                         textAlign = TextAlign.End,
                     )

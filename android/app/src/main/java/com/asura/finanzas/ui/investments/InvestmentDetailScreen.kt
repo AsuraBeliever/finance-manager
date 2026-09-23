@@ -71,6 +71,7 @@ import com.asura.finanzas.ui.formatDelta
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 
 @Composable
@@ -648,7 +649,7 @@ private fun MovementRow(
         Text(
             (if (deposit) "+" else "−") +
                 maskIfHidden(formatMoney(movement.amountCents, currencyCode), hide),
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp).tabular(),
             color = if (deposit) colors.accent else colors.danger,
         )
     }
@@ -687,7 +688,7 @@ private fun StatBox(
         Spacer(Modifier.height(4.dp))
         Text(
             value,
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 20.sp, lineHeight = 26.sp),
+            style = MaterialTheme.typography.displayLarge.copy(fontSize = 20.sp, lineHeight = 28.sp),
             color = valueColor ?: colors.fg,
         )
     }
@@ -784,7 +785,7 @@ private fun MiniStat(label: String, value: String, color: Color) {
         Spacer(Modifier.height(2.dp))
         Text(
             value,
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 18.sp),
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 18.sp, lineHeight = 28.sp),
             color = color,
         )
     }

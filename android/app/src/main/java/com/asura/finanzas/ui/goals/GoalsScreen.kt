@@ -82,6 +82,7 @@ import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 
 @Composable
@@ -454,13 +455,13 @@ fun GoalCard(
                     fontSize = 24.sp,
                     lineHeight = 28.sp,
                     fontWeight = FontWeight.SemiBold,
-                ),
+                ).tabular(),
                 color = colors.fg,
             )
             Text(
                 " " + stringResource(R.string.goals_of) + " " +
                     maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp).tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(start = 6.dp, bottom = 2.dp),
             )
@@ -500,7 +501,7 @@ fun GoalCard(
                         }
                     }
                 },
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.tabular(),
                 modifier = Modifier.weight(1f),
             )
             // Both of these are ghost Buttons on the web — plain foreground on

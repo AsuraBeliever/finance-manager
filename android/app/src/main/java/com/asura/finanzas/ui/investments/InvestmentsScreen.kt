@@ -69,6 +69,7 @@ import com.asura.finanzas.ui.formatDelta
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 
 @Composable
 fun InvestmentsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
@@ -310,7 +311,7 @@ private fun Stat(
         Spacer(Modifier.height(2.dp))
         Text(
             value,
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp),
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp, lineHeight = 29.33.sp),
             color = valueColor,
         )
     }
@@ -352,7 +353,7 @@ private fun InvestmentCard(investment: Investment, hide: Boolean, onOpen: (Inves
         Spacer(Modifier.height(8.dp))
         Text(
             maskIfHidden(formatMoney(investment.currentValueCents, investment.currencyCode), hide),
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineMedium.tabular(),
             color = colors.fg,
         )
         Spacer(Modifier.height(4.dp))
@@ -368,7 +369,7 @@ private fun InvestmentCard(investment: Investment, hide: Boolean, onOpen: (Inves
             Spacer(Modifier.width(6.dp))
             Text(
                 maskIfHidden(formatDelta(investment.gainCents, investment.currencyCode), hide),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyLarge.tabular(),
                 color = if (investment.gainCents >= 0) colors.accent else colors.danger,
             )
         }

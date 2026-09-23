@@ -37,6 +37,7 @@ import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import com.asura.finanzas.ui.transactions.transactionTimeLabel
 
 /**
@@ -107,7 +108,7 @@ fun CategoryDetailDialog(
                     )
                     Text(
                         maskIfHidden(formatMoney(target.mxnCents), hide),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.tabular(),
                         color = colors.fg,
                     )
                 }
@@ -185,7 +186,7 @@ private fun CategoryDetailRow(
         Text(
             (if (income) "+" else "−") +
                 maskIfHidden(formatMoney(tx.amountCents, currency), hide),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.tabular(),
             color = tint,
         )
     }

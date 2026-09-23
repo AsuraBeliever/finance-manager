@@ -5,6 +5,7 @@ import com.asura.finanzas.ui.components.PeriodPickerDialog
 import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.ChipButton
+import com.asura.finanzas.ui.theme.tabular
 import com.asura.finanzas.ui.transactions.TransactionTotal
 import com.asura.finanzas.ui.transactions.KindFilter
 import com.asura.finanzas.data.TxTotals
@@ -507,7 +508,7 @@ private fun BalanceCard(
                 ),
                 hide,
             ),
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp),
+            style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp).tabular(),
             color = colors.fg,
         )
         credit?.creditLimitCents?.let { limit ->
@@ -516,7 +517,7 @@ private fun BalanceCard(
                     "{limit}",
                     maskIfHidden(formatMoney(limit, wallet.currencyCode), hide),
                 ),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -530,7 +531,7 @@ private fun BalanceCard(
                         hide,
                     ) + " · " + stringResource(R.string.wallets_reserved) + " " +
                     maskIfHidden(formatMoney(reserved, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -545,7 +546,7 @@ private fun BalanceCard(
                             formatMoney(-wallet.initialBalanceCents, wallet.currencyCode),
                             hide,
                         ),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                     color = colors.fgSubtle,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -554,7 +555,7 @@ private fun BalanceCard(
             Text(
                 stringResource(R.string.wallets_initial_balance) + ": " +
                     maskIfHidden(formatMoney(wallet.initialBalanceCents, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -621,14 +622,14 @@ private fun CreditPanel(
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
-            ),
+            ).tabular(),
             color = if (summary.debtCents > 0) colors.danger else colors.fg,
         )
         if (summary.pendingMsiCents > 0) {
             Text(
                 "${stringResource(R.string.credit_msi_pending_total)}: " +
                     maskIfHidden(formatMoney(summary.pendingMsiCents, currency), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
             )
         }
@@ -676,7 +677,7 @@ private fun CreditPanel(
                     } else {
                         ""
                     },
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
             )
             Spacer(Modifier.height(4.dp))
@@ -710,7 +711,7 @@ private fun CreditPanel(
                             hide,
                         ),
                     ),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                     color = colors.fgMuted,
                 )
             }
@@ -836,7 +837,7 @@ private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () 
                     R.string.credit_msi_monthly,
                     "amount" to maskIfHidden(formatMoney(plan.monthlyCents, currency), hide),
                 ),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelLarge.tabular(),
                 color = colors.fgMuted,
             )
             Spacer(Modifier.width(10.dp))
@@ -954,7 +955,7 @@ private fun WalletGoalRow(goal: SavingsGoal, hide: Boolean) {
                 maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide) + " " +
                     stringResource(R.string.goals_of) + " " +
                     maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
             )
         }

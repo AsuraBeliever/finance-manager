@@ -86,11 +86,13 @@ import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.TrackingWide
+import com.asura.finanzas.ui.theme.tabular
 
 private val rpcJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
 /** The line box of a chart's axis tick (`labelSmall`), used to centre it. */
-private val TICK_LABEL_HEIGHT = 16.dp
+private val TICK_LABEL_HEIGHT = 16.5.dp
 
 // The plot box recharts lays out, which is what decides how fat a bar is: a
 // band is the plot divided by the number of buckets. Letting the chart run to
@@ -472,7 +474,7 @@ private fun LegendRow(color: androidx.compose.ui.graphics.Color, label: String, 
         Spacer(Modifier.width(8.dp))
         Text(
             amount,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium.tabular().copy(fontSize = 14.sp),
             color = colors.fg,
         )
     }
@@ -499,7 +501,7 @@ private fun FlowRow(
         Spacer(Modifier.width(8.dp))
         Text(
             amount,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium.tabular().copy(fontSize = 14.sp),
             color = colors.fg,
         )
         // Nothing to compare against reads as noise, so the web hides it at zero.
@@ -508,7 +510,7 @@ private fun FlowRow(
             Text(
                 text = stringResource(R.string.dashboard_previously) + " " +
                     maskIfHidden(formatMoney(previousCents), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
             )
         }
@@ -583,7 +585,8 @@ private fun FlowChart(trends: SpendingTrends) {
                 listOf(1f, 0.75f, 0.5f, 0.25f, 0f).forEach { fraction ->
                     Text(
                         ((max * fraction).toLong() / 100).toString(),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                        style = MaterialTheme.typography.labelSmall
+                            .copy(fontSize = 11.sp, lineHeight = 16.5.sp),
                         color = colors.fgSubtle,
                     )
                 }
@@ -783,13 +786,14 @@ private fun NetWorthCard(
         MicroLabel(
             stringResource(R.string.dashboard_period_start),
             color = colors.fgSubtle,
-            letterSpacing = 0.3.sp,
+            letterSpacing = TrackingWide,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
         )
         Spacer(Modifier.height(2.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 maskIfHidden(formatMoney(netStart), hide),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineMedium.tabular(),
                 color = colors.fgMuted,
             )
             Icon(
@@ -804,7 +808,8 @@ private fun NetWorthCard(
         MicroLabel(
             stringResource(R.string.dashboard_period_end),
             color = colors.fgSubtle,
-            letterSpacing = 0.3.sp,
+            letterSpacing = TrackingWide,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
         )
         // `text-4xl` — 36 px, not the 40 sp the other heroes use.
         HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 36.sp)
@@ -884,7 +889,7 @@ private fun NetWorthCard(
                         Spacer(Modifier.width(4.dp))
                         Text(
                             maskIfHidden(formatMoney(sub.balanceCents, sub.currencyCode), hide),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp).tabular(),
                             color = colors.fgMuted,
                         )
                         if (!sub.hasRate) {
@@ -964,7 +969,8 @@ private fun FlowRangeCard(
                     listOf(1f, 0.75f, 0.5f, 0.25f, 0f).forEach { fraction ->
                         Text(
                             ((max * fraction).toLong() / 100).toString(),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                            style = MaterialTheme.typography.labelSmall
+                            .copy(fontSize = 11.sp, lineHeight = 16.5.sp),
                             color = colors.fgSubtle,
                         )
                     }

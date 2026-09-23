@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.TrackingEyebrow
+import com.asura.finanzas.ui.theme.tabular
 
 /**
  * The gradient-mesh canvas from `src/index.css` (`body::before`): three soft
@@ -168,7 +170,9 @@ fun PageHeader(
             )
             Text(
                 text = title,
-                style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp, lineHeight = 30.sp),
+                // No override: `displayLarge` is already the page title's
+                // `text-[1.9rem] leading-none tracking-tight`, to the tenth.
+                style = MaterialTheme.typography.displayLarge,
                 color = colors.fg,
                 modifier = Modifier.padding(start = 12.dp),
             )
@@ -218,16 +222,23 @@ fun MicroLabel(
     text: String,
     modifier: Modifier = Modifier,
     color: androidx.compose.ui.graphics.Color? = null,
-    letterSpacing: androidx.compose.ui.unit.TextUnit = 2.sp,
+    letterSpacing: androidx.compose.ui.unit.TextUnit = TrackingEyebrow,
+    /**
+     * `.eyebrow` is medium; the plainer `uppercase tracking-wide` captions the
+     * web scatters around (a stat's name, a date) are regular. Same size, and
+     * at 11 px the difference in weight is the whole difference.
+     */
+    fontWeight: androidx.compose.ui.text.font.FontWeight =
+        androidx.compose.ui.text.font.FontWeight.Medium,
 ) {
     Text(
         text = text.uppercase(),
+        // `.eyebrow`: 0.7rem over a 1.5 line box, tracked wide.
         style = MaterialTheme.typography.labelSmall.copy(
             letterSpacing = letterSpacing,
-            fontSize = 11.sp,
-            // Compose's own leading would sit the glyphs ~8 px lower than the
-            // browser's line box does, which throws off every gap below.
-            lineHeight = 15.sp,
+            fontWeight = fontWeight,
+            fontSize = 11.2.sp,
+            lineHeight = 16.8.sp,
         ),
         color = color ?: Broke.colors.fgMuted,
         modifier = modifier,
@@ -244,9 +255,11 @@ fun HeroAmount(
     val colors = Broke.colors
     Text(
         text = text,
-        style = MaterialTheme.typography.displayLarge.copy(
+        style = MaterialTheme.typography.displayLarge.tabular().copy(
             fontSize = fontSize,
-            lineHeight = fontSize * 1.15f,
+            // `text-4xl` is 2.25rem over a 2.5rem line box; 1.15 was a guess
+            // that sat every hero a couple of pixels low.
+            lineHeight = fontSize * 1.1111f,
             // `font-semibold` on the money heroes; the headers stay medium.
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             brush = Brush.linearGradient(
@@ -360,7 +373,9 @@ fun EmptyState(
         }
         Text(
             title,
-            style = MaterialTheme.typography.titleLarge,
+            // The only `font-display text-lg` in the app without
+            // `tracking-tight`, so the role's has to be undone here.
+            style = MaterialTheme.typography.titleLarge.copy(letterSpacing = 0.sp),
             color = colors.fg,
             textAlign = TextAlign.Center,
         )

@@ -38,6 +38,7 @@ import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 
 /**
  * Card title with an optional "View all" affordance, as on the web.
@@ -186,7 +187,7 @@ fun BudgetWidget(
                 Text(
                     maskIfHidden(formatMoney(budget.spentMxnCents), hide) + " / " +
                         maskIfHidden(formatMoney(budget.limitCents), hide),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.tabular(),
                     color = if (over) colors.danger else colors.fgSubtle,
                 )
             }
@@ -234,7 +235,7 @@ fun GoalsWidget(
                     maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide) +
                         " ${stringResource(R.string.goals_of)} " +
                         maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp).tabular(),
                     color = colors.fgSubtle,
                 )
             }
@@ -264,7 +265,7 @@ fun SubscriptionsWidget(
         Text(
             "${stringResource(R.string.subscriptions_charged_in_period)}: " +
                 maskIfHidden(formatMoney(monthlyTotalMxnCents), hide),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.tabular(),
             color = colors.fgSubtle,
         )
         charged.take(5).forEach { subscription ->
@@ -291,7 +292,7 @@ fun SubscriptionsWidget(
                         formatMoney(subscription.amountCents, subscription.currencyCode),
                         hide,
                     ),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.tabular(),
                     color = colors.fg,
                 )
             }

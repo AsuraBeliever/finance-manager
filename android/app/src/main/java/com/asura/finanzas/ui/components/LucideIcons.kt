@@ -19,39 +19,39 @@ import androidx.compose.ui.unit.dp
  *
  * Keep them in sync with `node_modules/lucide-react/dist/esm/icons/<name>.mjs`.
  */
-object Lucide {
-    val Wallet by lazy {
-        icon(
+private val WALLET_PATHS = arrayOf(
             "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1",
             "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4",
-        )
-    }
+    )
 
-    val Banknote by lazy {
-        icon(
+private val BANKNOTE_PATHS = arrayOf(
             "M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z",
             "M14 12a2 2 0 1 1-4 0 2 2 0 1 1 4 0z",
             "M6 12h.01",
             "M18 12h.01",
-        )
-    }
+    )
 
-    val Coins by lazy {
-        icon(
+private val COINS_PATHS = arrayOf(
             "M13.744 17.736a6 6 0 1 1-7.48-7.48",
             "M15 6h1v4",
             "m6.134 14.768.866-.5 2 3.464",
             "M22 8a6 6 0 1 1-12 0 6 6 0 1 1 12 0z",
-        )
-    }
+    )
 
-    val PiggyBank by lazy {
-        icon(
+private val PIGGY_PATHS = arrayOf(
             "M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z",
             "M16 10h.01",
             "M2 8v1a2 2 0 0 0 2 2h1",
-        )
-    }
+    )
+
+object Lucide {
+    val Wallet by lazy { icon(*WALLET_PATHS) }
+
+    val Banknote by lazy { icon(*BANKNOTE_PATHS) }
+
+    val Coins by lazy { icon(*COINS_PATHS) }
+
+    val PiggyBank by lazy { icon(*PIGGY_PATHS) }
 
     /** Six dots in two columns — every drag handle in the app. */
     val GripVertical by lazy {
@@ -410,7 +410,26 @@ object Lucide {
  * and joins and no fill — a dot like `M16 10h.01` only shows up because of the
  * round cap, so those settings are not cosmetic.
  */
-private fun icon(vararg pathData: String): ImageVector =
+/**
+ * The four money motifs at the watermark's own weight — `strokeWidth={1.25}`
+ * in `WalletCard.tsx`.
+ */
+object LucideThin {
+    val Wallet by lazy { icon(1.25f, *WALLET_PATHS) }
+    val Banknote by lazy { icon(1.25f, *BANKNOTE_PATHS) }
+    val Coins by lazy { icon(1.25f, *COINS_PATHS) }
+    val PiggyBank by lazy { icon(1.25f, *PIGGY_PATHS) }
+}
+
+private fun icon(vararg pathData: String): ImageVector = icon(2f, *pathData)
+
+/**
+ * Same glyph at another stroke weight. lucide-react's `strokeWidth` prop
+ * scales with the icon, so a 150 px watermark drawn at 1.25 has a 7.8 px
+ * stroke where the default 2 would give 12.5 — the difference between a hint
+ * of a motif and a drawing.
+ */
+private fun icon(strokeWidth: Float, vararg pathData: String): ImageVector =
     ImageVector.Builder(
         defaultWidth = 24.dp,
         defaultHeight = 24.dp,
@@ -422,7 +441,7 @@ private fun icon(vararg pathData: String): ImageVector =
                 pathData = PathParser().parsePathString(d).toNodes(),
                 fill = null,
                 stroke = SolidColor(Color.Black),
-                strokeLineWidth = 2f,
+                strokeLineWidth = strokeWidth,
                 strokeLineCap = StrokeCap.Round,
                 strokeLineJoin = StrokeJoin.Round,
             )

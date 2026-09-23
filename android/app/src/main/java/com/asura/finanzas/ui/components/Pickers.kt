@@ -107,7 +107,8 @@ fun <T> PickerField(
                 Text(
                     text = if (selected != null) optionLabel(selected) else emptyLabel,
                     // The closed `<select>`, so the same 16 sp as an input.
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = ControlFontSize),
+                    style = MaterialTheme.typography.bodyMedium
+                        .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
                     color = if (enabled) colors.fg else colors.fgSubtle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

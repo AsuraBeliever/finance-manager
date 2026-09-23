@@ -177,6 +177,47 @@ el ojo no había cazado. Lo que conviene recordar:
   web hace `setSetting("theme", …)` e hidrata al entrar; ahora `AppearanceSync`
   también.
 
+## Cuarto barrido (2026-09-22): paridad de métrica
+
+El tercero cerró «sin diferencias que se noten». Este fue a por las que **no**
+se notan: se sacó del navegador el estilo calculado de cada rol de texto
+(`getComputedStyle` a ancho de teléfono) y se comparó contra el ancho que
+predicen los propios binarios de fuente con fontTools. Lo que salió:
+
+- **La fuente es la misma** — Hanken Grotesk 3.013 y Sora 2.000, `upm` 1000,
+  las dos variables. Google sirve un solo archivo por familia para todos los
+  pesos, y es el que está en `res/font/`. Cualquier diferencia de ancho, por
+  tanto, no es la fuente.
+- **`tabular-nums`.** La web lo escribe en 64 lugares — toda cifra que imprime.
+  Las cifras tabulares de Sora son bastante más anchas que las
+  proporcionales: el patrimonio salía 50 px corto. Va en `fontFeatureSettings
+  = "tnum"`, y como sólo cambia dígitos es inocuo donde no los hay. El helper
+  es `TextStyle.tabular()`; se aplica donde el texto viene de `formatMoney`,
+  `formatDelta` o `maskIfHidden`, que es exactamente donde la web lo pone.
+- **Tailwind trae un `line-height` con cada `text-*`, y Compose no.** Peor:
+  `.copy(fontSize = …)` **no** reescala el `lineHeight`, así que un rol usado
+  a otro tamaño lo arrastra mal. Están todos anotados en `Type.kt` con el
+  número que reporta el navegador.
+- **El título de página es `text-[1.9rem]`, o sea 30.4 px, no 30.**
+- **`tracking-tight` (−0.025em) va en varios títulos**, y Android **redondea el
+  letter-spacing a pixel entero**: a 30.4 sp los −2.28 px por hueco caían a −3
+  y el título quedaba ~5 px más apretado que en flexbox. En un encabezado que
+  está a dos pixeles de envolver eso decide si son una línea o dos. `TrackingTight`
+  lleva el valor que aterriza donde el navegador **después** del redondeo.
+- **Las micro-etiquetas no son todas del mismo peso.** `.eyebrow` es 500; las
+  `uppercase tracking-wide` sueltas («AT THE END», «PERIOD START») son 400. A
+  11 px el peso es toda la diferencia: se veía 24% más tinta.
+- **El motivo de la tarjeta lleva `strokeWidth={1.25}`**, no el 2 de Lucide, y
+  desborda 8 px a la derecha (`-right-2`). Con el trazo por defecto y 2 dp de
+  desborde el mismo glifo de 150 px se leía como uno más grande y más gordo.
+
+**Lo que queda, y no es de la app:** el rasterizador. Chromium pone ~10-15%
+más tinta que Skia en texto claro sobre fondo oscuro, así que la caja de tinta
+medida sale 2-3% más ancha en el navegador aunque el trazado sea el mismo —
+mismo glifo, misma posición de arranque, mismo avance. Se comprueba contando
+pixeles encendidos de la misma cadena: el ancho de caja difiere, la densidad
+no. No hay ajuste de la app que lo iguale.
+
 Diferencias conocidas que se dejaron a propósito:
 
 - En **Apariencia**, «Se reescala a 128 px…» cae al lado del botón en el APK y

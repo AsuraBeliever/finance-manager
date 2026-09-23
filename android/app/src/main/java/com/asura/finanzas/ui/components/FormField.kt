@@ -70,6 +70,13 @@ import com.asura.finanzas.ui.theme.Broke
 val ControlFontSize = 16.sp
 
 /**
+ * The line box that comes with it: `text-sm` ships a *unitless* 1.4286, so
+ * forcing the size to 16 px stretches the line to 22.86 — not the 20 the
+ * 14 px version has.
+ */
+val ControlLineHeight = 22.86.sp
+
+/**
  * …and the size for a control the web does not build out of an input.
  *
  * That rule lists `input, select, textarea`; the date box is a `<button>`
@@ -135,6 +142,10 @@ fun FormField(
             visualTransformation = visualTransformation,
             textStyle = MaterialTheme.typography.bodyMedium.copy(
                 fontSize = fontSize,
+                lineHeight = fontSize * 1.4286f,
+                // Every control the web prints a figure in is `tabular-nums`,
+                // and the ones that are not have no digits to change.
+                fontFeatureSettings = "tnum",
                 color = valueColor ?: if (enabled) colors.fg else colors.fgSubtle,
             ),
             cursorBrush = SolidColor(colors.accent),
@@ -166,7 +177,7 @@ fun FormField(
                             Text(
                                 placeholder,
                                 style = MaterialTheme.typography.bodyMedium
-                                    .copy(fontSize = ControlFontSize),
+                                    .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
                                 color = colors.fgSubtle,
                             )
                         }
@@ -176,7 +187,7 @@ fun FormField(
                         Text(
                             suffix,
                             style = MaterialTheme.typography.bodyMedium
-                                .copy(fontSize = ControlFontSize),
+                                .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
                             color = colors.fgSubtle,
                         )
                     }
@@ -251,7 +262,8 @@ fun MoneyField(
         leading = {
             Text(
                 "$",
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = ControlFontSize),
+                style = MaterialTheme.typography.bodyMedium
+                    .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
                 color = Broke.colors.fgSubtle,
             )
         },

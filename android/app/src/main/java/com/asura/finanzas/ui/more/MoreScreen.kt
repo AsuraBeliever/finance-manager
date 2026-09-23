@@ -30,6 +30,7 @@ import androidx.activity.compose.BackHandler
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.TrackingEyebrow
 
 /**
  * The web keeps five items in the mobile bar and folds planning behind "More".
@@ -96,7 +97,7 @@ fun MoreSheet(onDismiss: () -> Unit, onOpen: (MoreDestination) -> Unit) {
                 stringResource(R.string.nav_planning).uppercase(),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontSize = 11.2.sp,
-                    letterSpacing = 2.02.sp,
+                    letterSpacing = TrackingEyebrow,
                 ),
                 color = colors.fgMuted,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),

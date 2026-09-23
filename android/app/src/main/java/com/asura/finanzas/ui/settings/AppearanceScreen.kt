@@ -232,7 +232,7 @@ fun AppearanceScreen(
                     Spacer(Modifier.width(10.dp))
                     Text(
                         current.appName.ifBlank { stringResource(R.string.app_name) },
-                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 20.sp),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 20.sp, lineHeight = 28.sp),
                         color = colors.fg,
                         maxLines = 1,
                     )
