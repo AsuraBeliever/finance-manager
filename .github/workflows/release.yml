@@ -110,6 +110,10 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The default also asks for the legacy `tools` package, which the
+          # SDK repository no longer serves — sdkmanager then fails outright.
+          packages: platform-tools
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
