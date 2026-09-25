@@ -731,6 +731,10 @@ export const esDict = {
     action: "Actualizar",
     updating: "Actualizando…",
     updatingHint: "Aplicando la nueva versión, no cierres la app.",
+    // Android only: the APK downloads the new release and hands it to the
+    // system installer.
+    downloadingHint: "Descargando la nueva versión; Android te pedirá confirmar la instalación.",
+    downloadFailed: "No se pudo descargar la actualización. Intenta de nuevo en unos minutos.",
   },
   whatsNew: {
     title: "Qué hay de nuevo",
