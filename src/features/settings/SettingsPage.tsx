@@ -5,7 +5,7 @@ import { es as dateLocaleEs, enUS as dateLocaleEn } from "date-fns/locale";
 import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Sparkles, Tags } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
-import { InstallButton } from "../../components/InstallButton";
+import { InstallOfferView, useInstallOffer } from "../../components/InstallButton";
 import { PageHeader } from "../../components/PageHeader";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { WhatsNewModal } from "../update/WhatsNew";
@@ -103,6 +103,7 @@ function DevicesList() {
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
+  const install = useInstallOffer();
   const categories = useQuery({
     queryKey: ["walletCategories"],
     queryFn: listWalletCategories,
@@ -210,14 +211,16 @@ export function SettingsPage() {
           </Link>
         </section>
 
-        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
-          <h3 className="mb-1 flex items-center gap-2 font-medium">
-            <Download size={16} className="text-fg-subtle" />
-            {es.install.title}
-          </h3>
-          <p className="mb-3 text-xs text-fg-subtle">{es.install.hint}</p>
-          <InstallButton showInstalled />
-        </section>
+        {install.offer && (
+          <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+            <h3 className="mb-1 flex items-center gap-2 font-medium">
+              <Download size={16} className="text-fg-subtle" />
+              {es.install.title}
+            </h3>
+            <p className="mb-3 text-xs text-fg-subtle">{es.install.hint}</p>
+            <InstallOfferView install={install} detailed />
+          </section>
+        )}
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-1 flex items-center gap-2 font-medium">

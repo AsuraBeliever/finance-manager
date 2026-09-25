@@ -337,12 +337,12 @@
     <string name="install_title">Instalar app</string>
     <string name="install_hint">Instálala en tu dispositivo para abrirla como una app, con su propia ventana e ícono.</string>
     <string name="install_action">Instalar app</string>
-    <string name="install_installed">Ya está instalada en este dispositivo ✓</string>
-    <string name="install_desktop_app">Ya estás usando la app de escritorio ✓</string>
     <string name="install_ios_hint">En iPhone o iPad: toca el botón Compartir y luego «Agregar a pantalla de inicio».</string>
     <string name="install_manual_hint">Si no aparece el botón, abre el menú de tu navegador y elige «Instalar app» o «Agregar a pantalla de inicio».</string>
     <string name="install_download_windows">Descargar para Windows</string>
     <string name="install_download_linux">Descargar para Linux</string>
+    <string name="install_download_android">Descargar para Android</string>
+    <string name="install_android_hint">Al abrir el .apk, Android te pedirá permiso para instalar desde el navegador — es normal en una app que no viene de la Play Store.</string>
     <string name="install_other_formats">Otras opciones de Linux (.deb, .rpm)…</string>
     <string name="categories_title">Categorías</string>
     <string name="categories_manage">Gestionar categorías</string>

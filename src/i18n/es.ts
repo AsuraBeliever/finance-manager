@@ -388,14 +388,15 @@ export const esDict = {
     title: "Instalar app",
     hint: "Instálala en tu dispositivo para abrirla como una app, con su propia ventana e ícono.",
     action: "Instalar app",
-    installed: "Ya está instalada en este dispositivo ✓",
-    desktopApp: "Ya estás usando la app de escritorio ✓",
     iosHint:
       "En iPhone o iPad: toca el botón Compartir y luego «Agregar a pantalla de inicio».",
     manualHint:
       "Si no aparece el botón, abre el menú de tu navegador y elige «Instalar app» o «Agregar a pantalla de inicio».",
     downloadWindows: "Descargar para Windows",
     downloadLinux: "Descargar para Linux",
+    downloadAndroid: "Descargar para Android",
+    androidHint:
+      "Al abrir el .apk, Android te pedirá permiso para instalar desde el navegador — es normal en una app que no viene de la Play Store.",
     otherFormats: "Otras opciones de Linux (.deb, .rpm)…",
   },
   categories: {
