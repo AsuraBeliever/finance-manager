@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.40.2",
+    date: "2026-09-25",
+    es: [
+      "Desde el navegador de un teléfono Android, «Instalar app» ahora te da la app de Android (el .apk) en vez de decirte que ya estaba instalada.",
+      "Y si ya tienes la app, la sección de instalar simplemente no aparece: nada de avisos de «ya está instalada».",
+    ],
+    en: [
+      "From the browser on an Android phone, \"Install app\" now gives you the Android app (the .apk) instead of telling you it was already installed.",
+      "And if you already have the app, the install section just doesn't show up — no more \"already installed\" notices.",
+    ],
+  },
+  {
     version: "2.40.1",
     date: "2026-09-25",
     es: [
