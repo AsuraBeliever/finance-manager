@@ -72,6 +72,7 @@ import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 
 @Composable
@@ -247,7 +248,7 @@ private fun SubscriptionContent(
                 Text(
                     maskIfHidden(formatMoney(data.monthlyTotalMxnCents), hide),
                     style = MaterialTheme.typography.displayLarge
-                        .copy(fontSize = 16.sp, lineHeight = 20.sp),
+                        .copy(fontSize = 16.sp, lineHeight = 20.sp).tabular(),
                     color = Broke.colors.fg,
                 )
             }
@@ -256,6 +257,7 @@ private fun SubscriptionContent(
         if (data.subscriptions.isEmpty()) {
             item {
                 EmptyState(
+                    Lucide.CreditCard,
                     stringResource(R.string.subscriptions_empty_title),
                     stringResource(R.string.subscriptions_empty_description),
                 )
@@ -359,7 +361,7 @@ private fun SubscriptionCard(
                     formatMoney(subscription.amountCents, subscription.currencyCode),
                     hide,
                 ),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.tabular(),
                 color = colors.fg,
             )
             // Register a payment, pause/resume, edit, delete.

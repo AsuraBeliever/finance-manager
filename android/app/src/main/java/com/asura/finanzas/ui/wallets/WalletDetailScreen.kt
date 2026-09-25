@@ -5,6 +5,7 @@ import com.asura.finanzas.ui.components.PeriodPickerDialog
 import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.ChipButton
+import com.asura.finanzas.ui.theme.tabular
 import com.asura.finanzas.ui.transactions.TransactionTotal
 import com.asura.finanzas.ui.transactions.KindFilter
 import com.asura.finanzas.data.TxTotals
@@ -31,9 +32,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +67,7 @@ import com.asura.finanzas.data.MsiSchedulePreview
 import com.asura.finanzas.data.Transaction
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
+import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.HairLine
@@ -170,9 +169,9 @@ fun WalletDetailScreen(
             // line and only drop below when the name is long enough to push
             // them off it.
             PageHeader(current.name, actionGap = 8.dp) {
-                Action(Icons.Outlined.Edit, stringResource(R.string.common_edit)) { onEdit(current) }
+                Action(Lucide.Pencil, stringResource(R.string.common_edit)) { onEdit(current) }
                 Action(
-                    Icons.Outlined.Archive,
+                    Lucide.Archive,
                     stringResource(
                         if (current.isArchived) R.string.wallets_unarchive
                         else R.string.wallets_archive,
@@ -184,7 +183,7 @@ fun WalletDetailScreen(
                     }
                 }
                 Action(
-                    Icons.Outlined.Delete,
+                    Lucide.Trash,
                     stringResource(R.string.common_delete),
                     colors.danger,
                 ) {
@@ -266,7 +265,26 @@ fun WalletDetailScreen(
         totals?.let { summary ->
             item { TransactionTotal(summary, hide, income = txKind.wire == "income") }
         }
-        if (movements.isNotEmpty()) {
+        if (movements.isEmpty()) {
+            // The web swaps the list for an empty state here, and says a
+            // different thing when a filter is what emptied it. Without this
+            // the screen just stopped after the period chip, with nothing to
+            // explain the gap.
+            item {
+                val filtered = txKind != KindFilter.All || txPeriod != Period.AllTime
+                EmptyState(
+                    Lucide.ArrowLeftRight,
+                    stringResource(
+                        if (filtered) R.string.transactions_no_match_title
+                        else R.string.transactions_empty_title,
+                    ),
+                    stringResource(
+                        if (filtered) R.string.transactions_no_match_description
+                        else R.string.transactions_empty_description,
+                    ),
+                )
+            }
+        } else {
             item {
                 TransactionListCard(
                     transactions = movements,
@@ -441,7 +459,7 @@ private fun Action(
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = tint ?: colors.fgMuted, modifier = Modifier.size(15.dp))
+        Icon(icon, contentDescription = null, tint = tint ?: colors.fg, modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(8.dp))
         Text(
             label,
@@ -490,7 +508,7 @@ private fun BalanceCard(
                 ),
                 hide,
             ),
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp),
+            style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp).tabular(),
             color = colors.fg,
         )
         credit?.creditLimitCents?.let { limit ->
@@ -499,7 +517,7 @@ private fun BalanceCard(
                     "{limit}",
                     maskIfHidden(formatMoney(limit, wallet.currencyCode), hide),
                 ),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -513,7 +531,7 @@ private fun BalanceCard(
                         hide,
                     ) + " · " + stringResource(R.string.wallets_reserved) + " " +
                     maskIfHidden(formatMoney(reserved, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -528,7 +546,7 @@ private fun BalanceCard(
                             formatMoney(-wallet.initialBalanceCents, wallet.currencyCode),
                             hide,
                         ),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                     color = colors.fgSubtle,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -537,7 +555,7 @@ private fun BalanceCard(
             Text(
                 stringResource(R.string.wallets_initial_balance) + ": " +
                     maskIfHidden(formatMoney(wallet.initialBalanceCents, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -604,14 +622,14 @@ private fun CreditPanel(
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
-            ),
+            ).tabular(),
             color = if (summary.debtCents > 0) colors.danger else colors.fg,
         )
         if (summary.pendingMsiCents > 0) {
             Text(
                 "${stringResource(R.string.credit_msi_pending_total)}: " +
                     maskIfHidden(formatMoney(summary.pendingMsiCents, currency), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
             )
         }
@@ -659,7 +677,7 @@ private fun CreditPanel(
                     } else {
                         ""
                     },
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
             )
             Spacer(Modifier.height(4.dp))
@@ -693,7 +711,7 @@ private fun CreditPanel(
                             hide,
                         ),
                     ),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                     color = colors.fgMuted,
                 )
             }
@@ -819,12 +837,12 @@ private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () 
                     R.string.credit_msi_monthly,
                     "amount" to maskIfHidden(formatMoney(plan.monthlyCents, currency), hide),
                 ),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelLarge.tabular(),
                 color = colors.fgMuted,
             )
             Spacer(Modifier.width(10.dp))
             Icon(
-                Icons.Outlined.Delete,
+                Lucide.Trash,
                 contentDescription = stringResource(R.string.common_delete),
                 tint = colors.fgSubtle,
                 modifier = Modifier.width(20.dp).clickable(onClick = onDelete),
@@ -937,7 +955,7 @@ private fun WalletGoalRow(goal: SavingsGoal, hide: Boolean) {
                 maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide) + " " +
                     stringResource(R.string.goals_of) + " " +
                     maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                 color = colors.fgSubtle,
             )
         }

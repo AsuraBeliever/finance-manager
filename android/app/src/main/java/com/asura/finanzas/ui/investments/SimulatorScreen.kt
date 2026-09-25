@@ -58,6 +58,7 @@ import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 
 /** The three things the web simulator answers. */
 private enum class SimMode { Project, Goal, Compare }
@@ -244,7 +245,7 @@ private fun Stat(label: String, cents: Long?, color: Color) {
         Spacer(Modifier.height(4.dp))
         Text(
             cents?.let { maskIfHidden(formatMoney(it), hide) } ?: "—",
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 20.sp),
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 20.sp, lineHeight = 28.sp).tabular(),
             color = color,
         )
     }
@@ -428,7 +429,7 @@ private fun GoalResult(
         Spacer(Modifier.height(4.dp))
         Text(
             monthly?.let { maskIfHidden(formatMoney(it), hide) } ?: "—",
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 36.sp),
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 36.sp, lineHeight = 40.sp).tabular(),
             color = Broke.colors.accent,
         )
         if (monthly == 0L) {
@@ -532,7 +533,7 @@ private fun InstrumentRow(inst: Instrument, onRate: (String) -> Unit) {
         Spacer(
             Modifier
                 .size(10.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .clip(RoundedCornerShape(4.dp))
                 .background(inst.color),
         )
         Text(
@@ -599,7 +600,7 @@ private fun CompareResult(
                     Spacer(
                         Modifier
                             .size(8.dp)
-                            .clip(RoundedCornerShape(2.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(inst.color),
                     )
                     Text(
@@ -612,7 +613,7 @@ private fun CompareResult(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     maskIfHidden(formatMoney(sim.finalValueCents), hide),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 18.sp),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 18.sp, lineHeight = 28.sp).tabular(),
                     color = Broke.colors.fg,
                 )
             }

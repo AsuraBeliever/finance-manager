@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -193,7 +191,7 @@ fun PeriodPickerDialog(
                         Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
                             if (active) {
                                 Icon(
-                                    Icons.Filled.Check,
+                                    Lucide.Check,
                                     contentDescription = null,
                                     tint = colors.accent,
                                     modifier = Modifier.size(16.dp),

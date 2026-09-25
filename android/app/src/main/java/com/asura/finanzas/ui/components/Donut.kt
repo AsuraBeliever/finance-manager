@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 
 /** One arc of a donut: a label, an amount and the colour to draw it in. */
 data class DonutSlice(
@@ -220,7 +221,7 @@ fun LegendBelowDonut(slices: List<DonutSlice>, modifier: Modifier = Modifier) {
                     Box(
                         Modifier
                             .size(10.dp)
-                            .clip(RoundedCornerShape(2.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(slice.color),
                     )
                     Text(
@@ -306,7 +307,8 @@ fun RingGauge(
         ) {
             Text(
                 centerValue,
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp),
+                style = MaterialTheme.typography.titleLarge
+                    .tabular().copy(fontSize = 24.sp, lineHeight = 32.sp),
                 color = colors.fg,
                 maxLines = 1,
                 softWrap = false,

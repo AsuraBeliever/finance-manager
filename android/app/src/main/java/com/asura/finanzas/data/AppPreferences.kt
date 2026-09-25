@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import java.util.Locale
@@ -84,6 +85,18 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setLocale(locale: String) = edit { it[localeKey] = locale }
     suspend fun setTheme(theme: ThemeChoice) = edit { it[themeKey] = theme.name }
+
+    /**
+     * The stored choice, or null when this device has never made one.
+     *
+     * `settings` folds the absent case into `System`, which is right for
+     * rendering and wrong for syncing: the account's theme may only be
+     * adopted by a device that has not chosen for itself, and "System"
+     * is a choice someone can make.
+     */
+    suspend fun storedTheme(): ThemeChoice? =
+        context.prefsDataStore.data.first()[themeKey]
+            ?.let { runCatching { ThemeChoice.valueOf(it) }.getOrNull() }
     suspend fun setHideBalances(hide: Boolean) = edit { it[hideBalancesKey] = hide }
     suspend fun setClock24(value: Boolean) = edit { it[clock24Key] = value }
     suspend fun setTimezone(zone: String) = edit { it[timezoneKey] = zone }

@@ -23,10 +23,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,14 +35,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.TrackingEyebrow
+import com.asura.finanzas.ui.theme.tabular
 
 /**
  * The gradient-mesh canvas from `src/index.css` (`body::before`): three soft
@@ -145,7 +150,15 @@ fun PageHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            // The header's `gap-3`. `SpaceBetween` alone never reserves it, so
+            // the actions rode the title's line at widths where flexbox had
+            // already wrapped them — Movimientos was one line here and two in
+            // the browser. Carried as end padding, it counts towards the wrap
+            // and is swallowed by the free space when they do fit.
+            modifier = Modifier.padding(end = 12.dp),
+        ) {
             // Same tab and title metrics as the web's PageHeader: a 4×28 rule
             // in the "gold" accent (cyan here) and a 1.9rem display title.
             Box(
@@ -157,7 +170,9 @@ fun PageHeader(
             )
             Text(
                 text = title,
-                style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp, lineHeight = 30.sp),
+                // No override: `displayLarge` is already the page title's
+                // `text-[1.9rem] leading-none tracking-tight`, to the tenth.
+                style = MaterialTheme.typography.displayLarge,
                 color = colors.fg,
                 modifier = Modifier.padding(start = 12.dp),
             )
@@ -207,16 +222,23 @@ fun MicroLabel(
     text: String,
     modifier: Modifier = Modifier,
     color: androidx.compose.ui.graphics.Color? = null,
-    letterSpacing: androidx.compose.ui.unit.TextUnit = 2.sp,
+    letterSpacing: androidx.compose.ui.unit.TextUnit = TrackingEyebrow,
+    /**
+     * `.eyebrow` is medium; the plainer `uppercase tracking-wide` captions the
+     * web scatters around (a stat's name, a date) are regular. Same size, and
+     * at 11 px the difference in weight is the whole difference.
+     */
+    fontWeight: androidx.compose.ui.text.font.FontWeight =
+        androidx.compose.ui.text.font.FontWeight.Medium,
 ) {
     Text(
         text = text.uppercase(),
+        // `.eyebrow`: 0.7rem over a 1.5 line box, tracked wide.
         style = MaterialTheme.typography.labelSmall.copy(
             letterSpacing = letterSpacing,
-            fontSize = 11.sp,
-            // Compose's own leading would sit the glyphs ~8 px lower than the
-            // browser's line box does, which throws off every gap below.
-            lineHeight = 15.sp,
+            fontWeight = fontWeight,
+            fontSize = 11.2.sp,
+            lineHeight = 16.8.sp,
         ),
         color = color ?: Broke.colors.fgMuted,
         modifier = modifier,
@@ -233,9 +255,11 @@ fun HeroAmount(
     val colors = Broke.colors
     Text(
         text = text,
-        style = MaterialTheme.typography.displayLarge.copy(
+        style = MaterialTheme.typography.displayLarge.tabular().copy(
             fontSize = fontSize,
-            lineHeight = fontSize * 1.15f,
+            // `text-4xl` is 2.25rem over a 2.5rem line box; 1.15 was a guess
+            // that sat every hero a couple of pixels low.
+            lineHeight = fontSize * 1.1111f,
             // `font-semibold` on the money heroes; the headers stay medium.
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             brush = Brush.linearGradient(
@@ -287,26 +311,84 @@ fun Dot(color: androidx.compose.ui.graphics.Color, size: androidx.compose.ui.uni
     )
 }
 
-/** Centred placeholder text for empty lists. */
+/**
+ * The web's `EmptyState`: a dashed card with an accent badge above the title.
+ *
+ * It was two bare centred texts here, which on a screen with nothing else on
+ * it read as a page that had failed to load rather than one with nothing in
+ * it yet. Every measurement is the web's — `rounded-2xl`, `py-16`, `gap-3`, a
+ * 56 px badge on `accent-dim/15` inside a `ring-1 ring-accent/20`, and a
+ * 1 px dashed border whose 3 dp/2 dp rhythm is what the browser draws.
+ */
 @Composable
-fun EmptyState(title: String, description: String, modifier: Modifier = Modifier) {
+fun EmptyState(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
+    val colors = Broke.colors
+    val shape = RoundedCornerShape(16.dp)
     Column(
-        modifier = modifier.fillMaxWidth().padding(vertical = 40.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(colors.surfaceRaised.copy(alpha = 0.4f))
+            .drawBehind {
+                val stroke = 1.dp.toPx()
+                drawRoundRect(
+                    color = colors.borderMuted,
+                    topLeft = Offset(stroke / 2, stroke / 2),
+                    size = androidx.compose.ui.geometry.Size(
+                        size.width - stroke,
+                        size.height - stroke,
+                    ),
+                    cornerRadius = CornerRadius(16.dp.toPx()),
+                    style = Stroke(
+                        width = stroke,
+                        pathEffect = PathEffect.dashPathEffect(
+                            floatArrayOf(3.dp.toPx(), 2.dp.toPx()),
+                        ),
+                    ),
+                )
+            }
+            .padding(vertical = 64.dp, horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(shape)
+                .background(colors.accentDim.copy(alpha = 0.15f))
+                .border(1.dp, colors.accent.copy(alpha = 0.2f), shape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = colors.accent,
+                modifier = Modifier.size(24.dp),
+            )
+        }
         Text(
             title,
-            style = MaterialTheme.typography.titleMedium,
-            color = Broke.colors.fg,
+            // The only `font-display text-lg` in the app without
+            // `tracking-tight`, so the role's has to be undone here.
+            style = MaterialTheme.typography.titleLarge.copy(letterSpacing = 0.sp),
+            color = colors.fg,
             textAlign = TextAlign.Center,
         )
-        Text(
-            description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Broke.colors.fgMuted,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 6.dp),
-        )
+        if (description.isNotBlank()) {
+            Text(
+                description,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fgSubtle,
+                textAlign = TextAlign.Center,
+                // `max-w-sm`, so a long line breaks before the card edge.
+                modifier = Modifier.widthIn(max = 384.dp),
+            )
+        }
     }
 }
 
@@ -334,7 +416,7 @@ fun BackHeader(
                 .padding(vertical = 6.dp, horizontal = 2.dp),
         ) {
             Icon(
-                Icons.AutoMirrored.Outlined.ArrowBack,
+                Lucide.ArrowLeft,
                 contentDescription = null,
                 tint = colors.fgMuted,
                 modifier = Modifier.size(20.dp),

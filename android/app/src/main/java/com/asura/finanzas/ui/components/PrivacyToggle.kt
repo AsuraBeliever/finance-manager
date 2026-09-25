@@ -3,9 +3,6 @@ package com.asura.finanzas.ui.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -31,7 +28,7 @@ fun PrivacyToggle(modifier: Modifier = Modifier) {
     val preferences = (LocalContext.current.applicationContext as BrokeApp).preferences
 
     Icon(
-        imageVector = if (hidden) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+        imageVector = if (hidden) Lucide.EyeOff else Lucide.Eye,
         contentDescription = stringResource(
             if (hidden) R.string.dashboard_show_balance else R.string.dashboard_hide_balance,
         ),

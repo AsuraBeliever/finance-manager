@@ -71,6 +71,7 @@ import com.asura.finanzas.ui.formatDelta
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 
 @Composable
@@ -315,7 +316,9 @@ private fun DetailContent(
                 StatBox(
                     stringResource(R.string.investments_gain),
                     maskIfHidden(formatDelta(detail.gainCents, detail.currencyCode), hide),
-                    valueColor = if (detail.gainCents >= 0) colors.positive else colors.danger,
+                    // The web paints this one with `text-accent`, not the
+                    // green it uses for a positive figure elsewhere.
+                    valueColor = if (detail.gainCents >= 0) colors.accent else colors.danger,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -506,7 +509,9 @@ private fun DetailContent(
                         ticks = if (hide) emptyList() else axisTicks(lo, hi),
                         // The web's SIM_GOLD while the what-if is on: a
                         // simulated curve should not look like the real one.
-                        color = if (simActive) Color(0xFFC9A14A) else null,
+                        // Otherwise `POSITIVE`, the green the web strokes the
+                        // projection with — not the accent.
+                        color = if (simActive) Color(0xFFC9A14A) else colors.positive,
                         dates = points.map { it.date },
                     )
                 }
@@ -644,7 +649,7 @@ private fun MovementRow(
         Text(
             (if (deposit) "+" else "−") +
                 maskIfHidden(formatMoney(movement.amountCents, currencyCode), hide),
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp).tabular(),
             color = if (deposit) colors.accent else colors.danger,
         )
     }
@@ -683,7 +688,7 @@ private fun StatBox(
         Spacer(Modifier.height(4.dp))
         Text(
             value,
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 20.sp, lineHeight = 26.sp),
+            style = MaterialTheme.typography.displayLarge.copy(fontSize = 20.sp, lineHeight = 28.sp),
             color = valueColor ?: colors.fg,
         )
     }
@@ -780,7 +785,7 @@ private fun MiniStat(label: String, value: String, color: Color) {
         Spacer(Modifier.height(2.dp))
         Text(
             value,
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 18.sp),
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 18.sp, lineHeight = 28.sp),
             color = color,
         )
     }

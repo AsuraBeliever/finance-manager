@@ -30,14 +30,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -68,8 +60,10 @@ import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.seedName
+import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.Lucide
+import com.asura.finanzas.ui.components.LucideThin
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.Load
@@ -88,6 +82,7 @@ import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 
 @Composable
@@ -197,25 +192,17 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     }
 
     confirmDelete?.let { target ->
-        AlertDialog(
-            onDismissRequest = { confirmDelete = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(stringResource(R.string.wallets_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.wallets_delete_confirm_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = null
-                    scope.launch {
-                        runCatching { repository.deleteWallet(target.id) }
-                        reload()
-                    }
-                }) { Text(stringResource(R.string.common_delete), color = Broke.colors.danger) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = null }) {
-                    Text(stringResource(R.string.common_cancel))
+        ConfirmDialog(
+            title = stringResource(R.string.wallets_delete_confirm_title),
+            message = stringResource(R.string.wallets_delete_confirm_message),
+            onConfirm = {
+                confirmDelete = null
+                scope.launch {
+                    runCatching { repository.deleteWallet(target.id) }
+                    reload()
                 }
             },
+            onDismiss = { confirmDelete = null },
         )
     }
 }
@@ -290,7 +277,7 @@ private fun WalletList(
                 PrimaryButton(
                     text = stringResource(R.string.wallets_new_wallet),
                     onClick = onNew,
-                    leadingIcon = Icons.Outlined.Add,
+                    leadingIcon = Lucide.Plus,
                 )
             }
         }
@@ -302,6 +289,7 @@ private fun WalletList(
         if (roots.isEmpty()) {
             item {
                 EmptyState(
+                    Lucide.Wallet,
                     stringResource(R.string.wallets_empty_title),
                     stringResource(R.string.wallets_empty_description),
                 )
@@ -335,7 +323,7 @@ private fun WalletList(
                             .padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
                     ) {
                         Icon(
-                            Icons.Outlined.ExpandMore,
+                            Lucide.ChevronDown,
                             contentDescription = null,
                             tint = Broke.colors.fgSubtle,
                             modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = turn },
@@ -453,7 +441,10 @@ fun WalletCard(
                 tint = skin.fg.copy(alpha = 0.14f),
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .offset(x = 2.dp)
+                    // `-right-2`: the motif hangs 8 px past the card's edge and
+                    // is clipped there. At 2 dp it sat 18 px further left, which
+                    // made the same 150 px glyph read as a bigger one.
+                    .offset(x = 8.dp)
                     .size(150.dp),
             )
         }
@@ -528,7 +519,7 @@ fun WalletCard(
                 Text(
                     maskIfHidden(formatMoney(total, wallet.currencyCode), hide),
                     style = MaterialTheme.typography.displayLarge
-                        .copy(fontSize = 24.sp, lineHeight = 30.sp),
+                        .copy(fontSize = 24.sp, lineHeight = 30.sp).tabular(),
                     color = skin.fg,
                 )
                 Text(
@@ -540,7 +531,7 @@ fun WalletCard(
                     } else {
                         seedName(wallet.categoryName).orEmpty()
                     },
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
                     color = skin.fg.copy(alpha = 0.80f),
                     modifier = Modifier.padding(top = 2.dp),
                 )
@@ -620,7 +611,7 @@ private fun PocketRow(pocket: Wallet, hide: Boolean, onOpen: (Wallet) -> Unit) {
         )
         Text(
             maskIfHidden(formatMoney(pocket.balanceCents, pocket.currencyCode), hide),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.tabular(),
             color = colors.fg,
         )
     }
@@ -629,9 +620,11 @@ private fun PocketRow(pocket: Wallet, hide: Boolean, onOpen: (Wallet) -> Unit) {
 /** The motif the web draws on each skin group. */
 @Composable
 private fun skinArtIcon(art: SkinArt) = when (art) {
-    SkinArt.Wallet -> Lucide.Wallet
-    SkinArt.Banknote -> Lucide.Banknote
-    SkinArt.Coins -> Lucide.Coins
-    SkinArt.Piggy -> Lucide.PiggyBank
+    // The thin cut: the watermark is drawn at `strokeWidth={1.25}`, so at
+    // 150 dp the default 2 came out two thirds heavier than the browser's.
+    SkinArt.Wallet -> LucideThin.Wallet
+    SkinArt.Banknote -> LucideThin.Banknote
+    SkinArt.Coins -> LucideThin.Coins
+    SkinArt.Piggy -> LucideThin.PiggyBank
     else -> Lucide.CreditCard
 }

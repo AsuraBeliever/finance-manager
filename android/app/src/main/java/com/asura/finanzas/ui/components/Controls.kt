@@ -24,6 +24,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -162,6 +165,9 @@ fun <T> SegmentedControl(
     }
 }
 
+/** `rgba(22,164,122,.8)` — the colour the web casts the button's glow in. */
+private val BUTTON_GLOW = Color(0xFF16A47A)
+
 /** The violet pill with the soft glow — the web's primary `Button`. */
 @Composable
 fun PrimaryButton(
@@ -175,12 +181,32 @@ fun PrimaryButton(
     // Metrics copied from the web's Button: rounded-lg, px-4 py-2, text-sm, on
     // the dimmed accent. It shows up on nearly every screen, so a fatter pill
     // here is a difference the eye catches everywhere at once.
+    val alpha = if (enabled) 1f else 0.5f
     Row(
         modifier = modifier
+            // The web's two-part `shadow-[…]`: a green glow cast below the
+            // pill and a hairline of white along its top edge. Flat, the
+            // button sat on the page instead of floating over it.
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(8.dp),
+                ambientColor = BUTTON_GLOW.copy(alpha = 0.8f * alpha),
+                spotColor = BUTTON_GLOW.copy(alpha = 0.8f * alpha),
+            )
             .clip(RoundedCornerShape(8.dp))
             // `disabled:opacity-50` — the same pill, faded, not a grey one.
-            .background(colors.accentDim.copy(alpha = if (enabled) 1f else 0.5f))
+            .background(colors.accentDim.copy(alpha = alpha))
             .clickable(enabled = enabled, onClick = onClick)
+            .drawWithContent {
+                drawContent()
+                val y = 0.5.dp.toPx()
+                drawLine(
+                    color = Color.White.copy(alpha = 0.12f * alpha),
+                    start = Offset(0f, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -197,6 +223,35 @@ fun PrimaryButton(
             text = text,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
             color = Color.White.copy(alpha = if (enabled) 1f else 0.5f),
+        )
+    }
+}
+
+/**
+ * The web's `variant="dangerSolid"`: the same pill as the primary one, filled
+ * with the danger colour. No glow — the web only casts one under the accent
+ * button.
+ */
+@Composable
+fun DangerButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val colors = Broke.colors
+    val alpha = if (enabled) 1f else 0.5f
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.danger.copy(alpha = alpha))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+            color = Color.White.copy(alpha = alpha),
         )
     }
 }

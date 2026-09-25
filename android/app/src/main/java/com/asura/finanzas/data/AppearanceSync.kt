@@ -5,12 +5,14 @@ import kotlinx.serialization.json.Json
 
 private val syncJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-/** The account setting both apps read and write. */
+/** The account settings both apps read and write. */
 private const val SETTING_KEY = "appearance"
+private const val THEME_KEY = "theme"
 
 /**
- * Cross-device appearance sync, last-write-wins by timestamp — the same rule
- * the web applies in `src/lib/appearance.ts`.
+ * Cross-device sync for the two look settings the account carries: the
+ * appearance (last-write-wins by timestamp, the rule `src/lib/appearance.ts`
+ * applies) and the light/dark theme.
  *
  * On sign-in the account copy is adopted when this device has never saved one,
  * or when the account's stamp is newer than the local one. A local edit always
@@ -48,4 +50,33 @@ class AppearanceSync(
             )
         }
     }
+
+    /**
+     * Adopt the account's theme, but only on a device that has never picked
+     * one — `hydrateThemeFromServer` in `src/lib/theme.ts`, same rule. An
+     * explicit local choice always wins, or the app would flip on every
+     * launch.
+     *
+     * Without this pair the theme was the one account setting the phone did
+     * not share: switching to light on the web left the APK dark for good.
+     */
+    suspend fun pullTheme() {
+        if (preferences.storedTheme() != null) return
+        val remote = runCatching { repository.getSetting(THEME_KEY) }.getOrNull() ?: return
+        themeFromWire(remote)?.let { preferences.setTheme(it) }
+    }
+
+    /** Save locally and mirror to the account, as `setThemePref` does. */
+    suspend fun saveTheme(theme: ThemeChoice) {
+        preferences.setTheme(theme)
+        runCatching { repository.setSetting(THEME_KEY, theme.name.lowercase()) }
+    }
+}
+
+/** The web writes "light" | "dark" | "system"; the enum is capitalised. */
+private fun themeFromWire(value: String): ThemeChoice? = when (value) {
+    "light" -> ThemeChoice.Light
+    "dark" -> ThemeChoice.Dark
+    "system" -> ThemeChoice.System
+    else -> null
 }

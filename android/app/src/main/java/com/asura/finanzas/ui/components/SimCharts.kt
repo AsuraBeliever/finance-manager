@@ -287,7 +287,7 @@ fun ChartLegend(items: List<Pair<Color, String>>, modifier: Modifier = Modifier)
                 Spacer(
                     Modifier
                         .size(10.dp)
-                        .clip(RoundedCornerShape(2.dp))
+                        .clip(RoundedCornerShape(4.dp))
                         .background(color),
                 )
                 Text(

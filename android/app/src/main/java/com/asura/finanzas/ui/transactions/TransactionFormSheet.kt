@@ -38,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.draw.clip
@@ -251,15 +252,24 @@ fun TransactionFormSheet(
         }
     }
 
+    // `autoFocus` on the web's amount input: the form opens ready to type,
+    // with the box already outlined in the accent. Requested once, so moving
+    // to another field does not snap back here.
+    val amountFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { amountFocus.requestFocus() } }
+
     val amountCents = parseAmountToCents(amount)
     // The web's own guard, no stricter: an empty amount is caught on submit,
     // not by greying the button out — the two forms have to look the same the
     // moment they open.
-    // A missing destination is caught on submit with a message, not by greying
-    // Save out — the web leaves the button live and complains, and the two
-    // forms have to look the same the moment they open.
+    //
+    // A transfer with nowhere to go is the exception, and it is the web's:
+    // `disabled={… || (tab === "transfer" && toWalletId === null)}`. Leaving
+    // Save live here meant the APK answered a tap with an error where the
+    // browser had simply greyed the button out.
     val canSave = !busy &&
         (!msiActive || (description.isNotBlank() && msiMonthsValid)) &&
+        (kind != TxKind.Transfer || toWallet != null) &&
         wallets.isNotEmpty()
 
     // The shared dialog carries the title, the X, the divider and the
@@ -379,6 +389,7 @@ fun TransactionFormSheet(
                 value = amount,
                 onValueChange = { amount = it; error = null },
                 modifier = Modifier.fillMaxWidth(),
+                focusRequester = amountFocus,
             )
 
             // Date and time share a row, as on the web.

@@ -53,6 +53,7 @@ import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -399,7 +400,7 @@ fun ContributeSheet(
             Text(
                 stringResource(R.string.goals_suggested_chip) + " " +
                     maskIfHidden(formatMoney(suggested, goal.currencyCode), hide),
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp).tabular(),
                 color = Broke.colors.accent,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))

@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
@@ -113,7 +112,7 @@ private fun RateList(
             PrimaryButton(
                 text = stringResource(R.string.common_refresh),
                 onClick = onRefresh,
-                leadingIcon = Icons.Outlined.Refresh,
+                leadingIcon = Lucide.RotateCw,
             )
         }
 

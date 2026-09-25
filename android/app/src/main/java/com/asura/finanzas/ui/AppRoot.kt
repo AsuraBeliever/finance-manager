@@ -70,6 +70,8 @@ fun AppRoot(
         // Adopt the account's appearance when it is newer than this device's,
         // so a colour picked on the web shows up here.
         runCatching { appearanceSync.pull() }
+        // …and the theme, so light/dark picked on the web reaches the phone.
+        runCatching { appearanceSync.pullTheme() }
         // Anything captured without signal goes out as soon as we are back.
         runCatching { repository.flushOutbox() }
     }

@@ -15,10 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DarkMode
-import androidx.compose.material.icons.outlined.LightMode
-import androidx.compose.material.icons.outlined.Monitor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -144,9 +140,9 @@ fun SettingsScreen(
 
     val themeIcon: (ThemeChoice) -> ImageVector = {
         when (it) {
-            ThemeChoice.Light -> Icons.Outlined.LightMode
-            ThemeChoice.Dark -> Icons.Outlined.DarkMode
-            ThemeChoice.System -> Icons.Outlined.Monitor
+            ThemeChoice.Light -> Lucide.Sun
+            ThemeChoice.Dark -> Lucide.Moon
+            ThemeChoice.System -> Lucide.Monitor
         }
     }
     val themeLabel: @Composable (ThemeChoice) -> String = {
@@ -177,7 +173,7 @@ fun SettingsScreen(
                     selected = settings.theme,
                     label = { themeLabel(it) },
                     icon = themeIcon,
-                    onSelect = { scope.launch { preferences.setTheme(it) } },
+                    onSelect = { scope.launch { appearanceSync.saveTheme(it) } },
                 )
             }
         }

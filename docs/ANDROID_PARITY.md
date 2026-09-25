@@ -130,6 +130,94 @@ Dos cosas más que sólo se ven probando, no mirando:
   la entrada de 2.39.1 porque aquel release tocó `src/lib/changelog.ts` y no
   regeneró el asset: «Novedades» nunca mostró esa versión en el teléfono.
 
+## Tercer barrido (2026-09-21): medir, no mirar
+
+Los dos barridos anteriores cerraron en «se ve igual». Este se hizo midiendo
+cada pantalla con las dos superficies sobre **la misma cuenta** —el APK del
+emulador apuntando a `10.0.2.2:8787`, y Playwright con la cookie de sesión que
+el APK guarda en `files/datastore/broke_session.preferences_pb`— y a la métrica
+exacta del emulador (448×997 dp @3× = 1344×2991). Salieron 17 diferencias que
+el ojo no había cazado. Lo que conviene recordar:
+
+- **`Typography()` sin `bodySmall` ni `labelMedium` deja Roboto.** Material
+  rellena lo que no declares, y `FieldLabel`/`FieldHint` los usan: todas las
+  etiquetas y pistas de todos los formularios salían en otra fuente y con la
+  tracking de Material. Si se agrega un rol tipográfico, decláralo en
+  `BrokeTypography`, no sólo en `rememberBrokeTypography`.
+- **En un teléfono los controles de la web miden 16 px, no 14.** `index.css`
+  los sube con `@media (pointer: coarse)` para que Safari no haga zoom al
+  enfocar. Copiar `text-sm` dejaba cada valor 14% más chico que en el navegador.
+  La excepción es la caja de fecha, que es un `<button>` y sí se queda en 14.
+- **`enabled = false` no significa «no se escribe», significa «apagado».** La
+  fecha y la hora se veían como placeholder por eso; lo que hacía falta era
+  `readOnly` y el color del texto puesto a mano.
+- **Una barra de recharts mide su banda, no un ancho fijo.** La banda es el
+  área de trazo entre el número de cubos, y `barCategoryGap` deja el 10% libre
+  **a cada lado**. Y el área de trazo no llega a los bordes de la tarjeta:
+  `<YAxis width={40}>` más el `margin` de 5 por lado. Con 5 dp fijos el APK
+  dibujaba pelos donde la web dibujaba columnas.
+- **Un helper compartido no es el que usan las pantallas.** `ConfirmDialog`
+  estaba bien copiado y casi nadie lo llamaba: había 17 `AlertDialog` sueltos.
+  Al cambiar un componente de chrome, hay que barrer quién lo usa de verdad.
+- **`SpaceBetween` no reserva el `gap`.** El encabezado de la web envuelve
+  cuando título + 12 px + acciones no caben; un `FlowRow` con `SpaceBetween`
+  sólo mide los dos bloques, así que Movimientos quedaba en un renglón aquí y
+  en dos allá. El truco es llevar el hueco como padding del primer bloque.
+- **Los estados vacíos son una tarjeta, no un par de textos**, y hay que
+  comprobar que existan: el detalle de cartera sin movimientos no dibujaba
+  nada, porque el `if (isNotEmpty)` no tenía `else`.
+- **`rounded-sm` de Tailwind v4 son 4 px**, no 2. Toda la escala está corrida
+  respecto de v3.
+- **El signo de un delta se decide en `>= 0`, no en `> 0`.** Una ganancia de
+  cero se escribe `+$0.00` en la web.
+- **Un color copiado puede estar copiado al revés.** En el detalle de inversión
+  el «Rendimiento» iba en acento y la línea de proyección en verde; el APK los
+  tenía intercambiados. Comparar valores RGB, no impresiones.
+- **El tema era el único ajuste de cuenta que el teléfono no compartía.** La
+  web hace `setSetting("theme", …)` e hidrata al entrar; ahora `AppearanceSync`
+  también.
+
+## Cuarto barrido (2026-09-22): paridad de métrica
+
+El tercero cerró «sin diferencias que se noten». Este fue a por las que **no**
+se notan: se sacó del navegador el estilo calculado de cada rol de texto
+(`getComputedStyle` a ancho de teléfono) y se comparó contra el ancho que
+predicen los propios binarios de fuente con fontTools. Lo que salió:
+
+- **La fuente es la misma** — Hanken Grotesk 3.013 y Sora 2.000, `upm` 1000,
+  las dos variables. Google sirve un solo archivo por familia para todos los
+  pesos, y es el que está en `res/font/`. Cualquier diferencia de ancho, por
+  tanto, no es la fuente.
+- **`tabular-nums`.** La web lo escribe en 64 lugares — toda cifra que imprime.
+  Las cifras tabulares de Sora son bastante más anchas que las
+  proporcionales: el patrimonio salía 50 px corto. Va en `fontFeatureSettings
+  = "tnum"`, y como sólo cambia dígitos es inocuo donde no los hay. El helper
+  es `TextStyle.tabular()`; se aplica donde el texto viene de `formatMoney`,
+  `formatDelta` o `maskIfHidden`, que es exactamente donde la web lo pone.
+- **Tailwind trae un `line-height` con cada `text-*`, y Compose no.** Peor:
+  `.copy(fontSize = …)` **no** reescala el `lineHeight`, así que un rol usado
+  a otro tamaño lo arrastra mal. Están todos anotados en `Type.kt` con el
+  número que reporta el navegador.
+- **El título de página es `text-[1.9rem]`, o sea 30.4 px, no 30.**
+- **`tracking-tight` (−0.025em) va en varios títulos**, y Android **redondea el
+  letter-spacing a pixel entero**: a 30.4 sp los −2.28 px por hueco caían a −3
+  y el título quedaba ~5 px más apretado que en flexbox. En un encabezado que
+  está a dos pixeles de envolver eso decide si son una línea o dos. `TrackingTight`
+  lleva el valor que aterriza donde el navegador **después** del redondeo.
+- **Las micro-etiquetas no son todas del mismo peso.** `.eyebrow` es 500; las
+  `uppercase tracking-wide` sueltas («AT THE END», «PERIOD START») son 400. A
+  11 px el peso es toda la diferencia: se veía 24% más tinta.
+- **El motivo de la tarjeta lleva `strokeWidth={1.25}`**, no el 2 de Lucide, y
+  desborda 8 px a la derecha (`-right-2`). Con el trazo por defecto y 2 dp de
+  desborde el mismo glifo de 150 px se leía como uno más grande y más gordo.
+
+**Lo que queda, y no es de la app:** el rasterizador. Chromium pone ~10-15%
+más tinta que Skia en texto claro sobre fondo oscuro, así que la caja de tinta
+medida sale 2-3% más ancha en el navegador aunque el trazado sea el mismo —
+mismo glifo, misma posición de arranque, mismo avance. Se comprueba contando
+pixeles encendidos de la misma cadena: el ancho de caja difiere, la densidad
+no. No hay ajuste de la app que lo iguale.
+
 Diferencias conocidas que se dejaron a propósito:
 
 - En **Apariencia**, «Se reescala a 128 px…» cae al lado del botón en el APK y

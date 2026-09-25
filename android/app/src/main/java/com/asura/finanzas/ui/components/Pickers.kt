@@ -106,7 +106,9 @@ fun <T> PickerField(
             ) {
                 Text(
                     text = if (selected != null) optionLabel(selected) else emptyLabel,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    // The closed `<select>`, so the same 16 sp as an input.
+                    style = MaterialTheme.typography.bodyMedium
+                        .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
                     color = if (enabled) colors.fg else colors.fgSubtle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -194,6 +196,10 @@ fun DateField(
             modifier = Modifier.fillMaxWidth(),
             enabled = false,
             readOnly = true,
+            // Not typeable, but not greyed either: the picker fills it in.
+            valueColor = Broke.colors.fg,
+            // A `<button>` on the web, so it keeps `text-sm`.
+            fontSize = ButtonControlFontSize,
             trailing = {
                 Icon(
                     Lucide.Calendar,
@@ -262,6 +268,8 @@ fun TimeField(
             modifier = Modifier.fillMaxWidth(),
             enabled = false,
             readOnly = true,
+            // Not typeable, but not greyed either: the picker fills it in.
+            valueColor = Broke.colors.fg,
             leading = {
                 Icon(
                     Lucide.Clock,

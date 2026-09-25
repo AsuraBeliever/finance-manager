@@ -32,6 +32,7 @@ import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -213,7 +214,7 @@ fun MsiPreviewLines(preview: MsiSchedulePreview, currency: String) {
             "monthly" to formatMoney(preview.monthlyCents, currency),
             "months" to preview.months,
         ),
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodySmall.tabular(),
         color = colors.fgMuted,
     )
     Text(
@@ -230,7 +231,7 @@ fun MsiPreviewLines(preview: MsiSchedulePreview, currency: String) {
                 "cut" to formatDayMonth(preview.firstCutDate),
             )
         },
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelSmall.tabular(),
         color = colors.fgSubtle,
     )
 }
@@ -246,7 +247,7 @@ fun MsiSavedInfo(preview: MsiSchedulePreview, currency: String) {
             "cut" to formatDayMonth(preview.firstCutDate),
             "last" to formatDayMonth(preview.lastChargeDate),
         ),
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.bodyMedium.tabular(),
         color = colors.fgMuted,
     )
     if (preview.alreadyBilledMonths > 1) {
@@ -256,7 +257,7 @@ fun MsiSavedInfo(preview: MsiSchedulePreview, currency: String) {
                 "n" to preview.alreadyBilledMonths,
                 "amount" to formatMoney(preview.alreadyBilledCents, currency),
             ),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.tabular(),
             color = colors.fgSubtle,
         )
     }
