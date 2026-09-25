@@ -12,6 +12,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.40.1",
+    date: "2026-09-25",
+    es: [
+      "La app de Android ahora se ve igual que la web, al pixel: se midió pantalla por pantalla contra el navegador y se corrigieron márgenes, rellenos, tamaños de texto, interlineados y grosores que a simple vista no se notaban pero hacían que el teléfono se sintiera como otra app.",
+      "Las cifras en el teléfono usan el mismo ancho fijo por dígito que la web, así que las cantidades ya no bailan ni se ven más angostas; y las etiquetas y pistas de los formularios dejaron de salir con la fuente del sistema.",
+      "Los íconos que todavía eran los de Android se cambiaron por los mismos de la web, las gráficas de barras dibujan columnas del mismo ancho, y las pantallas sin datos (como una cartera sin movimientos) ahora muestran su aviso en vez de quedar en blanco.",
+      "Arreglado: en el teléfono la fecha y la hora de un movimiento se veían grises, como si estuvieran vacías, y el tema claro/oscuro ahora se sincroniza con tu cuenta como el resto de la apariencia.",
+    ],
+    en: [
+      "The Android app now looks the same as the web, down to the pixel: every screen was measured against the browser and margins, paddings, text sizes, line heights and weights were fixed — differences too small to spot at a glance, but enough to make the phone feel like a different app.",
+      "Numbers on the phone use the same fixed-width digits as the web, so amounts no longer shift around or look narrower; and form labels and hints no longer fall back to the system font.",
+      "Icons that were still Android's own now match the web's, bar charts draw columns of the same width, and empty screens (like a wallet with no movements) now show their notice instead of staying blank.",
+      "Fixed: on the phone a movement's date and time looked grey, as if they were empty, and the light/dark theme now syncs with your account like the rest of your appearance settings.",
+    ],
+  },
+  {
     version: "2.40.0",
     date: "2026-09-21",
     es: [
