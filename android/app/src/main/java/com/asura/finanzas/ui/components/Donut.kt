@@ -30,6 +30,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -205,8 +207,43 @@ fun LegendBelowDonut(slices: List<DonutSlice>, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(Modifier.fillMaxWidth().height(176.dp), contentAlignment = Alignment.Center) {
+        // Tapping a slice reads it out, like hovering it on the web. The
+        // tooltip's view box is the chart minus recharts' 5 px margin.
+        val hit = rememberChartHit()
+        val density = LocalDensity.current
+        val margin = with(density) { 5.dp.toPx() }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(176.dp)
+                .zIndex(1f)
+                .chartTap(hit, slices) { tap, size ->
+                    with(density) {
+                        donutHit(
+                            tap = tap,
+                            center = Offset(size.width / 2f, size.height / 2f),
+                            innerRadius = 46.dp.toPx(),
+                            outerRadius = 74.dp.toPx(),
+                            values = slices.map { it.valueCents },
+                        )
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
             DonutRing(slices, innerRadius = 46.dp, outerRadius = 74.dp)
+            val picked = hit.shown?.takeIf { it.index in slices.indices }
+            ChartTooltip(
+                anchor = picked?.anchor?.let { Offset(it.x - margin, it.y - margin) },
+                content = picked?.let {
+                    val slice = slices[it.index]
+                    TooltipContent(
+                        label = null,
+                        items = listOf(TooltipItem(slice.label, slice.formatted, slice.color)),
+                        itemsInTextColor = true,
+                    )
+                },
+                modifier = Modifier.matchParentSize().padding(5.dp),
+            )
         }
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),

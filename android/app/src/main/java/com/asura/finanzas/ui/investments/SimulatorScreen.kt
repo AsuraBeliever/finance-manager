@@ -353,6 +353,9 @@ private fun ProjectResult(
                 // constants, and they have to match across both.
                 lowerColor = chartColor(2),
                 upperColor = chartColor(4),
+                interest = data?.points?.map { it.interestCents } ?: emptyList(),
+                names = stringResource(R.string.simulator_contributed_series) to
+                    stringResource(R.string.simulator_interest_series),
             )
             Spacer(Modifier.height(12.dp))
             ChartLegend(

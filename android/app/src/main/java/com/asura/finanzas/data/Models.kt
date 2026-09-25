@@ -500,6 +500,8 @@ data class SimPoint(
     val month: Int = 0,
     val contributedCents: Long = 0,
     val valueCents: Long = 0,
+    /** Value over what was put in, floored at zero — from finanzas-core. */
+    val interestCents: Long = 0,
 )
 
 @Serializable

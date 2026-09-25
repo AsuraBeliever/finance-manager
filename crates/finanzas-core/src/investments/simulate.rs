@@ -57,6 +57,14 @@ pub struct SimulationPoint {
     pub value_cents: i64,
 }
 
+impl SimulationPoint {
+    /// Earnings on top of what was put in — the upper band of the simulator's
+    /// chart. Floored at zero: a negative rate never shows as negative interest.
+    pub fn interest_cents(&self) -> i64 {
+        (self.value_cents - self.contributed_cents).max(0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimulationResult {
     /// One point per month, including t=0 and the final month.
@@ -163,6 +171,21 @@ mod tests {
         assert_eq!(r.total_interest_cents, 126_825);
         assert_eq!(r.points.len(), 13);
         assert_eq!(r.points[0].value_cents, 1_000_000);
+        // Per point, the chart's interest band: 1,126,825 − 1,000,000.
+        assert_eq!(r.points[0].interest_cents(), 0);
+        assert_eq!(r.points[12].interest_cents(), 126_825);
+    }
+
+    #[test]
+    fn point_interest_never_goes_negative() {
+        // A point worth less than was put in (a loss) shows no interest band,
+        // not a negative one: 90,000 value on 100,000 contributed → 0.
+        let p = SimulationPoint {
+            month: 3,
+            contributed_cents: 100_000,
+            value_cents: 90_000,
+        };
+        assert_eq!(p.interest_cents(), 0);
     }
 
     #[test]

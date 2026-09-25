@@ -2,6 +2,7 @@ package com.asura.finanzas.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.theme.Broke
+import kotlin.math.roundToInt
 
 /** How tall the plot is, matching the web chart's 280 px box minus its axis. */
 private val PLOT_HEIGHT = 210.dp
@@ -65,6 +67,12 @@ fun LineChart(
      * what-if is on, so the simulated curve is not mistaken for the real one.
      */
     color: androidx.compose.ui.graphics.Color? = null,
+    /**
+     * What a tap on point `i` reads out — the web's `<Tooltip>`. Null leaves
+     * the chart untappable. Each item also gets recharts' active dot on the
+     * curve, in its own colour.
+     */
+    tooltip: ((Int) -> TooltipContent?)? = null,
 ) {
     val colors = Broke.colors
     if (values.size < 2) return
@@ -105,7 +113,28 @@ fun LineChart(
             }
 
             Column(Modifier.weight(1f)) {
-                Canvas(Modifier.fillMaxWidth().height(PLOT_HEIGHT)) {
+                val hit = rememberChartHit()
+                val picked = hit.shown?.takeIf { it.index in values.indices }
+                val pickedContent = picked?.let { tooltip?.invoke(it.index) }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(PLOT_HEIGHT)
+                        .then(
+                            if (tooltip == null) {
+                                Modifier
+                            } else {
+                                Modifier.chartTap(hit, values) { tap, size ->
+                                    val stepX = size.width / (values.size - 1f)
+                                    ChartHit(
+                                        (tap.x / stepX).roundToInt().coerceIn(0, values.lastIndex),
+                                        tap,
+                                    )
+                                }
+                            },
+                        ),
+                ) {
+                Canvas(Modifier.matchParentSize()) {
                     val stepX = size.width / (values.size - 1)
                     val dashed = PathEffect.dashPathEffect(
                         floatArrayOf(3.dp.toPx(), 3.dp.toPx()),
@@ -205,6 +234,19 @@ fun LineChart(
                             ),
                         )
                     }
+
+                    // recharts' cursor and active dot on the tapped point.
+                    if (picked != null && pickedContent != null) {
+                        val at = pointAt(picked.index)
+                        lineCursor(at.x)
+                        pickedContent.items.forEach { activeDot(at, it.color) }
+                    }
+                }
+                ChartTooltip(
+                    anchor = picked?.anchor,
+                    content = pickedContent,
+                    modifier = Modifier.matchParentSize(),
+                )
                 }
 
                 if (labelled.isEmpty()) {

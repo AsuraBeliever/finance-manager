@@ -242,7 +242,7 @@ function ProjectMode({
   const chartData = (data?.points ?? []).map((p) => ({
     month: p.month,
     contributed: p.contributedCents / 100,
-    interest: Math.max(0, (p.valueCents - p.contributedCents) / 100),
+    interest: p.interestCents / 100,
   }));
   const rateNum = Number(rate);
   const doubling = rateNum > 0 ? (72 / rateNum).toFixed(1) : null;
