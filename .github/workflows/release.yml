@@ -13,6 +13,9 @@ on:
 
 jobs:
   build:
+    # Only a tag publishes a release. A manual run builds just the APK below, so
+    # CI can be checked without cutting a release named after the branch.
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write # create the release and upload the installers
     strategy:
@@ -96,6 +99,8 @@ jobs:
   # after the desktop job so the GitHub Release already exists to upload into.
   android:
     needs: build
+    # Also run when `build` was skipped (manual run); never after it failed.
+    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # upload the APK to the release
