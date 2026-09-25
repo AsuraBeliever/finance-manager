@@ -1,5 +1,17 @@
 [
   {
+    "version": "2.41.0",
+    "date": "2026-09-25",
+    "es": [
+      "En la app de Android ya puedes tocar cualquier gráfica para ver sus datos, igual que en la web: el flujo de ingresos y gastos de cada día o mes, el total del periodo, cuánto hay en cada cartera o inversión, el valor de la proyección en cada fecha y, en el simulador, lo aportado y los intereses de cada punto.",
+      "Toca otro punto para moverlo, o el mismo para quitarlo."
+    ],
+    "en": [
+      "In the Android app you can now tap any chart to read its data, just like on the web: each day's or month's income and expenses, the period's totals, how much is in each wallet or investment, the projected value on any date and, in the simulator, what was contributed and the interest at each point.",
+      "Tap another point to move it, or the same one to put it away."
+    ]
+  },
+  {
     "version": "2.40.2",
     "date": "2026-09-25",
     "es": [

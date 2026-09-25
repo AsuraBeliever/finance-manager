@@ -63,6 +63,15 @@ import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.WebCheckbox
 import com.asura.finanzas.ui.components.chartColor
+import com.asura.finanzas.ui.components.ChartTooltip
+import com.asura.finanzas.ui.components.TooltipContent
+import com.asura.finanzas.ui.components.TooltipItem
+import com.asura.finanzas.ui.components.chartTap
+import com.asura.finanzas.ui.components.donutHit
+import com.asura.finanzas.ui.components.rememberChartHit
+import com.asura.finanzas.ui.components.shown
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatDelta
@@ -270,7 +279,13 @@ private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MiniDonut(
                     slices = portfolio.slices.map { it.currentValueCents },
-                    modifier = Modifier.size(112.dp),
+                    names = portfolio.slices.map { it.name },
+                    formatted = portfolio.slices.map {
+                        maskIfHidden(formatMoney(it.currentValueCents), hide)
+                    },
+                    // Above the key beside it: a tooltip wider than the ring
+                    // overhangs the legend, as on the web.
+                    modifier = Modifier.size(112.dp).zIndex(1f),
                 )
                 Spacer(Modifier.width(16.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -425,10 +440,34 @@ private fun calculatorLabel(calculator: String): String = stringResource(
  * slices, matching the web's chart exactly. No labels — the key sits beside it.
  */
 @Composable
-private fun MiniDonut(slices: List<Long>, modifier: Modifier = Modifier) {
+private fun MiniDonut(
+    slices: List<Long>,
+    names: List<String>,
+    formatted: List<String>,
+    modifier: Modifier = Modifier,
+) {
     val total = slices.sum().coerceAtLeast(1)
     val colors = slices.indices.map { chartColor(it) }
-    Canvas(modifier) {
+    // Tapping a slice reads it out, as hovering it does on the web — rows in
+    // the slice's own colour here (this chart sets no `itemStyle`).
+    val hit = rememberChartHit()
+    val density = LocalDensity.current
+    // recharts' view box starts 5 px into a 120 px box; this ring's box is the
+    // ring itself (112), so that edge sits 1 dp in.
+    val inset = with(density) { 1.dp.toPx() }
+    Box(
+        modifier.chartTap(hit, slices) { tap, size ->
+            val outer = size.width / 2f
+            donutHit(
+                tap = tap,
+                center = Offset(size.width / 2f, size.height / 2f),
+                innerRadius = outer * 34f / 56f,
+                outerRadius = outer,
+                values = slices,
+            )
+        },
+    ) {
+    Canvas(Modifier.matchParentSize()) {
         val stroke = (56f - 34f) / 56f * (size.minDimension / 2f)
         val radius = size.minDimension / 2f - stroke / 2f
         // Recharts measures angles the way maths does — anticlockwise from three
@@ -448,5 +487,17 @@ private fun MiniDonut(slices: List<Long>, modifier: Modifier = Modifier) {
             )
             start += sweep
         }
+    }
+    val picked = hit.shown?.takeIf { it.index in slices.indices }
+    ChartTooltip(
+        anchor = picked?.anchor?.let { Offset(it.x - inset, it.y - inset) },
+        content = picked?.let {
+            TooltipContent(
+                label = null,
+                items = listOf(TooltipItem(names[it.index], formatted[it.index], colors[it.index])),
+            )
+        },
+        modifier = Modifier.matchParentSize().padding(start = 1.dp, top = 1.dp),
+    )
     }
 }

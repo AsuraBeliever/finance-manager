@@ -47,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,6 +84,14 @@ import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.PeriodPickerDialog
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
+import com.asura.finanzas.ui.components.ChartHit
+import com.asura.finanzas.ui.components.ChartTooltip
+import com.asura.finanzas.ui.components.TooltipContent
+import com.asura.finanzas.ui.components.TooltipItem
+import com.asura.finanzas.ui.components.bandCursor
+import com.asura.finanzas.ui.components.chartTap
+import com.asura.finanzas.ui.components.rememberChartHit
+import com.asura.finanzas.ui.components.shown
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
@@ -566,6 +576,9 @@ private fun FlowChart(trends: SpendingTrends) {
     val max = niceCeiling(peak)
     val axisColor = colors.borderMuted
     val axisLabelHeight = 20.dp
+    val hit = rememberChartHit()
+    val plotPx = with(LocalDensity.current) { 150.dp.toPx() }
+    val cursorColor = colors.borderMuted
 
     Row(modifier = Modifier.fillMaxWidth().height(170.dp)) {
         // Vertical scale, hidden with the balances like every other figure.
@@ -601,11 +614,25 @@ private fun FlowChart(trends: SpendingTrends) {
                 .height(150.dp)
                 .background(colors.borderMuted),
         )
+        // Tapping a bucket reads it out — the web's tooltip, with the band
+        // under the finger shaded.
+        Box(Modifier.weight(1f).padding(end = CHART_MARGIN)) {
         Row(
             modifier = Modifier
-                .weight(1f)
-                .padding(end = CHART_MARGIN)
+                .fillMaxSize()
+                .chartTap(hit, buckets) { tap, size ->
+                    if (buckets.isEmpty() || tap.y > plotPx) {
+                        null
+                    } else {
+                        val band = size.width / buckets.size.toFloat()
+                        ChartHit((tap.x / band).toInt().coerceIn(0, buckets.lastIndex), tap)
+                    }
+                }
                 .drawBehind {
+                    hit.shown?.let { h ->
+                        val band = size.width / buckets.size.toFloat()
+                        bandCursor(h.index * band, band, plotPx, cursorColor)
+                    }
                     val y = size.height - axisLabelHeight.toPx()
                     drawLine(
                         color = axisColor,
@@ -645,6 +672,24 @@ private fun FlowChart(trends: SpendingTrends) {
                     )
                 }
             }
+        }
+        val picked = hit.shown?.takeIf { it.index in buckets.indices }
+        val incomes = stringResource(R.string.dashboard_incomes)
+        val expenses = stringResource(R.string.dashboard_expenses)
+        ChartTooltip(
+            anchor = picked?.anchor,
+            content = picked?.let {
+                val bucket = buckets[it.index]
+                TooltipContent(
+                    label = bucketLongLabel(bucket.key, trends.bucketUnit),
+                    items = listOf(
+                        TooltipItem(incomes, maskIfHidden(formatMoney(bucket.incomeMxnCents), hide), colors.positive),
+                        TooltipItem(expenses, maskIfHidden(formatMoney(bucket.expenseMxnCents), hide), colors.danger),
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth().height(150.dp),
+        )
         }
     }
 
@@ -715,6 +760,29 @@ private fun bucketLabel(key: String, unit: String): String {
     } else {
         key.takeLast(2)
     }
+}
+
+/**
+ * The tooltip's heading for a bucket — the web's `bucketLabel` in its long
+ * form: "Jueves, 10 de septiembre de 2026", or "Septiembre de 2026" for a
+ * monthly bucket. ICU skeletons give the same words `Intl.DateTimeFormat` does.
+ */
+@Composable
+private fun bucketLongLabel(key: String, unit: String): String {
+    val locale = java.util.Locale.forLanguageTag(
+        if (LocalAppSettings.current.locale == "en") "en-US" else "es-MX",
+    )
+    return runCatching {
+        val (skeleton, date) = if (unit == "month") {
+            "yMMMM" to java.time.LocalDate.parse("$key-01")
+        } else {
+            "yMMMMEEEEd" to java.time.LocalDate.parse(key)
+        }
+        val millis = date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+        val format = android.icu.text.DateFormat.getInstanceForSkeleton(skeleton, locale)
+        format.timeZone = android.icu.util.TimeZone.GMT_ZONE
+        format.format(java.util.Date(millis)).replaceFirstChar { it.uppercase(locale) }
+    }.getOrDefault(key)
 }
 
 /**
@@ -938,6 +1006,9 @@ private fun FlowRangeCard(
     // label their axis the way the web's does.
     val max = niceCeiling(maxOf(trends.incomeMxnCents, trends.expenseMxnCents).coerceAtLeast(1))
     val axisColor = colors.borderMuted
+    val hit = rememberChartHit()
+    val incomes = stringResource(R.string.dashboard_incomes)
+    val expenses = stringResource(R.string.dashboard_expenses)
 
     GlassCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -989,7 +1060,13 @@ private fun FlowRangeCard(
                     .weight(1f)
                     .padding(end = CHART_MARGIN)
                     .height(150.dp)
+                    // One category, so any tap on the plot reads it out and
+                    // shades the whole band, as recharts does.
+                    .chartTap(hit, trends) { tap, _ -> ChartHit(0, tap) }
                     .drawBehind {
+                        if (hit.shown != null) {
+                            bandCursor(0f, size.width, size.height, colors.borderMuted)
+                        }
                         drawLine(
                             color = axisColor,
                             start = Offset(0f, size.height),
@@ -1017,6 +1094,20 @@ private fun FlowRangeCard(
                         modifier = Modifier.weight(1f),
                     )
                 }
+                // No label line: the web's single category is named " ".
+                ChartTooltip(
+                    anchor = hit.shown?.anchor,
+                    content = hit.shown?.let {
+                        TooltipContent(
+                            label = null,
+                            items = listOf(
+                                TooltipItem(incomes, maskIfHidden(formatMoney(trends.incomeMxnCents), hide), colors.positive),
+                                TooltipItem(expenses, maskIfHidden(formatMoney(trends.expenseMxnCents), hide), colors.danger),
+                            ),
+                        )
+                    },
+                    modifier = Modifier.matchParentSize(),
+                )
             }
         }
 

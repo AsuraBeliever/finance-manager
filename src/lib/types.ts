@@ -286,6 +286,8 @@ export interface SimPoint {
   month: number;
   contributedCents: number;
   valueCents: number;
+  /** valueCents − contributedCents, floored at 0 (computed in finanzas-core). */
+  interestCents: number;
 }
 
 export interface SimResult {

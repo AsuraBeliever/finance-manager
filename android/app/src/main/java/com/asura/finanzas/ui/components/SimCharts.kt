@@ -28,6 +28,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.theme.Broke
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.res.stringResource
+import com.asura.finanzas.R
+import com.asura.finanzas.ui.formatMoney
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.log10
@@ -99,6 +103,12 @@ private fun ChartFrame(
     maxCents: Long,
     xLabels: List<Pair<String, Float>>,
     modifier: Modifier = Modifier,
+    /** How many points share the x axis; a tap snaps to the nearest one. */
+    count: Int = 0,
+    /** The tooltip for point `i`, the web's `<Tooltip>`. */
+    tooltipAt: ((Int) -> TooltipContent?)? = null,
+    /** Where recharts puts its active dots on point `i`: value and colour. */
+    dotsAt: (Int) -> List<Pair<Long, Color>> = { emptyList() },
     plot: DrawScope.(Float, Float, (Long) -> Float) -> Unit,
 ) {
     val colors = Broke.colors
@@ -124,7 +134,25 @@ private fun ChartFrame(
             Spacer(Modifier.width(8.dp))
 
             Column(Modifier.weight(1f)) {
-                Canvas(Modifier.fillMaxWidth().height(SIM_PLOT_HEIGHT)) {
+                val hit = rememberChartHit()
+                val picked = hit.shown?.takeIf { it.index in 0 until count }
+                val content = picked?.let { tooltipAt?.invoke(it.index) }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(SIM_PLOT_HEIGHT)
+                        .then(
+                            if (tooltipAt == null || count < 2) {
+                                Modifier
+                            } else {
+                                Modifier.chartTap(hit, count to maxCents) { tap, size ->
+                                    val stepX = size.width / (count - 1f)
+                                    ChartHit((tap.x / stepX).roundToInt().coerceIn(0, count - 1), tap)
+                                }
+                            },
+                        ),
+                ) {
+                Canvas(Modifier.matchParentSize()) {
                     val dashed = PathEffect.dashPathEffect(
                         floatArrayOf(3.dp.toPx(), 3.dp.toPx()),
                     )
@@ -177,6 +205,20 @@ private fun ChartFrame(
                         size.height - (cents.toFloat() / top.toFloat()) * size.height
                     }
                     plot(size.width, size.height, toY)
+
+                    if (picked != null && content != null) {
+                        val x = picked.index * size.width / (count - 1f)
+                        lineCursor(x)
+                        dotsAt(picked.index).forEach { (cents, color) ->
+                            activeDot(Offset(x, toY(cents)), color)
+                        }
+                    }
+                }
+                ChartTooltip(
+                    anchor = picked?.anchor,
+                    content = content,
+                    modifier = Modifier.matchParentSize(),
+                )
                 }
                 AxisLabels(xLabels)
             }
@@ -199,14 +241,35 @@ fun StackedAreaChart(
     lowerColor: Color,
     upperColor: Color,
     modifier: Modifier = Modifier,
+    /** The interest band per point, from finanzas-core, for the tooltip. */
+    interest: List<Long> = emptyList(),
+    /** Series names for the tooltip: contributed, then interest. */
+    names: Pair<String, String>? = null,
 ) {
     if (contributed.size < 2 || total.size != contributed.size) return
     val max = total.max()
+    val years = stringResource(R.string.simulator_years)
 
     ChartFrame(
         maxCents = max,
         xLabels = yearTicks(contributed.size - 1),
         modifier = modifier,
+        count = contributed.size,
+        tooltipAt = if (names == null || interest.size != contributed.size) {
+            null
+        } else {
+            { i ->
+                TooltipContent(
+                    label = yearsLabel(i, years),
+                    items = listOf(
+                        TooltipItem(names.first, formatMoney(contributed[i]), lowerColor),
+                        TooltipItem(names.second, formatMoney(interest[i]), upperColor),
+                    ),
+                )
+            }
+        },
+        // Stacked: the lower dot on the contributions, the upper one on top.
+        dotsAt = { i -> listOf(contributed[i] to lowerColor, total[i] to upperColor) },
     ) { width, height, toY ->
         val stepX = width / (contributed.size - 1)
         fun curve(values: List<Long>) = Path().apply {
@@ -257,11 +320,20 @@ fun MultiLineChart(series: List<SimSeries>, modifier: Modifier = Modifier) {
     if (drawable.isEmpty()) return
     val length = drawable.minOf { it.values.size }
     val max = drawable.maxOf { it.values.take(length).max() }
+    val years = stringResource(R.string.simulator_years)
 
     ChartFrame(
         maxCents = max,
         xLabels = yearTicks(length - 1),
         modifier = modifier,
+        count = length,
+        tooltipAt = { i ->
+            TooltipContent(
+                label = yearsLabel(i, years),
+                items = drawable.map { TooltipItem(it.name, formatMoney(it.values[i]), it.color) },
+            )
+        },
+        dotsAt = { i -> drawable.map { it.values[i] to it.color } },
     ) { width, _, toY ->
         val stepX = width / (length - 1)
         drawable.forEach { s ->
@@ -273,6 +345,14 @@ fun MultiLineChart(series: List<SimSeries>, modifier: Modifier = Modifier) {
         }
     }
 }
+
+/**
+ * The tooltip heading at month `m`: the web's
+ * `${(m / 12).toFixed(1)} ${es.simulator.years}`, "2.6 Plazo (años)". A month
+ * count shown as years is presentation, not money.
+ */
+private fun yearsLabel(month: Int, years: String): String =
+    "${java.math.BigDecimal(month / 12.0).setScale(1, java.math.RoundingMode.HALF_UP).toPlainString()} $years"
 
 /** The swatch-and-name row under a chart, as on the web. */
 @Composable

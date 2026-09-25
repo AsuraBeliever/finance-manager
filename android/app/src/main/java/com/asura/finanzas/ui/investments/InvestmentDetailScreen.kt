@@ -65,6 +65,8 @@ import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.LineChart
+import com.asura.finanzas.ui.components.TooltipContent
+import com.asura.finanzas.ui.components.TooltipItem
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.formatDelta
@@ -499,6 +501,9 @@ private fun DetailContent(
                     val lo = points.minOf { it.valueCents }
                     val hi = points.maxOf { it.valueCents }
                     val today = java.time.LocalDate.now().toString()
+                    val currentValueName = stringResource(R.string.investments_current_value)
+                    val projectionName = stringResource(R.string.investments_projection)
+                    val withContribName = stringResource(R.string.investments_projection_with_contrib)
                     LineChart(
                         values = points.map { it.valueCents },
                         startLabel = points.first().date,
@@ -513,6 +518,29 @@ private fun DetailContent(
                         // projection with — not the accent.
                         color = if (simActive) Color(0xFFC9A14A) else colors.positive,
                         dates = points.map { it.date },
+                        // The web's tooltip: the raw date, then whichever of
+                        // its three series has a value there — up to today the
+                        // real value, from today on the projection (or the
+                        // what-if). Today itself carries both.
+                        tooltip = { i ->
+                            val point = points[i]
+                            val amount = maskIfHidden(formatMoney(point.valueCents, detail.currencyCode), hide)
+                            TooltipContent(
+                                label = point.date,
+                                items = buildList {
+                                    if (point.date <= today) add(TooltipItem(currentValueName, amount, colors.positive))
+                                    if (point.date >= today) {
+                                        add(
+                                            if (simActive) {
+                                                TooltipItem(withContribName, amount, Color(0xFFC9A14A))
+                                            } else {
+                                                TooltipItem(projectionName, amount, colors.positive)
+                                            },
+                                        )
+                                    }
+                                },
+                            )
+                        },
                     )
                 }
             }

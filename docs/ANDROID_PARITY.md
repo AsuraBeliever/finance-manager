@@ -177,6 +177,28 @@ el ojo no había cazado. Lo que conviene recordar:
   web hace `setSetting("theme", …)` e hidrata al entrar; ahora `AppearanceSync`
   también.
 
+## Los tooltips de las gráficas (2026-09-25)
+
+Los barridos comparaban capturas **quietas**, así que ninguno vio que en la web
+tocar una gráfica muestra sus datos y en el APK no pasaba nada. Lo que se copió,
+medido en el navegador y no supuesto (`components/ChartTooltip.kt`):
+
+- La caja es `chart.tooltip` de `palette.ts`, con el padding de 10 de recharts
+  y texto a 16/24 (el `pointer: coarse` del teléfono). **Sin** el recorte de
+  interlineado que Compose trae por defecto: con él la caja salía 12 px más baja.
+- Las filas van **ordenadas por nombre** (el `itemSorter` por defecto de
+  recharts), por eso «Gastos» sale antes que «Ingresos».
+- Se pone a 10 px del punto, se voltea si no cabe y nunca sale de la esquina
+  superior izquierda del área de trazo. En las donas el punto **no es el dedo**:
+  es la mitad del arco de la rebanada, a medio anillo.
+- Sólo hay un tooltip abierto a la vez: tocar otra gráfica cierra el anterior,
+  como el `mouseleave` del navegador.
+- El «interés» de cada punto del simulador lo calculaba la web restando en el
+  navegador. Ahora es `interestCents`, de `finanzas-core`, para las dos.
+
+Para la próxima: **una captura quieta no ve lo interactivo.** Al comparar una
+pantalla, tocar también lo que en la web responde al toque.
+
 ## Cuarto barrido (2026-09-22): paridad de métrica
 
 El tercero cerró «sin diferencias que se noten». Este fue a por las que **no**
@@ -361,6 +383,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Caché offline de lectura | `JsonCache` | ✅ |
 | Banner «sin conexión» | `OfflineNotice` | ✅ |
 | Formato de dinero por moneda | `Money.kt` | ✅ con el espacio tras el código ISO, como `Intl` |
+| Tocar una gráfica muestra sus datos (tooltip de recharts) | `components/ChartTooltip.kt` | ✅ las 7: flujo, totales, donas del panel y del portafolio, proyección, simulador y comparación |
 | Paleta y tipografía «neon glass» | `ui/theme` | ✅ |
 
 ## Nota: login con Google en Android

@@ -1207,6 +1207,7 @@ pub struct SimPoint {
     pub month: i64,
     pub contributed_cents: i64,
     pub value_cents: i64,
+    pub interest_cents: i64,
 }
 
 #[derive(Serialize)]
@@ -1241,6 +1242,7 @@ pub fn simulate_investment(a: SimulateArgs) -> AppResult<SimResult> {
                 month: p.month,
                 contributed_cents: p.contributed_cents,
                 value_cents: p.value_cents,
+                interest_cents: p.interest_cents(),
             })
             .collect(),
         final_value_cents: r.final_value_cents,
