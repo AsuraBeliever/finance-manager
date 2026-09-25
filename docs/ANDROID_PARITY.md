@@ -372,7 +372,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Categorías de cartera | `ui/settings` | ✅ (solo lectura, igual que la web) |
 | Monedas y tipos de cambio | `ui/settings/CurrenciesScreen` | ✅ ver, refrescar y fijar a mano — **la web no tiene esta pantalla** |
 | Novedades (changelog in-app) | `WhatsNewScreen` (asset **generado**) | ✅ con enlace «Ver novedades» y estado vacío |
-| Aviso de versión nueva | `components/UpdateNotice` | ✅ avisa; instalar el APK sigue siendo manual |
+| Aviso de versión nueva | `components/UpdateBanner` + `data/ApkUpdate` | ✅ la misma barra con «Actualizar», sobre la barra de pestañas (arriba sin sesión); el botón baja el APK del release y abre el instalador |
 
 ## Transversal
 
@@ -446,10 +446,13 @@ final del orden en vez de perderse. «Restablecer vista» limpia los dos ajustes
   esté instalada — la PWA no es la app. El APK no tiene sección de instalar, y
   ninguna superficie dice «ya está instalada»: si no hay nada que ofrecer, la
   sección no se dibuja.
-- **Instalar una actualización**: la web se recarga sola; el APK sólo avisa que
-  hay una versión más nueva (`UpdateNotice`, comparando `appVersion` de
-  `/version.json` contra `BuildConfig.VERSION_NAME`). Instalarlo es manual
-  mientras el APK se distribuya a mano.
+- **Instalar una actualización**: la barra y el botón son los de la web, pero
+  lo que hace el botón no puede serlo. La web cambia su service worker y se
+  recarga; el APK baja `Broke_<versión>_android.apk` del release de GitHub
+  (`data/ApkUpdate.kt`) y abre el instalador del sistema, que pide confirmar y,
+  la primera vez, permitir la app como origen (`REQUEST_INSTALL_PACKAGES`).
+  CI sube el APK unos minutos después del tag: si todavía no está, la barra lo
+  dice y el botón se queda para reintentar.
 - **Pantalla de monedas**: existe en Android y **no** en la web. El comando
   `set_exchange_rate` ya existía en el worker y `setSetting`/`getSetting` lo
   exponen, pero ninguna vista web lo usa. Si se quiere paridad estricta, toca

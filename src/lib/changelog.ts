@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.42.0",
+    date: "2026-09-25",
+    es: [
+      "La app de Android se actualiza sola: cuando sale una versión nueva aparece la misma barra que en la web, «Hay una nueva versión» con su botón «Actualizar». Al tocarlo, la app descarga la versión nueva y Android te pide confirmar la instalación; ya no hay que ir a buscar el .apk a GitHub.",
+      "La primera vez, Android te pedirá permitir que Broke instale apps: actívalo, regresa y vuelve a tocar «Actualizar».",
+      "Esta versión todavía hay que instalarla a mano; de aquí en adelante, ya no.",
+    ],
+    en: [
+      "The Android app now updates itself: when a new version is out you get the same bar as on the web, \"A new version is available\" with its \"Update\" button. Tap it and the app downloads the new version and Android asks you to confirm the install — no more fetching the .apk from GitHub.",
+      "The first time, Android will ask you to let Broke install apps: turn it on, come back and tap \"Update\" again.",
+      "This version still has to be installed by hand; from here on, it doesn't.",
+    ],
+  },
+  {
     version: "2.41.0",
     date: "2026-09-25",
     es: [

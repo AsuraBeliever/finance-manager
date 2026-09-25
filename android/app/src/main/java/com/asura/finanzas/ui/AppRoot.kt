@@ -1,5 +1,8 @@
 package com.asura.finanzas.ui
 
+import com.asura.finanzas.ui.components.UpdateBanner
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -97,10 +100,17 @@ fun AppRoot(
     ) {
         when (state) {
             AuthState.Checking -> Unit
-            AuthState.SignedOut -> LoginScreen(
-                repository = repository,
-                onSignedIn = { state = AuthState.SignedIn },
-            )
+            // Signed out, the web's banner tops the column instead of resting on
+            // a tab bar that is not there.
+            AuthState.SignedOut -> Column(Modifier.fillMaxSize()) {
+                UpdateBanner(repository, Modifier.statusBarsPadding(), atTop = true)
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    LoginScreen(
+                        repository = repository,
+                        onSignedIn = { state = AuthState.SignedIn },
+                    )
+                }
+            }
             // Above the tabs on purpose: the cache has to outlive the screen
             // you just left, which is the whole point of it.
             AuthState.SignedIn -> ProvideQueryCache(repository.queries) {

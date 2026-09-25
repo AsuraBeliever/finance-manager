@@ -617,6 +617,8 @@
     <string name="update_action">Actualizar</string>
     <string name="update_updating">Actualizando…</string>
     <string name="update_updating_hint">Aplicando la nueva versión, no cierres la app.</string>
+    <string name="update_downloading_hint">Descargando la nueva versión; Android te pedirá confirmar la instalación.</string>
+    <string name="update_download_failed">No se pudo descargar la actualización. Intenta de nuevo en unos minutos.</string>
     <string name="whats_new_title">Qué hay de nuevo</string>
     <string name="whats_new_empty">No hay novedades por ahora.</string>
     <string name="whats_new_settings_hint">Mira los cambios de cada versión de la app.</string>

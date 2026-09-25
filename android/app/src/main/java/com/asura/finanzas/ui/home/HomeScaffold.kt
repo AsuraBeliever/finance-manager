@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,7 +54,7 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.ui.components.MeshBackground
 import com.asura.finanzas.ui.dashboard.DashboardScreen
 import com.asura.finanzas.ui.dashboard.DashboardTarget
-import com.asura.finanzas.ui.components.UpdateNotice
+import com.asura.finanzas.ui.components.UpdateBanner
 import com.asura.finanzas.ui.settings.WhatsNewAuto
 import com.asura.finanzas.ui.investments.InvestmentsScreen
 import com.asura.finanzas.ui.more.MoreDestination
@@ -103,8 +104,7 @@ fun HomeScaffold(
     MeshBackground {
       Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            // Sits above every tab, like the web banner does above the router.
-            Box(Modifier.statusBarsPadding()) { UpdateNotice(repository) }
+            Spacer(Modifier.statusBarsPadding())
             // Pops once after an update, like the web's WhatsNewAuto.
             WhatsNewAuto(preferences)
             Box(Modifier.weight(1f)) {
@@ -151,6 +151,10 @@ fun HomeScaffold(
                     MoreDestination.Categories ->
                         CategoriesScreen(repository, onBack = { moreTarget = null })
                 }
+
+                // On top of every page, resting on the tab bar — the web's
+                // `UpdateBanner bottomOnMobile`.
+                UpdateBanner(repository, Modifier.align(Alignment.BottomCenter))
 
             }
             BottomBar(

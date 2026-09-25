@@ -718,6 +718,8 @@ export const en: Dict = {
     action: "Update",
     updating: "Updating…",
     updatingHint: "Applying the new version, don't close the app.",
+    downloadingHint: "Downloading the new version; Android will ask you to confirm the install.",
+    downloadFailed: "Couldn't download the update. Try again in a few minutes.",
   },
   whatsNew: {
     title: "What's new",
