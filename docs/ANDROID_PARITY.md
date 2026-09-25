@@ -418,6 +418,11 @@ final del orden en vez de perderse. «Restablecer vista» limpia los dos ajustes
 
 ## Diferencias que quedan a propósito
 
+- **Instalar la app**: sólo existe en la web, y en un teléfono Android ofrece
+  **el APK** (el asset `_android.apk` del último release), aunque la PWA ya
+  esté instalada — la PWA no es la app. El APK no tiene sección de instalar, y
+  ninguna superficie dice «ya está instalada»: si no hay nada que ofrecer, la
+  sección no se dibuja.
 - **Instalar una actualización**: la web se recarga sola; el APK sólo avisa que
   hay una versión más nueva (`UpdateNotice`, comparando `appVersion` de
   `/version.json` contra `BuildConfig.VERSION_NAME`). Instalarlo es manual

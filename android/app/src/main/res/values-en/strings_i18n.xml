@@ -337,12 +337,12 @@
     <string name="install_title">Install app</string>
     <string name="install_hint">Install it on your device to open it like an app, with its own window and icon.</string>
     <string name="install_action">Install app</string>
-    <string name="install_installed">Already installed on this device ✓</string>
-    <string name="install_desktop_app">You\'re already using the desktop app ✓</string>
     <string name="install_ios_hint">On iPhone or iPad: tap the Share button, then “Add to Home Screen”.</string>
     <string name="install_manual_hint">If you don\'t see the button, open your browser menu and choose “Install app” or “Add to Home Screen”.</string>
     <string name="install_download_windows">Download for Windows</string>
     <string name="install_download_linux">Download for Linux</string>
+    <string name="install_download_android">Download for Android</string>
+    <string name="install_android_hint">When you open the .apk, Android will ask to allow installs from your browser — that\'s expected for an app that doesn\'t come from the Play Store.</string>
     <string name="install_other_formats">Other Linux options (.deb, .rpm)…</string>
     <string name="categories_title">Categories</string>
     <string name="categories_manage">Manage categories</string>

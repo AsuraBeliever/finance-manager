@@ -381,13 +381,14 @@ export const en: Dict = {
     title: "Install app",
     hint: "Install it on your device to open it like an app, with its own window and icon.",
     action: "Install app",
-    installed: "Already installed on this device ✓",
-    desktopApp: "You're already using the desktop app ✓",
     iosHint: "On iPhone or iPad: tap the Share button, then “Add to Home Screen”.",
     manualHint:
       "If you don't see the button, open your browser menu and choose “Install app” or “Add to Home Screen”.",
     downloadWindows: "Download for Windows",
     downloadLinux: "Download for Linux",
+    downloadAndroid: "Download for Android",
+    androidHint:
+      "When you open the .apk, Android will ask to allow installs from your browser — that's expected for an app that doesn't come from the Play Store.",
     otherFormats: "Other Linux options (.deb, .rpm)…",
   },
   categories: {
