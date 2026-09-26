@@ -19,6 +19,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.components.ColorPicker
 import com.asura.finanzas.ui.components.FieldLabel
 import com.asura.finanzas.R
@@ -72,6 +81,21 @@ fun SubscriptionFormSheet(
     // New subscriptions open on the first chart colour, like the web form
     // (picking a brand logo overwrites it with the brand's own).
     var color by remember { mutableStateOf(existing?.color ?: "#a855f7") }
+    // The brand logo slug, detected from the name as it is typed — the web's
+    // `onNameChange`. Only a change of brand repaints the colour, so a colour
+    // picked by hand survives further typing.
+    var icon by remember { mutableStateOf(existing?.icon) }
+    fun onNameChange(value: String) {
+        name = value
+        error = null
+        val brand = matchBrand(value)
+        if (brand != null && brand.slug != icon) {
+            icon = brand.slug
+            color = brand.hex
+        } else if (brand == null && icon != null) {
+            icon = null
+        }
+    }
 
     val genericError = stringResource(R.string.common_error)
     val offlineError = stringResource(R.string.offline_banner)
@@ -116,6 +140,7 @@ fun SubscriptionFormSheet(
                         walletId = wallet?.id,
                         categoryId = category?.id,
                         color = color,
+                        icon = icon,
                     )
                 }
                     .onSuccess { onSaved() }
@@ -126,14 +151,36 @@ fun SubscriptionFormSheet(
             }
         },
     ) {
-        FormField(
-            label = stringResource(R.string.subscriptions_name),
-            value = name,
-            onValueChange = { name = it; error = null },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = stringResource(R.string.subscriptions_name_placeholder),
-            singleLine = true,
-        )
+        // The matched brand's badge sits beside the box, outside it, as on
+        // the web (h-9 w-9 rounded-lg, 18 px glyph).
+        Column(Modifier.fillMaxWidth()) {
+            FieldLabel(stringResource(R.string.subscriptions_name))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                brandIcon(icon)?.let { logo ->
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(parseHexColor(color) ?: Broke.colors.accent),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(logo, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                }
+                FormField(
+                    label = "",
+                    value = name,
+                    onValueChange = { onNameChange(it) },
+                    modifier = Modifier.weight(1f),
+                    placeholder = stringResource(R.string.subscriptions_name_placeholder),
+                    singleLine = true,
+                )
+            }
+        }
 
         // Web order: amount + currency, then frequency + next charge, both in
         // two-column rows.

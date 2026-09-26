@@ -172,6 +172,16 @@ function toBrandKotlin(entries) {
   const rows = entries
     .map(({ icon }) => `    ${kotlinString(icon.slug)} to ${kotlinString(icon.path)},`)
     .join("\n");
+  // Same order as ENTRIES: the first keyword hit wins, so more specific names
+  // ("apple music") have to stay ahead of the general ones ("apple").
+  const matchers = entries
+    .map(
+      ({ icon, keywords }) =>
+        `    BrandMatch(${kotlinString(icon.slug)}, ${kotlinString("#" + icon.hex)}, listOf(${keywords
+          .map(kotlinString)
+          .join(", ")})),`,
+    )
+    .join("\n");
 
   return `package com.asura.finanzas.ui.subscriptions
 
@@ -183,6 +193,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
+import java.text.Normalizer
 
 /** simple-icons path data, by slug — the same table the web renders from. */
 private val BRAND_PATHS: Map<String, String> = mapOf(
@@ -210,6 +221,25 @@ fun brandIcon(slug: String?): ImageVector? {
             )
         }.build()
     }
+}
+
+/** A brand the name box can recognise: its slug, its colour, its keywords. */
+data class BrandMatch(val slug: String, val hex: String, val keywords: List<String>)
+
+private val BRAND_MATCHERS: List<BrandMatch> = listOf(
+${matchers}
+)
+
+/**
+ * Best brand for a free-text subscription name, or null — the web's
+ * \`matchBrand\`: lower-cased, accents stripped, first keyword contained wins.
+ */
+fun matchBrand(name: String): BrandMatch? {
+    val n = Normalizer.normalize(name.lowercase(), Normalizer.Form.NFD)
+        .replace(Regex("[\\u0300-\\u036f]"), "")
+        .trim()
+    if (n.isEmpty()) return null
+    return BRAND_MATCHERS.firstOrNull { b -> b.keywords.any { n.contains(it) } }
 }
 `;
 }

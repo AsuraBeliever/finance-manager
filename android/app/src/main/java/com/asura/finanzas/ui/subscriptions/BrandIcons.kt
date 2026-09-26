@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
+import java.text.Normalizer
 
 /** simple-icons path data, by slug — the same table the web renders from. */
 private val BRAND_PATHS: Map<String, String> = mapOf(
@@ -95,4 +96,83 @@ fun brandIcon(slug: String?): ImageVector? {
             )
         }.build()
     }
+}
+
+/** A brand the name box can recognise: its slug, its colour, its keywords. */
+data class BrandMatch(val slug: String, val hex: String, val keywords: List<String>)
+
+private val BRAND_MATCHERS: List<BrandMatch> = listOf(
+    BrandMatch("applemusic", "#FA243C", listOf("apple music")),
+    BrandMatch("appletv", "#000000", listOf("apple tv")),
+    BrandMatch("applearcade", "#000000", listOf("apple arcade")),
+    BrandMatch("applepodcasts", "#9933CC", listOf("apple podcasts")),
+    BrandMatch("applenews", "#FD415E", listOf("apple news")),
+    BrandMatch("icloud", "#3693F3", listOf("icloud", "icloud+")),
+    BrandMatch("youtubemusic", "#FF0000", listOf("youtube music", "yt music")),
+    BrandMatch("youtube", "#FF0000", listOf("youtube", "youtube premium", "yt premium")),
+    BrandMatch("hbomax", "#000000", listOf("hbo max", "hbomax")),
+    BrandMatch("hbo", "#000000", listOf("hbo")),
+    BrandMatch("spotify", "#1ED760", listOf("spotify")),
+    BrandMatch("netflix", "#E50914", listOf("netflix")),
+    BrandMatch("crunchyroll", "#FF5E00", listOf("crunchyroll", "crunchy")),
+    BrandMatch("paramountplus", "#0064FF", listOf("paramount", "paramount+")),
+    BrandMatch("starz", "#082125", listOf("starz")),
+    BrandMatch("showtime", "#B10000", listOf("showtime")),
+    BrandMatch("mubi", "#000000", listOf("mubi")),
+    BrandMatch("plex", "#EBAF00", listOf("plex")),
+    BrandMatch("vimeo", "#1AB7EA", listOf("vimeo")),
+    BrandMatch("tidal", "#000000", listOf("tidal")),
+    BrandMatch("deezer", "#A238FF", listOf("deezer")),
+    BrandMatch("soundcloud", "#FF5500", listOf("soundcloud")),
+    BrandMatch("bandcamp", "#408294", listOf("bandcamp")),
+    BrandMatch("pandora", "#224099", listOf("pandora")),
+    BrandMatch("audible", "#F8991C", listOf("audible")),
+    BrandMatch("playstation", "#0070D1", listOf("playstation", "ps plus", "ps+", "psn")),
+    BrandMatch("steam", "#000000", listOf("steam")),
+    BrandMatch("epicgames", "#313131", listOf("epic games", "epic")),
+    BrandMatch("riotgames", "#EB0029", listOf("riot", "riot games")),
+    BrandMatch("twitch", "#9146FF", listOf("twitch")),
+    BrandMatch("kick", "#53FC19", listOf("kick")),
+    BrandMatch("discord", "#5865F2", listOf("discord", "nitro")),
+    BrandMatch("notion", "#000000", listOf("notion")),
+    BrandMatch("obsidian", "#7C3AED", listOf("obsidian")),
+    BrandMatch("github", "#181717", listOf("github", "copilot")),
+    BrandMatch("figma", "#F24E1E", listOf("figma")),
+    BrandMatch("jetbrains", "#000000", listOf("jetbrains", "intellij")),
+    BrandMatch("grammarly", "#027E6F", listOf("grammarly")),
+    BrandMatch("coursera", "#0056D2", listOf("coursera")),
+    BrandMatch("udemy", "#A435F0", listOf("udemy")),
+    BrandMatch("medium", "#000000", listOf("medium")),
+    BrandMatch("vercel", "#000000", listOf("vercel")),
+    BrandMatch("netlify", "#00C7B7", listOf("netlify")),
+    BrandMatch("digitalocean", "#0080FF", listOf("digitalocean", "digital ocean")),
+    BrandMatch("backblaze", "#E21E29", listOf("backblaze")),
+    BrandMatch("mega", "#D9272E", listOf("mega")),
+    BrandMatch("dropbox", "#0061FF", listOf("dropbox")),
+    BrandMatch("claude", "#D97757", listOf("claude", "anthropic")),
+    BrandMatch("duolingo", "#58CC02", listOf("duolingo")),
+    BrandMatch("wise", "#9FE870", listOf("wise")),
+    BrandMatch("revolut", "#191C1F", listOf("revolut")),
+    BrandMatch("nordvpn", "#4687FF", listOf("nordvpn", "nord vpn")),
+    BrandMatch("protonvpn", "#66DEB1", listOf("proton vpn", "protonvpn")),
+    BrandMatch("proton", "#6D4AFF", listOf("proton")),
+    BrandMatch("expressvpn", "#DA3940", listOf("expressvpn", "express vpn")),
+    BrandMatch("zoom", "#0B5CFF", listOf("zoom")),
+    BrandMatch("patreon", "#000000", listOf("patreon")),
+    BrandMatch("googleplay", "#414141", listOf("google play", "play pass", "play store")),
+    BrandMatch("googlecloud", "#4285F4", listOf("google cloud", "gcp")),
+    BrandMatch("google", "#4285F4", listOf("google one", "google", "gemini")),
+    BrandMatch("apple", "#000000", listOf("apple one", "apple")),
+)
+
+/**
+ * Best brand for a free-text subscription name, or null — the web's
+ * `matchBrand`: lower-cased, accents stripped, first keyword contained wins.
+ */
+fun matchBrand(name: String): BrandMatch? {
+    val n = Normalizer.normalize(name.lowercase(), Normalizer.Form.NFD)
+        .replace(Regex("[\u0300-\u036f]"), "")
+        .trim()
+    if (n.isEmpty()) return null
+    return BRAND_MATCHERS.firstOrNull { b -> b.keywords.any { n.contains(it) } }
 }

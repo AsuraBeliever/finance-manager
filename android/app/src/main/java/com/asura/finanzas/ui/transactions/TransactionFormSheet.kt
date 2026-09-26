@@ -483,13 +483,17 @@ fun TransactionFormSheet(
             }
 
             if (kind != TxKind.Transfer) {
+                val noCategory = stringResource(R.string.transactions_no_category)
+                // "Uncategorized" is a choice in its own right, first in the
+                // list, as the web's `<option value="">` is — so a pick can
+                // be undone.
                 PickerField(
                     label = stringResource(R.string.transactions_category),
-                    options = categories,
+                    options = listOf<TransactionCategory?>(null) + categories,
                     selected = category,
-                    optionLabel = { seedName(it.name, it.isSystem).orEmpty() },
+                    optionLabel = { c -> c?.let { seedName(it.name, it.isSystem) } ?: noCategory },
                     onSelect = { category = it },
-                    emptyLabel = stringResource(R.string.transactions_no_category),
+                    emptyLabel = noCategory,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

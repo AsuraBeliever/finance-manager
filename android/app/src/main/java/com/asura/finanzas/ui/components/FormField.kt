@@ -26,6 +26,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -121,6 +124,12 @@ fun FormField(
     focusRequester: FocusRequester? = null,
     /** Overridable for a control the web does not build out of an input. */
     fontSize: androidx.compose.ui.unit.TextUnit = ControlFontSize,
+    /**
+     * Keep the caret pinned after the last character. The money box needs
+     * it: its digits fill in from the right, so an edit anywhere but the end
+     * would shuffle them.
+     */
+    cursorAtEnd: Boolean = false,
 ) {
     val colors = Broke.colors
     val interaction = remember { MutableInteractionSource() }
@@ -130,71 +139,113 @@ fun FormField(
         if (label.isNotBlank()) {
             FieldLabel(label)
         }
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            enabled = enabled,
-            readOnly = readOnly,
-            singleLine = singleLine,
-            interactionSource = interaction,
-            keyboardOptions = keyboardOptions,
-            keyboardActions = keyboardActions,
-            visualTransformation = visualTransformation,
-            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = fontSize,
-                lineHeight = fontSize * 1.4286f,
-                // Every control the web prints a figure in is `tabular-nums`,
-                // and the ones that are not have no digits to change.
-                fontFeatureSettings = "tnum",
-                color = valueColor ?: if (enabled) colors.fg else colors.fgSubtle,
-            ),
-            cursorBrush = SolidColor(colors.accent),
-            modifier = Modifier
-                .fillMaxWidth()
-                .let { if (focusRequester != null) it.focusRequester(focusRequester) else it },
-            decorationBox = { inner ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(colors.surface)
-                        .border(
-                            1.dp,
-                            when {
-                                isError -> colors.danger
-                                focused -> colors.accent
-                                else -> colors.borderMuted
-                            },
-                            RoundedCornerShape(8.dp),
-                        )
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    leading?.invoke()
-                    Box(Modifier.weight(1f)) {
-                        if (value.isEmpty() && placeholder.isNotBlank()) {
-                            Text(
-                                placeholder,
-                                style = MaterialTheme.typography.bodyMedium
-                                    .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
-                                color = colors.fgSubtle,
-                            )
-                        }
-                        inner()
-                    }
-                    if (suffix.isNotBlank()) {
+        val decoration: @Composable (@Composable () -> Unit) -> Unit = { inner ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(colors.surface)
+                    .border(
+                        1.dp,
+                        when {
+                            isError -> colors.danger
+                            focused -> colors.accent
+                            else -> colors.borderMuted
+                        },
+                        RoundedCornerShape(8.dp),
+                    )
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                leading?.invoke()
+                Box(Modifier.weight(1f)) {
+                    if (value.isEmpty() && placeholder.isNotBlank()) {
                         Text(
-                            suffix,
+                            placeholder,
                             style = MaterialTheme.typography.bodyMedium
                                 .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
                             color = colors.fgSubtle,
                         )
                     }
-                    trailing?.invoke()
+                    inner()
                 }
-            },
-        )
+                if (suffix.isNotBlank()) {
+                    Text(
+                        suffix,
+                        style = MaterialTheme.typography.bodyMedium
+                            .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
+                        color = colors.fgSubtle,
+                    )
+                }
+                trailing?.invoke()
+            }
+        }
+        if (cursorAtEnd) {
+            // The caret lives at the end and nowhere else: a tap in the middle
+            // or a drag of the handle snaps back, so the only edits are typing
+            // onto the end and deleting from it. A fresh value on every change
+            // (neverEqualPolicy) is what pushes the snap back into the field
+            // even when the text itself did not change.
+            var field by remember {
+                mutableStateOf(TextFieldValue(value, TextRange(value.length)), neverEqualPolicy())
+            }
+            if (field.text != value || field.selection != TextRange(value.length)) {
+                field = TextFieldValue(value, TextRange(value.length))
+            }
+            BasicTextField(
+                value = field,
+                onValueChange = { next ->
+                    if (next.text != field.text) onValueChange(next.text)
+                    field = TextFieldValue(value, TextRange(value.length))
+                },
+                enabled = enabled,
+                readOnly = readOnly,
+                singleLine = singleLine,
+                interactionSource = interaction,
+                keyboardOptions = keyboardOptions,
+                keyboardActions = keyboardActions,
+                visualTransformation = visualTransformation,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = fontSize,
+                    lineHeight = fontSize * 1.4286f,
+                    // Every control the web prints a figure in is `tabular-nums`,
+                    // and the ones that are not have no digits to change.
+                    fontFeatureSettings = "tnum",
+                    color = valueColor ?: if (enabled) colors.fg else colors.fgSubtle,
+                ),
+                cursorBrush = SolidColor(colors.accent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { if (focusRequester != null) it.focusRequester(focusRequester) else it },
+                decorationBox = decoration,
+            )
+        } else {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                enabled = enabled,
+                readOnly = readOnly,
+                singleLine = singleLine,
+                interactionSource = interaction,
+                keyboardOptions = keyboardOptions,
+                keyboardActions = keyboardActions,
+                visualTransformation = visualTransformation,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = fontSize,
+                    lineHeight = fontSize * 1.4286f,
+                    // Every control the web prints a figure in is `tabular-nums`,
+                    // and the ones that are not have no digits to change.
+                    fontFeatureSettings = "tnum",
+                    color = valueColor ?: if (enabled) colors.fg else colors.fgSubtle,
+                ),
+                cursorBrush = SolidColor(colors.accent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { if (focusRequester != null) it.focusRequester(focusRequester) else it },
+                decorationBox = decoration,
+            )
+        }
     }
 }
 
@@ -255,6 +306,7 @@ fun MoneyField(
         },
         modifier = modifier,
         focusRequester = focusRequester,
+        cursorAtEnd = true,
         placeholder = "0.00",
         singleLine = true,
         suffix = suffix,
