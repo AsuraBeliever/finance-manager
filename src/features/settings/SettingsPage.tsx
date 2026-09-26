@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es as dateLocaleEs, enUS as dateLocaleEn } from "date-fns/locale";
-import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Sparkles, Tags } from "lucide-react";
+import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, RefreshCw, Smartphone, Sparkles, Tags } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { InstallOfferView, useInstallOffer } from "../../components/InstallButton";
 import { PageHeader } from "../../components/PageHeader";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { WhatsNewModal } from "../update/WhatsNew";
+import { checkForUpdates } from "../update/updateCheck";
 import { changelogEnabled, setChangelogEnabled, visibleEntries } from "../../lib/changelog";
 import { listWalletCategories } from "../../lib/api";
 import {
@@ -322,6 +323,7 @@ export function SettingsPage() {
             <span className="text-fg-muted">{es.settings.version}</span>
             <span className="font-mono text-fg">v{__APP_VERSION__}</span>
           </div>
+          <CheckForUpdates />
         </section>
       </div>
 
@@ -330,6 +332,46 @@ export function SettingsPage() {
         onClose={() => setWhatsNewOpen(false)}
         entries={visibleEntries(__APP_VERSION__)}
       />
+    </div>
+  );
+}
+
+/** "Check for updates" under About: runs the update bar's detection now and
+ *  says what it found; a new version raises the bar itself. */
+function CheckForUpdates() {
+  const [state, setState] = useState<"idle" | "checking" | "latest" | "found" | "failed">(
+    "idle",
+  );
+  const run = async () => {
+    if (state === "checking") return;
+    setState("checking");
+    const found = await checkForUpdates();
+    setState(found === null ? "failed" : found ? "found" : "latest");
+  };
+  const message =
+    state === "latest"
+      ? es.settings.upToDate
+      : state === "found"
+        ? es.settings.updateFound
+        : state === "failed"
+          ? es.settings.updateCheckFailed
+          : null;
+  return (
+    <div className="mt-4 flex flex-col items-start gap-2">
+      <Button
+        variant="ghost"
+        onClick={run}
+        disabled={state === "checking"}
+        className="inline-flex items-center gap-2 border border-border-muted"
+      >
+        <RefreshCw size={15} className={state === "checking" ? "animate-spin" : undefined} />
+        {state === "checking" ? es.settings.checkingUpdates : es.settings.checkUpdates}
+      </Button>
+      {message && (
+        <p className={`text-xs ${state === "found" ? "text-accent" : "text-fg-subtle"}`}>
+          {message}
+        </p>
+      )}
     </div>
   );
 }

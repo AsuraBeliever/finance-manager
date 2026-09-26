@@ -50,6 +50,8 @@ import com.asura.finanzas.data.ApkUpdate
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.launch
 
 /**
@@ -70,6 +72,21 @@ fun isNewerVersion(deployed: String, installed: String): Boolean {
 
 /** The web re-checks hourly and whenever the window comes back into view. */
 private const val CHECK_INTERVAL_MS = 60 * 60 * 1000L
+
+/**
+ * The deployed version, shared by the bar and Settings' "Check for updates" —
+ * the button checks on demand and, when it finds one, the bar is already up.
+ */
+object AppUpdates {
+    val deployed = MutableStateFlow<String?>(null)
+
+    /** true = newer version out, false = up to date, null = could not tell. */
+    suspend fun check(repository: BrokeRepository): Boolean? {
+        val version = repository.deployedAppVersion() ?: return null
+        deployed.value = version
+        return isNewerVersion(version, BuildConfig.VERSION_NAME)
+    }
+}
 
 /**
  * The web's `UpdateBanner` at phone width: a full-width bar resting on the tab
@@ -95,14 +112,14 @@ fun UpdateBanner(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var deployed by remember { mutableStateOf<String?>(null) }
+    val deployed by AppUpdates.deployed.collectAsState()
     var applying by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
 
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (true) {
-                repository.deployedAppVersion()?.let { deployed = it }
+                AppUpdates.check(repository)
                 delay(CHECK_INTERVAL_MS)
             }
         }
@@ -210,7 +227,7 @@ fun UpdateBanner(
 
 /** Lucide's `RefreshCw`, turning like Tailwind's `animate-spin` (1 s, linear). */
 @Composable
-private fun SpinningRefresh(spinning: Boolean, size: Int, tint: androidx.compose.ui.graphics.Color) {
+internal fun SpinningRefresh(spinning: Boolean, size: Int, tint: androidx.compose.ui.graphics.Color) {
     val angle = if (spinning) {
         rememberInfiniteTransition(label = "spin").animateFloat(
             initialValue = 0f,
@@ -222,4 +239,57 @@ private fun SpinningRefresh(spinning: Boolean, size: Int, tint: androidx.compose
         0f
     }
     Icon(Lucide.RefreshCw, contentDescription = null, tint = tint, modifier = Modifier.size(size.dp).rotate(angle))
+}
+
+/**
+ * "Check for updates" under About, as on the web: runs the bar's check now and
+ * says what it found. A new version raises the bar, whose button installs it.
+ * The web's `Button variant="ghost"` with a hairline border.
+ */
+@Composable
+fun CheckForUpdatesButton(repository: BrokeRepository, modifier: Modifier = Modifier) {
+    val colors = Broke.colors
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<Boolean?>(null) }
+    var ran by remember { mutableStateOf(false) }
+
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+                .clickable(enabled = !checking) {
+                    checking = true
+                    scope.launch {
+                        result = AppUpdates.check(repository)
+                        ran = true
+                        checking = false
+                    }
+                }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SpinningRefresh(spinning = checking, size = 15, tint = colors.fg.copy(alpha = if (checking) 0.5f else 1f))
+            Text(
+                stringResource(if (checking) R.string.settings_checking_updates else R.string.settings_check_updates),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fg.copy(alpha = if (checking) 0.5f else 1f),
+            )
+        }
+        if (ran && !checking) {
+            Text(
+                stringResource(
+                    when (result) {
+                        true -> R.string.settings_update_found
+                        false -> R.string.settings_up_to_date
+                        null -> R.string.settings_update_check_failed
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                color = if (result == true) colors.accent else colors.fgSubtle,
+            )
+        }
+    }
 }

@@ -679,6 +679,11 @@ export const esDict = {
     session: "Sesión",
     about: "Acerca de",
     version: "Versión",
+    checkUpdates: "Buscar actualizaciones",
+    checkingUpdates: "Buscando…",
+    upToDate: "Ya tienes la versión más reciente.",
+    updateFound: "Hay una nueva versión: toca «Actualizar» en la barra para instalarla.",
+    updateCheckFailed: "No se pudo buscar. Revisa tu conexión e inténtalo de nuevo.",
   },
   auth: {
     loginTitle: "Inicia sesión",

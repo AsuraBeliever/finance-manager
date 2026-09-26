@@ -668,6 +668,11 @@ export const en: Dict = {
     session: "Session",
     about: "About",
     version: "Version",
+    checkUpdates: "Check for updates",
+    checkingUpdates: "Checking…",
+    upToDate: "You're on the latest version.",
+    updateFound: "A new version is available: tap \"Update\" in the bar to install it.",
+    updateCheckFailed: "Couldn't check. Check your connection and try again.",
   },
   auth: {
     loginTitle: "Sign in",

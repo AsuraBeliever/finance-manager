@@ -79,6 +79,11 @@ Cosas que salieron de hacer esto y conviene no repetir:
   web persiste su caché de TanStack Query; Android guarda `QueryCache` en disco.
   Sin eso, cada arranque en frío (y cada actualización lo es) cargaba las
   ventanas una por una.
+- **«Buscar actualizaciones» (Ajustes → Acerca de) corre la misma detección que
+  la barra de «Actualizar».** Web: `features/update/updateCheck.ts` (la barra
+  registra su checker); Android: `AppUpdates` en `UpdateBanner.kt`, estado
+  compartido con la barra. Si hay versión nueva, la barra aparece y su botón
+  instala.
 - Medidas compartidas: tarjetas `rounded-2xl` (16 dp), márgenes de página
   16 dp, botón primario `rounded-lg` px16/py8 sobre `accentDim`, encabezado con
   regla de 4×28 y título de 30 sp cuyas acciones **envuelven**.

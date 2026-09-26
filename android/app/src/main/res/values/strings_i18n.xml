@@ -573,6 +573,11 @@
     <string name="settings_session">Sesión</string>
     <string name="settings_about">Acerca de</string>
     <string name="settings_version">Versión</string>
+    <string name="settings_check_updates">Buscar actualizaciones</string>
+    <string name="settings_checking_updates">Buscando…</string>
+    <string name="settings_up_to_date">Ya tienes la versión más reciente.</string>
+    <string name="settings_update_found">Hay una nueva versión: toca «Actualizar» en la barra para instalarla.</string>
+    <string name="settings_update_check_failed">No se pudo buscar. Revisa tu conexión e inténtalo de nuevo.</string>
     <string name="auth_login_title">Inicia sesión</string>
     <string name="auth_register_title">Crea tu cuenta</string>
     <string name="auth_email">Correo electrónico</string>

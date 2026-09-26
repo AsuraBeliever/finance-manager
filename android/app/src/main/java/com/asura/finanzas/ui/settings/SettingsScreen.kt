@@ -467,6 +467,8 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.fgSubtle,
             )
+            Spacer(Modifier.height(16.dp))
+            com.asura.finanzas.ui.components.CheckForUpdatesButton(repository)
         }
 
         GlassCard(Modifier.fillMaxWidth()) {
