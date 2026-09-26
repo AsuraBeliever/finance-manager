@@ -1,5 +1,19 @@
 [
   {
+    "version": "2.43.0",
+    "date": "2026-09-26",
+    "es": [
+      "Tus preferencias ahora viven en tu cuenta: idioma, formato de hora, zona horaria, tema y el aviso de novedades se guardan contigo y se restauran solos al iniciar sesión en cualquier dispositivo — en la web, en el iPhone y en la app de Android, aunque la reinstales. Cambiarlas en uno las cambia en todos.",
+      "En la app de Android, cada pantalla abre al instante con lo último que mostró, también después de cerrar la app o de actualizarla, y se pone al día sola en segundo plano; ya no hay que esperar a que carguen una por una.",
+      "En la app de Android, la barra de «Actualizar» aparece sola en cuanto la versión nueva está lista para el teléfono, sin tener que cerrar y volver a abrir la app. Y en Ajustes → Acerca de hay un botón «Buscar actualizaciones» para revisar al momento."
+    ],
+    "en": [
+      "Your preferences now live in your account: language, time format, time zone, theme and the what's-new notice travel with you and come back by themselves when you sign in on any device — on the web, on iPhone and in the Android app, even after reinstalling it. Change them on one and they change on all.",
+      "In the Android app, every screen opens instantly with what it last showed, even after closing or updating the app, and catches up by itself in the background — no more waiting for them to load one by one.",
+      "In the Android app, the \"Update\" bar shows up by itself as soon as the new version is ready for the phone, without closing and reopening the app. And Settings → About has a \"Check for updates\" button to check right away."
+    ]
+  },
+  {
     "version": "2.42.1",
     "date": "2026-09-26",
     "es": [
