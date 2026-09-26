@@ -2,7 +2,6 @@ import { useRegisterSW } from "virtual:pwa-register/react";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { es } from "../../i18n/es";
-import { registerUpdateChecker } from "./updateCheck";
 
 // Re-check for a new deployment hourly and whenever the window regains focus,
 // so the desktop shell (which stays open for days) notices updates without a
@@ -115,25 +114,6 @@ function ProdUpdateBanner({ bottomOnMobile }: { bottomOnMobile: boolean }) {
       window.removeEventListener("online", check);
     };
   }, [remoteStale]);
-
-  // Settings' "Check for updates" runs this on demand: ask the service worker
-  // to look for a new version and compare build ids, raising the bar if either
-  // finds one.
-  useEffect(
-    () =>
-      registerUpdateChecker(async () => {
-        const registration = registrationRef.current;
-        if (registration) await registration.update().catch(() => {});
-        const deployed = await deployedBuildId();
-        if (deployed && deployed !== __BUILD_ID__) {
-          setRemoteStale(true);
-          return true;
-        }
-        if (registration?.waiting) return true;
-        return deployed ? false : null;
-      }),
-    [],
-  );
 
   if (!needRefresh && !remoteStale) return null;
 

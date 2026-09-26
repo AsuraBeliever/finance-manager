@@ -62,6 +62,19 @@ object ApkUpdate {
         target
     }
 
+    /**
+     * Whether CI has attached [version]'s APK yet: true / false, or null when
+     * GitHub could not be reached. The web deploy — and with it version.json —
+     * lands about ten minutes before the APK does, so "a newer version exists"
+     * is not yet "a newer version you can install".
+     */
+    suspend fun isPublished(version: String): Boolean? = withContext(Dispatchers.IO) {
+        runCatching {
+            client.newCall(Request.Builder().url(apkUrl(version)).head().build()).execute()
+                .use { it.isSuccessful }
+        }.getOrNull()
+    }
+
     /** Open the system installer on a downloaded APK. */
     fun install(context: Context, apk: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", apk)

@@ -578,6 +578,7 @@
     <string name="settings_up_to_date">Ya tienes la versión más reciente.</string>
     <string name="settings_update_found">Hay una nueva versión: toca «Actualizar» en la barra para instalarla.</string>
     <string name="settings_update_check_failed">No se pudo buscar. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="settings_update_preparing">Ya salió una versión nueva y se está preparando para el teléfono; la barra de «Actualizar» aparecerá sola en unos minutos.</string>
     <string name="auth_login_title">Inicia sesión</string>
     <string name="auth_register_title">Crea tu cuenta</string>
     <string name="auth_email">Correo electrónico</string>

@@ -578,6 +578,7 @@
     <string name="settings_up_to_date">You\'re on the latest version.</string>
     <string name="settings_update_found">A new version is available: tap \"Update\" in the bar to install it.</string>
     <string name="settings_update_check_failed">Couldn\'t check. Check your connection and try again.</string>
+    <string name="settings_update_preparing">A new version is out and being prepared for the phone; the \"Update\" bar will show up by itself in a few minutes.</string>
     <string name="auth_login_title">Sign in</string>
     <string name="auth_register_title">Create your account</string>
     <string name="auth_email">Email</string>

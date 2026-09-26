@@ -679,11 +679,14 @@ export const esDict = {
     session: "Sesión",
     about: "Acerca de",
     version: "Versión",
+    // "Buscar actualizaciones" is Android-only: the web's update bar appears on
+    // its own, while the APK waits on CI to attach the new .apk.
     checkUpdates: "Buscar actualizaciones",
     checkingUpdates: "Buscando…",
     upToDate: "Ya tienes la versión más reciente.",
     updateFound: "Hay una nueva versión: toca «Actualizar» en la barra para instalarla.",
     updateCheckFailed: "No se pudo buscar. Revisa tu conexión e inténtalo de nuevo.",
+    updatePreparing: "Ya salió una versión nueva y se está preparando para el teléfono; la barra de «Actualizar» aparecerá sola en unos minutos.",
   },
   auth: {
     loginTitle: "Inicia sesión",

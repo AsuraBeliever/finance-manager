@@ -673,6 +673,7 @@ export const en: Dict = {
     upToDate: "You're on the latest version.",
     updateFound: "A new version is available: tap \"Update\" in the bar to install it.",
     updateCheckFailed: "Couldn't check. Check your connection and try again.",
+    updatePreparing: "A new version is out and being prepared for the phone; the \"Update\" bar will show up by itself in a few minutes.",
   },
   auth: {
     loginTitle: "Sign in",

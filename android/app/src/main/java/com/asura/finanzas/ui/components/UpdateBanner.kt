@@ -70,21 +70,35 @@ fun isNewerVersion(deployed: String, installed: String): Boolean {
     return false
 }
 
-/** The web re-checks hourly and whenever the window comes back into view. */
-private const val CHECK_INTERVAL_MS = 60 * 60 * 1000L
+/**
+ * How often the open app looks for a new version. A minute, not the web's
+ * hour: the APK lands on GitHub ~10 minutes after the deploy, so an hourly
+ * check (or one only when the app comes to the front) left the bar missing
+ * until the app was closed and reopened. It is one tiny JSON read.
+ */
+private const val CHECK_INTERVAL_MS = 60 * 1000L
 
 /**
- * The deployed version, shared by the bar and Settings' "Check for updates" —
- * the button checks on demand and, when it finds one, the bar is already up.
+ * What the bar and Settings' "Check for updates" share: the newer version whose
+ * APK is ready to install. The button checks on demand; when it finds one, the
+ * bar is already up.
  */
 object AppUpdates {
-    val deployed = MutableStateFlow<String?>(null)
+    val ready = MutableStateFlow<String?>(null)
 
-    /** true = newer version out, false = up to date, null = could not tell. */
-    suspend fun check(repository: BrokeRepository): Boolean? {
-        val version = repository.deployedAppVersion() ?: return null
-        deployed.value = version
-        return isNewerVersion(version, BuildConfig.VERSION_NAME)
+    enum class Result { Ready, Preparing, UpToDate, Unknown }
+
+    suspend fun check(repository: BrokeRepository): Result {
+        val version = repository.deployedAppVersion() ?: return Result.Unknown
+        if (!isNewerVersion(version, BuildConfig.VERSION_NAME)) return Result.UpToDate
+        if (ready.value == version) return Result.Ready
+        // Only offer what can actually be downloaded: announcing the version
+        // before CI attached its APK made the button fail for ten minutes.
+        return when (ApkUpdate.isPublished(version)) {
+            true -> Result.Ready.also { ready.value = version }
+            false -> Result.Preparing
+            null -> Result.Unknown
+        }
     }
 }
 
@@ -95,9 +109,9 @@ object AppUpdates {
  *
  * What the button does is the one honest difference. The web swaps its
  * service worker and reloads; here it downloads the release APK from GitHub
- * and opens the system installer on it ([ApkUpdate]). If the asset is not
- * there yet — CI attaches it a few minutes after the deploy — the bar says so
- * and the button stays to retry.
+ * and opens the system installer on it ([ApkUpdate]). The bar only appears
+ * once CI has attached that APK ([AppUpdates]); if the download still fails,
+ * the bar says so and the button stays to retry.
  *
  * Lay it over the bottom of the content, above the tab bar, the way the web's
  * `fixed bottom-[var(--bottom-nav-h)]` does.
@@ -112,7 +126,7 @@ fun UpdateBanner(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val deployed by AppUpdates.deployed.collectAsState()
+    val ready by AppUpdates.ready.collectAsState()
     var applying by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
 
@@ -125,7 +139,7 @@ fun UpdateBanner(
         }
     }
 
-    val newer = deployed?.takeIf { isNewerVersion(it, BuildConfig.VERSION_NAME) } ?: return
+    val newer = ready ?: return
     val colors = Broke.colors
 
     fun apply() {
@@ -242,16 +256,21 @@ internal fun SpinningRefresh(spinning: Boolean, size: Int, tint: androidx.compos
 }
 
 /**
- * "Check for updates" under About, as on the web: runs the bar's check now and
- * says what it found. A new version raises the bar, whose button installs it.
- * The web's `Button variant="ghost"` with a hairline border.
+ * "Check for updates" under About — Android only: the web's bar shows up by
+ * itself, the APK has to wait for CI. Runs the bar's check now and says what it
+ * found; a version ready to install raises the bar, whose button installs it.
+ * Drawn as the web's `Button variant="ghost"` with a hairline border.
  */
 @Composable
 fun CheckForUpdatesButton(repository: BrokeRepository, modifier: Modifier = Modifier) {
     val colors = Broke.colors
     val scope = rememberCoroutineScope()
     var checking by remember { mutableStateOf(false) }
-    var result by remember { mutableStateOf<Boolean?>(null) }
+    var checked by remember { mutableStateOf(AppUpdates.Result.Unknown) }
+    // The bar's own minute check can find the APK after this button said
+    // "being prepared"; follow it rather than keep saying so under the bar.
+    val ready by AppUpdates.ready.collectAsState()
+    val result = if (ready != null) AppUpdates.Result.Ready else checked
     var ran by remember { mutableStateOf(false) }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -262,7 +281,7 @@ fun CheckForUpdatesButton(repository: BrokeRepository, modifier: Modifier = Modi
                 .clickable(enabled = !checking) {
                     checking = true
                     scope.launch {
-                        result = AppUpdates.check(repository)
+                        checked = AppUpdates.check(repository)
                         ran = true
                         checking = false
                     }
@@ -282,13 +301,14 @@ fun CheckForUpdatesButton(repository: BrokeRepository, modifier: Modifier = Modi
             Text(
                 stringResource(
                     when (result) {
-                        true -> R.string.settings_update_found
-                        false -> R.string.settings_up_to_date
-                        null -> R.string.settings_update_check_failed
+                        AppUpdates.Result.Ready -> R.string.settings_update_found
+                        AppUpdates.Result.Preparing -> R.string.settings_update_preparing
+                        AppUpdates.Result.UpToDate -> R.string.settings_up_to_date
+                        AppUpdates.Result.Unknown -> R.string.settings_update_check_failed
                     },
                 ),
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = if (result == true) colors.accent else colors.fgSubtle,
+                color = if (result == AppUpdates.Result.Ready) colors.accent else colors.fgSubtle,
             )
         }
     }
