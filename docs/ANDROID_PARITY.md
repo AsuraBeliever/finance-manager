@@ -69,6 +69,23 @@ Cosas que salieron de hacer esto y conviene no repetir:
   - Un `<select>` con `<option value="">` se porta con `null` **como opción de
     la lista**, no sólo como `emptyLabel`: si no, una categoría elegida no se
     puede quitar.
+- **Las preferencias van atadas a la cuenta, en las dos superficies.** Idioma,
+  formato de hora, zona horaria, tema y «Novedades al actualizar» viajan en la
+  llave `preferences` de `settings` (gana la escritura más reciente). Una
+  reinstalación, un teléfono nuevo o un navegador limpio las recuperan al
+  iniciar sesión. Una preferencia nueva de Ajustes entra en ese sobre en web
+  (`src/lib/preferences.ts`) y en Android (`AppearanceSync`) a la vez.
+- **Cada ventana abre con lo último que mostró, también tras reiniciar.** La
+  web persiste su caché de TanStack Query; Android guarda `QueryCache` en disco.
+  Sin eso, cada arranque en frío (y cada actualización lo es) cargaba las
+  ventanas una por una.
+- **Excepción deliberada (pedida por el usuario, 2026-09-26): «Buscar
+  actualizaciones» en Ajustes → Acerca de existe sólo en Android.** En la web la
+  barra de «Actualizar» sale sola en cuanto se deploya; el APK depende de que CI
+  suba el .apk ~10 min después. Android revisa cada minuto con la app abierta
+  (`AppUpdates` en `UpdateBanner.kt`) y sólo muestra la barra cuando el APK ya
+  está en GitHub (`ApkUpdate.isPublished`); el botón corre esa misma revisión
+  al momento.
 - Medidas compartidas: tarjetas `rounded-2xl` (16 dp), márgenes de página
   16 dp, botón primario `rounded-lg` px16/py8 sobre `accentDim`, encabezado con
   regla de 4×28 y título de 30 sp cuyas acciones **envuelven**.

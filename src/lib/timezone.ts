@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { emitPrefChange } from "./prefsBus";
 
 const KEY = "finanzas.timezone";
 
@@ -39,6 +40,7 @@ export function setTimezone(tz: string): void {
     /* ignore */
   }
   for (const fn of listeners) fn();
+  emitPrefChange();
 }
 
 function subscribe(fn: () => void): () => void {

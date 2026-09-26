@@ -6,6 +6,7 @@ import com.asura.finanzas.data.AppearanceSync
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.JsonCache
 import com.asura.finanzas.data.Outbox
+import com.asura.finanzas.data.QueryCache
 import com.asura.finanzas.data.RpcClient
 import com.asura.finanzas.data.SessionCookieJar
 
@@ -31,7 +32,10 @@ class BrokeApp : Application() {
         cookieJar = SessionCookieJar(this)
         val rpc = RpcClient(cookieJar)
         outbox = Outbox(this, rpc)
-        repository = BrokeRepository(rpc, JsonCache(this), cookieJar, outbox)
+        repository = BrokeRepository(
+            rpc, JsonCache(this), cookieJar, outbox,
+            QueryCache(java.io.File(filesDir, "query_cache.json")),
+        )
         preferences = AppPreferences(this)
         appearanceSync = AppearanceSync(repository, preferences)
     }

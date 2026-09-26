@@ -70,6 +70,9 @@ fun AppRoot(
     // defaults until the next launch.
     LaunchedEffect(state) {
         if (state != AuthState.SignedIn) return@LaunchedEffect
+        // Language, clock, timezone… as the account has them, so a reinstall
+        // or a new phone comes back with the user's choices, not the defaults.
+        runCatching { appearanceSync.pullPreferences(repository.me().id) }
         // Adopt the account's appearance when it is newer than this device's,
         // so a colour picked on the web shows up here.
         runCatching { appearanceSync.pull() }

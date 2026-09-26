@@ -24,6 +24,7 @@ import { LoginPage } from "./features/auth/LoginPage";
 import { UpdateBanner } from "./features/update/UpdateBanner";
 import { WhatsNewAuto } from "./features/update/WhatsNew";
 import { hydrateThemeFromServer } from "./lib/theme";
+import { hydratePreferencesFromServer } from "./lib/preferences";
 import { hydrateAppearanceFromServer, useAppearance, ICONS } from "./lib/appearance";
 
 export default function App() {
@@ -64,11 +65,12 @@ export default function App() {
     retry: false,
   });
 
-  // On login, adopt the theme saved on the account (local preference wins if
-  // the call fails — offline or no server-side value yet).
+  // On login, adopt the preferences saved on the account (language, clock,
+  // timezone, theme…), then the legacy theme key for accounts that only have
+  // that one. If the calls fail — offline — the local choices stay.
   useEffect(() => {
     if (user) {
-      hydrateThemeFromServer();
+      hydratePreferencesFromServer(user.id).finally(hydrateThemeFromServer);
       hydrateAppearanceFromServer();
     }
   }, [user?.id]);

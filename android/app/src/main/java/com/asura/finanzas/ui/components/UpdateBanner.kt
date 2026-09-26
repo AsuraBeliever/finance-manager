@@ -50,6 +50,8 @@ import com.asura.finanzas.data.ApkUpdate
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.launch
 
 /**
@@ -68,8 +70,37 @@ fun isNewerVersion(deployed: String, installed: String): Boolean {
     return false
 }
 
-/** The web re-checks hourly and whenever the window comes back into view. */
-private const val CHECK_INTERVAL_MS = 60 * 60 * 1000L
+/**
+ * How often the open app looks for a new version. A minute, not the web's
+ * hour: the APK lands on GitHub ~10 minutes after the deploy, so an hourly
+ * check (or one only when the app comes to the front) left the bar missing
+ * until the app was closed and reopened. It is one tiny JSON read.
+ */
+private const val CHECK_INTERVAL_MS = 60 * 1000L
+
+/**
+ * What the bar and Settings' "Check for updates" share: the newer version whose
+ * APK is ready to install. The button checks on demand; when it finds one, the
+ * bar is already up.
+ */
+object AppUpdates {
+    val ready = MutableStateFlow<String?>(null)
+
+    enum class Result { Ready, Preparing, UpToDate, Unknown }
+
+    suspend fun check(repository: BrokeRepository): Result {
+        val version = repository.deployedAppVersion() ?: return Result.Unknown
+        if (!isNewerVersion(version, BuildConfig.VERSION_NAME)) return Result.UpToDate
+        if (ready.value == version) return Result.Ready
+        // Only offer what can actually be downloaded: announcing the version
+        // before CI attached its APK made the button fail for ten minutes.
+        return when (ApkUpdate.isPublished(version)) {
+            true -> Result.Ready.also { ready.value = version }
+            false -> Result.Preparing
+            null -> Result.Unknown
+        }
+    }
+}
 
 /**
  * The web's `UpdateBanner` at phone width: a full-width bar resting on the tab
@@ -78,9 +109,9 @@ private const val CHECK_INTERVAL_MS = 60 * 60 * 1000L
  *
  * What the button does is the one honest difference. The web swaps its
  * service worker and reloads; here it downloads the release APK from GitHub
- * and opens the system installer on it ([ApkUpdate]). If the asset is not
- * there yet — CI attaches it a few minutes after the deploy — the bar says so
- * and the button stays to retry.
+ * and opens the system installer on it ([ApkUpdate]). The bar only appears
+ * once CI has attached that APK ([AppUpdates]); if the download still fails,
+ * the bar says so and the button stays to retry.
  *
  * Lay it over the bottom of the content, above the tab bar, the way the web's
  * `fixed bottom-[var(--bottom-nav-h)]` does.
@@ -95,20 +126,20 @@ fun UpdateBanner(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var deployed by remember { mutableStateOf<String?>(null) }
+    val ready by AppUpdates.ready.collectAsState()
     var applying by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
 
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (true) {
-                repository.deployedAppVersion()?.let { deployed = it }
+                AppUpdates.check(repository)
                 delay(CHECK_INTERVAL_MS)
             }
         }
     }
 
-    val newer = deployed?.takeIf { isNewerVersion(it, BuildConfig.VERSION_NAME) } ?: return
+    val newer = ready ?: return
     val colors = Broke.colors
 
     fun apply() {
@@ -210,7 +241,7 @@ fun UpdateBanner(
 
 /** Lucide's `RefreshCw`, turning like Tailwind's `animate-spin` (1 s, linear). */
 @Composable
-private fun SpinningRefresh(spinning: Boolean, size: Int, tint: androidx.compose.ui.graphics.Color) {
+internal fun SpinningRefresh(spinning: Boolean, size: Int, tint: androidx.compose.ui.graphics.Color) {
     val angle = if (spinning) {
         rememberInfiniteTransition(label = "spin").animateFloat(
             initialValue = 0f,
@@ -222,4 +253,63 @@ private fun SpinningRefresh(spinning: Boolean, size: Int, tint: androidx.compose
         0f
     }
     Icon(Lucide.RefreshCw, contentDescription = null, tint = tint, modifier = Modifier.size(size.dp).rotate(angle))
+}
+
+/**
+ * "Check for updates" under About — Android only: the web's bar shows up by
+ * itself, the APK has to wait for CI. Runs the bar's check now and says what it
+ * found; a version ready to install raises the bar, whose button installs it.
+ * Drawn as the web's `Button variant="ghost"` with a hairline border.
+ */
+@Composable
+fun CheckForUpdatesButton(repository: BrokeRepository, modifier: Modifier = Modifier) {
+    val colors = Broke.colors
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+    var checked by remember { mutableStateOf(AppUpdates.Result.Unknown) }
+    // The bar's own minute check can find the APK after this button said
+    // "being prepared"; follow it rather than keep saying so under the bar.
+    val ready by AppUpdates.ready.collectAsState()
+    val result = if (ready != null) AppUpdates.Result.Ready else checked
+    var ran by remember { mutableStateOf(false) }
+
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+                .clickable(enabled = !checking) {
+                    checking = true
+                    scope.launch {
+                        checked = AppUpdates.check(repository)
+                        ran = true
+                        checking = false
+                    }
+                }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SpinningRefresh(spinning = checking, size = 15, tint = colors.fg.copy(alpha = if (checking) 0.5f else 1f))
+            Text(
+                stringResource(if (checking) R.string.settings_checking_updates else R.string.settings_check_updates),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fg.copy(alpha = if (checking) 0.5f else 1f),
+            )
+        }
+        if (ran && !checking) {
+            Text(
+                stringResource(
+                    when (result) {
+                        AppUpdates.Result.Ready -> R.string.settings_update_found
+                        AppUpdates.Result.Preparing -> R.string.settings_update_preparing
+                        AppUpdates.Result.UpToDate -> R.string.settings_up_to_date
+                        AppUpdates.Result.Unknown -> R.string.settings_update_check_failed
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                color = if (result == AppUpdates.Result.Ready) colors.accent else colors.fgSubtle,
+            )
+        }
+    }
 }

@@ -97,6 +97,29 @@ class AppPreferences(private val context: Context) {
     suspend fun storedTheme(): ThemeChoice? =
         context.prefsDataStore.data.first()[themeKey]
             ?.let { runCatching { ThemeChoice.valueOf(it) }.getOrNull() }
+    // The explicit choices, or null where this device never made one — what
+    // the account sync may send. `settings` folds the absent case into the
+    // device default, and a default must never overwrite the account's value.
+    suspend fun storedLocale(): String? = context.prefsDataStore.data.first()[localeKey]
+    suspend fun storedClock24(): Boolean? = context.prefsDataStore.data.first()[clock24Key]
+    suspend fun storedTimezone(): String? = context.prefsDataStore.data.first()[timezoneKey]
+    suspend fun storedChangelogEnabled(): Boolean? =
+        context.prefsDataStore.data.first()[changelogEnabledKey]
+
+    /**
+     * When [userId]'s preferences last changed on this device, for the
+     * last-write-wins sync with the account. Per user, so another account
+     * signing in here never looks newer than its own copy.
+     */
+    suspend fun preferencesUpdatedAt(userId: Long): Long =
+        context.prefsDataStore.data.first()[prefsStampKey(userId)] ?: 0L
+
+    suspend fun setPreferencesUpdatedAt(userId: Long, stamp: Long) =
+        edit { it[prefsStampKey(userId)] = stamp }
+
+    private fun prefsStampKey(userId: Long) =
+        androidx.datastore.preferences.core.longPreferencesKey("prefs_updated_at_$userId")
+
     suspend fun setHideBalances(hide: Boolean) = edit { it[hideBalancesKey] = hide }
     suspend fun setClock24(value: Boolean) = edit { it[clock24Key] = value }
     suspend fun setTimezone(zone: String) = edit { it[timezoneKey] = zone }

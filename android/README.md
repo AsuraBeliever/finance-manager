@@ -26,7 +26,7 @@ app/src/main/java/com/asura/finanzas/
     Rpc.kt             POST /api/rpc/<command>; mirrors src/lib/api.ts
     SessionCookieJar   persists the one session cookie so the phone stays signed in
     JsonCache.kt       last-synced response per screen, for opening without signal
-    QueryCache.kt      the same responses in memory, so a tab switch is instant
+    QueryCache.kt      the same responses, in memory and on disk, so a screen opens instantly
     BrokeRepository    the app's only door to the backend
     Models.kt          wire shapes; mirror src/lib/types.ts
   ui/
@@ -52,7 +52,11 @@ server-side to make this work.
 whatever that key returned last is painted immediately while the request runs
 behind it — the web's `staleTime: 0`. That is what keeps changing tabs instant:
 Compose throws the screen away when you leave it, but `QueryCache` keeps its
-data for the session, so coming back never spins for something already read.
+data, so coming back never spins for something already read. It keeps it **on
+disk** too (`files/query_cache.json`), like the web's persisted query cache: a
+cold start — reopening the app, a reboot, every update — paints each window
+straight away instead of loading them again one by one. That is why
+`loadSynced` is `reified`: the type's serializer is what reads the copy back.
 Only a key nobody has read yet starts on a spinner.
 
 Two rules when adding one: give it a key no other screen uses (a collision

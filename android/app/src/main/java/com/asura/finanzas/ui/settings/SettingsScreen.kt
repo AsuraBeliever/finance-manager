@@ -185,7 +185,7 @@ fun SettingsScreen(
                     options = Locale.entries,
                     selected = Locale.entries.first { it.tag == settings.locale },
                     label = { it.label },
-                    onSelect = { scope.launch { preferences.setLocale(it.tag) } },
+                    onSelect = { scope.launch { appearanceSync.saveLocale(it.tag) } },
                 )
             }
         }
@@ -210,7 +210,7 @@ fun SettingsScreen(
                 selected = settings.timezone,
                 // The web prints zone ids with spaces, not underscores.
                 optionLabel = { it.replace('_', ' ') },
-                onSelect = { scope.launch { preferences.setTimezone(it) } },
+                onSelect = { scope.launch { appearanceSync.saveTimezone(it) } },
                 modifier = Modifier.fillMaxWidth(),
             )
             // Clock format lives inside this card on the web, not in one of its
@@ -225,7 +225,7 @@ fun SettingsScreen(
                     label = {
                         stringResource(if (it) R.string.settings_clock24 else R.string.settings_clock12)
                     },
-                    onSelect = { scope.launch { preferences.setClock24(it) } },
+                    onSelect = { scope.launch { appearanceSync.saveClock24(it) } },
                 )
             }
         }
@@ -430,7 +430,7 @@ fun SettingsScreen(
                 Switch(
                     checked = settings.changelogEnabled,
                     onCheckedChange = {
-                        scope.launch { preferences.setChangelogEnabled(it) }
+                        scope.launch { appearanceSync.saveChangelogEnabled(it) }
                     },
                 )
             }
@@ -467,6 +467,8 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.fgSubtle,
             )
+            Spacer(Modifier.height(16.dp))
+            com.asura.finanzas.ui.components.CheckForUpdatesButton(repository)
         }
 
         GlassCard(Modifier.fillMaxWidth()) {

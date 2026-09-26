@@ -1,18 +1,42 @@
 package com.asura.finanzas.data
 
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 private val syncJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+private val prefsJson = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
 /** The account settings both apps read and write. */
 private const val SETTING_KEY = "appearance"
 private const val THEME_KEY = "theme"
+private const val PREFS_KEY = "preferences"
 
 /**
- * Cross-device sync for the two look settings the account carries: the
- * appearance (last-write-wins by timestamp, the rule `src/lib/appearance.ts`
- * applies) and the light/dark theme.
+ * The `preferences` account setting — the same envelope `src/lib/preferences.ts`
+ * writes. A field is present only if some device explicitly chose it.
+ */
+@Serializable
+data class PrefsEnvelope(
+    val updatedAt: Long = 0,
+    val locale: String? = null,
+    /** "12" | "24", the web's `Clock`. */
+    val clock: String? = null,
+    val timezone: String? = null,
+    /** "light" | "dark" | "system". */
+    val theme: String? = null,
+    val changelogEnabled: Boolean? = null,
+) {
+    fun fields() = listOf(locale, clock, timezone, theme, changelogEnabled)
+}
+
+/**
+ * Cross-device sync for what the account carries: the appearance
+ * (last-write-wins by timestamp, the rule `src/lib/appearance.ts` applies), the
+ * light/dark theme, and the preferences — language, clock, timezone, theme and
+ * the "What's new" toggle — so a reinstall or a new phone restores them.
  *
  * On sign-in the account copy is adopted when this device has never saved one,
  * or when the account's stamp is newer than the local one. A local edit always
@@ -70,6 +94,90 @@ class AppearanceSync(
     suspend fun saveTheme(theme: ThemeChoice) {
         preferences.setTheme(theme)
         runCatching { repository.setSetting(THEME_KEY, theme.name.lowercase()) }
+        preferenceChanged()
+    }
+
+    // ---- preferences ----
+
+    /** Whose preferences these are; set by [pullPreferences] on sign-in. */
+    private var userId: Long? = null
+    private val prefsLock = Mutex()
+
+    /**
+     * On sign-in and on launch: adopt the account's preferences when they are
+     * the newer copy, then hand the account whatever this device chose that it
+     * lacks. `hydratePreferencesFromServer` on the web, same rules.
+     */
+    suspend fun pullPreferences(user: Long) = prefsLock.withLock {
+        userId = user
+        // A failed read means "unknown", not "empty": touch nothing.
+        val raw = runCatching { repository.fetchSetting(PREFS_KEY) }.getOrElse { return@withLock }
+        val remote = raw?.let { runCatching { prefsJson.decodeFromString(PrefsEnvelope.serializer(), it) }.getOrNull() }
+        val mine = preferences.preferencesUpdatedAt(user)
+        if (remote != null && remote.updatedAt >= mine) {
+            applyPreferences(remote)
+            preferences.setPreferencesUpdatedAt(user, remote.updatedAt)
+        }
+        val local = explicitPreferences()
+        val missing = remote == null || local.fields().zip(remote.fields()).any { (l, r) -> l != null && r == null }
+        if (remote == null || mine > remote.updatedAt || missing) push(user, local)
+    }
+
+    /** Language, clock, timezone and "What's new": saved here, sent to the account. */
+    suspend fun saveLocale(locale: String) {
+        preferences.setLocale(locale); preferenceChanged()
+    }
+
+    suspend fun saveClock24(value: Boolean) {
+        preferences.setClock24(value); preferenceChanged()
+    }
+
+    suspend fun saveTimezone(zone: String) {
+        preferences.setTimezone(zone); preferenceChanged()
+    }
+
+    suspend fun saveChangelogEnabled(on: Boolean) {
+        preferences.setChangelogEnabled(on); preferenceChanged()
+    }
+
+    /** Best-effort: offline, the newer local stamp makes the next pull push it. */
+    private suspend fun preferenceChanged() = prefsLock.withLock {
+        val user = userId ?: return@withLock
+        preferences.setPreferencesUpdatedAt(user, System.currentTimeMillis())
+        push(user, explicitPreferences())
+    }
+
+    private suspend fun push(user: Long, local: PrefsEnvelope) {
+        if (local.fields().all { it == null }) return
+        val stamp = System.currentTimeMillis()
+        preferences.setPreferencesUpdatedAt(user, stamp)
+        runCatching {
+            repository.setSetting(
+                PREFS_KEY,
+                prefsJson.encodeToString(PrefsEnvelope.serializer(), local.copy(updatedAt = stamp)),
+            )
+        }
+    }
+
+    private suspend fun explicitPreferences() = PrefsEnvelope(
+        locale = preferences.storedLocale(),
+        clock = preferences.storedClock24()?.let { if (it) "24" else "12" },
+        timezone = preferences.storedTimezone(),
+        theme = preferences.storedTheme()?.name?.lowercase(),
+        changelogEnabled = preferences.storedChangelogEnabled(),
+    )
+
+    private suspend fun applyPreferences(remote: PrefsEnvelope) {
+        remote.locale?.takeIf { it == "es" || it == "en" }?.let { preferences.setLocale(it) }
+        when (remote.clock) {
+            "24" -> preferences.setClock24(true)
+            "12" -> preferences.setClock24(false)
+        }
+        remote.timezone
+            ?.takeIf { runCatching { java.time.ZoneId.of(it) }.isSuccess }
+            ?.let { preferences.setTimezone(it) }
+        remote.theme?.let(::themeFromWire)?.let { preferences.setTheme(it) }
+        remote.changelogEnabled?.let { preferences.setChangelogEnabled(it) }
     }
 }
 
