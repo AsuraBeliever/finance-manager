@@ -1,5 +1,19 @@
 [
   {
+    "version": "2.42.1",
+    "date": "2026-09-26",
+    "es": [
+      "En la app de Android, al capturar un movimiento la categoría ya sólo ofrece las del tipo que elegiste: las de ingreso para un ingreso y las de gasto para un gasto, igual que en la web. «Sin categoría» vuelve a estar en la lista para poder quitar una que ya elegiste.",
+      "El monto en el teléfono funciona igual que en la web: los dígitos entran por la derecha y el cursor se queda al final, así que ya no se pueden editar números sueltos a la mitad.",
+      "Las suscripciones en Android reconocen el servicio al escribir el nombre y le ponen su logo y su color, como en la web. Y editar en el teléfono una suscripción ya no le borra el logo."
+    ],
+    "en": [
+      "In the Android app, the category picker now only offers the ones for the type you chose — income categories for income, expense ones for an expense — just like on the web. \"Uncategorized\" is back in the list so you can clear a pick.",
+      "The amount box on the phone works like the web's: digits come in from the right and the cursor stays at the end, so you can no longer edit single digits in the middle.",
+      "Subscriptions on Android recognize the service as you type its name and give it its logo and color, like on the web. And editing a subscription on the phone no longer wipes its logo."
+    ]
+  },
+  {
     "version": "2.42.0",
     "date": "2026-09-25",
     "es": [
