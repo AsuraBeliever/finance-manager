@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { emitPrefChange } from "../lib/prefsBus";
 
 export type Locale = "es" | "en";
 
@@ -34,6 +35,7 @@ export function setLocale(locale: Locale): void {
   }
   if (typeof document !== "undefined") document.documentElement.lang = locale;
   for (const fn of listeners) fn();
+  emitPrefChange();
 }
 
 function subscribe(fn: () => void): () => void {

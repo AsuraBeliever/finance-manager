@@ -4,6 +4,7 @@
 // so it follows the user across devices.
 import { useSyncExternalStore } from "react";
 import { getSetting, setSetting } from "./api";
+import { emitPrefChange } from "./prefsBus";
 
 export type ThemePref = "light" | "dark" | "system";
 type Resolved = "light" | "dark";
@@ -41,6 +42,7 @@ export function setThemePref(pref: ThemePref) {
   apply(pref);
   // Best-effort: ignore failures (offline or logged out — local pref still wins).
   setSetting("theme", pref).catch(() => {});
+  emitPrefChange();
 }
 
 /** On first login on a device with no local preference yet, seed the theme

@@ -48,6 +48,13 @@ cachés globales (`bonddia_price`). `exchange_rates` usa el mismo patrón que
 usuario). Tablas globales sin user_id: `currencies`, `wallet_categories`,
 `rate_history`, `crypto_prices`.
 
+Llaves de `settings` por usuario que escriben los clientes (web y Android, las
+dos): `appearance` (sobre `{updatedAt, value}`), `theme` (legado:
+`light|dark|system`) y `preferences` — sobre JSON
+`{updatedAt, locale?, clock?, timezone?, theme?, changelogEnabled?}`, gana la
+escritura más reciente y sólo viajan los campos que alguien eligió a propósito
+(`src/lib/preferences.ts`, `android/.../data/AppearanceSync.kt`).
+
 ## Convenciones
 
 | Dato | Representación | Ejemplo |

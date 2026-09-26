@@ -32,14 +32,13 @@ class BrokeRepository(
     private val cache: JsonCache,
     private val cookieJar: SessionCookieJar,
     private val outbox: Outbox,
-) {
-
     /**
-     * What each read last returned, so leaving a tab and coming back repaints
-     * at once instead of starting over. Lives here so it dies with the session,
-     * like every other piece of the user's data.
+     * What each read last returned, so opening a screen repaints at once
+     * instead of starting over — across restarts too. Owned here so it dies
+     * with the session, like every other piece of the user's data.
      */
-    val queries = QueryCache()
+    val queries: QueryCache = QueryCache(),
+) {
 
     // ---- session ----
 
@@ -134,6 +133,16 @@ class BrokeRepository(
         val element = rpc.call("get_setting", buildJsonObject { put("key", key) })
         (element as? JsonPrimitive)?.takeIf { !it.isString || it.content.isNotEmpty() }?.content
     }.getOrNull()
+
+    /**
+     * [getSetting] that lets failures through. The preference sync has to tell
+     * "the account has nothing" apart from "the request never arrived": taking
+     * the second for the first would push this device's copy over a newer one.
+     */
+    suspend fun fetchSetting(key: String): String? {
+        val element = rpc.call("get_setting", buildJsonObject { put("key", key) })
+        return (element as? JsonPrimitive)?.takeIf { it.isString && it.content.isNotEmpty() }?.content
+    }
 
     suspend fun setSetting(key: String, value: String) {
         rpc.call("set_setting", buildJsonObject { put("key", key); put("value", value) })

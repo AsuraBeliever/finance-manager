@@ -69,6 +69,16 @@ Cosas que salieron de hacer esto y conviene no repetir:
   - Un `<select>` con `<option value="">` se porta con `null` **como opción de
     la lista**, no sólo como `emptyLabel`: si no, una categoría elegida no se
     puede quitar.
+- **Las preferencias van atadas a la cuenta, en las dos superficies.** Idioma,
+  formato de hora, zona horaria, tema y «Novedades al actualizar» viajan en la
+  llave `preferences` de `settings` (gana la escritura más reciente). Una
+  reinstalación, un teléfono nuevo o un navegador limpio las recuperan al
+  iniciar sesión. Una preferencia nueva de Ajustes entra en ese sobre en web
+  (`src/lib/preferences.ts`) y en Android (`AppearanceSync`) a la vez.
+- **Cada ventana abre con lo último que mostró, también tras reiniciar.** La
+  web persiste su caché de TanStack Query; Android guarda `QueryCache` en disco.
+  Sin eso, cada arranque en frío (y cada actualización lo es) cargaba las
+  ventanas una por una.
 - Medidas compartidas: tarjetas `rounded-2xl` (16 dp), márgenes de página
   16 dp, botón primario `rounded-lg` px16/py8 sobre `accentDim`, encabezado con
   regla de 4×28 y título de 30 sp cuyas acciones **envuelven**.

@@ -2,6 +2,7 @@
 // Newest first. The "What's new" modal shows entries the user hasn't seen yet
 // (auto on update, toggleable) and Settings can open the full list on demand.
 import { getLocale } from "../i18n/store";
+import { emitPrefChange } from "./prefsBus";
 
 export interface ChangelogEntry {
   version: string;
@@ -614,6 +615,7 @@ export function changelogEnabled(): boolean {
 }
 export function setChangelogEnabled(on: boolean): void {
   localStorage.setItem(ENABLED_KEY, on ? "true" : "false");
+  emitPrefChange();
 }
 
 export function lastSeenVersion(): string | null {

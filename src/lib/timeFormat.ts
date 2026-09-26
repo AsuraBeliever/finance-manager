@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { emitPrefChange } from "./prefsBus";
 
 /** "12" = 5:16 p.m. · "24" = 17:16. */
 export type Clock = "12" | "24";
@@ -39,6 +40,7 @@ export function setClock(clock: Clock): void {
     /* ignore */
   }
   for (const fn of listeners) fn();
+  emitPrefChange();
 }
 
 function subscribe(fn: () => void): () => void {

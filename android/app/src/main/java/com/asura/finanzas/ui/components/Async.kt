@@ -23,7 +23,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.QueryCache
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.serializerOrNull
+import kotlin.reflect.typeOf
 import com.asura.finanzas.data.Synced
 import com.asura.finanzas.ui.theme.Broke
 
@@ -67,9 +71,29 @@ sealed interface Load<out T> {
  *   screen, which is how a reload after a capture behaves on the web.
  */
 @Composable
-fun <T> loadSynced(
+inline fun <reified T> loadSynced(
     queryKey: Any,
     refetch: Any = Unit,
+    noinline fetch: suspend () -> Synced<T>,
+): State<Load<T>> = loadSyncedWith(queryKey, refetch, rememberSerializer<T>(), fetch)
+
+/**
+ * The serializer for [T], so [QueryCache] can keep the answer on disk and read
+ * it back after a restart; null for a type that has none, which then only
+ * lives in memory.
+ */
+@Composable
+inline fun <reified T> rememberSerializer(): KSerializer<T>? = remember {
+    @Suppress("UNCHECKED_CAST")
+    serializerOrNull(typeOf<T>()) as KSerializer<T>?
+}
+
+@PublishedApi
+@Composable
+internal fun <T> loadSyncedWith(
+    queryKey: Any,
+    refetch: Any,
+    serializer: KSerializer<T>?,
     fetch: suspend () -> Synced<T>,
 ): State<Load<T>> {
     val cache = LocalQueryCache.current
@@ -80,19 +104,24 @@ fun <T> loadSynced(
 
     val state = remember(id) {
         mutableStateOf<Load<T>>(
-            cache.peek<T>(id)?.let { Load.Ready(it.value, it.fromCache) } ?: Load.Loading,
+            cache.peek(id, serializer)?.let { Load.Ready(it.value, it.fromCache) } ?: Load.Loading,
         )
     }
 
     LaunchedEffect(id, refetch) {
         runCatching { fetch() }.fold(
             onSuccess = {
-                cache.put(id, it)
+                cache.put(id, it, serializer)
                 state.value = Load.Ready(it.value, it.fromCache)
             },
             onFailure = {
-                if (state.value !is Load.Ready) {
-                    state.value = Load.Failed(it.message ?: genericError)
+                when (val current = state.value) {
+                    // What is up may be from before the restart; without signal
+                    // it is not current any more, so it gets the offline marker.
+                    is Load.Ready -> if (it is NetworkException) {
+                        state.value = current.copy(fromCache = true)
+                    }
+                    else -> state.value = Load.Failed(it.message ?: genericError)
                 }
             },
         )
@@ -111,11 +140,11 @@ fun <T> loadSynced(
  * piece every time you open it.
  */
 @Composable
-fun <T> loadCached(
+inline fun <reified T> loadCached(
     queryKey: Any,
     refetch: Any = Unit,
     fallback: T,
-    fetch: suspend () -> T,
+    noinline fetch: suspend () -> T,
 ): T {
     val state by loadSynced(queryKey, refetch) { Synced(fetch(), fromCache = false) }
     return (state as? Load.Ready)?.data ?: fallback
