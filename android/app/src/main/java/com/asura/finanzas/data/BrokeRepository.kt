@@ -465,11 +465,16 @@ class BrokeRepository(
         }
     }
 
+    /**
+     * The picker's categories for one kind. The server returns both sets (it
+     * has no `kind` argument), so they are split here — the web's
+     * `categories.filter((c) => c.kind === tab)`.
+     */
     suspend fun transactionCategories(kind: String): List<TransactionCategory> =
         rpc.json.decodeFromJsonElement(
             ListSerializer(TransactionCategory.serializer()),
-            rpc.call("list_transaction_categories", buildJsonObject { put("kind", kind) }),
-        )
+            rpc.call("list_transaction_categories", buildJsonObject {}),
+        ).filter { it.kind == kind }
 
     /**
      * Every category a movement may already point at, including the reserved
@@ -995,10 +1000,14 @@ class BrokeRepository(
         walletId: Long?,
         categoryId: Long?,
         color: String?,
+        /** Brand logo slug; sent every time, since an update without it
+         *  clears the column. */
+        icon: String?,
     ) {
         val body = buildJsonObject {
             id?.let { put("id", it) }
             put("name", name.trim())
+            icon?.let { put("icon", it) }
             put("amountCents", amountCents)
             put("currencyCode", currencyCode)
             put("cadence", cadence)

@@ -54,6 +54,21 @@ Cosas que salieron de hacer esto y conviene no repetir:
   flexbox eso es gratis (`min-content`); en Compose hay que pedirlo con
   `Modifier.width(IntrinsicSize.Min)`. Repartir el ancho con fracciones de
   `weight` lo aparenta hasta que una traducción no cabe y el texto sale cortado.
+- **Paridad de interacción, no sólo de pixeles.** Tres que se escaparon porque
+  la captura se veía idéntica:
+  - `list_transaction_categories` **ignora `kind`**: regresa ingreso y gasto
+    juntos y la web filtra en el cliente. `BrokeRepository.transactionCategories`
+    filtra igual; sin eso cada picker ofrecía las dos listas.
+  - El monto es **caja registradora con el cursor clavado al final**
+    (`MoneyField` → `FormField(cursorAtEnd = true)`): tocar en medio no mueve el
+    cursor, sólo se escribe o borra por la derecha.
+  - La suscripción **detecta la marca al escribir el nombre** (`matchBrand`,
+    generado de `src/lib/brandIcons.ts` junto con los logos) y manda `icon`
+    siempre: `update_subscription` sin `icon` lo pone en NULL y borraba el logo
+    de las creadas en la web.
+  - Un `<select>` con `<option value="">` se porta con `null` **como opción de
+    la lista**, no sólo como `emptyLabel`: si no, una categoría elegida no se
+    puede quitar.
 - Medidas compartidas: tarjetas `rounded-2xl` (16 dp), márgenes de página
   16 dp, botón primario `rounded-lg` px16/py8 sobre `accentDim`, encabezado con
   regla de 4×28 y título de 30 sp cuyas acciones **envuelven**.
