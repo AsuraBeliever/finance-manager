@@ -58,6 +58,8 @@ import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
+import androidx.compose.ui.draw.alpha
+import com.asura.finanzas.ui.components.ColorPicker
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
@@ -97,16 +99,19 @@ fun CategoriesScreen(
             fromCache = current.fromCache,
             onBack = onBack,
             onLongPress = { actionsFor = it },
-            // The eye hides a category or restores it — the same single action
-            // the web's row button offers.
-            onToggleHidden = { target ->
-                if (target.isHidden) {
-                    scope.launch {
-                        runCatching { repository.restoreCategory(target.id) }
-                        reload()
-                    }
-                } else {
-                    deleting = target
+            // The row's own buttons, as on the web: restore a hidden one,
+            // ask before hiding a seed or deleting your own, rename in place.
+            onRestore = { target ->
+                scope.launch {
+                    runCatching { repository.restoreCategory(target.id) }
+                    reload()
+                }
+            },
+            onAskDelete = { deleting = it },
+            onRename = { target, name, color ->
+                scope.launch {
+                    runCatching { repository.updateCategory(target.id, name, color) }
+                    reload()
                 }
             },
             // Order is kept per kind, exactly like the web's two sortable lists.
@@ -209,7 +214,9 @@ private fun CategoryList(
     fromCache: Boolean,
     onBack: () -> Unit,
     onLongPress: (TransactionCategory) -> Unit,
-    onToggleHidden: (TransactionCategory) -> Unit,
+    onRestore: (TransactionCategory) -> Unit,
+    onAskDelete: (TransactionCategory) -> Unit,
+    onRename: (TransactionCategory, String, String?) -> Unit,
     onReorder: (List<Long>) -> Unit,
     onCreate: (name: String, kind: String, color: String) -> Unit,
     modifier: Modifier = Modifier,
@@ -268,10 +275,11 @@ private fun CategoryList(
                 onBack,
                 backLabel = stringResource(R.string.settings_back),
             )
-            Spacer(Modifier.height(6.dp))
+            // `mb-5 -mt-3 text-sm`: 16 under the header's `mb-7`.
+            Spacer(Modifier.height(16.dp))
             Text(
                 stringResource(R.string.categories_settings_hint),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = Broke.colors.fgSubtle,
             )
         }
@@ -282,7 +290,7 @@ private fun CategoryList(
 
         // Both sections always render: the add row lives inside each one, so an
         // empty kind still needs somewhere to add to — same as the web's cards.
-        item { Spacer(Modifier.height(16.dp)) }
+        item { Spacer(Modifier.height(20.dp)) }
         item {
             SectionTop(stringResource(R.string.categories_income))
         }
@@ -299,7 +307,9 @@ private fun CategoryList(
                     onLongPress = onLongPress,
                     reorderState = incomeReorder,
                     rowKey = "i-${category.id}",
-                    onToggleHidden = onToggleHidden,
+                    onRestore = onRestore,
+                    onAskDelete = onAskDelete,
+                    onRename = onRename,
                 )
             }
         }
@@ -309,7 +319,8 @@ private fun CategoryList(
             }
         }
 
-        item { Spacer(Modifier.height(16.dp)) }
+        // `flex flex-col gap-6` between the two cards.
+        item { Spacer(Modifier.height(24.dp)) }
         item {
             SectionTop(stringResource(R.string.categories_expense))
         }
@@ -326,7 +337,9 @@ private fun CategoryList(
                     onLongPress = onLongPress,
                     reorderState = expenseReorder,
                     rowKey = "e-${category.id}",
-                    onToggleHidden = onToggleHidden,
+                    onRestore = onRestore,
+                    onAskDelete = onAskDelete,
+                    onRename = onRename,
                 )
             }
         }
@@ -353,7 +366,7 @@ private fun SectionTop(title: String) {
             .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
             .background(colors.surfaceRaised)
             .sideBorders()
-            .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp),
+            .padding(start = 21.dp, end = 21.dp, top = 21.dp, bottom = 4.dp),
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = colors.fg)
     }
@@ -366,7 +379,7 @@ private fun SectionBody(content: @Composable ColumnScope.() -> Unit) {
             .fillMaxWidth()
             .background(Broke.colors.surfaceRaised)
             .sideBorders()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 21.dp),
         content = content,
     )
 }
@@ -379,7 +392,7 @@ private fun SectionBottom(content: @Composable ColumnScope.() -> Unit) {
             .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
             .background(Broke.colors.surfaceRaised)
             .sideBorders(bottom = true)
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+            .padding(start = 21.dp, end = 21.dp, top = 12.dp, bottom = 21.dp),
         content = content,
     )
 }
@@ -413,44 +426,94 @@ private fun CategoryRow(
     onLongPress: (TransactionCategory) -> Unit,
     reorderState: ReorderState,
     rowKey: String,
-    onToggleHidden: (TransactionCategory) -> Unit,
+    onRestore: (TransactionCategory) -> Unit,
+    onAskDelete: (TransactionCategory) -> Unit,
+    onRename: (TransactionCategory, String, String?) -> Unit,
 ) {
     val colors = Broke.colors
     val dragging = reorderState.draggingKey == "i-${category.id}" ||
         reorderState.draggingKey == "e-${category.id}"
-    // A hidden category is dimmed rather than removed, the same signal the web
-    // gives before you decide whether to restore it.
-    val alpha = if (category.isHidden) 0.5f else 1f
+    var editing by remember(category.id) { mutableStateOf(false) }
+    var name by remember(category.id, category.name) { mutableStateOf(category.name) }
+    var color by remember(category.id, category.color) { mutableStateOf(category.color) }
 
-    // A plain row inside the section's single card — the web separates them with
-    // hairlines instead of giving each category a card of its own.
+    if (editing) {
+        // The web renames in place: the name box with a check and an ✕, and
+        // the colour swatches under it (`flex flex-col gap-2 py-2.5`).
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+                androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+                FormField(
+                    label = "",
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    focusRequester = focus,
+                )
+                val canSave = name.isNotBlank()
+                Icon(
+                    Lucide.Check,
+                    contentDescription = stringResource(R.string.categories_save),
+                    tint = colors.accent.copy(alpha = if (canSave) 1f else 0.4f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(enabled = canSave) { onRename(category, name.trim(), color); editing = false }
+                        .padding(6.dp)
+                        .size(16.dp),
+                )
+                Icon(
+                    Lucide.X,
+                    contentDescription = stringResource(R.string.common_cancel),
+                    tint = colors.fgMuted,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { editing = false; name = category.name; color = category.color }
+                        .padding(6.dp)
+                        .size(16.dp),
+                )
+            }
+            ColorPicker(value = color, onChange = { color = it })
+        }
+        return
+    }
+
+    // A hidden category is dimmed rather than removed (`opacity-50`).
+    val alpha = if (category.isHidden) 0.5f else 1f
+    // `flex items-center gap-2 py-2.5`: grip, dot, name, badge, buttons.
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .zIndex(if (dragging) 1f else 0f)
             .graphicsLayer { translationY = if (dragging) reorderState.offsetY else 0f }
+            .alpha(alpha)
             .combinedClickable(onClick = {}, onLongClick = { onLongPress(category) })
-            .padding(horizontal = 4.dp, vertical = 10.dp),
+            .padding(vertical = 10.dp),
     ) {
-        // Grip on the left, as on the web.
         ReorderHandle(state = reorderState, key = rowKey)
-        Spacer(Modifier.width(8.dp))
-        Dot((parseHexColor(category.color) ?: colors.accent).copy(alpha = alpha), 10.dp)
-        Spacer(Modifier.width(10.dp))
+        // `NEUTRAL_DOT` when the category has no colour of its own.
+        Dot(parseHexColor(category.color) ?: androidx.compose.ui.graphics.Color(0xFF9A93B5), 10.dp)
         Text(
             seedName(category.name, category.isSystem).orEmpty(),
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-            color = colors.fg.copy(alpha = alpha),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.fg,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        if (category.isHidden || category.isSystem) {
+        if (category.isSystem) {
             Text(
                 stringResource(
                     if (category.isHidden) R.string.categories_hidden_label
                     else R.string.categories_default_badge,
                 ),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 15.sp),
                 color = colors.fgSubtle,
                 modifier = Modifier
                     .clip(RoundedCornerShape(percent = 50))
@@ -458,18 +521,30 @@ private fun CategoryRow(
                     .padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
-        // Hiding a seeded category is what the web's eye offers here; a real
-        // delete is only for your own, and stays on the long press.
-        Icon(
-            if (category.isHidden) Lucide.Eye else Lucide.EyeOff,
-            contentDescription = null,
-            tint = colors.fgSubtle,
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .clickable { onToggleHidden(category) }
-                .padding(6.dp)
-                .size(15.dp),
-        )
+        @Composable
+        fun action(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = colors.fgMuted,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable(onClick = onClick)
+                    .padding(6.dp)
+                    .size(15.dp),
+            )
+        }
+        if (category.isHidden) {
+            action(Lucide.RotateCcw, stringResource(R.string.categories_restore)) { onRestore(category) }
+        } else {
+            if (!category.isSystem) {
+                action(Lucide.Pencil, stringResource(R.string.categories_rename)) { editing = true }
+            }
+            action(
+                if (category.isSystem) Lucide.EyeOff else Lucide.Trash,
+                stringResource(if (category.isSystem) R.string.categories_hide else R.string.categories_delete),
+            ) { onAskDelete(category) }
+        }
     }
 }
 
@@ -493,9 +568,10 @@ private fun InlineAddCategory(
             ?: CATEGORY_PALETTE[existing.size % CATEGORY_PALETTE.size]
     }
 
+    // `mt-3 flex items-center gap-2` (the section's bottom slice adds the mt).
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         FormField(
             // The web's add row shows only the placeholder, no caption.
@@ -517,6 +593,7 @@ private fun InlineAddCategory(
                     onCreate(name.trim(), kind, color)
                     name = ""
                 }
+                // A ghost Button with `px-3 py-2`, no `font-medium`.
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Icon(
@@ -527,7 +604,7 @@ private fun InlineAddCategory(
             )
             Text(
                 stringResource(R.string.categories_add),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = if (name.isBlank()) colors.fg.copy(alpha = 0.5f) else colors.fg,
             )
         }
