@@ -13,6 +13,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.asura.finanzas.ui.components.FieldHint
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.components.FormField
@@ -97,6 +102,10 @@ fun MsiPlanSheet(
         }
     }
 
+    // `autoFocus` on the description, as the web's form opens.
+    val descriptionFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { descriptionFocus.requestFocus() } }
+
     FormSheet(
         title = stringResource(R.string.credit_msi_add),
         busy = busy,
@@ -139,23 +148,26 @@ fun MsiPlanSheet(
             onValueChange = { description = it; error = null },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            focusRequester = descriptionFocus,
         )
-        MoneyField(
-            label = stringResource(R.string.credit_msi_total),
-            value = total,
-            onValueChange = { total = it; error = null },
-            modifier = Modifier.fillMaxWidth(),
-            suffix = wallet.currencyCode,
-        )
-        FormField(
-            label = stringResource(R.string.credit_msi_months),
-            value = monthsText,
-            onValueChange = { monthsText = it.filter { c -> c.isDigit() }.take(2); error = null },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = monthsText.isNotBlank() && !monthsValid,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
+        // `grid grid-cols-2 gap-3`: total and months side by side.
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MoneyField(
+                label = stringResource(R.string.credit_msi_total),
+                value = total,
+                onValueChange = { total = it; error = null },
+                modifier = Modifier.weight(1f),
+            )
+            FormField(
+                label = stringResource(R.string.credit_msi_months),
+                value = monthsText,
+                onValueChange = { monthsText = it.filter { c -> c.isDigit() }.take(2); error = null },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                isError = monthsText.isNotBlank() && !monthsValid,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+        }
         PickerField(
             label = stringResource(R.string.transactions_category),
             options = listOf<TransactionCategory?>(null) + categories,
@@ -165,16 +177,15 @@ fun MsiPlanSheet(
             emptyLabel = noCategory,
             modifier = Modifier.fillMaxWidth(),
         )
-        DateField(
-            label = stringResource(R.string.credit_msi_purchased_at),
-            value = purchasedAt,
-            onChange = { purchasedAt = it },
-        )
-        Text(
-            stringResource(R.string.credit_msi_backdated_hint),
-            style = MaterialTheme.typography.labelSmall,
-            color = colors.fgSubtle,
-        )
+        // The hint hangs `mt-1` under the date, inside the same field.
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            DateField(
+                label = stringResource(R.string.credit_msi_purchased_at),
+                value = purchasedAt,
+                onChange = { purchasedAt = it },
+            )
+            FieldHint(stringResource(R.string.credit_msi_backdated_hint))
+        }
 
         preview?.let { MsiPreviewLines(it, wallet.currencyCode) }
     }
