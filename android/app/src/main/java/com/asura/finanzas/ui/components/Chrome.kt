@@ -209,9 +209,16 @@ fun PageHeader(
 fun FlexShrinkRow(
     gap: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
+    /** `justify-between`: the first child at the start, the last at the end. */
+    spaceBetween: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    androidx.compose.ui.layout.Layout(content = content, modifier = modifier) { measurables, constraints ->
+    val policy = remember(gap, spaceBetween) {
+        object : androidx.compose.ui.layout.MeasurePolicy {
+            override fun androidx.compose.ui.layout.MeasureScope.measure(
+                measurables: List<androidx.compose.ui.layout.Measurable>,
+                constraints: androidx.compose.ui.unit.Constraints,
+            ): androidx.compose.ui.layout.MeasureResult {
         val gapPx = gap.roundToPx()
         val n = measurables.size
         val basis = measurables.map { it.maxIntrinsicWidth(androidx.compose.ui.unit.Constraints.Infinity) }
@@ -245,15 +252,43 @@ fun FlexShrinkRow(
             m.measure(androidx.compose.ui.unit.Constraints(minWidth = widths[i], maxWidth = widths[i]))
         }
         val height = placeables.maxOfOrNull { it.height } ?: 0
-        val width = placeables.sumOf { it.width } + gapPx * (n - 1).coerceAtLeast(0)
-        layout(width.coerceAtMost(if (constraints.hasBoundedWidth) constraints.maxWidth else width), height) {
+        val natural = placeables.sumOf { it.width } + gapPx * (n - 1).coerceAtLeast(0)
+        val width = if (spaceBetween && constraints.hasBoundedWidth) constraints.maxWidth
+        else natural.coerceAtMost(if (constraints.hasBoundedWidth) constraints.maxWidth else natural)
+        val extra = if (spaceBetween && n > 1) ((width - natural).coerceAtLeast(0)) / (n - 1) else 0
+        return layout(width, height) {
             var x = 0
             placeables.forEach { p ->
                 p.placeRelative(x, (height - p.height) / 2)
-                x += p.width + gapPx
+                x += p.width + gapPx + extra
             }
         }
+                }
+
+            // What the row can shrink to is every child at its min-content;
+            // what it wants is every child at its max-content.
+            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicWidth(
+                measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>,
+                height: Int,
+            ) = measurables.sumOf { it.minIntrinsicWidth(height) } + gap.roundToPx() * (measurables.size - 1).coerceAtLeast(0)
+
+            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicWidth(
+                measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>,
+                height: Int,
+            ) = measurables.sumOf { it.maxIntrinsicWidth(height) } + gap.roundToPx() * (measurables.size - 1).coerceAtLeast(0)
+
+            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicHeight(
+                measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>,
+                width: Int,
+            ) = measurables.maxOfOrNull { it.minIntrinsicHeight(androidx.compose.ui.unit.Constraints.Infinity) } ?: 0
+
+            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicHeight(
+                measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>,
+                width: Int,
+            ) = measurables.maxOfOrNull { it.maxIntrinsicHeight(androidx.compose.ui.unit.Constraints.Infinity) } ?: 0
+        }
     }
+    androidx.compose.ui.layout.Layout(content = content, modifier = modifier, measurePolicy = policy)
 }
 
 /**
