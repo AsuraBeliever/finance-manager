@@ -1,6 +1,7 @@
 package com.asura.finanzas.ui.goals
 
 import com.asura.finanzas.ui.components.ConfirmDialog
+import com.asura.finanzas.ui.wallets.WalletFormSheet
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.text.appendInlineContent
 import com.asura.finanzas.ui.components.GhostButton
@@ -222,30 +223,16 @@ fun GoalsScreen(
         )
     }
 
+    // Graduating a fund opens the wallet form in its convert mode, as on the
+    // web: name, design, category, parent and notes, prefilled from the goal.
     confirmConvert?.let { target ->
-        val hide = LocalAppSettings.current.hideBalances
-        ConfirmDialog(
-            title = stringResource(R.string.goals_convert_to_wallet),
-            message = text(
-                R.string.goals_convert_moves,
-                "amount" to maskIfHidden(
-                    formatMoney(target.savedCents, target.currencyCode),
-                    hide,
-                ),
-            ),
-            confirmLabel = stringResource(R.string.goals_convert_to_wallet),
-            onConfirm = {
-                confirmConvert = null
-                scope.launch {
-                    // No style overrides: the new wallet keeps the goal's own
-                    // name and colour, which is the web's default too.
-                    runCatching {
-                        repository.convertGoalToWallet(target.id, null, target.color, null)
-                    }
-                    reload()
-                }
-            },
+        WalletFormSheet(
+            repository = repository,
+            existing = null,
+            wallets = wallets,
             onDismiss = { confirmConvert = null },
+            onSaved = { confirmConvert = null; reload() },
+            convert = goalConvert(target, wallets),
         )
     }
 
@@ -692,3 +679,15 @@ private fun BadgeLine(
         modifier = modifier,
     )
 }
+
+/** What the wallet form needs to graduate [goal] — the web's `convert` prop. */
+fun goalConvert(goal: SavingsGoal, wallets: List<com.asura.finanzas.data.Wallet>) =
+    com.asura.finanzas.ui.wallets.GoalConvert(
+        goalId = goal.id,
+        name = goal.name,
+        color = goal.color,
+        currencyCode = goal.currencyCode,
+        savedCents = goal.savedCents,
+        sourceCategoryId = wallets.firstOrNull { it.id == goal.linkedWalletId }?.categoryId,
+        sourceWalletId = goal.linkedWalletId,
+    )

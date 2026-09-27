@@ -72,6 +72,8 @@ fun <T> SegmentedControl(
     /** Split the width evenly, as the web does wherever the row has space. */
     fillEqually: Boolean = false,
     style: SegStyle = SegStyle.Pill,
+    /** `py-1.5` on most; the goal's reserve/release tabs are `py-2`. */
+    chipVerticalPadding: androidx.compose.ui.unit.Dp = 6.dp,
 ) {
     val colors = Broke.colors
     val trayRadius = if (style == SegStyle.Tray || style == SegStyle.Theme) 8.dp else 12.dp
@@ -95,6 +97,14 @@ fun <T> SegmentedControl(
         val isSelected = option == selected
         Row(
             modifier = Modifier
+                // `shadow-sm` under the raised chip of the pill shape.
+                .then(
+                    if (isSelected && style == SegStyle.Pill) {
+                        Modifier.cssBoxShadow(1.dp, 3.dp, 0.dp, Color.Black.copy(alpha = 0.1f), chipRadius)
+                    } else {
+                        Modifier
+                    },
+                )
                 .clip(RoundedCornerShape(chipRadius))
                 .background(
                     when {
@@ -106,7 +116,7 @@ fun <T> SegmentedControl(
                     },
                 )
                 .clickable { onSelect(option) }
-                .padding(horizontal = chipPadding, vertical = 6.dp),
+                .padding(horizontal = chipPadding, vertical = chipVerticalPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         ) {

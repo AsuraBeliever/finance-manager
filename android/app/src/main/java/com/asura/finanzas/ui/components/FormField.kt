@@ -177,10 +177,10 @@ fun FormField(
                     inner()
                 }
                 if (suffix.isNotBlank()) {
+                    // An absolutely placed `text-sm` span on the web.
                     Text(
                         suffix,
-                        style = MaterialTheme.typography.bodyMedium
-                            .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
+                        style = MaterialTheme.typography.bodyMedium,
                         color = colors.fgSubtle,
                     )
                 }

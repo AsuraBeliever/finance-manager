@@ -119,7 +119,9 @@ fun <T> PickerField(
                         .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
                     color = if (enabled) colors.fg else colors.fgSubtle,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
+                    // A closed `<select>` clips its text at the chevron; no "…".
+                    overflow = TextOverflow.Clip,
                     modifier = Modifier.weight(1f),
                 )
                 Icon(

@@ -952,6 +952,9 @@ class BrokeRepository(
         name: String?,
         color: String?,
         categoryId: Long?,
+        skin: String? = null,
+        notes: String? = null,
+        parentWalletId: Long? = null,
     ) {
         rpc.call(
             "convert_goal_to_wallet",
@@ -960,6 +963,9 @@ class BrokeRepository(
                 name?.takeIf { it.isNotBlank() }?.let { put("name", it) }
                 color?.let { put("color", it) }
                 categoryId?.let { put("categoryId", it) }
+                skin?.let { put("skin", it) }
+                notes?.takeIf { it.isNotBlank() }?.let { put("notes", it) }
+                parentWalletId?.let { put("parentWalletId", it) }
             },
         )
         cache.invalidateReads()
