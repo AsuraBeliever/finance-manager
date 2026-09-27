@@ -1,6 +1,9 @@
 package com.asura.finanzas.ui.goals
 
 import com.asura.finanzas.ui.components.ConfirmDialog
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.text.appendInlineContent
+import com.asura.finanzas.ui.components.GhostButton
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.PageHeader
 import androidx.activity.compose.BackHandler
@@ -303,11 +306,11 @@ private fun GoalList(
         state = listState,
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             BackHandler(onBack = onBack)
-            PageHeader(stringResource(R.string.goals_title)) {
+            // The header's `mb-7`, the hint's `mb-3`, the cards' `gap-4`.
+            PageHeader(stringResource(R.string.goals_title), Modifier.padding(bottom = 28.dp)) {
                 PrivacyToggle()
                 PrimaryButton(
                     text = stringResource(R.string.goals_new_goal),
@@ -318,7 +321,7 @@ private fun GoalList(
         }
 
         if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
+            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth().padding(bottom = 16.dp)) }
         }
 
         if (goals.isEmpty()) {
@@ -337,12 +340,14 @@ private fun GoalList(
         item {
             Text(
                 stringResource(R.string.goals_reorder_hint),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.bodyMedium,
                 color = Broke.colors.fgSubtle,
+                modifier = Modifier.padding(bottom = 12.dp),
             )
         }
 
-        itemsIndexed(ordered, key = { _, it -> it.id }) { _, goal ->
+        itemsIndexed(ordered, key = { _, it -> it.id }) { index, goal ->
+            if (index > 0) Spacer(Modifier.height(16.dp))
             GoalCard(
                 goal = goal,
                 hide = hide,
@@ -385,10 +390,14 @@ fun GoalCard(
             .combinedClickable(onClick = {}, onLongClick = { onLongPress(goal) }),
     ) {
         val tint = parseHexColor(goal.color) ?: colors.accent
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            // Grip first, then the badge — the order the web lays out.
+        // `mb-4 flex items-center gap-2`: grip, badge, name over its wallet,
+        // then edit and delete (`gap-1`, `p-1.5`) — shown on a touch screen.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        ) {
             reorderState?.let { ReorderHandle(state = it, key = goal.id) }
-            Spacer(Modifier.width(8.dp))
             Box(
                 Modifier
                     .size(36.dp)
@@ -396,100 +405,87 @@ fun GoalCard(
                     .background(tint.copy(alpha = 0.22f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Lucide.PiggyBank,
-                    contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier.size(17.dp),
-                )
+                Icon(Lucide.PiggyBank, contentDescription = null, tint = tint, modifier = Modifier.size(17.dp))
             }
-            Spacer(Modifier.width(8.dp))
-            // Neither the deadline nor the percentage repeats here: the plan
-            // sentence already carries the date, and the progress line below
-            // carries the percentage — the same split the web makes.
             Column(Modifier.weight(1f)) {
                 Text(
                     goal.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    // `font-display text-lg font-medium`, no tracking.
+                    style = MaterialTheme.typography.titleLarge.copy(letterSpacing = 0.sp),
                     color = colors.fg,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     walletName(goal.linkedWalletId)
                         ?.let { "${stringResource(R.string.goals_apartado_in)} $it" }
                         ?: stringResource(R.string.goals_track_only),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            // The web offers edit and delete on the card itself.
-            Icon(
-                Lucide.Pencil,
-                contentDescription = stringResource(R.string.common_edit),
-                tint = colors.fgSubtle,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable { onEdit(goal) }
-                    .padding(6.dp)
-                    .size(15.dp),
-            )
-            Icon(
-                Lucide.Trash,
-                contentDescription = stringResource(R.string.common_delete),
-                tint = colors.fgSubtle,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable { onDelete(goal) }
-                    .padding(6.dp)
-                    .size(15.dp),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(
+                    Lucide.Pencil,
+                    contentDescription = stringResource(R.string.common_edit),
+                    tint = colors.fgSubtle,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onEdit(goal) }
+                        .padding(6.dp)
+                        .size(15.dp),
+                )
+                Icon(
+                    Lucide.Trash,
+                    contentDescription = stringResource(R.string.common_delete),
+                    tint = colors.fgSubtle,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onDelete(goal) }
+                        .padding(6.dp)
+                        .size(15.dp),
+                )
+            }
         }
 
-        // Figure first, bar under it — the web's order; and the bar carries the
-        // goal's own colour rather than the app accent.
-        Spacer(Modifier.height(14.dp))
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        // `font-display text-2xl font-semibold`, and its target in a `text-sm`
+        // span (still the display face) `ml-1.5` along the same baseline.
+        Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide),
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 24.sp,
-                    lineHeight = 28.sp,
-                    fontWeight = FontWeight.SemiBold,
-                ).tabular(),
+                style = MaterialTheme.typography.headlineMedium.tabular(),
                 color = colors.fg,
+                modifier = Modifier.alignByBaseline(),
             )
             Text(
-                " " + stringResource(R.string.goals_of) + " " +
+                stringResource(R.string.goals_of) + " " +
                     maskIfHidden(formatMoney(goal.targetCents, goal.currencyCode), hide),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp).tabular(),
+                style = MaterialTheme.typography.headlineMedium.tabular().copy(
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Normal,
+                ),
                 color = colors.fgSubtle,
-                modifier = Modifier.padding(start = 6.dp, bottom = 2.dp),
+                modifier = Modifier.padding(start = 6.dp).alignByBaseline(),
             )
         }
 
-        Spacer(Modifier.height(12.dp))
-        ProgressBar(goal.progressBps, color = tint)
-        Spacer(Modifier.height(12.dp))
+        ProgressBar(goal.progressBps, color = tint, modifier = Modifier.padding(top = 12.dp))
         val remaining = (goal.targetCents - goal.savedCents).coerceAtLeast(0)
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // Two spans, as on the web: the figure carries the accent and the
-            // weight, and what is left to save trails behind it in the subtle
-            // tone. One flat string made the whole line read as one thing.
-            val done = remaining == 0L
+        val done = goal.progressBps >= 10_000
+        // `mt-3 flex items-center justify-between`.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 buildAnnotatedString {
-                    withStyle(
-                        SpanStyle(
-                            color = colors.accent,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
-                    ) {
+                    withStyle(SpanStyle(color = colors.accent, fontWeight = FontWeight.SemiBold)) {
                         append(
-                            if (done) {
-                                stringResource(R.string.goals_completed)
-                            } else {
-                                "${Math.round(goal.progressBps / 100.0)}%"
-                            },
+                            if (done) stringResource(R.string.goals_completed)
+                            else "${Math.round(goal.progressBps / 100.0)}%",
                         )
                     }
                     if (!done) {
@@ -501,84 +497,65 @@ fun GoalCard(
                         }
                     }
                 },
-                style = MaterialTheme.typography.labelMedium.tabular(),
+                style = MaterialTheme.typography.bodyMedium.tabular(),
                 modifier = Modifier.weight(1f),
             )
-            // Both of these are ghost Buttons on the web — plain foreground on
-            // a rounded hit area, not accent links.
-            Text(
-                stringResource(R.string.goals_contribute),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.fg,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onContribute(goal) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            // Spending a purchase goal and graduating a fund are the same slot
-            // on the web; which one shows depends on the goal's kind.
-            if (goal.savedCents > 0) {
-                Spacer(Modifier.width(4.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onUse(goal) }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    Icon(
-                        if (goal.goalKind == "fund") Lucide.Wallet else Lucide.Check,
-                        contentDescription = null,
-                        tint = colors.fg,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
+            // Ghost buttons, `gap-1`: contribute, then buy or graduate.
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                GhostButton(stringResource(R.string.goals_contribute), onClick = { onContribute(goal) })
+                if (goal.savedCents > 0) {
+                    GhostButton(
                         stringResource(
                             if (goal.goalKind == "fund") R.string.goals_convert_to_wallet
                             else R.string.goals_buy,
                         ),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = colors.fg,
+                        onClick = { onUse(goal) },
+                        leadingIcon = if (goal.goalKind == "fund") Lucide.Wallet else Lucide.Check,
+                        iconSize = 14.dp,
+                        iconGap = 6.dp,
                     )
                 }
             }
         }
 
-        // The deadline plan, only once the goal actually has one and is unmet.
+        // The deadline plan, only once the goal actually has one and is unmet:
+        // `mt-3 border-t pt-3 text-xs`.
         val plan = goal.plan
-        if (plan != null && goal.progressBps < 10_000) {
+        if (plan != null && !done) {
             Spacer(Modifier.height(12.dp))
             HairLine()
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             GoalPlanLines(goal, plan, hide)
             // Only offered when the plan is off track — the same condition the
             // web uses, so it does not nag an on-pace goal.
             if (plan.overdue || goal.isBehind) {
-                Spacer(Modifier.height(8.dp))
                 Text(
                     stringResource(R.string.goals_adjust_date),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelSmall,
                     color = colors.accent,
-                    modifier = Modifier.clickable { onAdjustDate(goal) },
+                    modifier = Modifier.padding(top = 8.dp).clickable { onAdjustDate(goal) },
                 )
             }
         }
     }
 }
 
-/** Short, locale-aware date like "30 nov 2026" for the plan line. */
+/**
+ * Short date like "30 nov 2026" for the plan line — `toLocaleDateString` with
+ * `{ day, month: "short", year }`, as the browser writes it in es-MX / en-US.
+ */
 @Composable
 private fun planDate(iso: String?): String {
     if (iso.isNullOrBlank()) return ""
-    val locale = java.util.Locale.forLanguageTag(LocalAppSettings.current.locale)
+    val locale = java.util.Locale.forLanguageTag(
+        if (LocalAppSettings.current.locale.startsWith("en")) "en-US" else "es-MX",
+    )
     val date = runCatching { java.time.LocalDate.parse(iso) }.getOrNull() ?: return iso
-    // The locale decides the order ("Dec 31, 2026" vs "31 dic 2026"); hand-
-    // assembling it always produced the Spanish order, even in English.
-    val formatter = java.time.format.DateTimeFormatter
-        .ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
-        .withLocale(locale)
-    return runCatching { date.format(formatter) }.getOrDefault(iso)
+    return runCatching {
+        val format = android.icu.text.DateFormat.getInstanceForSkeleton("yMMMd", locale)
+        format.timeZone = android.icu.util.TimeZone.GMT_ZONE
+        format.format(java.util.Date(date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()))
+    }.getOrDefault(iso)
 }
 
 /** Cadence adverb ("al mes") for the reserve sentence. */
@@ -614,17 +591,16 @@ private fun GoalPlanLines(goal: SavingsGoal, plan: ContributionPlan, hide: Boole
     val colors = Broke.colors
     val remaining = (goal.targetCents - goal.savedCents).coerceAtLeast(0)
     fun money(cents: Long) = maskIfHidden(formatMoney(cents, goal.currencyCode), hide)
+    val warningText = if (colors.isDark) Color(0xFFFBBF24) else Color(0xFFD97706)
+    val amber = Color(0xFFF59E0B)
 
     if (plan.overdue) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Badge(stringResource(R.string.goals_overdue_badge), colors.danger)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text(R.string.goals_overdue_hint, "amount" to money(remaining)),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
-            )
-        }
+        BadgeLine(
+            badge = stringResource(R.string.goals_overdue_badge),
+            badgeColor = colors.danger,
+            badgeFill = colors.danger.copy(alpha = 0.12f),
+            text = text(R.string.goals_overdue_hint, "amount" to money(remaining)),
+        )
     } else {
         val line = when {
             plan.contributedThisPeriodCents <= 0 -> text(
@@ -646,33 +622,73 @@ private fun GoalPlanLines(goal: SavingsGoal, plan: ContributionPlan, hide: Boole
                 "date" to planDate(goal.targetDate),
             )
         }
-        Text(line, style = MaterialTheme.typography.labelSmall, color = colors.fgMuted)
+        Text(line, style = MaterialTheme.typography.bodySmall, color = colors.fgMuted)
 
         if (goal.isBehind) {
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Badge(stringResource(R.string.goals_behind_badge), colors.warning)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text(R.string.goals_behind_hint, "amount" to money(plan.behindCents)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.fgSubtle,
-                )
-            }
+            BadgeLine(
+                badge = stringResource(R.string.goals_behind_badge),
+                badgeColor = warningText,
+                badgeFill = amber.copy(alpha = 0.15f),
+                text = text(R.string.goals_behind_hint, "amount" to money(plan.behindCents)),
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }
 
-/** The small status pill the web puts before a behind/overdue explanation. */
+/**
+ * The web's `<p>` with a `BadgeTag` in it: an `inline-block` pill
+ * (`rounded-md px-1.5 py-0.5 font-semibold`) sitting in the sentence, the rest
+ * of the text flowing after it and wrapping under it — not a pill in a column
+ * beside a paragraph.
+ */
 @Composable
-private fun Badge(label: String, tint: Color) {
+private fun BadgeLine(
+    badge: String,
+    badgeColor: Color,
+    badgeFill: Color,
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    val colors = Broke.colors
+    val style = MaterialTheme.typography.bodySmall
+    val badgeStyle = style.copy(fontWeight = FontWeight.SemiBold)
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val badgeWidth = with(density) {
+        (measurer.measure(badge, badgeStyle).size.width.toDp() + 12.dp + 2.dp).toSp()
+    }
+    val content = mapOf(
+        "badge" to androidx.compose.foundation.text.InlineTextContent(
+            androidx.compose.ui.text.Placeholder(
+                width = badgeWidth,
+                height = 20.sp,
+                placeholderVerticalAlign = androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter,
+            ),
+        ) {
+            Box(Modifier.fillMaxWidth().padding(end = 2.dp)) {
+                Text(
+                    badge,
+                    style = badgeStyle,
+                    color = badgeColor,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(badgeFill)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        },
+    )
     Text(
-        label,
-        style = MaterialTheme.typography.labelSmall,
-        color = tint,
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(tint.copy(alpha = 0.15f))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+        buildAnnotatedString {
+            appendInlineContent("badge", badge)
+            append(" ")
+            append(text)
+        },
+        inlineContent = content,
+        style = style,
+        color = colors.fgSubtle,
+        modifier = modifier,
     )
 }

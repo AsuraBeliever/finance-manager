@@ -30,6 +30,8 @@ import androidx.activity.compose.BackHandler
 import com.asura.finanzas.R
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.theme.Broke
+import androidx.compose.ui.draw.drawBehind
+import com.asura.finanzas.ui.components.cardHighlight
 import com.asura.finanzas.ui.theme.TrackingEyebrow
 
 /**
@@ -78,11 +80,13 @@ fun MoreSheet(onDismiss: () -> Unit, onOpen: (MoreDestination) -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                // `bg-surface-raised` is translucent, and in the browser the
-                // blur behind it is what makes it read as a solid sheet. With
-                // no cheap backdrop blur here, the page is laid under it.
-                .background(colors.surface)
+                // `bg-surface-raised border-t`: the same see-through glass as
+                // the web's, over the dimmed (and blurred) page.
                 .background(colors.surfaceRaised)
+                .cardHighlight()
+                .drawBehind {
+                    drawLine(colors.borderMuted, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), density)
+                }
                 // Swallow taps so hitting the sheet does not close it.
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },

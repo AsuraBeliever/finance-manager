@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -110,7 +111,9 @@ fun HomeScaffold(
 
     MeshBackground {
       Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
+        // `backdrop-blur-sm` behind the "More" sheet: the page goes soft
+        // under the scrim, as it does in the browser.
+        Column(Modifier.fillMaxSize().then(if (moreOpen) Modifier.blur(4.dp) else Modifier)) {
             Spacer(Modifier.statusBarsPadding())
             // Pops once after an update, like the web's WhatsNewAuto.
             WhatsNewAuto(preferences)

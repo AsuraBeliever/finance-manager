@@ -218,6 +218,9 @@ fun GhostButton(
     leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     tint: androidx.compose.ui.graphics.Color? = null,
     enabled: Boolean = true,
+    /** Most buttons carry a 15 px glyph `gap-2` away; a few use 14 and `gap-1.5`. */
+    iconSize: Dp = 15.dp,
+    iconGap: Dp = 8.dp,
 ) {
     val color = (tint ?: Broke.colors.fg).let { if (enabled) it else it.copy(alpha = it.alpha * 0.5f) }
     Row(
@@ -226,10 +229,10 @@ fun GhostButton(
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(iconGap),
     ) {
         leadingIcon?.let {
-            Icon(it, contentDescription = null, tint = color, modifier = Modifier.size(15.dp))
+            Icon(it, contentDescription = null, tint = color, modifier = Modifier.size(iconSize))
         }
         Text(
             text,
