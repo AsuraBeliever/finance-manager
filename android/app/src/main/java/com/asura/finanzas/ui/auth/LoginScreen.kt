@@ -1,6 +1,14 @@
 package com.asura.finanzas.ui.auth
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.asura.finanzas.ui.components.PrimaryButton
+import com.asura.finanzas.ui.components.cssBoxShadow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -121,22 +129,36 @@ fun LoginScreen(
         }
     }
 
+    // `flex min-h-full items-center justify-center px-4 py-10` around a
+    // `max-w-sm` column: the card stops at 384 dp on a wide screen.
     Column(
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding()
             .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 40.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // The brand the user configured, falling back to the app's own name.
-        // Tile beside the name, the same header the web draws above the card.
-        val appearance = LocalAppSettings.current.appearance
-        Row(verticalAlignment = Alignment.CenterVertically) {
+      Column(Modifier.widthIn(max = 384.dp).fillMaxWidth()) {
+        // The web's brand row: the app's own name and its trending-up tile —
+        // signed out there is no user appearance to draw from.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Box(
                 Modifier
+                    // `shadow-[0_4px_14px_-4px_rgba(22,164,122,0.7)]`
+                    .cssBoxShadow(
+                        offsetY = 4.dp,
+                        blur = 14.dp,
+                        spread = (-4).dp,
+                        color = Color(0xB316A47A),
+                        radius = 12.dp,
+                    )
                     .size(44.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(
@@ -144,159 +166,149 @@ fun LoginScreen(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                BrandMark(appearance, size = 22.dp, tint = Color.White)
+                Icon(Lucide.TrendingUp, null, tint = Color.White, modifier = Modifier.size(22.dp))
             }
-            Spacer(Modifier.width(10.dp))
+            // `font-display text-2xl font-semibold tracking-tight`
             Text(
-                appearance.appName.ifBlank { stringResource(R.string.app_name) },
-                style = MaterialTheme.typography.titleLarge,
+                stringResource(R.string.app_name),
+                style = MaterialTheme.typography.headlineMedium.copy(letterSpacing = (-0.6).sp),
                 color = colors.fg,
             )
         }
         Spacer(Modifier.height(32.dp))
 
-        // The form lives in a card, heading included — same as the web, whose
-        // `gap-4` is the 16 dp between every row below.
+        // The form lives in a card, heading included — `flex flex-col gap-4
+        // rounded-2xl p-6 shadow-card`.
         GlassCard(Modifier.fillMaxWidth(), padding = 24.dp) {
-        Text(
-            text = stringResource(
-                if (registering) R.string.auth_register_title else R.string.auth_login_title,
-            ),
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.fg,
-        )
-        Spacer(Modifier.height(16.dp))
-
-        // Same order as the web: Google first, then the email form.
-        GoogleButton(enabled = !busy, onClick = { signInWithGoogle() })
-
-        Spacer(Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            HairLine(Modifier.weight(1f))
+          Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // `font-display text-lg font-medium tracking-tight`
             Text(
-                stringResource(R.string.auth_or),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
-                modifier = Modifier.padding(horizontal = 12.dp),
+                text = stringResource(
+                    if (registering) R.string.auth_register_title else R.string.auth_login_title,
+                ),
+                style = MaterialTheme.typography.titleLarge,
+                color = colors.fg,
             )
-            HairLine(Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(16.dp))
 
-        FormField(
-            label = stringResource(R.string.auth_email),
-            value = email,
-            onValueChange = { email = it; error = null },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = stringResource(R.string.auth_email_placeholder),
-            enabled = !busy,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Email,
-            imeAction = ImeAction.Next,
-            ),
-        )
-        Spacer(Modifier.height(16.dp))
+            // Same order as the web: Google first, then the email form.
+            GoogleButton(enabled = !busy, onClick = { signInWithGoogle() })
 
-        FormField(
-            label = stringResource(R.string.auth_password),
-            value = password,
-            onValueChange = { password = it; error = null },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !busy,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Password,
-            imeAction = ImeAction.Go,
-            ),
-            keyboardActions = KeyboardActions(onGo = { submit() }),
-            visualTransformation = if (showPassword) {
-                VisualTransformation.None
-            } else {
-                PasswordVisualTransformation()
-            },
-            trailing = {
-                val label = stringResource(
-                    if (showPassword) R.string.auth_hide_password
-                    else R.string.auth_show_password,
-                )
-                Icon(
-                    imageVector = if (showPassword) {
-                        Lucide.EyeOff
-                    } else {
-                        Lucide.Eye
-                    },
-                    contentDescription = label,
-                    tint = colors.fgSubtle,
-                    modifier = Modifier
-                        .clickable { showPassword = !showPassword }
-                        .padding(horizontal = 12.dp)
-                        // `size={17}` on the web's eye.
-                        .size(17.dp),
-                )
-            },
-        )
-
-        if (registering) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.auth_password_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth(),
-            )
-        }
+            ) {
+                HairLine(Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.auth_or),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.fgSubtle,
+                )
+                HairLine(Modifier.weight(1f))
+            }
 
-        if (error != null) {
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = error!!,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.danger,
+            FormField(
+                label = stringResource(R.string.auth_email),
+                value = email,
+                onValueChange = { email = it; error = null },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = stringResource(R.string.auth_email_placeholder),
+                enabled = !busy,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next,
+                ),
             )
-        }
 
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = { submit() },
+            Column {
+                FormField(
+                    label = stringResource(R.string.auth_password),
+                    value = password,
+                    onValueChange = { password = it; error = null },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Go,
+                    ),
+                    keyboardActions = KeyboardActions(onGo = { submit() }),
+                    visualTransformation = if (showPassword) {
+                        VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    },
+                    trailing = {
+                        val label = stringResource(
+                            if (showPassword) R.string.auth_hide_password
+                            else R.string.auth_show_password,
+                        )
+                        Icon(
+                            imageVector = if (showPassword) Lucide.EyeOff else Lucide.Eye,
+                            contentDescription = label,
+                            tint = colors.fgSubtle,
+                            // `absolute right-0 px-3`: 12 dp from the field's
+                            // outer edge, which sits 14 dp past our padded row.
+                            modifier = Modifier
+                                .offset(x = 2.dp)
+                                // No ripple slab: the web's eye only recolours.
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { showPassword = !showPassword }
+                                .padding(start = 12.dp)
+                                // `size={17}` on the web's eye.
+                                .size(17.dp),
+                        )
+                    },
+                )
+                if (registering) {
+                    // `mt-1 text-xs text-fg-subtle`
+                    Text(
+                        stringResource(R.string.auth_password_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.fgSubtle,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    )
+                }
+            }
+
+            error?.let {
+                Text(text = it, style = MaterialTheme.typography.bodyMedium, color = colors.danger)
+            }
+
             // The web leaves this live with the fields empty — the browser's
             // own required-field check is what stops the submit — so it reads
             // as the call to action, not a grey slab. `submit()` ignores blanks.
-            enabled = !busy,
-            shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = colors.accentDim),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            modifier = Modifier.fillMaxWidth().height(36.dp),
-        ) {
-            if (busy) {
-                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.height(20.dp))
-            } else {
-                Text(
-                    stringResource(
-                        if (registering) R.string.auth_register else R.string.auth_login,
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-            }
-        }
+            PrimaryButton(
+                text = stringResource(
+                    if (registering) R.string.auth_register else R.string.auth_login,
+                ),
+                onClick = { submit() },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = stringResource(
-                if (registering) R.string.auth_switch_to_login
-                else R.string.auth_switch_to_register,
-            ),
-            style = MaterialTheme.typography.labelLarge,
-            color = colors.fgMuted,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    registering = !registering
-                    error = null
-                },
-        )
+            // `text-sm text-fg-muted`
+            Text(
+                text = stringResource(
+                    if (registering) R.string.auth_switch_to_login
+                    else R.string.auth_switch_to_register,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.fgMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        registering = !registering
+                        error = null
+                    },
+            )
+          }
         }
+      }
     }
 }
 
@@ -310,10 +322,12 @@ private fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(38.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(Color.White)
-            .clickable(enabled = enabled, onClick = onClick),
+            .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            // `px-4 py-2` inside the 1 px border.
+            .padding(horizontal = 17.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -327,8 +341,9 @@ private fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Text(
             text = stringResource(R.string.auth_continue_with_google),
-            style = MaterialTheme.typography.labelLarge,
-            color = Color(0xFF1F2937),
+            // `text-sm font-medium text-stone-800`
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+            color = Color(0xFF292524),
         )
     }
 }

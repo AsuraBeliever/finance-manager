@@ -185,3 +185,16 @@ fun ErrorBox(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier
         }
     }
 }
+
+/**
+ * TanStack's `placeholderData: (p) => p`: while a new key loads, keep showing
+ * the last answer instead of dropping back to [Load.Loading]. The dashboard
+ * uses it so switching period swaps the figures in place rather than blanking
+ * the page (which also closed the period dropdown under your finger).
+ */
+@Composable
+fun <T> Load<T>.keepingPrevious(): Load<T> {
+    val last = remember { arrayOfNulls<Load.Ready<T>>(1) }
+    if (this is Load.Ready) last[0] = this
+    return if (this is Load.Loading) last[0] ?: this else this
+}

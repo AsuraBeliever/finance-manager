@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -200,7 +201,20 @@ fun DateField(
             value.format(DateTimeFormatter.ofPattern(pattern, locale))
         }.getOrDefault(value.toString())
     }
-    Box(modifier) {
+    // Where this window sits on screen. Inside another popup (the period
+    // dropdown) the anchor arrives relative to that popup's window while the
+    // calendar is placed in screen space, so without it the calendar landed
+    // a whole panel too high.
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val position = remember(density) { CalendarPosition(density) }
+    Box(
+        modifier.onGloballyPositioned { c ->
+            position.windowOrigin = (c.localToScreen(androidx.compose.ui.geometry.Offset.Zero) -
+                c.localToWindow(androidx.compose.ui.geometry.Offset.Zero)).let {
+                androidx.compose.ui.unit.IntOffset(it.x.toInt(), it.y.toInt())
+            }
+        },
+    ) {
         Box(Modifier.clickable { open = !open }) {
             FormField(
                 label = label,
@@ -230,17 +244,19 @@ fun DateField(
         }
         if (open) {
             androidx.compose.ui.window.Popup(
-                popupPositionProvider = remember { CalendarPosition() },
+                popupPositionProvider = position,
                 onDismissRequest = { open = false },
                 properties = androidx.compose.ui.window.PopupProperties(focusable = true),
             ) {
-                CalendarCard(
-                    value = value,
-                    min = min,
-                    lang = lang,
-                    locale = locale,
-                    onPick = { onChange(it); open = false },
-                )
+                PopupShadowBox(onDismiss = { open = false }) {
+                    CalendarCard(
+                        value = value,
+                        min = min,
+                        lang = lang,
+                        locale = locale,
+                        onPick = { onChange(it); open = false },
+                    )
+                }
             }
         }
     }
@@ -250,26 +266,38 @@ fun DateField(
  * Where the web puts the calendar: right-aligned to the box, 8 px under it,
  * flipped above when it does not fit below, and kept 8 px inside the screen.
  */
-private class CalendarPosition : androidx.compose.ui.window.PopupPositionProvider {
+private class CalendarPosition(
+    private val density: androidx.compose.ui.unit.Density,
+) : androidx.compose.ui.window.PopupPositionProvider {
+    /** The anchor's window's offset on screen; zero for the activity. */
+    var windowOrigin = androidx.compose.ui.unit.IntOffset.Zero
+
     override fun calculatePosition(
-        anchorBounds: androidx.compose.ui.unit.IntRect,
+        windowAnchor: androidx.compose.ui.unit.IntRect,
         windowSize: androidx.compose.ui.unit.IntSize,
         layoutDirection: androidx.compose.ui.unit.LayoutDirection,
         popupContentSize: androidx.compose.ui.unit.IntSize,
     ): androidx.compose.ui.unit.IntOffset {
+        val anchorBounds = windowAnchor.translate(windowOrigin)
         // The anchor is the whole field, label included; the web anchors to
-        // the box, which ends at the same bottom edge and right edge.
-        val gap = (popupContentSize.width / 36f).toInt() // 8 of the card's 288
-        val w = popupContentSize.width
-        val h = popupContentSize.height
-        val left = maxOf(gap, minOf(anchorBounds.right - w, windowSize.width - w - gap))
-        val below = anchorBounds.bottom + gap
-        val top = if (below + h > windowSize.height - gap && anchorBounds.top - h - gap > gap) {
-            anchorBounds.top - h - gap
-        } else {
-            below
+        // the box, which ends at the same bottom edge and right edge. The
+        // popup is the card plus its shadow margin (PopupShadowBox), so the
+        // card's own size and origin are worked out first.
+        with(density) {
+            val roomStart = PopupShadowRoom.start.roundToPx()
+            val gap = 8.dp.roundToPx()
+            val w = popupContentSize.width - roomStart - PopupShadowRoom.end.roundToPx()
+            val h = popupContentSize.height - PopupShadowRoom.bottom.roundToPx()
+            val left = maxOf(gap, minOf(anchorBounds.right - w, windowSize.width - w - gap))
+            val below = anchorBounds.bottom + gap
+            val top = if (below + h > windowSize.height - gap && anchorBounds.top - h - gap > gap) {
+                anchorBounds.top - h - gap
+            } else {
+                below
+            }
+            // Placed in screen space, which is why the anchor was moved there too.
+            return androidx.compose.ui.unit.IntOffset(left - roomStart, top)
         }
-        return androidx.compose.ui.unit.IntOffset(left, top)
     }
 }
 
@@ -302,7 +330,7 @@ private fun CalendarCard(
     Column(
         Modifier
             .width(288.dp)
-            .shadow(24.dp, RoundedCornerShape(12.dp))
+            .shadow2xl(12.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(colors.surfaceOverlay)
             .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))

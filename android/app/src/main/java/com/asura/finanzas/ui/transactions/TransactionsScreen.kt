@@ -77,7 +77,7 @@ import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.PeriodLabel
-import com.asura.finanzas.ui.components.PeriodPickerDialog
+import com.asura.finanzas.ui.components.PeriodPicker
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.PrivacyToggle
@@ -161,7 +161,6 @@ fun TransactionsScreen(
     // so switching kind clears it (web: TransactionFilters).
     var category by remember { mutableStateOf<TransactionCategory?>(null) }
     var period by remember { mutableStateOf<Period>(Period.AllTime) }
-    var showPeriod by remember { mutableStateOf(false) }
 
     // Includes the reserved categories a capture form would not offer, because a
     // movement may already be filed under one.
@@ -212,14 +211,16 @@ fun TransactionsScreen(
     val scope = rememberCoroutineScope()
 
     Box(modifier.fillMaxSize()) {
-        when (val current = state) {
-            is Load.Loading -> LoadingBox()
-            is Load.Failed -> ErrorBox(current.message, reload)
-            is Load.Ready -> TransactionList(
+        // Header and filters stay put while a new filter loads, as on the
+        // web: only the list is missing until it arrives. Swapping the whole
+        // page for a spinner also tore down an open period dropdown.
+        val current = state
+        TransactionList(
                 outbox = outbox,
                 repository = repository,
                 onSynced = reload,
-                transactions = current.data,
+                transactions = (current as? Load.Ready)?.data,
+                error = (current as? Load.Failed)?.message,
                 filter = filter,
                 onFilter = { filter = it; category = null },
                 wallets = wallets,
@@ -229,26 +230,16 @@ fun TransactionsScreen(
                 category = category,
                 onCategory = { category = it },
                 period = period,
-                onPickPeriod = { showPeriod = true },
-                fromCache = current.fromCache,
+                onPeriodChange = { period = it },
+                fromCache = (current as? Load.Ready)?.fromCache == true,
                 onNew = { showForm = true },
                 totals = totals,
                 onLongPress = { actionsFor = it },
                 onEdit = { if (it.isApartado) editingApartado = it else editing = it },
                 onDelete = { pendingDelete = it },
             )
-        }
     }
 
-    if (showPeriod) {
-        PeriodPickerDialog(
-            selected = period,
-            // Parameters are edited inline, so a pick applies without closing.
-            onSelect = { period = it },
-            onDismiss = { showPeriod = false },
-            allowAll = true,
-        )
-    }
 
     if (showForm) {
         TransactionFormSheet(
@@ -352,7 +343,10 @@ private fun TransactionList(
     outbox: Outbox,
     repository: BrokeRepository,
     onSynced: () -> Unit,
-    transactions: List<Transaction>,
+    /** Null while the current filters load — the web draws no list then. */
+    transactions: List<Transaction>?,
+    /** `text-sm text-danger` above where the list would be. */
+    error: String?,
     filter: KindFilter,
     onFilter: (KindFilter) -> Unit,
     wallets: List<Wallet>,
@@ -362,7 +356,7 @@ private fun TransactionList(
     category: TransactionCategory?,
     onCategory: (TransactionCategory?) -> Unit,
     period: Period,
-    onPickPeriod: () -> Unit,
+    onPeriodChange: (Period) -> Unit,
     fromCache: Boolean,
     onNew: () -> Unit,
     totals: TxTotals?,
@@ -375,7 +369,7 @@ private fun TransactionList(
 
     // The server applies the filters; the list arrives ready to render.
     // Both legs of a transfer read as one line, like the web's list.
-    val shown = foldTransfers(transactions)
+    val shown = transactions?.let(::foldTransfers)
 
     // No uniform gap: the web stacks these with their own margins — the
     // header's mb-7, the filter column's gap-3 and mb-4, the total's mb-4 —
@@ -463,11 +457,10 @@ private fun TransactionList(
         }
 
         item {
-            ChipButton(
-                text = PeriodLabel(period),
-                onClick = onPickPeriod,
-                leadingIcon = Lucide.CalendarRange,
-                trailingIcon = Lucide.ChevronDown,
+            PeriodPicker(
+                value = period,
+                onChange = onPeriodChange,
+                allowAll = true,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
         }
@@ -480,7 +473,14 @@ private fun TransactionList(
             }
         }
 
-        if (shown.isEmpty()) {
+        error?.let { message ->
+            item {
+                Text(message, style = MaterialTheme.typography.bodyMedium, color = colors.danger)
+            }
+        }
+        if (shown == null || transactions == null) {
+            // Still loading, or failed: nothing where the list goes.
+        } else if (shown.isEmpty()) {
             // "Nothing matches" is a different message from "nothing here yet",
             // and telling them apart is the whole point: with a filter on, an
             // empty list is about the filter, not the account.

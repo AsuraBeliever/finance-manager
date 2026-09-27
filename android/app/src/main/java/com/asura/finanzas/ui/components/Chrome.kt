@@ -695,3 +695,43 @@ fun BackHeader(
         PageHeader(title, Modifier.padding(top = 12.dp), actions = actions)
     }
 }
+
+/** Tailwind's `shadow-2xl`: `0 25px 50px -12px rgb(0 0 0 / .25)`. */
+fun Modifier.shadow2xl(radius: androidx.compose.ui.unit.Dp): Modifier = cssBoxShadow(
+    offsetY = 25.dp,
+    blur = 50.dp,
+    spread = (-12).dp,
+    color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.25f),
+    radius = radius,
+)
+
+/**
+ * The clear margin a popup's card sits in. A popup window clips whatever it
+ * draws, and `shadow-2xl` falls 38 dp past the sides and 63 below; without the
+ * margin it ended in a hard grey edge. Only 8 dp on the start side — the
+ * closest the web lets a popover come to the screen edge — because a popup
+ * cannot begin left of the screen.
+ */
+object PopupShadowRoom {
+    val start = 8.dp
+    val end = 40.dp
+    val bottom = 64.dp
+}
+
+/** [PopupShadowRoom] around [content]; a tap on the margin is a tap outside. */
+@Composable
+fun PopupShadowBox(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            )
+            .padding(
+                start = PopupShadowRoom.start,
+                end = PopupShadowRoom.end,
+                bottom = PopupShadowRoom.bottom,
+            ),
+    ) { content() }
+}

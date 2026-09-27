@@ -1,6 +1,34 @@
 package com.asura.finanzas.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
+import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,14 +36,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -120,18 +144,24 @@ private fun String.capitalizeFirst(locale: Locale): String =
 @Composable
 private fun appLocale(): Locale = Locale.forLanguageTag(LocalAppSettings.current.locale)
 
+// `Intl.DateTimeFormat` with `{ month: "long", year: "numeric" }`: "septiembre
+// de 2026" / "September 2026", first letter raised like the web's `cap`.
 @Composable
 private fun monthName(year: Int, month1: Int): String {
     val locale = appLocale()
-    val name = java.time.Month.of(month1).getDisplayName(TextStyle.FULL, locale)
-    return "${name.capitalizeFirst(locale)} $year"
+    val pattern = if (locale.language == "en") "MMMM yyyy" else "MMMM 'de' yyyy"
+    return LocalDate.of(year, month1, 1)
+        .format(DateTimeFormatter.ofPattern(pattern, locale))
+        .capitalizeFirst(locale)
 }
 
+// `{ day: "numeric", month: "long", year: "numeric" }`: "26 de septiembre de
+// 2026" / "September 26, 2026".
 @Composable
 private fun dayName(date: LocalDate): String {
     val locale = appLocale()
-    val month = date.month.getDisplayName(TextStyle.FULL, locale)
-    return "${date.dayOfMonth} ${month.capitalizeFirst(locale)} ${date.year}"
+    val pattern = if (locale.language == "en") "MMMM d, yyyy" else "d 'de' MMMM 'de' yyyy"
+    return date.format(DateTimeFormatter.ofPattern(pattern, locale))
 }
 
 /** Human label for the current selection, shown on the trigger. */
@@ -141,7 +171,7 @@ fun PeriodLabel(period: Period): String = when (period) {
     is Period.CurrentMonth -> stringResource(R.string.dashboard_period_current_month)
     is Period.LastMonths -> text(R.string.dashboard_period_last_months_n, "n" to period.months)
     is Period.Month -> monthName(period.year, period.month)
-    is Period.Day -> dayName(period.date)
+    is Period.Day -> dayName(period.date).capitalizeFirst(appLocale())
     is Period.Range -> "${dayName(period.from)} – ${dayName(period.to)}"
 }
 
@@ -158,63 +188,118 @@ private fun modeLabel(mode: PeriodMode): String = stringResource(
 )
 
 /**
- * Picking a mode selects it; the parameters for the selected mode are edited
- * inline underneath, exactly like the web dropdown. Choices apply immediately,
- * so the only button is "close".
+ * The web's `PeriodPicker`: a bordered trigger and, under it, a dropdown panel
+ * anchored to its left edge. Picking a mode selects it and its parameters are
+ * edited inline underneath; every change applies at once, and a tap outside
+ * closes the panel — there is no title and no "close" button.
  */
 @Composable
-fun PeriodPickerDialog(
-    selected: Period,
-    onSelect: (Period) -> Unit,
-    onDismiss: () -> Unit,
+fun PeriodPicker(
+    value: Period,
+    onChange: (Period) -> Unit,
+    modifier: Modifier = Modifier,
     /** Offer "todo el tiempo" as the first choice. */
     allowAll: Boolean = false,
 ) {
     val colors = Broke.colors
-    val modes = PeriodMode.entries.filter { allowAll || it != PeriodMode.AllTime }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = colors.surfaceOverlay,
-        title = { Text(stringResource(R.string.dashboard_period_label), color = colors.fg) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                modes.forEach { mode ->
-                    val active = selected.mode == mode
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { if (!active) onSelect(defaultFor(mode)) }
-                            .padding(vertical = 12.dp),
-                    ) {
-                        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-                            if (active) {
-                                Icon(
-                                    Lucide.Check,
-                                    contentDescription = null,
-                                    tint = colors.accent,
-                                    modifier = Modifier.size(16.dp),
+    var open by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    Box(modifier) {
+        ChipButton(
+            text = PeriodLabel(value),
+            onClick = { open = !open },
+            leadingIcon = Lucide.CalendarRange,
+            trailingIcon = Lucide.ChevronDown,
+        )
+        if (open) {
+            Popup(
+                popupPositionProvider = remember(density) { BelowLeft(density) },
+                onDismissRequest = { open = false },
+                properties = PopupProperties(focusable = true),
+            ) {
+                val modes = PeriodMode.entries.filter { allowAll || it != PeriodMode.AllTime }
+                // `w-72 max-w-[calc(100vw-2rem)] rounded-xl border
+                // bg-surface-overlay p-2 shadow-2xl`
+                PopupShadowBox(onDismiss = { open = false }) {
+                Column(
+                    Modifier
+                        .widthIn(max = 288.dp)
+                        .fillMaxWidth()
+                        .shadow2xl(12.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.surfaceOverlay)
+                        .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
+                        .padding(9.dp),
+                    // `space-y-0.5`
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    modes.forEach { mode ->
+                        val active = value.mode == mode
+                        Column {
+                            // `flex gap-2 rounded-lg px-2.5 py-1.5 text-sm`
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { if (!active) onChange(defaultFor(mode)) }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                            ) {
+                                Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                                    if (active) {
+                                        Icon(
+                                            Lucide.Check,
+                                            contentDescription = null,
+                                            tint = colors.accent,
+                                            modifier = Modifier.size(14.dp),
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = modeLabel(mode),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (active) colors.fg else colors.fgMuted,
                                 )
                             }
+                            if (active) PeriodModeEditor(value, onChange)
                         }
-                        Text(
-                            text = modeLabel(mode),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (active) colors.fg else colors.fgMuted,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
                     }
-
-                    if (active) PeriodModeEditor(selected, onSelect)
+                }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_close), color = colors.fgMuted)
-            }
-        },
+        }
+    }
+}
+
+/**
+ * `absolute left-0 mt-2`: the panel's left edge on the trigger's, 8 dp under
+ * it, kept 16 dp inside the screen (`max-w-[calc(100vw-2rem)]`).
+ */
+private class BelowLeft(private val density: Density) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset = with(density) {
+        val room = PopupShadowRoom.start.roundToPx()
+        val panelWidth = popupContentSize.width - room - PopupShadowRoom.end.roundToPx()
+        val x = anchorBounds.left
+            .coerceAtMost(windowSize.width - panelWidth - 16.dp.roundToPx())
+            .coerceAtLeast(0)
+        IntOffset(x - room, anchorBounds.bottom + 8.dp.roundToPx())
+    }
+}
+
+/** `text-xs text-fg-subtle mb-1` over an inline control. */
+@Composable
+private fun EditorLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = Broke.colors.fgSubtle,
+        modifier = Modifier.padding(bottom = 4.dp),
     )
 }
 
@@ -222,27 +307,26 @@ fun PeriodPickerDialog(
 @Composable
 private fun PeriodModeEditor(selected: Period, onSelect: (Period) -> Unit) {
     val locale = appLocale()
+    // `px-2.5 pb-2 pt-1`
+    val pad = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 8.dp)
     when (selected) {
-        is Period.LastMonths -> FormField(
-            label = stringResource(R.string.dashboard_period_months_count),
-            value = selected.months.toString(),
-            onValueChange = { raw ->
-                val n = raw.filter { it.isDigit() }.take(2).toIntOrNull() ?: 1
-                onSelect(Period.LastMonths(n.coerceIn(1, 36)))
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 28.dp, bottom = 8.dp),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
+        is Period.LastMonths -> Column(pad) {
+            EditorLabel(stringResource(R.string.dashboard_period_months_count))
+            FormField(
+                label = "",
+                value = selected.months.toString(),
+                onValueChange = { raw ->
+                    val n = raw.filter { it.isDigit() }.take(2).toIntOrNull() ?: 1
+                    onSelect(Period.LastMonths(n.coerceIn(1, 36)))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+        }
 
-        is Period.Month -> Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
-        ) {
-            PickerField(
-                label = stringResource(R.string.dashboard_period_specific_month),
+        is Period.Month -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = pad) {
+            ButtonSelect(
                 options = (1..12).toList(),
                 selected = selected.month,
                 optionLabel = { m ->
@@ -254,8 +338,7 @@ private fun PeriodModeEditor(selected: Period, onSelect: (Period) -> Unit) {
             )
             // Same eight-year window the web offers.
             val years = (0..7).map { LocalDate.now().year - it }
-            PickerField(
-                label = stringResource(R.string.common_year),
+            ButtonSelect(
                 options = years,
                 selected = selected.year,
                 optionLabel = { it.toString() },
@@ -264,35 +347,173 @@ private fun PeriodModeEditor(selected: Period, onSelect: (Period) -> Unit) {
             )
         }
 
-        is Period.Day -> Box(modifier = Modifier.padding(start = 28.dp, bottom = 8.dp)) {
+        is Period.Day -> Box(pad) {
             DateField(
-                label = stringResource(R.string.dashboard_period_specific_day),
+                label = "",
                 value = selected.date,
                 onChange = { onSelect(Period.Day(it)) },
             )
         }
 
-        is Period.Range -> Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
+        // `flex items-end gap-2`: from and to side by side, like the web.
+        is Period.Range -> Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom,
+            modifier = pad,
         ) {
-            DateField(
-                label = stringResource(R.string.dashboard_period_from),
-                value = selected.from,
-                // Keep the window valid: dragging "from" past "to" pushes "to" along.
-                onChange = { from ->
-                    onSelect(Period.Range(from, if (selected.to < from) from else selected.to))
-                },
-            )
-            DateField(
-                label = stringResource(R.string.dashboard_period_to),
-                value = selected.to,
-                onChange = { to ->
-                    onSelect(Period.Range(if (to < selected.from) to else selected.from, to))
-                },
-            )
+            Column(Modifier.weight(1f)) {
+                EditorLabel(stringResource(R.string.dashboard_period_from))
+                DateField(
+                    label = "",
+                    value = selected.from,
+                    onChange = { from -> onSelect(selected.copy(from = from)) },
+                )
+            }
+            Column(Modifier.weight(1f)) {
+                EditorLabel(stringResource(R.string.dashboard_period_to))
+                DateField(
+                    label = "",
+                    value = selected.to,
+                    min = selected.from,
+                    onChange = { to -> onSelect(selected.copy(to = to)) },
+                )
+            }
         }
 
         else -> Unit
+    }
+}
+
+/**
+ * The web's own `Select` component — used only here, inside the period
+ * dropdown — which is not the native `<select>` [PickerField] mirrors: a
+ * button in `inputClass` at `text-sm` that truncates with "…", and a popover
+ * list the width of the button with a check on the chosen row.
+ */
+@Composable
+private fun <T> ButtonSelect(
+    options: List<T>,
+    selected: T,
+    optionLabel: @Composable (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = Broke.colors
+    val density = LocalDensity.current
+    var open by remember { mutableStateOf(false) }
+    val position = remember(density) { SelectPosition(density) }
+    var width by remember { mutableStateOf(0.dp) }
+    Box(
+        modifier.onGloballyPositioned { c ->
+            width = with(density) { c.size.width.toDp() }
+            val o = c.localToScreen(Offset.Zero) - c.localToWindow(Offset.Zero)
+            position.windowOrigin = IntOffset(o.x.toInt(), o.y.toInt())
+        },
+    ) {
+        // `inputClass flex items-center justify-between gap-2`; a clicked
+        // button keeps focus, so the accent ring shows while the list is open.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRing(open, colors.accent)
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.surface)
+                .border(1.dp, if (open) colors.accent else colors.borderMuted, RoundedCornerShape(8.dp))
+                .clickable { open = !open }
+                .padding(horizontal = 13.dp, vertical = 9.dp),
+        ) {
+            Text(
+                optionLabel(selected),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.fg,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(Lucide.ChevronDown, null, tint = colors.fgSubtle, modifier = Modifier.size(15.dp))
+        }
+        if (open) {
+            Popup(
+                popupPositionProvider = position,
+                onDismissRequest = { open = false },
+                properties = PopupProperties(focusable = true),
+            ) {
+                PopupShadowBox(onDismiss = { open = false }) {
+                    // `max-h-64 min-w-[7rem] overflow-y-auto rounded-xl border
+                    // bg-surface-overlay p-1 shadow-2xl`, as wide as the button.
+                    Column(
+                        Modifier
+                            .width(maxOf(width, 112.dp))
+                            .heightIn(max = 256.dp)
+                            .shadow2xl(12.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.surfaceOverlay)
+                            .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
+                            .verticalScroll(rememberScrollState())
+                            .padding(5.dp),
+                    ) {
+                        options.forEach { option ->
+                            val active = option == selected
+                            // `px-2.5 py-2 text-sm gap-2 rounded-lg`
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (active) colors.surfaceRaised else Color.Transparent)
+                                    .clickable { onSelect(option); open = false }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                            ) {
+                                Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                                    if (active) {
+                                        Icon(Lucide.Check, null, tint = colors.accent, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                                Text(
+                                    optionLabel(option),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (active) colors.fg else colors.fgMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * `Select`'s `reposition()`: left-aligned to the button and kept 8 px inside
+ * the screen, 4 px under it, flipped above when it does not fit. The anchor is
+ * moved to screen space first — this select lives inside another popup.
+ */
+private class SelectPosition(private val density: Density) : PopupPositionProvider {
+    var windowOrigin = IntOffset.Zero
+
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset = with(density) {
+        val a = anchorBounds.translate(windowOrigin)
+        val roomStart = PopupShadowRoom.start.roundToPx()
+        val w = popupContentSize.width - roomStart - PopupShadowRoom.end.roundToPx()
+        val h = popupContentSize.height - PopupShadowRoom.bottom.roundToPx()
+        val edge = 8.dp.roundToPx()
+        val left = maxOf(edge, minOf(a.left, windowSize.width - w - edge))
+        val below = a.bottom + 4.dp.roundToPx()
+        val top = if (below + h > windowSize.height - edge && a.top - h - edge > edge) {
+            a.top - h - edge
+        } else {
+            below
+        }
+        IntOffset(left - roomStart, top)
     }
 }

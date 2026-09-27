@@ -4,6 +4,7 @@ import com.asura.finanzas.ui.components.UpdateBanner
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.background
+import com.asura.finanzas.ui.components.MeshBackground
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -105,13 +106,16 @@ fun AppRoot(
             AuthState.Checking -> Unit
             // Signed out, the web's banner tops the column instead of resting on
             // a tab bar that is not there.
-            AuthState.SignedOut -> Column(Modifier.fillMaxSize()) {
-                UpdateBanner(repository, Modifier.statusBarsPadding(), atTop = true)
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    LoginScreen(
-                        repository = repository,
-                        onSignedIn = { state = AuthState.SignedIn },
-                    )
+            // The same gradient-mesh canvas the web paints under its login.
+            AuthState.SignedOut -> MeshBackground {
+                Column(Modifier.fillMaxSize()) {
+                    UpdateBanner(repository, Modifier.statusBarsPadding(), atTop = true)
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        LoginScreen(
+                            repository = repository,
+                            onSignedIn = { state = AuthState.SignedIn },
+                        )
+                    }
                 }
             }
             // Above the tabs on purpose: the cache has to outlive the screen

@@ -278,6 +278,8 @@ fun PlainSheet(
                 .padding(16.dp)
                 .widthIn(max = 448.dp)
                 .fillMaxWidth()
+                // `max-h-[90dvh]`, like every modal on the web.
+                .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.9f)
                 .cardShadow()
                 .clip(RoundedCornerShape(16.dp))
                 .background(colors.surfaceRaised)

@@ -76,13 +76,14 @@ import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.LoadingBox
+import com.asura.finanzas.ui.components.keepingPrevious
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.PeriodLabel
-import com.asura.finanzas.ui.components.PeriodPickerDialog
+import com.asura.finanzas.ui.components.PeriodPicker
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.components.ChartHit
@@ -130,7 +131,6 @@ fun DashboardScreen(
 ) {
     val (key, reload) = rememberReloadKey()
     val scope = rememberCoroutineScope()
-    var showPeriod by remember { mutableStateOf(false) }
     // Which breakdown slice is open, as (kind, target).
     var drillInto by remember { mutableStateOf<Pair<String, CategoryDetailTarget>?>(null) }
     // Widget order, shared with the web through the account.
@@ -149,18 +149,22 @@ fun DashboardScreen(
     val walletsState by loadSynced("wallets" to false, refetch = key) { repository.wallets() }
     val walletsForDrill = (walletsState as? Load.Ready)?.data ?: emptyList()
 
-    val summaryState by loadSynced("dashboard" to period, refetch = key) {
+    val summaryState = loadSynced("dashboard" to period, refetch = key) {
         repository.dashboard(period.toJson())
-    }
-    val trendsState by loadSynced("trends" to period, refetch = key) {
+    }.value.keepingPrevious()
+
+    val trendsState = loadSynced("trends" to period, refetch = key) {
         repository.spendingTrends(period.toJson())
-    }
-    val expenseState by loadSynced("breakdownExpense" to period, refetch = key) {
+    }.value.keepingPrevious()
+
+    val expenseState = loadSynced("breakdownExpense" to period, refetch = key) {
         repository.categoryBreakdown("expense", period.toJson())
-    }
-    val incomeState by loadSynced("breakdownIncome" to period, refetch = key) {
+    }.value.keepingPrevious()
+
+    val incomeState = loadSynced("breakdownIncome" to period, refetch = key) {
         repository.categoryBreakdown("income", period.toJson())
-    }
+    }.value.keepingPrevious()
+
 
     val trends = (trendsState as? Load.Ready)?.data
     val expenseBreakdown = (expenseState as? Load.Ready)?.data
@@ -192,7 +196,7 @@ fun DashboardScreen(
             subscriptions = subscriptions,
             fromCache = current.fromCache,
             period = period,
-            onPickPeriod = { showPeriod = true },
+            onPeriodChange = onPeriodChange,
             onViewAll = onViewAll,
             onResetLayout = {
                 scope.launch {
@@ -240,15 +244,6 @@ fun DashboardScreen(
         )
     }
 
-    if (showPeriod) {
-        PeriodPickerDialog(
-            selected = period,
-            // Parameters are edited inline, so a pick applies without closing.
-            onSelect = onPeriodChange,
-            onDismiss = { showPeriod = false },
-            allowAll = true,
-        )
-    }
 }
 
 @Composable
@@ -262,7 +257,7 @@ private fun DashboardContent(
     subscriptions: SubscriptionList?,
     fromCache: Boolean,
     period: Period,
-    onPickPeriod: () -> Unit,
+    onPeriodChange: (Period) -> Unit,
     onViewAll: (DashboardTarget) -> Unit,
     onSlice: (String, CategorySlice) -> Unit,
     onResetLayout: () -> Unit,
@@ -386,12 +381,7 @@ private fun DashboardContent(
                 modifier = Modifier.padding(bottom = 12.dp),
                 actionGap = 8.dp,
             ) {
-                ChipButton(
-                    text = PeriodLabel(period),
-                    onClick = onPickPeriod,
-                    leadingIcon = Lucide.CalendarRange,
-                    trailingIcon = Lucide.ChevronDown,
-                )
+                PeriodPicker(value = period, onChange = onPeriodChange, allowAll = true)
                 // Clears both the phone order and the desktop grid layout, so
                 // every device snaps back to the defaults together. A ghost
                 // button on the web.

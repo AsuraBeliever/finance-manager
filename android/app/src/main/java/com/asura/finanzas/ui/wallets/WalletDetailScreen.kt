@@ -1,7 +1,7 @@
 package com.asura.finanzas.ui.wallets
 
 import com.asura.finanzas.ui.components.SegmentedControl
-import com.asura.finanzas.ui.components.PeriodPickerDialog
+import com.asura.finanzas.ui.components.PeriodPicker
 import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.ChipButton
@@ -132,7 +132,6 @@ fun WalletDetailScreen(
     // The web filters this page's ledger just like the movements page does.
     var txKind by remember { mutableStateOf<KindFilter>(KindFilter.All) }
     var txPeriod by remember { mutableStateOf<Period>(Period.AllTime) }
-    var showPeriod by remember { mutableStateOf(false) }
     var totals by remember { mutableStateOf<TxTotals?>(null) }
     // The shared filter bar's category select, for income/expense.
     var txCategory by remember { mutableStateOf<TransactionCategory?>(null) }
@@ -304,11 +303,10 @@ fun WalletDetailScreen(
             }
         }
         item {
-            ChipButton(
-                text = PeriodLabel(txPeriod),
-                onClick = { showPeriod = true },
-                leadingIcon = Lucide.CalendarRange,
-                trailingIcon = Lucide.ChevronDown,
+            PeriodPicker(
+                value = txPeriod,
+                onChange = { txPeriod = it },
+                allowAll = true,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
         }
@@ -377,14 +375,6 @@ fun WalletDetailScreen(
         )
     }
 
-    if (showPeriod) {
-        PeriodPickerDialog(
-            selected = txPeriod,
-            onSelect = { txPeriod = it; showPeriod = false },
-            onDismiss = { showPeriod = false },
-            allowAll = true,
-        )
-    }
 
     if (addingPocket) {
         WalletFormSheet(
