@@ -5,7 +5,7 @@
 //   node scripts/parity-shots.mjs wallets goals   # only these
 //
 // Env: BASE (default http://localhost:8787), OUT (default ./parity-shots),
-// EMAIL, PASSWORD, LOCALE (default en-US), SCHEME ("light" to shoot the light
+// EMAIL, PASSWORD, VIEWPORT ("WxH" in CSS px), SCALE, LOCALE (default en-US), SCHEME ("light" to shoot the light
 // theme; dark otherwise), CARD (the credit card's name in this account),
 // PERIOD ("YYYY-MM" pins the
 // dashboard to that month — the widgets that need movement do not render at
@@ -30,8 +30,11 @@ const CARD = process.env.CARD ?? "Tarjeta Test A";
 
 // The S25U reports 720×1560 at density 280, which is this viewport at this
 // scale. Anything else and the two images cannot be laid on top of each other.
-const VIEWPORT = { width: 411, height: 891 };
-const SCALE = 1.75;
+// VIEWPORT="448x997" and SCALE override them for another device (the Pixel
+// emulator is 1344×2992 at density 480).
+const [VW, VH] = (process.env.VIEWPORT ?? "411x891").split("x").map(Number);
+const VIEWPORT = { width: VW, height: VH };
+const SCALE = Number(process.env.SCALE ?? 1.75);
 
 /**
  * `steps` is how many viewport-heights to walk down before stopping. `open`
@@ -51,7 +54,7 @@ const SCREENS = [
     open: [
       /new wallet|nueva cartera/i,
       // Second select in the modal: the first is "pocket of".
-      { css: "select >> nth=1", option: "Credit card" },
+      { css: "select >> nth=1", option: /^(Credit card|Tarjeta de crédito)$/ },
       { css: "input[type=checkbox]" },
     ],
     steps: 4,
@@ -72,17 +75,17 @@ const SCREENS = [
     open: [/^expense$|^gasto$/i],
     steps: 3,
   },
-  { name: "tx-form", route: "/#/transacciones", open: [/new transaction|nuevo movimiento/i], steps: 3 },
+  { name: "tx-form", route: "/#/transacciones", open: [/new transaction|nueva transacción/i], steps: 3 },
   {
     name: "tx-form-expense",
     route: "/#/transacciones",
-    open: [/new transaction|nuevo movimiento/i, /^expense$|^gasto$/i],
+    open: [/new transaction|nueva transacción/i, /^expense$|^gasto$/i],
     steps: 3,
   },
   {
     name: "tx-form-transfer",
     route: "/#/transacciones",
-    open: [/new transaction|nuevo movimiento/i, /^transfer$|^transferencia$/i],
+    open: [/new transaction|nueva transacción/i, /^transfer$|^transferencia$/i],
     steps: 3,
   },
   // An expense on a credit card: the months-without-interest box appears.
@@ -90,7 +93,7 @@ const SCREENS = [
     name: "tx-form-msi",
     route: "/#/transacciones",
     open: [
-      /new transaction|nuevo movimiento/i,
+      /new transaction|nueva transacción/i,
       /^expense$|^gasto$/i,
       { css: "select", option: `${CARD} (MXN)` },
       { css: "input[type=checkbox]" },
@@ -112,7 +115,7 @@ const SCREENS = [
   {
     name: "inv-form-nu",
     route: "/#/inversiones",
-    open: [/new investment|nueva inversión/i, { css: "button:has-text('Nu Box')" }],
+    open: [/new investment|nueva inversión/i, { css: "button:has-text('Nu Box'),button:has-text('Nu Cajita')" }],
     steps: 3,
   },
   {
@@ -259,7 +262,11 @@ async function shoot({ name, route, steps = 1, open = [] }) {
     // `{ css, option }` picks a value in a <select> instead of clicking it —
     // some states only exist once a particular wallet is chosen (a credit card
     // is what makes the MSI box appear).
-    if (target.option) await locator.selectOption({ label: target.option });
+    // A regex option matches the label in either language.
+    if (target.option instanceof RegExp) {
+      const labels = (await locator.locator("option").allTextContents()).map((t) => t.trim());
+      await locator.selectOption({ label: labels.find((t) => target.option.test(t)) });
+    } else if (target.option) await locator.selectOption({ label: target.option });
     else await locator.click();
     // Some of these fetch on open — the investment form waits on Banxico — so
     // settle on the network, or the shot is of a spinner. The first pause is

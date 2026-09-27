@@ -87,7 +87,8 @@ fun FormSheet(
     fields: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = Broke.colors
-    ModalCard(title = title, onDismiss = onDismiss) {
+    // The web's `<form className="grid gap-4">`, footer included.
+    ModalCard(title = title, onDismiss = onDismiss, bodySpacing = 16.dp) {
         fields()
 
         error?.let {
@@ -98,7 +99,6 @@ fun FormSheet(
             )
         }
 
-        Spacer(Modifier.height(2.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
@@ -152,8 +152,10 @@ fun ModalCard(
                 // the screen, unreachable however far the body is scrolled —
                 // which is exactly what a long form (a credit card) hits.
                 .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.9f)
+                .cardShadow()
                 .clip(RoundedCornerShape(16.dp))
-                .background(colors.surfaceOverlay)
+                .background(colors.surfaceRaised)
+                .cardHighlight()
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
                 .imePadding(),
         ) {
@@ -165,8 +167,7 @@ fun ModalCard(
             ) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.displayLarge
-                        .copy(fontSize = 18.sp, lineHeight = 24.sp),
+                    style = MaterialTheme.typography.titleLarge,
                     color = colors.fg,
                     modifier = Modifier.weight(1f),
                 )
@@ -197,19 +198,36 @@ fun ModalCard(
     }
 }
 
-/** The web's `variant="ghost"` button: text only, no fill. */
+/**
+ * The web's `variant="ghost"` button (and `variant="danger"` with [tint]):
+ * `rounded-lg px-4 py-2 text-sm`, no fill, and — unlike the primary one — no
+ * `font-medium`. An optional 15 px glyph sits `gap-2` before the label.
+ */
 @Composable
-fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
+fun GhostButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    tint: androidx.compose.ui.graphics.Color? = null,
+    enabled: Boolean = true,
+) {
+    val color = (tint ?: Broke.colors.fg).let { if (enabled) it else it.copy(alpha = it.alpha * 0.5f) }
+    Row(
         modifier
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        leadingIcon?.let {
+            Icon(it, contentDescription = null, tint = color, modifier = Modifier.size(15.dp))
+        }
         Text(
             text,
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-            color = Broke.colors.fg,
+            style = MaterialTheme.typography.bodyMedium,
+            color = color,
         )
     }
 }
@@ -250,8 +268,10 @@ fun PlainSheet(
                 .padding(16.dp)
                 .widthIn(max = 448.dp)
                 .fillMaxWidth()
+                .cardShadow()
                 .clip(RoundedCornerShape(16.dp))
-                .background(colors.surfaceOverlay)
+                .background(colors.surfaceRaised)
+                .cardHighlight()
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp)),
         ) {
             Row(
@@ -260,8 +280,7 @@ fun PlainSheet(
             ) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.displayLarge
-                        .copy(fontSize = 18.sp, lineHeight = 24.sp),
+                    style = MaterialTheme.typography.titleLarge,
                     color = colors.fg,
                     modifier = Modifier.weight(1f),
                 )

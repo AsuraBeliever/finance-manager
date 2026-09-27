@@ -70,6 +70,7 @@ import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.GlassCard
+import com.asura.finanzas.ui.components.GhostButton
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.Load
@@ -379,7 +380,12 @@ private fun DashboardContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            PageHeader(stringResource(R.string.dashboard_title)) {
+            // The header's `mb-7`: 28, of which the list's gap gives 16.
+            PageHeader(
+                stringResource(R.string.dashboard_title),
+                modifier = Modifier.padding(bottom = 12.dp),
+                actionGap = 8.dp,
+            ) {
                 ChipButton(
                     text = PeriodLabel(period),
                     onClick = onPickPeriod,
@@ -387,27 +393,13 @@ private fun DashboardContent(
                     trailingIcon = Lucide.ChevronDown,
                 )
                 // Clears both the phone order and the desktop grid layout, so
-                // every device snaps back to the defaults together.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onResetLayout() }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                ) {
-                    Icon(
-                        Lucide.RotateCcw,
-                        contentDescription = null,
-                        tint = colors.fg,
-                        modifier = Modifier.size(15.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(R.string.dashboard_reset_layout),
-                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-                        color = colors.fg,
-                    )
-                }
+                // every device snaps back to the defaults together. A ghost
+                // button on the web.
+                GhostButton(
+                    stringResource(R.string.dashboard_reset_layout),
+                    onClick = onResetLayout,
+                    leadingIcon = Lucide.RotateCcw,
+                )
             }
         }
 
@@ -830,6 +822,14 @@ private fun applyOrder(keys: List<String>, order: List<String>): List<String> {
     return keys.sortedBy { rank[it] ?: Int.MAX_VALUE }
 }
 
+/** Gauss error function (Abramowitz–Stegun 7.1.26), for the blurred disc. */
+private fun erf(x: Float): Float {
+    val t = 1f / (1f + 0.3275911f * kotlin.math.abs(x))
+    val y = 1f - (((((1.061405429f * t - 1.453152027f) * t) + 1.421413741f) * t - 0.284496736f) * t + 0.254829592f) *
+        t * kotlin.math.exp(-x * x)
+    return if (x >= 0) y else -y
+}
+
 /** Patrimonio: where the period started, where it ended, and the split. */
 @Composable
 private fun NetWorthCard(
@@ -840,54 +840,100 @@ private fun NetWorthCard(
     hide: Boolean,
 ) {
     val colors = Broke.colors
-    // `p-6` on the web, not the `p-5` most cards use.
-    GlassCard(Modifier.fillMaxWidth(), padding = 24.dp) {
+    val accent = colors.accent
+    val gold = colors.cyan
+    // `p-6` on the web, not the `p-5` most cards use. Behind it, the web's two
+    // decorations: a 256 px accent/10 disc blurred by 64 px hanging off the
+    // top-right corner, and a 1 px gold/40 line fading in and out along the top.
+    GlassCard(
+        Modifier.fillMaxWidth(),
+        decoration = {
+                val px = density
+                // A disc of radius 128 blurred with σ = 64 is, radially,
+                // 0.1 × Φ((128 − r) / 64): sampled here as gradient stops.
+                val center = androidx.compose.ui.geometry.Offset(size.width + 64 * px - 128 * px, -96 * px + 128 * px)
+                val reach = 128 * px + 2.5f * 64 * px
+                val stops = (0..10).map { i ->
+                    val r = reach * i / 10f
+                    val z = (128 * px - r) / (64 * px)
+                    val phi = 0.5f * (1f + erf(z / kotlin.math.sqrt(2f)))
+                    (i / 10f) to accent.copy(alpha = 0.10f * phi)
+                }.toTypedArray()
+                drawCircle(
+                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                        colorStops = stops,
+                        center = center,
+                        radius = reach,
+                    ),
+                    radius = reach,
+                    center = center,
+                )
+                drawRect(
+                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        listOf(
+                            androidx.compose.ui.graphics.Color.Transparent,
+                            gold.copy(alpha = 0.40f),
+                            androidx.compose.ui.graphics.Color.Transparent,
+                        ),
+                    ),
+                    // Inside the border, like any absolute child of the card.
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, 1 * px),
+                    size = androidx.compose.ui.geometry.Size(size.width, 1 * px),
+                )
+        },
+        padding = 24.dp,
+    ) {
         // The eye lives here, beside the eyebrow, exactly as on the web — not
-        // up in the page header.
+        // up in the page header. `flex items-center gap-2`.
         Row(verticalAlignment = Alignment.CenterVertically) {
             MicroLabel(stringResource(R.string.dashboard_net_worth))
             Spacer(Modifier.width(8.dp))
             PrivacyToggle()
         }
-        Spacer(Modifier.height(9.dp))
 
-        MicroLabel(
-            stringResource(R.string.dashboard_period_start),
-            color = colors.fgSubtle,
-            letterSpacing = TrackingWide,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
-        )
-        Spacer(Modifier.height(2.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                maskIfHidden(formatMoney(netStart), hide),
-                style = MaterialTheme.typography.headlineMedium.tabular(),
-                color = colors.fgMuted,
-            )
+        // `mt-2 flex flex-wrap items-end gap-x-5 gap-y-3`: at phone width the
+        // start figure and its arrow share the first line and the end figure
+        // wraps under them.
+        ComposeFlowRow(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.align(Alignment.Bottom)) {
+                MicroLabel(
+                    stringResource(R.string.dashboard_period_start),
+                    color = colors.fgSubtle,
+                    letterSpacing = TrackingWide,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                )
+                Text(
+                    maskIfHidden(formatMoney(netStart), hide),
+                    style = MaterialTheme.typography.headlineMedium.tabular(),
+                    color = colors.fgMuted,
+                )
+            }
             Icon(
                 Lucide.ArrowRight,
                 contentDescription = null,
                 tint = colors.fgSubtle,
-                modifier = Modifier.padding(start = 12.dp).size(20.dp),
+                modifier = Modifier.align(Alignment.Bottom).padding(bottom = 6.dp).size(22.dp),
             )
+            Column(Modifier.align(Alignment.Bottom)) {
+                MicroLabel(
+                    stringResource(R.string.dashboard_period_end),
+                    color = colors.fgSubtle,
+                    letterSpacing = TrackingWide,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                )
+                // `text-4xl` — 36 px, not the 40 sp the other heroes use.
+                HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 36.sp)
+            }
         }
 
-        Spacer(Modifier.height(13.dp))
-        MicroLabel(
-            stringResource(R.string.dashboard_period_end),
-            color = colors.fgSubtle,
-            letterSpacing = TrackingWide,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
-        )
-        // `text-4xl` — 36 px, not the 40 sp the other heroes use.
-        HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 36.sp)
-
-        Spacer(Modifier.height(12.dp))
         // One wrapping line with a middle dot between the two, the web's
-        // `flex flex-wrap gap-x-2`. Stacking them in a column read as two
-        // separate facts and dropped the separator the web draws.
+        // `mt-3 flex flex-wrap gap-x-2 gap-y-1`.
         ComposeFlowRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -904,7 +950,7 @@ private fun NetWorthCard(
                 )
                 LegendRow(
                     color = colors.cyan,
-                    label = stringResource(R.string.nav_investments),
+                    label = stringResource(R.string.investments_total),
                     amount = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
                 )
             }
@@ -913,25 +959,31 @@ private fun NetWorthCard(
         // Only when the period actually moved money. A quiet month otherwise
         // gets a rule and two "$0.00 · −100%" rows saying nothing, which is
         // why the web gates this block the same way.
+        // `mt-4 border-t pt-4 flex flex-wrap gap-x-6 gap-y-2`.
         if (trends != null && (trends.incomeMxnCents > 0 || trends.expenseMxnCents > 0)) {
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(16.dp))
             HairLine()
             Spacer(Modifier.height(16.dp))
-            FlowRow(
-                label = stringResource(R.string.dashboard_incomes),
-                amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
-                previousCents = trends.incomePrevMxnCents,
-                trendBps = trends.incomeTrendBps,
-                upIsGood = true,
-            )
-            Spacer(Modifier.height(8.dp))
-            FlowRow(
-                label = stringResource(R.string.dashboard_expenses),
-                amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
-                previousCents = trends.expensePrevMxnCents,
-                trendBps = trends.expenseTrendBps,
-                upIsGood = false,
-            )
+            ComposeFlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FlowRow(
+                    label = stringResource(R.string.dashboard_incomes),
+                    amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
+                    previousCents = trends.incomePrevMxnCents,
+                    trendBps = trends.incomeTrendBps,
+                    upIsGood = true,
+                )
+                FlowRow(
+                    label = stringResource(R.string.dashboard_expenses),
+                    amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
+                    previousCents = trends.expensePrevMxnCents,
+                    trendBps = trends.expenseTrendBps,
+                    upIsGood = false,
+                )
+            }
         }
 
         // With a single currency the consolidated figure above already says

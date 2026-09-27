@@ -94,6 +94,8 @@ fun TransactionFormSheet(
     defaultKind: TxKind = TxKind.Income,
     defaultToWalletId: Long? = null,
     defaultAmountText: String = "",
+    /** The wallet the form opens on — a wallet's own page passes itself. */
+    defaultWalletId: Long? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -104,7 +106,10 @@ fun TransactionFormSheet(
     var kind by remember { mutableStateOf(defaultKind) }
     var wallet by remember {
         // Never default the source to the card being paid.
-        mutableStateOf(spendable.firstOrNull { it.id != defaultToWalletId })
+        mutableStateOf(
+            spendable.firstOrNull { it.id == defaultWalletId && it.id != defaultToWalletId }
+                ?: spendable.firstOrNull { it.id != defaultToWalletId },
+        )
     }
     var toWallet by remember {
         mutableStateOf(spendable.firstOrNull { it.id == defaultToWalletId })

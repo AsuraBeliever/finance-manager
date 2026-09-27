@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +54,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
@@ -71,6 +74,7 @@ import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
+import com.asura.finanzas.ui.components.cardShadow
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.PrivacyToggle
@@ -97,20 +101,25 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     var editing by remember { mutableStateOf<Wallet?>(null) }
     var creating by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<Wallet?>(null) }
-    var openId by remember { mutableStateOf<Long?>(null) }
+    // A stack, like the browser's history: an apartado opened from its
+    // parent's page goes back to that page, not to the list.
+    var openStack by remember { mutableStateOf<List<Long>>(emptyList()) }
     var confirmDelete by remember { mutableStateOf<Wallet?>(null) }
 
     val all = (state as? Load.Ready)?.data.orEmpty()
 
-    val detailId = openId
+    val detailId = openStack.lastOrNull()
     if (detailId != null) {
-        WalletDetailScreen(
-            repository = repository,
-            walletId = detailId,
-            onBack = { openId = null; reload() },
-            onEdit = { editing = it },
-            modifier = modifier,
-        )
+        key(detailId) {
+            WalletDetailScreen(
+                repository = repository,
+                walletId = detailId,
+                onBack = { openStack = openStack.dropLast(1); reload() },
+                onEdit = { editing = it },
+                modifier = modifier,
+                onOpenWallet = { openStack = openStack + it },
+            )
+        }
         if (editing != null) {
             WalletFormSheet(
                 repository = repository,
@@ -130,7 +139,7 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
             wallets = current.data,
             fromCache = current.fromCache,
             onNew = { creating = true },
-            onOpen = { openId = it.id },
+            onOpen = { openStack = listOf(it.id) },
             onLongPress = { actionsFor = it },
             showArchived = showArchived,
             onToggleArchived = { showArchived = !showArchived },
@@ -255,7 +264,8 @@ private fun WalletList(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item {
-            PageHeader(stringResource(R.string.wallets_title)) {
+            // The header's `mb-7`: 28, of which the list's gap gives 20.
+            PageHeader(stringResource(R.string.wallets_title), Modifier.padding(bottom = 8.dp)) {
                 PrivacyToggle()
                 // A real checkbox, as on the web — the label alone gave no clue
                 // whether archived wallets were being shown.
@@ -314,13 +324,16 @@ private fun WalletList(
                     // many apartados should not bury the next card.
                     var expanded by remember(wallet.id) { mutableStateOf(false) }
                     val turn by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+                    // `mt-2`, then a `px-1 py-1` toggle in 0.65rem medium
+                    // caps tracked 0.12em — its own caption, not `.eyebrow`.
                     Spacer(Modifier.height(8.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { expanded = !expanded }
-                            .padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
+                            .padding(4.dp),
                     ) {
                         Icon(
                             Lucide.ChevronDown,
@@ -329,13 +342,19 @@ private fun WalletList(
                             modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = turn },
                         )
                         Spacer(Modifier.width(6.dp))
-                        MicroLabel(
-                            "${stringResource(R.string.wallets_apartados_label)} · ${children.size}",
+                        Text(
+                            "${stringResource(R.string.wallets_apartados_label)} · ${children.size}".uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.4.sp,
+                                lineHeight = 15.6.sp,
+                                letterSpacing = 0.12.em,
+                            ),
+                            color = Broke.colors.fgSubtle,
                         )
                     }
                     AnimatedVisibility(expanded) {
                         // The pockets hang off a rail, the web's border-l-2.
-                        Row(Modifier.padding(top = 4.dp)) {
+                        Row(Modifier.padding(top = 4.dp).height(IntrinsicSize.Min)) {
                             Box(
                                 Modifier
                                     .width(2.dp)
@@ -343,9 +362,9 @@ private fun WalletList(
                                     .background(Broke.colors.borderMuted),
                             )
                             Column(Modifier.padding(start = 12.dp)) {
-                                children.forEach { pocket ->
+                                children.forEachIndexed { i, pocket ->
+                                    if (i > 0) Spacer(Modifier.height(6.dp))
                                     PocketRow(pocket, hide, onOpen)
-                                    Spacer(Modifier.height(6.dp))
                                 }
                             }
                         }
@@ -391,6 +410,8 @@ fun WalletCard(
             .fillMaxWidth()
             // Credit-card proportions, the web's aspect-[1.586/1].
             .aspectRatio(1.586f)
+            // `shadow-card`, like every card on the web.
+            .cardShadow()
             .clip(RoundedCornerShape(16.dp))
             .drawBehind { drawRect(skin.brushFor(size)) }
             .combinedClickable(onClick = { onOpen(wallet) }, onLongClick = { onLongPress(wallet) }),
@@ -585,7 +606,8 @@ private fun PocketRow(pocket: Wallet, hide: Boolean, onOpen: (Wallet) -> Unit) {
             .background(colors.surfaceRaised)
             .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
             .clickable { onOpen(pocket) }
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            // `px-3.5 py-2.5` plus the border.
+            .padding(horizontal = 15.dp, vertical = 11.dp),
     ) {
         Box(
             Modifier
@@ -611,7 +633,8 @@ private fun PocketRow(pocket: Wallet, hide: Boolean, onOpen: (Wallet) -> Unit) {
         )
         Text(
             maskIfHidden(formatMoney(pocket.balanceCents, pocket.currencyCode), hide),
-            style = MaterialTheme.typography.bodyMedium.tabular(),
+            // `font-medium`.
+            style = MaterialTheme.typography.labelLarge.tabular(),
             color = colors.fg,
         )
     }

@@ -34,7 +34,8 @@ fun ProgressBar(
 ) {
     val colors = Broke.colors
     val fraction = (progressBps / 10_000f).coerceIn(0f, 1f)
-    val fill = if (over) colors.danger else color ?: colors.accent
+    // Past 100 % turns the danger colour, whoever the bar belongs to.
+    val fill = if (over || progressBps > 10_001) colors.danger else color ?: colors.accent
 
     if (segments != null && segments > 0) {
         val filled = Math.round(fraction * segments)

@@ -83,6 +83,12 @@ import androidx.compose.ui.text.style.TextAlign
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
+import com.asura.finanzas.ui.components.PanelCard
+import com.asura.finanzas.ui.components.cssLineBox
+import com.asura.finanzas.data.TransactionCategory
+import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.components.GhostButton
+import androidx.compose.foundation.lazy.itemsIndexed
 
 /**
  * One wallet: what it holds, its credit-card panel when it is a card, and its
@@ -96,6 +102,8 @@ fun WalletDetailScreen(
     onBack: () -> Unit,
     onEdit: (Wallet) -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens another wallet's page — an apartado card here is a link. */
+    onOpenWallet: (Long) -> Unit = {},
 ) {
     val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
@@ -125,20 +133,29 @@ fun WalletDetailScreen(
     var txPeriod by remember { mutableStateOf<Period>(Period.AllTime) }
     var showPeriod by remember { mutableStateOf(false) }
     var totals by remember { mutableStateOf<TxTotals?>(null) }
+    // The shared filter bar's category select, for income/expense.
+    var txCategory by remember { mutableStateOf<TransactionCategory?>(null) }
+    var categories by remember { mutableStateOf<List<TransactionCategory>>(emptyList()) }
+    var confirmingDelete by remember { mutableStateOf(false) }
 
-    LaunchedEffect(walletId, reloadKey, txKind, txPeriod) {
+    LaunchedEffect(Unit) {
+        categories = runCatching { repository.filterCategories() }.getOrDefault(emptyList())
+    }
+
+    LaunchedEffect(walletId, reloadKey, txKind, txPeriod, txCategory) {
         wallet = runCatching { repository.wallet(walletId) }.getOrNull()
         movements = runCatching {
             repository.transactions(
                 walletId = walletId,
                 kind = txKind.wire,
+                categoryId = txCategory?.id,
                 period = txPeriod.toJson(),
             ).value
         }.getOrDefault(emptyList())
         // The web only totals a single-kind filter; "all" has nothing to add up.
         totals = txKind.wire?.takeIf { it == "income" || it == "expense" }?.let { kind ->
             runCatching {
-                repository.transactionTotals(kind, walletId, null, txPeriod.toJson())
+                repository.transactionTotals(kind, walletId, txCategory?.id, txPeriod.toJson())
             }.getOrNull()
         }
         credit = wallet?.takeIf { it.creditCutDay != null }
@@ -157,10 +174,12 @@ fun WalletDetailScreen(
         return
     }
 
+    // No uniform gap: each block carries the web's own margin — the header's
+    // mb-7, the balance card's and each section's mb-6, a heading's mb-3, the
+    // filter column's gap-3 + mb-4, the total's mb-4.
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
             BackHandler(onBack = onBack)
@@ -168,34 +187,36 @@ fun WalletDetailScreen(
             // hands them to `PageHeader` as `actions`, so they ride the title's
             // line and only drop below when the name is long enough to push
             // them off it.
-            PageHeader(current.name, actionGap = 8.dp) {
-                Action(Lucide.Pencil, stringResource(R.string.common_edit)) { onEdit(current) }
-                Action(
-                    Lucide.Archive,
+            PageHeader(current.name, Modifier.padding(bottom = 28.dp), actionGap = 8.dp) {
+                GhostButton(
+                    stringResource(R.string.common_edit),
+                    onClick = { onEdit(current) },
+                    leadingIcon = Lucide.Pencil,
+                )
+                GhostButton(
                     stringResource(
                         if (current.isArchived) R.string.wallets_unarchive
                         else R.string.wallets_archive,
                     ),
-                ) {
-                    scope.launch {
-                        runCatching { repository.archiveWallet(current.id, !current.isArchived) }
-                        reloadKey++
-                    }
-                }
-                Action(
-                    Lucide.Trash,
+                    onClick = {
+                        scope.launch {
+                            runCatching { repository.archiveWallet(current.id, !current.isArchived) }
+                            reloadKey++
+                        }
+                    },
+                    leadingIcon = if (current.isArchived) Lucide.ArchiveRestore else Lucide.Archive,
+                )
+                // Deleting takes the whole history with it, so it asks first.
+                GhostButton(
                     stringResource(R.string.common_delete),
-                    colors.danger,
-                ) {
-                    scope.launch {
-                        runCatching { repository.deleteWallet(current.id) }
-                        onBack()
-                    }
-                }
+                    onClick = { confirmingDelete = true },
+                    leadingIcon = Lucide.Trash,
+                    tint = colors.danger,
+                )
             }
         }
 
-        item { BalanceCard(current, credit, pockets, hide) }
+        item { BalanceCard(current, credit, pockets, hide, Modifier.padding(bottom = 24.dp)) }
 
         credit?.let { summary ->
             item {
@@ -208,6 +229,7 @@ fun WalletDetailScreen(
                     // Deleting a plan also deletes the instalments it already
                     // posted, so it asks first — the web does too.
                     onDeletePlan = { deletingMsi = it },
+                    modifier = Modifier.padding(bottom = 24.dp),
                 )
             }
         }
@@ -219,10 +241,16 @@ fun WalletDetailScreen(
                 SectionHeader(
                     stringResource(R.string.wallets_apartados_label),
                     stringResource(R.string.wallets_add_apartado),
+                    Modifier.padding(bottom = if (pockets.isEmpty()) 24.dp else 12.dp),
                 ) { addingPocket = true }
             }
-            items(pockets, key = { "pocket-${it.id}" }) { pocket ->
-                WalletCard(pocket, hide, onOpen = {}, onLongPress = {})
+            itemsIndexed(pockets, key = { _, it -> "pocket-${it.id}" }) { index, pocket ->
+                Box(
+                    Modifier.padding(bottom = if (index == pockets.lastIndex) 24.dp else 16.dp),
+                ) {
+                    // A link on the web: it opens that apartado's own page.
+                    WalletCard(pocket, hide, onOpen = { onOpenWallet(it.id) }, onLongPress = {})
+                }
             }
         }
 
@@ -234,6 +262,7 @@ fun WalletDetailScreen(
                     goals = goals,
                     wallets = allWallets,
                     onChanged = { reloadKey++ },
+                    modifier = Modifier.padding(bottom = 24.dp),
                 )
             }
         }
@@ -242,6 +271,7 @@ fun WalletDetailScreen(
             SectionHeader(
                 stringResource(R.string.transactions_title),
                 stringResource(R.string.transactions_new_transaction),
+                Modifier.padding(bottom = 12.dp),
             ) { addingTx = true }
         }
         item {
@@ -249,10 +279,28 @@ fun WalletDetailScreen(
                 options = KindFilter.entries,
                 selected = txKind,
                 label = { stringResource(it.labelRes) },
-                onSelect = { txKind = it },
-                modifier = Modifier.fillMaxWidth(),
+                onSelect = { txKind = it; txCategory = null },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 fillEqually = true,
             )
+        }
+        // Category only applies to income/expense, scoped to the chosen kind.
+        if (txKind == KindFilter.Income || txKind == KindFilter.Expense) {
+            item {
+                PickerField(
+                    label = "",
+                    options = listOf<TransactionCategory?>(null) +
+                        categories.filter { it.kind == txKind.wire },
+                    selected = txCategory,
+                    optionLabel = {
+                        it?.let { c -> seedName(c.name, c.isSystem) }
+                            ?: stringResource(R.string.transactions_all_categories)
+                    },
+                    onSelect = { txCategory = it },
+                    emptyLabel = stringResource(R.string.transactions_all_categories),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                )
+            }
         }
         item {
             ChipButton(
@@ -260,16 +308,19 @@ fun WalletDetailScreen(
                 onClick = { showPeriod = true },
                 leadingIcon = Lucide.CalendarRange,
                 trailingIcon = Lucide.ChevronDown,
+                modifier = Modifier.padding(bottom = 16.dp),
             )
         }
         totals?.let { summary ->
-            item { TransactionTotal(summary, hide, income = txKind.wire == "income") }
+            item {
+                Box(Modifier.padding(bottom = 16.dp)) {
+                    TransactionTotal(summary, hide, income = txKind.wire == "income")
+                }
+            }
         }
         if (movements.isEmpty()) {
             // The web swaps the list for an empty state here, and says a
-            // different thing when a filter is what emptied it. Without this
-            // the screen just stopped after the period chip, with nothing to
-            // explain the gap.
+            // different thing when a filter is what emptied it.
             item {
                 val filtered = txKind != KindFilter.All || txPeriod != Period.AllTime
                 EmptyState(
@@ -300,14 +351,29 @@ fun WalletDetailScreen(
                 item {
                     Text(
                         text(R.string.transactions_list_capped, "n" to TX_LIST_LIMIT),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        style = MaterialTheme.typography.bodySmall,
                         color = colors.fgSubtle,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     )
                 }
             }
         }
+    }
+
+    if (confirmingDelete) {
+        ConfirmDialog(
+            title = stringResource(R.string.wallets_delete_confirm_title),
+            message = stringResource(R.string.wallets_delete_confirm_message),
+            onConfirm = {
+                confirmingDelete = false
+                scope.launch {
+                    runCatching { repository.deleteWallet(current.id) }
+                    onBack()
+                }
+            },
+            onDismiss = { confirmingDelete = false },
+        )
     }
 
     if (showPeriod) {
@@ -359,6 +425,8 @@ fun WalletDetailScreen(
             wallets = allWallets,
             onDismiss = { addingTx = false },
             onSaved = { addingTx = false; reloadKey++ },
+            // Opened from a wallet, the form starts on that wallet.
+            defaultWalletId = current.id,
         )
     }
 
@@ -475,6 +543,7 @@ private fun BalanceCard(
     credit: CreditCardSummary?,
     pockets: List<Wallet>,
     hide: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
     // Same reading as the card in the list, so the figure does not change when
@@ -485,9 +554,11 @@ private fun BalanceCard(
         .sumOf { it.balanceCents }
     val reserved = wallet.reservedCents + pocketsCents
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    // Not a GlassCard: `rounded-xl border bg-surface-raised p-5`, no shadow.
+    PanelCard(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Dot(parseHexColor(wallet.color) ?: colors.fgSubtle, 12.dp)
+            // `#a8a29e` when the wallet has no colour of its own.
+            Dot(parseHexColor(wallet.color) ?: androidx.compose.ui.graphics.Color(0xFFA8A29E), 12.dp)
             Spacer(Modifier.width(8.dp))
             Text(
                 // Seeded category names arrive in Spanish whatever the app's
@@ -508,8 +579,14 @@ private fun BalanceCard(
                 ),
                 hide,
             ),
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp).tabular(),
+            // `text-3xl font-semibold` in the body face, not the display one.
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 30.sp,
+                lineHeight = 36.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            ).tabular(),
             color = colors.fg,
+            modifier = Modifier.cssLineBox(36.dp),
         )
         credit?.creditLimitCents?.let { limit ->
             Text(
@@ -517,7 +594,7 @@ private fun BalanceCard(
                     "{limit}",
                     maskIfHidden(formatMoney(limit, wallet.currencyCode), hide),
                 ),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = MaterialTheme.typography.bodySmall.tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -531,7 +608,7 @@ private fun BalanceCard(
                         hide,
                     ) + " · " + stringResource(R.string.wallets_reserved) + " " +
                     maskIfHidden(formatMoney(reserved, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = MaterialTheme.typography.bodySmall.tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -546,7 +623,7 @@ private fun BalanceCard(
                             formatMoney(-wallet.initialBalanceCents, wallet.currencyCode),
                             hide,
                         ),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                    style = MaterialTheme.typography.bodySmall.tabular(),
                     color = colors.fgSubtle,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -555,7 +632,7 @@ private fun BalanceCard(
             Text(
                 stringResource(R.string.wallets_initial_balance) + ": " +
                     maskIfHidden(formatMoney(wallet.initialBalanceCents, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = MaterialTheme.typography.bodySmall.tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -581,13 +658,14 @@ private fun CreditPanel(
     onPay: () -> Unit,
     onAddPlan: () -> Unit,
     onDeletePlan: (MsiPlan) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
     val st = summary.statement
     // The web colours this block red once the deadline is inside three days.
     val urgent = st.remainingCents > 0 && st.daysToDue <= 3
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    PanelCard(modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -890,36 +968,26 @@ private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () 
     }
 }
 
-/** Section heading with its action, the pair the web puts above each block. */
+/**
+ * Section heading with its action, the pair the web puts above each block:
+ * `flex items-center justify-between`, an h3 in `font-medium` and a ghost
+ * button with a plus.
+ */
 @Composable
-private fun SectionHeader(title: String, action: String, onAction: () -> Unit) {
+private fun SectionHeader(
+    title: String,
+    action: String,
+    modifier: Modifier = Modifier,
+    onAction: () -> Unit,
+) {
     val colors = Broke.colors
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = colors.fg)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onAction)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-        ) {
-            Icon(
-                Lucide.Plus,
-                contentDescription = null,
-                tint = colors.fg,
-                modifier = Modifier.size(15.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                action,
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-                color = colors.fg,
-            )
-        }
+        GhostButton(action, onClick = onAction, leadingIcon = Lucide.Plus)
     }
 }
 

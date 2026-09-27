@@ -30,9 +30,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -139,7 +142,7 @@ fun PageHeader(
     modifier: Modifier = Modifier,
     /** Gap between the actions themselves — the web's `gap-4`, or `gap-2`. */
     actionGap: androidx.compose.ui.unit.Dp = 16.dp,
-    actions: @Composable FlowRowScope.() -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     val colors = Broke.colors
     // `flex flex-wrap items-end justify-between gap-3`: the actions ride the
@@ -152,12 +155,14 @@ fun PageHeader(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
+            // `items-end` for the title too: next to taller actions it sits on
+            // their bottom edge, not at the top of the line.
             // The header's `gap-3`. `SpaceBetween` alone never reserves it, so
             // the actions rode the title's line at widths where flexbox had
             // already wrapped them — Movimientos was one line here and two in
             // the browser. Carried as end padding, it counts towards the wrap
             // and is swallowed by the free space when they do fit.
-            modifier = Modifier.padding(end = 12.dp),
+            modifier = Modifier.align(Alignment.Bottom).padding(end = 12.dp),
         ) {
             // Same tab and title metrics as the web's PageHeader: a 4×28 rule
             // in the "gold" accent (cyan here) and a 1.9rem display title.
@@ -174,15 +179,20 @@ fun PageHeader(
                 // `text-[1.9rem] leading-none tracking-tight`, to the tenth.
                 style = MaterialTheme.typography.displayLarge,
                 color = colors.fg,
-                modifier = Modifier.padding(start = 12.dp),
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    // `leading-none`: the line box is the font size, 30.4.
+                    .cssLineBox(30.4.dp),
             )
         }
-        FlowRow(
-            // `items-end`: the actions sit on the title's baseline, not at the
-            // top of its line box.
+        // `items-end`: the actions sit on the title's baseline, not at the top
+        // of its line box. Among themselves they are the web's `flex
+        // items-center gap-4`: one row that never wraps, a checkbox label
+        // centred on the button next to it.
+        Row(
             modifier = Modifier.align(Alignment.Bottom),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(actionGap),
+            verticalAlignment = Alignment.CenterVertically,
             content = actions,
         )
     }
@@ -197,18 +207,99 @@ fun PageHeader(
 fun GlassCard(
     modifier: Modifier = Modifier,
     padding: androidx.compose.ui.unit.Dp = 20.dp,
+    /** Painted over the card's fill and under its content — an absolutely
+     *  positioned decoration inside the web's card. */
+    decoration: (androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     // rounded-2xl, like every card on the web. A rounder corner is one of the
     // first things that reads as "a different app" when the two sit together.
     Column(
         modifier = modifier
+            .cardShadow()
             .clip(RoundedCornerShape(16.dp))
             .background(Broke.colors.surfaceRaised)
+            .cardHighlight()
+            .then(if (decoration != null) Modifier.drawBehind(decoration) else Modifier)
             .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(16.dp))
-            .padding(padding),
+            // The browser counts the 1 px border inside the box and pads from
+            // it; Compose draws the border over the padding. So `p-5` is 21.
+            .padding(padding + 1.dp),
         content = content,
     )
+}
+
+/**
+ * The web's plainer box: `rounded-xl border border-border-muted
+ * bg-surface-raised p-5` — a wallet's balance, its card panel — with no
+ * `shadow-card` and a tighter corner than [GlassCard].
+ */
+@Composable
+fun PanelCard(
+    modifier: Modifier = Modifier,
+    padding: androidx.compose.ui.unit.Dp = 20.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Broke.colors.surfaceRaised)
+            .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(12.dp))
+            .padding(padding + 1.dp),
+        content = content,
+    )
+}
+
+/**
+ * The drop half of `shadow-card`: `0 10px 34px -16px` violet at 30 % (dark:
+ * `0 8px 36px -16px` at 45 %). The negative spread tucks it under the card, so
+ * it only shows as a soft glow along the bottom edge.
+ */
+@Composable
+fun Modifier.cardShadow(radius: androidx.compose.ui.unit.Dp = 16.dp): Modifier {
+    val dark = Broke.colors.isDark
+    return drawBehind {
+        val offsetY = (if (dark) 8 else 10) * density
+        val blur = (if (dark) 36 else 34) * density
+        val spread = -16 * density
+        val paint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(if (dark) 115 else 77, 124, 58, 237)
+            // CSS blur radius B is a Gaussian with σ = B / 2; Android's mask
+            // radius r means σ ≈ 0.57735 r + 0.5.
+            maskFilter = android.graphics.BlurMaskFilter(
+                ((blur / 2f) - 0.5f) / 0.57735f,
+                android.graphics.BlurMaskFilter.Blur.NORMAL,
+            )
+        }
+        // A box-shadow is never painted under its own box — and these cards
+        // are see-through, so without cutting it out it glowed through them.
+        val canvas = drawContext.canvas.nativeCanvas
+        canvas.save()
+        val r = radius.toPx()
+        canvas.clipOutPath(
+            android.graphics.Path().apply {
+                addRoundRect(0f, 0f, size.width, size.height, r, r, android.graphics.Path.Direction.CW)
+            },
+        )
+        canvas.drawRect(
+            -spread, offsetY - spread, size.width + spread, size.height + offsetY + spread, paint,
+        )
+        canvas.restore()
+    }
+}
+
+/** The inset half of `shadow-card`: a 1 px highlight just inside the top border. */
+@Composable
+fun Modifier.cardHighlight(): Modifier {
+    val dark = Broke.colors.isDark
+    return drawBehind {
+        drawRect(
+            color = androidx.compose.ui.graphics.Color.White.copy(alpha = if (dark) 0.07f else 0.85f),
+            topLeft = androidx.compose.ui.geometry.Offset(0f, density),
+            size = androidx.compose.ui.geometry.Size(size.width, density),
+        )
+    }
 }
 
 /**
@@ -245,6 +336,23 @@ fun MicroLabel(
     )
 }
 
+/**
+ * A single line of text laid out in a line box shorter than its font, as CSS
+ * does with `leading-none` or `text-4xl`'s 2.5rem: the box is [height] and the
+ * glyphs spill over it evenly. Compose never lays a line out shorter than the
+ * font's own ascent + descent, so without this every such heading pushed the
+ * rest of the page down (7.6 dp under a page title, 5.3 under a hero figure).
+ */
+fun Modifier.cssLineBox(height: androidx.compose.ui.unit.Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val box = height.roundToPx()
+    if (placeable.height <= box) {
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    } else {
+        layout(placeable.width, box) { placeable.place(0, (box - placeable.height) / 2) }
+    }
+}
+
 /** The hero money figure: display face with the violet→cyan gradient. */
 @Composable
 fun HeroAmount(
@@ -253,22 +361,54 @@ fun HeroAmount(
     fontSize: androidx.compose.ui.unit.TextUnit = 40.sp,
 ) {
     val colors = Broke.colors
+    // `--hero-gradient`: 110deg, the two violets swapping places between the
+    // themes, and the cyan owning everything past the first fifth.
+    val first = if (colors.isDark) colors.accentBright else colors.accent
+    val second = if (colors.isDark) colors.accent else colors.accentBright
+    val brush = remember(first, second, colors.cyan) { cssLinearGradient(110f, listOf(0f to first, 0.2f to second, 1f to colors.cyan)) }
     Text(
         text = text,
         style = MaterialTheme.typography.displayLarge.tabular().copy(
             fontSize = fontSize,
-            // `text-4xl` is 2.25rem over a 2.5rem line box; 1.15 was a guess
-            // that sat every hero a couple of pixels low.
+            // `text-4xl` is 2.25rem over a 2.5rem line box.
             lineHeight = fontSize * 1.1111f,
             // `font-semibold` on the money heroes; the headers stay medium.
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-            brush = Brush.linearGradient(
-                listOf(colors.accentBright, colors.accent, colors.cyan),
+            brush = brush,
+            // `--hero-glow`, the drop-shadow the web casts in the accent.
+            shadow = androidx.compose.ui.graphics.Shadow(
+                color = colors.accent.copy(alpha = if (colors.isDark) 0.45f else 0.28f),
+                blurRadius = with(androidx.compose.ui.platform.LocalDensity.current) {
+                    (if (colors.isDark) 19.dp else 13.dp).toPx()
+                },
             ),
         ),
-        modifier = modifier,
+        maxLines = 1,
+        modifier = modifier.cssLineBox(with(androidx.compose.ui.platform.LocalDensity.current) { (fontSize * 1.1111f).toDp() }),
     )
 }
+
+/**
+ * A CSS `linear-gradient(<angle>deg, …)` over whatever box it paints: the line
+ * runs through the centre at that angle (0 = up, 90 = right) and is exactly
+ * long enough for the corners to land on the first and last stop.
+ */
+fun cssLinearGradient(angleDeg: Float, stops: List<Pair<Float, androidx.compose.ui.graphics.Color>>): Brush =
+    object : androidx.compose.ui.graphics.ShaderBrush() {
+        override fun createShader(size: androidx.compose.ui.geometry.Size): androidx.compose.ui.graphics.Shader {
+            val a = Math.toRadians(angleDeg.toDouble())
+            val dx = kotlin.math.sin(a).toFloat()
+            val dy = -kotlin.math.cos(a).toFloat()
+            val half = (kotlin.math.abs(size.width * dx) + kotlin.math.abs(size.height * dy)) / 2f
+            val c = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+            return androidx.compose.ui.graphics.LinearGradientShader(
+                from = c - androidx.compose.ui.geometry.Offset(dx * half, dy * half),
+                to = c + androidx.compose.ui.geometry.Offset(dx * half, dy * half),
+                colors = stops.map { it.second },
+                colorStops = stops.map { it.first },
+            )
+        }
+    }
 
 /** Thin "sin conexión — datos del último sync" strip. */
 @Composable
@@ -401,7 +541,7 @@ fun BackHeader(
     modifier: Modifier = Modifier,
     /** Defaults to a plain "Back"; settings passes its own wording. */
     backLabel: String? = null,
-    actions: @Composable FlowRowScope.() -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     val colors = Broke.colors
     // These screens are pushed inside a tab rather than routed, so nothing was

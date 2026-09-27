@@ -84,6 +84,13 @@ class AppPreferences(private val context: Context) {
         context.prefsDataStore.data.map { it[appearanceStampKey] ?: 0L }
 
     suspend fun setLocale(locale: String) = edit { it[localeKey] = locale }
+
+    /**
+     * The language to build the activity in, read before anything is drawn.
+     * Blocking on purpose: it runs once in `attachBaseContext`, where there
+     * is nothing to suspend into, and DataStore is a single small file.
+     */
+    fun localeNow(): String = kotlinx.coroutines.runBlocking { settings.first().locale }
     suspend fun setTheme(theme: ThemeChoice) = edit { it[themeKey] = theme.name }
 
     /**

@@ -309,27 +309,38 @@ fun RingGauge(
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.size(156.dp)) {
-            val stroke = size.width * 0.13f
-            val inset = stroke / 2
-            val arcSize = Size(size.width - stroke, size.height - stroke)
+            // recharts keeps a 5 px margin round the chart, so "100%" is a
+            // 73 px radius, and "74%" puts the inside of the bar at 54.
+            val outer = size.width / 2f - 5.dp.toPx()
+            val inner = outer * 0.74f
+            val stroke = outer - inner
+            val mid = (outer + inner) / 2f
+            val topLeft = androidx.compose.ui.geometry.Offset(center.x - mid, center.y - mid)
+            val arcSize = Size(mid * 2f, mid * 2f)
             drawArc(
                 color = colors.surfaceOverlay,
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,
-                topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+                topLeft = topLeft,
                 size = arcSize,
                 style = Stroke(width = stroke),
             )
-            drawArc(
-                color = ring,
-                startAngle = -90f,
-                sweepAngle = 360f * fraction,
-                useCenter = false,
-                topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
-                size = arcSize,
-                style = Stroke(width = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-            )
+            // `cornerRadius` rounds the bar's ends inside its own angle; a round
+            // stroke cap would poke half the bar's width past each end.
+            val cap = Math.toDegrees((stroke / 2f / mid).toDouble()).toFloat()
+            val sweep = 360f * fraction
+            if (sweep > 0f) {
+                drawArc(
+                    color = ring,
+                    startAngle = -90f + minOf(cap, sweep / 2f),
+                    sweepAngle = maxOf(sweep - 2f * cap, 0.01f),
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                )
+            }
         }
         // The hollow the label has to live in. The web sizes its centre block
         // to the same width.
@@ -344,8 +355,8 @@ fun RingGauge(
         ) {
             Text(
                 centerValue,
-                style = MaterialTheme.typography.titleLarge
-                    .tabular().copy(fontSize = 24.sp, lineHeight = 32.sp),
+                // `font-display text-2xl font-semibold`.
+                style = MaterialTheme.typography.headlineMedium.tabular(),
                 color = colors.fg,
                 maxLines = 1,
                 softWrap = false,
@@ -360,7 +371,8 @@ fun RingGauge(
             Spacer(Modifier.height(2.dp))
             Text(
                 centerCaption,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.2.sp),
+                // `text-[0.7rem] leading-tight`, regular weight.
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.2.sp, lineHeight = 14.sp),
                 color = colors.fgSubtle,
                 textAlign = TextAlign.Center,
                 maxLines = 2,

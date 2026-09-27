@@ -90,76 +90,140 @@ fun <T> SegmentedControl(
     val fontSize = if (style == SegStyle.Theme) 12.sp else 14.sp
     val accentChip = style == SegStyle.Theme || style == SegStyle.Modes
 
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(trayRadius))
-            .background(tray)
-            .then(
-                if (style == SegStyle.Theme || style == SegStyle.Modes) {
-                    Modifier.border(1.dp, colors.borderMuted, RoundedCornerShape(trayRadius))
-                } else {
-                    Modifier
-                },
-            )
-            // Long labels would otherwise be squeezed until each one wrapped
-            // down several lines, blowing the pill up into a tall block.
-            .then(if (fillEqually) Modifier else Modifier.horizontalScroll(rememberScrollState()))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(chipGap),
-    ) {
-        options.forEach { option ->
-            val isSelected = option == selected
-            Row(
-                modifier = Modifier
-                    .then(if (fillEqually) Modifier.weight(1f) else Modifier)
-                    .clip(RoundedCornerShape(chipRadius))
-                    .background(
-                        when {
-                            !isSelected -> Color.Transparent
-                            style == SegStyle.Theme -> colors.accentDim.copy(alpha = 0.20f)
-                            style == SegStyle.Modes -> colors.accent.copy(alpha = 0.15f)
-                            style == SegStyle.Tray -> colors.surfaceOverlay
-                            else -> colors.surfaceRaised
-                        },
-                    )
-                    .clickable { onSelect(option) }
-                    .padding(horizontal = chipPadding, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-            ) {
-                icon?.invoke(option)?.let {
-                    Icon(
-                        it,
-                        contentDescription = null,
-                        tint = when {
-                            !isSelected -> if (accentChip) colors.fgMuted else colors.fgSubtle
-                            accentChip -> colors.accent
-                            else -> colors.fg
-                        },
-                        modifier = Modifier.size(15.dp),
-                    )
-                }
-                Text(
-                    text = label(option),
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontSize = fontSize,
-                        // The tray shape only bolds the chosen option ("text-sm"
-                        // vs "text-sm font-medium"); the others always do.
-                        fontWeight = if (style == SegStyle.Tray && !isSelected) {
-                            androidx.compose.ui.text.font.FontWeight.Normal
-                        } else {
-                            androidx.compose.ui.text.font.FontWeight.Medium
-                        },
-                    ),
-                    color = when {
+    @Composable
+    fun Chip(option: T) {
+        val isSelected = option == selected
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(chipRadius))
+                .background(
+                    when {
+                        !isSelected -> Color.Transparent
+                        style == SegStyle.Theme -> colors.accentDim.copy(alpha = 0.20f)
+                        style == SegStyle.Modes -> colors.accent.copy(alpha = 0.15f)
+                        style == SegStyle.Tray -> colors.surfaceOverlay
+                        else -> colors.surfaceRaised
+                    },
+                )
+                .clickable { onSelect(option) }
+                .padding(horizontal = chipPadding, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        ) {
+            icon?.invoke(option)?.let {
+                Icon(
+                    it,
+                    contentDescription = null,
+                    tint = when {
                         !isSelected -> if (accentChip) colors.fgMuted else colors.fgSubtle
                         accentChip -> colors.accent
                         else -> colors.fg
                     },
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    softWrap = false,
+                    modifier = Modifier.size(15.dp),
                 )
+            }
+            Text(
+                text = label(option),
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontSize = fontSize,
+                    // The tray shape only bolds the chosen option ("text-sm"
+                    // vs "text-sm font-medium"); the others always do.
+                    fontWeight = if (style == SegStyle.Tray && !isSelected) {
+                        androidx.compose.ui.text.font.FontWeight.Normal
+                    } else {
+                        androidx.compose.ui.text.font.FontWeight.Medium
+                    },
+                ),
+                color = when {
+                    !isSelected -> if (accentChip) colors.fgMuted else colors.fgSubtle
+                    accentChip -> colors.accent
+                    else -> colors.fg
+                },
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+    }
+
+    val trayModifier = modifier
+        .clip(RoundedCornerShape(trayRadius))
+        .background(tray)
+        .then(
+            if (style == SegStyle.Theme || style == SegStyle.Modes) {
+                Modifier.border(1.dp, colors.borderMuted, RoundedCornerShape(trayRadius))
+            } else {
+                Modifier
+            },
+        )
+
+    if (fillEqually) {
+        FlexOneRow(gap = chipGap, modifier = trayModifier.padding(4.dp)) {
+            options.forEach { Chip(it) }
+        }
+    } else {
+        Row(
+            // Long labels would otherwise be squeezed until each one wrapped
+            // down several lines, blowing the pill up into a tall block.
+            modifier = trayModifier.horizontalScroll(rememberScrollState()).padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(chipGap),
+        ) {
+            options.forEach { Chip(it) }
+        }
+    }
+}
+
+/**
+ * CSS `flex-1` children, exactly: every child starts from an equal share of
+ * the row, but none is squeezed below its own content (`min-width: auto`), so
+ * a long label ("Transferencia") takes what it needs and the short ones split
+ * the rest. A plain `weight(1f)` made them all equal and cut the long one.
+ */
+@Composable
+private fun FlexOneRow(
+    gap: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    androidx.compose.ui.layout.Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val gapPx = gap.roundToPx()
+        val n = measurables.size
+        val available = (constraints.maxWidth - gapPx * (n - 1).coerceAtLeast(0)).coerceAtLeast(0)
+        val mins = measurables.map { it.maxIntrinsicWidth(constraints.maxHeight) }
+        val widths = IntArray(n)
+        val frozen = BooleanArray(n)
+        var remaining = available
+        var open = n
+        // Freeze whoever doesn't fit the equal share at their content width,
+        // then re-split what's left among the rest, until nobody else breaks.
+        while (open > 0) {
+            val share = remaining / open
+            var froze = false
+            for (i in 0 until n) {
+                if (!frozen[i] && mins[i] > share) {
+                    frozen[i] = true; widths[i] = mins[i]; remaining -= mins[i]; open--; froze = true
+                }
+            }
+            if (!froze) {
+                var left = remaining
+                val openIdx = (0 until n).filter { !frozen[it] }
+                openIdx.forEachIndexed { k, i ->
+                    widths[i] = if (k == openIdx.lastIndex) left else share
+                    left -= share
+                }
+                break
+            }
+        }
+        val placeables = measurables.mapIndexed { i, m ->
+            m.measure(androidx.compose.ui.unit.Constraints.fixedWidth(widths[i].coerceAtLeast(0)))
+        }
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else widths.sum() + gapPx * (n - 1)
+        layout(width, height) {
+            var x = 0
+            placeables.forEach { p ->
+                p.placeRelative(x, (height - p.height) / 2)
+                x += p.width + gapPx
             }
         }
     }
@@ -319,7 +383,8 @@ fun ChipButton(
             .background(colors.surface)
             .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            // `px-3 py-1.5` plus the 1 px border.
+            .padding(horizontal = 13.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -353,10 +418,12 @@ fun WebCheckbox(
     boxSize: androidx.compose.ui.unit.Dp = 13.dp,
 ) {
     val accent = Broke.colors.accent
-    // Chrome's dark-mode defaults, sampled off the rendered page.
-    val off = Color(0xFF3B3B3B)
-    val hairline = Color(0xFF858585)
-    val tick = Color(0xFF3B3B3B)
+    val dark = Broke.colors.isDark
+    // Chrome's defaults for each scheme, sampled off the rendered page: dark
+    // grey with a light hairline in dark mode, white with #767676 in light.
+    val off = if (dark) Color(0xFF3B3B3B) else Color.White
+    val hairline = if (dark) Color(0xFF858585) else Color(0xFF767676)
+    val tick = if (dark) Color(0xFF3B3B3B) else Color.White
     Canvas(
         modifier
             .size(boxSize)

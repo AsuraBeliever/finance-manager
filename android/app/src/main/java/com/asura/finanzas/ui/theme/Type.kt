@@ -7,38 +7,35 @@ import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 
-// Both faces ship as single variable fonts, so every weight costs no extra
-// bytes — one axis setting per weight instead of one file per weight.
-@OptIn(ExperimentalTextApi::class)
-private fun variable(resId: Int, weight: FontWeight) =
-    Font(
-        resId = resId,
-        weight = weight,
-        variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
-    )
+// One static file per weight, cut from the variable fonts with fontTools
+// (`instancer`, at wght 400…800) and subset to the ranges Google Fonts serves
+// the web. A single variable file with a `FontVariation` per weight looked
+// right in code and did nothing on the device: every weight came out 400, so
+// the web's `font-medium` headings and `font-semibold` figures read thin.
 
 /** UI type — Hanken Grotesk, same as the web app. */
 val HankenGrotesk = FontFamily(
-    variable(R.font.hanken_grotesk_variable, FontWeight.Normal),
-    variable(R.font.hanken_grotesk_variable, FontWeight.Medium),
-    variable(R.font.hanken_grotesk_variable, FontWeight.SemiBold),
-    variable(R.font.hanken_grotesk_variable, FontWeight.Bold),
+    Font(R.font.hanken_grotesk_400, FontWeight.Normal),
+    Font(R.font.hanken_grotesk_500, FontWeight.Medium),
+    Font(R.font.hanken_grotesk_600, FontWeight.SemiBold),
+    Font(R.font.hanken_grotesk_700, FontWeight.Bold),
 )
 
 /** Display type — Sora, for headings and the money hero figures. */
 val Sora = FontFamily(
-    variable(R.font.sora_variable, FontWeight.Normal),
-    variable(R.font.sora_variable, FontWeight.Medium),
-    variable(R.font.sora_variable, FontWeight.SemiBold),
-    variable(R.font.sora_variable, FontWeight.Bold),
+    Font(R.font.sora_400, FontWeight.Normal),
+    Font(R.font.sora_500, FontWeight.Medium),
+    Font(R.font.sora_600, FontWeight.SemiBold),
+    Font(R.font.sora_700, FontWeight.Bold),
+    Font(R.font.sora_800, FontWeight.ExtraBold),
 )
 
 /**
@@ -49,7 +46,7 @@ val Sora = FontFamily(
  * browser's without this — and the whole point of them is that a column of
  * amounts lines up. Only digits change, so it is a no-op on prose.
  */
-fun TextStyle.tabular(): TextStyle = copy(fontFeatureSettings = "tnum")
+fun TextStyle.tabular(): TextStyle = copy(fontFeatureSettings = "ss01, tnum")
 
 /**
  * Tailwind's `tracking-tight`, which several display headings carry.
@@ -79,6 +76,26 @@ val TrackingEyebrow = 0.18.em
 //   headlineMedium   money heroes and gauges       — `font-display font-semibold`
 //   titleLarge       widget headings               — `font-display text-lg font-medium`
 //   titleMedium      section h3                    — plain `font-medium`, sans
+/**
+ * How the browser lays out a line box: the leading split evenly above and
+ * below the glyphs, and none of it trimmed. Compose's default trims the half
+ * leading off the first and last line, so every label, chip and title came out
+ * a few pixels shorter than the web's — 16.7 dp for a field label the browser
+ * gives 19.2 — and whole forms drifted up a little more with every row.
+ */
+/**
+ * The web sets `font-feature-settings: "ss01"` on `body`, so every glyph on the
+ * page is the stylistic-set-one cut: Hanken's single-storey "g", and Sora's
+ * alternate I J P Q R f l r t u 7. Without it the headings and money figures
+ * were visibly a different drawing of the same font.
+ */
+const val WebFontFeatures = "ss01"
+
+val CssLineHeight = LineHeightStyle(
+    alignment = LineHeightStyle.Alignment.Center,
+    trim = LineHeightStyle.Trim.None,
+)
+
 val BrokeTypography = Typography(
     // Every number here is `getComputedStyle` on the browser at phone width,
     // not the nearest round figure: Tailwind ships a line-height with each
@@ -91,6 +108,8 @@ val BrokeTypography = Typography(
         // `text-[1.9rem] leading-none tracking-tight` — the page title.
         fontSize = 30.4.sp,
         lineHeight = 30.4.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
         letterSpacing = TrackingTight,
     ),
     headlineMedium = TextStyle(
@@ -99,6 +118,8 @@ val BrokeTypography = Typography(
         // `text-2xl` — the money figure on a wallet card.
         fontSize = 24.sp,
         lineHeight = 32.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
     ),
     titleLarge = TextStyle(
         fontFamily = Sora,
@@ -106,6 +127,8 @@ val BrokeTypography = Typography(
         // `text-lg tracking-tight` — modal titles and widget headings.
         fontSize = 18.sp,
         lineHeight = 28.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
         letterSpacing = TrackingTight,
     ),
     titleMedium = TextStyle(
@@ -113,6 +136,8 @@ val BrokeTypography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 16.sp,
         lineHeight = 24.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
     ),
     bodyLarge = TextStyle(
         fontFamily = HankenGrotesk,
@@ -120,12 +145,16 @@ val BrokeTypography = Typography(
         // `text-base`: 1.5, so 24 — not the 23 that was here.
         fontSize = 16.sp,
         lineHeight = 24.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
     ),
     bodyMedium = TextStyle(
         fontFamily = HankenGrotesk,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
     ),
     labelLarge = TextStyle(
         fontFamily = HankenGrotesk,
@@ -135,12 +164,16 @@ val BrokeTypography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
     ),
     labelSmall = TextStyle(
         fontFamily = HankenGrotesk,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
     ),
     // The three below are easy to forget because nothing in this file reads
     // them — but `FieldLabel` (labelMedium) and `FieldHint` (bodySmall) do, on
@@ -153,18 +186,24 @@ val BrokeTypography = Typography(
         // `text-[0.8rem]`, whose line box is 1.5 of it.
         fontSize = 12.8.sp,
         lineHeight = 19.2.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
     ),
     bodySmall = TextStyle(
         fontFamily = HankenGrotesk,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
     ),
     displayMedium = TextStyle(
         fontFamily = Sora,
         fontWeight = FontWeight.Medium,
         fontSize = 40.sp,
         lineHeight = 46.sp,
+        lineHeightStyle = CssLineHeight,
+        fontFeatureSettings = WebFontFeatures,
     ),
 )
 

@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.TextRange
@@ -110,6 +111,8 @@ fun FormField(
     readOnly: Boolean = false,
     /** Turns the outline red, the web's invalid state. */
     isError: Boolean = false,
+    /** Draw the focus outline without focus — a box whose popover is open. */
+    highlighted: Boolean = false,
     /** Trailing unit shown in muted text ("%", "MXN", "months"). */
     suffix: String = "",
     /** Drawn inside the box before the text (the amount field's currency sign). */
@@ -143,18 +146,21 @@ fun FormField(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .focusRing(focused || highlighted, colors.accent)
                     .clip(RoundedCornerShape(8.dp))
                     .background(colors.surface)
                     .border(
                         1.dp,
                         when {
                             isError -> colors.danger
-                            focused -> colors.accent
+                            focused || highlighted -> colors.accent
                             else -> colors.borderMuted
                         },
                         RoundedCornerShape(8.dp),
                     )
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    // `px-3 py-2` plus the 1 px border the browser counts
+                    // inside the box: 13 × 9 from the edge to the text.
+                    .padding(horizontal = 13.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -211,7 +217,7 @@ fun FormField(
                     lineHeight = fontSize * 1.4286f,
                     // Every control the web prints a figure in is `tabular-nums`,
                     // and the ones that are not have no digits to change.
-                    fontFeatureSettings = "tnum",
+                    fontFeatureSettings = "ss01, tnum",
                     color = valueColor ?: if (enabled) colors.fg else colors.fgSubtle,
                 ),
                 cursorBrush = SolidColor(colors.accent),
@@ -236,7 +242,7 @@ fun FormField(
                     lineHeight = fontSize * 1.4286f,
                     // Every control the web prints a figure in is `tabular-nums`,
                     // and the ones that are not have no digits to change.
-                    fontFeatureSettings = "tnum",
+                    fontFeatureSettings = "ss01, tnum",
                     color = valueColor ?: if (enabled) colors.fg else colors.fgSubtle,
                 ),
                 cursorBrush = SolidColor(colors.accent),
@@ -248,6 +254,22 @@ fun FormField(
         }
     }
 }
+
+/**
+ * `focus:ring-2 focus:ring-accent/25`: a 2 px halo outside the border, on top
+ * of the border turning accent. Drawn outside the box, so it takes no room.
+ */
+fun Modifier.focusRing(on: Boolean, accent: Color, radius: androidx.compose.ui.unit.Dp = 8.dp): Modifier =
+    if (!on) this else drawBehind {
+        val w = 2.dp.toPx()
+        drawRoundRect(
+            color = accent.copy(alpha = 0.25f),
+            topLeft = androidx.compose.ui.geometry.Offset(-w / 2, -w / 2),
+            size = androidx.compose.ui.geometry.Size(size.width + w, size.height + w),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius.toPx() + w / 2),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = w),
+        )
+    }
 
 /** The small muted note the web hangs under a control (`text-xs text-fg-subtle`). */
 @Composable

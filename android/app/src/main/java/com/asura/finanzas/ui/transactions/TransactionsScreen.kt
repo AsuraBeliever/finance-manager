@@ -377,13 +377,18 @@ private fun TransactionList(
     // Both legs of a transfer read as one line, like the web's list.
     val shown = foldTransfers(transactions)
 
+    // No uniform gap: the web stacks these with their own margins — the
+    // header's mb-7, the filter column's gap-3 and mb-4, the total's mb-4 —
+    // and one spacing for all of them put the list 4 dp off and the tabs 2.
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            PageHeader(stringResource(R.string.transactions_title)) {
+            PageHeader(
+                stringResource(R.string.transactions_title),
+                modifier = Modifier.padding(bottom = 28.dp),
+            ) {
                 PrivacyToggle()
                 PrimaryButton(
                     text = stringResource(R.string.transactions_new_transaction),
@@ -394,7 +399,12 @@ private fun TransactionList(
         }
 
         if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
+            item {
+                OfflineNotice(
+                    stringResource(R.string.offline_banner),
+                    Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                )
+            }
         }
 
         item {
@@ -403,7 +413,7 @@ private fun TransactionList(
                 repository = repository,
                 wallets = wallets,
                 onSynced = onSynced,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             )
         }
 
@@ -416,7 +426,7 @@ private fun TransactionList(
                 optionLabel = { it?.name ?: allWalletsLabel() },
                 onSelect = onWallet,
                 emptyLabel = stringResource(R.string.transactions_all_wallets),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             )
         }
 
@@ -426,7 +436,7 @@ private fun TransactionList(
                 selected = filter,
                 label = { stringResource(it.labelRes) },
                 onSelect = onFilter,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 fillEqually = true,
             )
         }
@@ -437,7 +447,8 @@ private fun TransactionList(
             item {
                 val ofKind = categories.filter { it.kind == filter.wire }
                 PickerField(
-                    label = stringResource(R.string.transactions_category),
+                    // Bare on the web too: the "all categories" option is its label.
+                    label = "",
                     options = listOf<TransactionCategory?>(null) + ofKind,
                     selected = category,
                     optionLabel = {
@@ -446,7 +457,7 @@ private fun TransactionList(
                     },
                     onSelect = onCategory,
                     emptyLabel = stringResource(R.string.transactions_all_categories),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 )
             }
         }
@@ -457,10 +468,17 @@ private fun TransactionList(
                 onClick = onPickPeriod,
                 leadingIcon = Lucide.CalendarRange,
                 trailingIcon = Lucide.ChevronDown,
+                modifier = Modifier.padding(bottom = 16.dp),
             )
         }
 
-        totals?.let { summary -> item { TransactionTotal(summary, hide, filter.wire == "income") } }
+        totals?.let { summary ->
+            item {
+                Box(Modifier.padding(bottom = 16.dp)) {
+                    TransactionTotal(summary, hide, filter.wire == "income")
+                }
+            }
+        }
 
         if (shown.isEmpty()) {
             // "Nothing matches" is a different message from "nothing here yet",
@@ -500,7 +518,7 @@ private fun TransactionList(
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                         color = colors.fgSubtle,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     )
                 }
             }
@@ -823,7 +841,9 @@ fun TransactionListCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(colors.surfaceRaised)
-            .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp)),
+            .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
+            // The list's own 1 px border, which the rows sit inside of.
+            .padding(1.dp),
     ) {
         rows.forEachIndexed { index, row ->
             if (index > 0) HairLine()
@@ -847,7 +867,7 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
             .clip(RoundedCornerShape(12.dp))
             .background(colors.surfaceRaised)
             .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 17.dp, vertical = 13.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
