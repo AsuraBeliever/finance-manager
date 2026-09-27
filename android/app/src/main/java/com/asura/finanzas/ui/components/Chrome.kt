@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clip
@@ -456,7 +457,9 @@ fun MicroLabel(
  */
 fun Modifier.cssLineBox(height: androidx.compose.ui.unit.Dp): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
-    val box = height.roundToPx()
+    // One box per line: a wrapped heading gets two, and so on.
+    val lines = (placeable.height / height.toPx()).roundToInt().coerceAtLeast(1)
+    val box = (height.toPx() * lines).roundToInt()
     if (placeable.height <= box) {
         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
     } else {
@@ -669,26 +672,25 @@ fun BackHeader(
     // listening for the system gesture: back closed the whole app.
     BackHandler(onBack = onBack)
     Column(modifier.fillMaxWidth()) {
+        // The web's back link: `mb-3 inline-flex items-center gap-1.5 text-sm
+        // text-fg-subtle` with a 15 px arrow, straight above the header.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .clickable(onClick = onBack)
-                .padding(vertical = 6.dp, horizontal = 2.dp),
+            modifier = Modifier.clickable(onClick = onBack),
         ) {
             Icon(
                 Lucide.ArrowLeft,
                 contentDescription = null,
-                tint = colors.fgMuted,
-                modifier = Modifier.size(20.dp),
+                tint = colors.fgSubtle,
+                modifier = Modifier.size(15.dp),
             )
             Text(
                 text = backLabel ?: stringResource(R.string.common_back),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.fgMuted,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.fgSubtle,
                 modifier = Modifier.padding(start = 6.dp),
             )
         }
-        PageHeader(title, Modifier.padding(top = 6.dp), actions = actions)
+        PageHeader(title, Modifier.padding(top = 12.dp), actions = actions)
     }
 }

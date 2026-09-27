@@ -205,12 +205,12 @@ fun ChartLegend(items: List<Pair<Color, String>>, modifier: Modifier = Modifier)
                 Spacer(
                     Modifier
                         .size(10.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(2.dp))
                         .background(color),
                 )
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.bodySmall,
                     color = Broke.colors.fgSubtle,
                     modifier = Modifier.padding(start = 6.dp),
                 )

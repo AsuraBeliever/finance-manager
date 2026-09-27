@@ -158,14 +158,19 @@ fun <T> SegmentedControl(
         )
 
     if (fillEqually) {
-        FlexOneRow(gap = chipGap, modifier = trayModifier.padding(4.dp)) {
+        FlexOneRow(
+            gap = chipGap,
+            modifier = trayModifier.padding(if (style == SegStyle.Theme || style == SegStyle.Modes) 5.dp else 4.dp),
+        ) {
             options.forEach { Chip(it) }
         }
     } else {
         Row(
             // Long labels would otherwise be squeezed until each one wrapped
             // down several lines, blowing the pill up into a tall block.
-            modifier = trayModifier.horizontalScroll(rememberScrollState()).padding(4.dp),
+            // `p-1`, plus the border on the bordered shapes.
+            modifier = trayModifier.horizontalScroll(rememberScrollState())
+                .padding(if (style == SegStyle.Theme || style == SegStyle.Modes) 5.dp else 4.dp),
             horizontalArrangement = Arrangement.spacedBy(chipGap),
         ) {
             options.forEach { Chip(it) }
