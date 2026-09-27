@@ -279,6 +279,11 @@ fun LegendBelowDonut(slices: List<DonutSlice>, modifier: Modifier = Modifier) {
  * Palette for chart slices, ported from `CHART_COLORS` in src/lib/palette.ts —
  * the same order, so a wallet keeps the same colour in both apps.
  */
+/** The web's `POSITIVE` / `NEGATIVE` (lib/palette): gain and loss, the same
+ *  two colours in either theme. */
+val WebPositive = Color(0xFF34D399)
+val WebNegative = Color(0xFFFB7185)
+
 val CHART_COLORS = listOf(
     Color(0xFFA855F7), Color(0xFFEC4899), Color(0xFF22D3EE), Color(0xFFF59E0B),
     Color(0xFF34D399), Color(0xFF60A5FA), Color(0xFFFB7185), Color(0xFFC084FC),

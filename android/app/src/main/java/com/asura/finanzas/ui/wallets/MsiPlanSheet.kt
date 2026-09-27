@@ -186,10 +186,16 @@ fun MsiPlanSheet(
  */
 @Composable
 fun formatDayMonth(iso: String): String {
-    val locale = java.util.Locale.forLanguageTag(LocalAppSettings.current.locale)
+    // The browser's `Intl` in es-MX, whose September is "sep" — the JDK's
+    // plain Spanish writes "sept", and the two sat side by side.
+    val en = LocalAppSettings.current.locale.startsWith("en")
+    val locale = java.util.Locale.forLanguageTag(if (en) "en-US" else "es-MX")
     val date = runCatching { LocalDate.parse(iso) }.getOrNull() ?: return iso
-    val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, locale)
-        .removeSuffix(".")
+    val month = if (en) {
+        date.month.getDisplayName(java.time.format.TextStyle.SHORT, locale).removeSuffix(".")
+    } else {
+        listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")[date.monthValue - 1]
+    }
     // English puts the month first ("Sep 4"), Spanish the day ("4 sept").
     val head = if (locale.language == "en") "$month ${date.dayOfMonth}" else "${date.dayOfMonth} $month"
     if (date.year == LocalDate.now().year) return head

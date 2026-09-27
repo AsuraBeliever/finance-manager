@@ -142,7 +142,7 @@ fun PageHeader(
     modifier: Modifier = Modifier,
     /** Gap between the actions themselves — the web's `gap-4`, or `gap-2`. */
     actionGap: androidx.compose.ui.unit.Dp = 16.dp,
-    actions: @Composable RowScope.() -> Unit = {},
+    actions: @Composable () -> Unit = {},
 ) {
     val colors = Broke.colors
     // `flex flex-wrap items-end justify-between gap-3`: the actions ride the
@@ -187,14 +187,72 @@ fun PageHeader(
         }
         // `items-end`: the actions sit on the title's baseline, not at the top
         // of its line box. Among themselves they are the web's `flex
-        // items-center gap-4`: one row that never wraps, a checkbox label
-        // centred on the button next to it.
-        Row(
+        // items-center gap-4`: one row that never wraps, where a crowded row
+        // shrinks its items the way flexbox does — labels break onto a
+        // second line rather than anything being pushed off.
+        FlexShrinkRow(
+            gap = actionGap,
             modifier = Modifier.align(Alignment.Bottom),
-            horizontalArrangement = Arrangement.spacedBy(actionGap),
-            verticalAlignment = Alignment.CenterVertically,
             content = actions,
         )
+    }
+}
+
+/**
+ * A `flex items-center` row with CSS's shrinking, exactly: children start at
+ * their natural (max-content) width; if together they overflow, each gives up
+ * room in proportion to that width, but never below its min-content width (a
+ * label's longest word). Whatever the row cannot shrink away is left to
+ * overflow, as in the browser.
+ */
+@Composable
+fun FlexShrinkRow(
+    gap: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    androidx.compose.ui.layout.Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val gapPx = gap.roundToPx()
+        val n = measurables.size
+        val basis = measurables.map { it.maxIntrinsicWidth(androidx.compose.ui.unit.Constraints.Infinity) }
+        val floor = measurables.map { it.minIntrinsicWidth(androidx.compose.ui.unit.Constraints.Infinity) }
+        val widths = basis.toIntArray()
+        if (constraints.hasBoundedWidth) {
+            val avail = constraints.maxWidth - gapPx * (n - 1).coerceAtLeast(0)
+            val frozen = BooleanArray(n)
+            while (true) {
+                val used = (0 until n).sumOf { widths[it] }
+                val over = used - avail
+                if (over <= 0) break
+                val weight = (0 until n).filter { !frozen[it] }.sumOf { basis[it].toLong() }
+                if (weight == 0L) break
+                var froze = false
+                val next = widths.copyOf()
+                for (i in 0 until n) {
+                    if (frozen[i]) continue
+                    val target = widths[i] - Math.ceil(over.toDouble() * basis[i] / weight).toInt()
+                    if (target <= floor[i]) {
+                        next[i] = floor[i]; frozen[i] = true; froze = true
+                    } else {
+                        next[i] = target
+                    }
+                }
+                for (i in 0 until n) widths[i] = next[i]
+                if (!froze) break
+            }
+        }
+        val placeables = measurables.mapIndexed { i, m ->
+            m.measure(androidx.compose.ui.unit.Constraints(minWidth = widths[i], maxWidth = widths[i]))
+        }
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        val width = placeables.sumOf { it.width } + gapPx * (n - 1).coerceAtLeast(0)
+        layout(width.coerceAtMost(if (constraints.hasBoundedWidth) constraints.maxWidth else width), height) {
+            var x = 0
+            placeables.forEach { p ->
+                p.placeRelative(x, (height - p.height) / 2)
+                x += p.width + gapPx
+            }
+        }
     }
 }
 
@@ -258,35 +316,53 @@ fun PanelCard(
 @Composable
 fun Modifier.cardShadow(radius: androidx.compose.ui.unit.Dp = 16.dp): Modifier {
     val dark = Broke.colors.isDark
-    return drawBehind {
-        val offsetY = (if (dark) 8 else 10) * density
-        val blur = (if (dark) 36 else 34) * density
-        val spread = -16 * density
-        val paint = android.graphics.Paint().apply {
-            isAntiAlias = true
-            color = android.graphics.Color.argb(if (dark) 115 else 77, 124, 58, 237)
-            // CSS blur radius B is a Gaussian with σ = B / 2; Android's mask
-            // radius r means σ ≈ 0.57735 r + 0.5.
-            maskFilter = android.graphics.BlurMaskFilter(
-                ((blur / 2f) - 0.5f) / 0.57735f,
-                android.graphics.BlurMaskFilter.Blur.NORMAL,
-            )
-        }
-        // A box-shadow is never painted under its own box — and these cards
-        // are see-through, so without cutting it out it glowed through them.
-        val canvas = drawContext.canvas.nativeCanvas
-        canvas.save()
-        val r = radius.toPx()
-        canvas.clipOutPath(
-            android.graphics.Path().apply {
-                addRoundRect(0f, 0f, size.width, size.height, r, r, android.graphics.Path.Direction.CW)
-            },
+    return cssBoxShadow(
+        offsetY = if (dark) 8.dp else 10.dp,
+        blur = if (dark) 36.dp else 34.dp,
+        spread = (-16).dp,
+        color = androidx.compose.ui.graphics.Color(124, 58, 237).copy(alpha = if (dark) 0.45f else 0.30f),
+        radius = radius,
+    )
+}
+
+/**
+ * A CSS `box-shadow: 0 <offsetY> <blur> <spread> <color>` behind a box with
+ * corner [radius]. Like the browser, it is never painted under the box itself
+ * — these cards are see-through, and it glowed through them otherwise.
+ */
+fun Modifier.cssBoxShadow(
+    offsetY: androidx.compose.ui.unit.Dp,
+    blur: androidx.compose.ui.unit.Dp,
+    spread: androidx.compose.ui.unit.Dp,
+    color: androidx.compose.ui.graphics.Color,
+    radius: androidx.compose.ui.unit.Dp,
+): Modifier = drawBehind {
+    val paint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        this.color = android.graphics.Color.argb(
+            (color.alpha * 255).toInt(), (color.red * 255).toInt(),
+            (color.green * 255).toInt(), (color.blue * 255).toInt(),
         )
-        canvas.drawRect(
-            -spread, offsetY - spread, size.width + spread, size.height + offsetY + spread, paint,
+        // CSS blur radius B is a Gaussian with σ = B / 2; Android's mask
+        // radius r means σ ≈ 0.57735 r + 0.5.
+        maskFilter = android.graphics.BlurMaskFilter(
+            (((blur.toPx() / 2f) - 0.5f) / 0.57735f).coerceAtLeast(0.1f),
+            android.graphics.BlurMaskFilter.Blur.NORMAL,
         )
-        canvas.restore()
     }
+    val canvas = drawContext.canvas.nativeCanvas
+    canvas.save()
+    val r = radius.toPx()
+    canvas.clipOutPath(
+        android.graphics.Path().apply {
+            addRoundRect(0f, 0f, size.width, size.height, r, r, android.graphics.Path.Direction.CW)
+        },
+    )
+    val sp = spread.toPx()
+    val oy = offsetY.toPx()
+    val cr = (r + sp).coerceAtLeast(0f)
+    canvas.drawRoundRect(-sp, oy - sp, size.width + sp, size.height + oy + sp, cr, cr, paint)
+    canvas.restore()
 }
 
 /** The inset half of `shadow-card`: a 1 px highlight just inside the top border. */
@@ -541,7 +617,7 @@ fun BackHeader(
     modifier: Modifier = Modifier,
     /** Defaults to a plain "Back"; settings passes its own wording. */
     backLabel: String? = null,
-    actions: @Composable RowScope.() -> Unit = {},
+    actions: @Composable () -> Unit = {},
 ) {
     val colors = Broke.colors
     // These screens are pushed inside a tab rather than routed, so nothing was

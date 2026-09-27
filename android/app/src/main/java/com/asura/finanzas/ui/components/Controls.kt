@@ -251,11 +251,14 @@ fun PrimaryButton(
             // The web's two-part `shadow-[…]`: a green glow cast below the
             // pill and a hairline of white along its top edge. Flat, the
             // button sat on the page instead of floating over it.
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(8.dp),
-                ambientColor = BUTTON_GLOW.copy(alpha = 0.8f * alpha),
-                spotColor = BUTTON_GLOW.copy(alpha = 0.8f * alpha),
+            // `0 8px 18px -10px rgba(22,164,122,.8)`, drawn as the browser
+            // does rather than as a Material elevation.
+            .cssBoxShadow(
+                offsetY = 8.dp,
+                blur = 18.dp,
+                spread = (-10).dp,
+                color = BUTTON_GLOW.copy(alpha = 0.8f * alpha),
+                radius = 8.dp,
             )
             .clip(RoundedCornerShape(8.dp))
             // `disabled:opacity-50` — the same pill, faded, not a grey one.
@@ -287,6 +290,8 @@ fun PrimaryButton(
             text = text,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
             color = Color.White.copy(alpha = if (enabled) 1f else 0.5f),
+            // A `<button>` centres its text when a squeezed row wraps it.
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -348,7 +353,8 @@ fun OutlineButton(
                 RoundedCornerShape(8.dp),
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            // `px-3 py-2` plus the border.
+            .padding(horizontal = 13.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

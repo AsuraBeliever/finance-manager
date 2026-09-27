@@ -50,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.size
 import com.asura.finanzas.data.SavingsGoal
@@ -665,9 +666,13 @@ private fun CreditPanel(
     // The web colours this block red once the deadline is inside three days.
     val urgent = st.remainingCents > 0 && st.daysToDue <= 3
 
+    // `text-xs uppercase tracking-[0.12em] text-fg-subtle` — the panel's own
+    // caption, lighter and tighter than the `.eyebrow`.
+    val caption = MaterialTheme.typography.bodySmall.copy(letterSpacing = 0.12.em)
+    val xs = MaterialTheme.typography.bodySmall
     PanelCard(modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -688,58 +693,44 @@ private fun CreditPanel(
             Text(
                 "${stringResource(R.string.credit_next_cut)}: " +
                     formatDayMonth(summary.nextCutDate) + " · " + inDays(summary.daysToCut),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = xs,
                 color = colors.fgSubtle,
             )
         }
 
-        Spacer(Modifier.height(14.dp))
-        MicroLabel(stringResource(R.string.credit_debt))
+        Text(stringResource(R.string.credit_debt).uppercase(), style = caption, color = colors.fgSubtle)
         Text(
             maskIfHidden(formatMoney(summary.debtCents, currency), hide),
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = 24.sp,
+                lineHeight = 32.sp,
                 fontWeight = FontWeight.SemiBold,
             ).tabular(),
             color = if (summary.debtCents > 0) colors.danger else colors.fg,
+            modifier = Modifier.padding(top = 4.dp),
         )
         if (summary.pendingMsiCents > 0) {
             Text(
                 "${stringResource(R.string.credit_msi_pending_total)}: " +
                     maskIfHidden(formatMoney(summary.pendingMsiCents, currency), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = xs.tabular(),
                 color = colors.fgSubtle,
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
-        // Paying the card is a transfer into it. The web offers it here always,
-        // even at zero debt — paying ahead of the cut is a fine move — and the
-        // phone had no way to do it at all.
-        Spacer(Modifier.height(8.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .offset(x = (-16).dp)
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onPay)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            Icon(
-                Lucide.ArrowDownToLine,
-                contentDescription = null,
-                tint = colors.fg,
-                modifier = Modifier.size(15.dp),
-            )
-            Text(
-                stringResource(R.string.credit_pay_action),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.fg,
-            )
-        }
+        // Paying the card is a transfer into it, offered here always — even at
+        // zero debt, paying ahead of the cut is a fine move. `mt-2 -ml-4`.
+        GhostButton(
+            stringResource(R.string.credit_pay_action),
+            onClick = onPay,
+            leadingIcon = Lucide.ArrowDownToLine,
+            modifier = Modifier.padding(top = 8.dp).offset(x = (-16).dp),
+        )
 
-        Spacer(Modifier.height(16.dp))
+        // `mt-4 rounded-lg px-3 py-2.5 text-sm`, red once it is urgent.
         Column(
             Modifier
+                .padding(top = 16.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(if (urgent) colors.danger.copy(alpha = 0.10f) else colors.surfaceOverlay)
@@ -755,28 +746,25 @@ private fun CreditPanel(
                     } else {
                         ""
                     },
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = xs.tabular(),
                 color = colors.fgSubtle,
             )
-            Spacer(Modifier.height(4.dp))
             Text(
                 statementLine(st, currency, hide),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                ),
+                style = MaterialTheme.typography.labelLarge,
                 color = if (urgent) colors.danger else colors.fgMuted,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
 
         summary.utilizationBps?.let { bps ->
             val fraction = bps / 10_000f
-            Spacer(Modifier.height(16.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                MicroLabel(stringResource(R.string.credit_utilization))
+                Text(stringResource(R.string.credit_utilization).uppercase(), style = caption, color = colors.fgSubtle)
                 Text(
                     "${Math.round(fraction * 100)}% · " + text(
                         R.string.credit_utilization_of,
@@ -789,17 +777,18 @@ private fun CreditPanel(
                             hide,
                         ),
                     ),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                    style = xs.tabular(),
                     color = colors.fgMuted,
                 )
             }
-            Spacer(Modifier.height(6.dp))
             ProgressBar(bps, color = usageColor(fraction))
         }
 
         summary.nextAnniversary?.let { day ->
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
                 Icon(
                     Lucide.CalendarClock,
                     contentDescription = null,
@@ -809,17 +798,17 @@ private fun CreditPanel(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     "${stringResource(R.string.credit_next_anniversary)}: " + formatDayMonth(day),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = xs,
                     color = colors.fgSubtle,
                 )
             }
         }
 
+        // `mt-5 border-t pt-4`, then a `mb-2` heading row.
         Spacer(Modifier.height(20.dp))
         HairLine()
-        Spacer(Modifier.height(16.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -828,37 +817,21 @@ private fun CreditPanel(
                 style = MaterialTheme.typography.labelLarge,
                 color = colors.fg,
             )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onAddPlan() }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Icon(
-                    Lucide.Plus,
-                    contentDescription = null,
-                    tint = colors.fg,
-                    modifier = Modifier.size(15.dp),
-                )
-                Text(
-                    stringResource(R.string.credit_msi_add),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.fg,
-                )
-            }
+            GhostButton(
+                stringResource(R.string.credit_msi_add),
+                onClick = onAddPlan,
+                leadingIcon = Lucide.Plus,
+            )
         }
         if (summary.msiPlans.isEmpty()) {
-            Spacer(Modifier.height(8.dp))
             Text(
                 stringResource(R.string.credit_msi_empty),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = xs,
                 color = colors.fgSubtle,
             )
         }
-        summary.msiPlans.forEach { plan ->
-            Spacer(Modifier.height(8.dp))
+        summary.msiPlans.forEachIndexed { i, plan ->
+            if (i > 0) Spacer(Modifier.height(8.dp))
             MsiRow(plan, currency, hide) { onDeletePlan(plan) }
         }
     }
@@ -896,37 +869,39 @@ private fun usageColor(fraction: Float) = when {
 @Composable
 private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () -> Unit) {
     val colors = Broke.colors
+    // `rounded-lg bg-surface-overlay px-3 py-2.5`.
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(colors.surfaceOverlay)
-            .padding(12.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
                 plan.description,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = colors.fg,
-                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
             Text(
                 text(
                     R.string.credit_msi_monthly,
                     "amount" to maskIfHidden(formatMoney(plan.monthlyCents, currency), hide),
                 ),
-                style = MaterialTheme.typography.labelLarge.tabular(),
+                style = MaterialTheme.typography.bodyMedium.tabular(),
                 color = colors.fgMuted,
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
             Icon(
                 Lucide.Trash,
                 contentDescription = stringResource(R.string.common_delete),
                 tint = colors.fgSubtle,
-                modifier = Modifier.width(20.dp).clickable(onClick = onDelete),
+                modifier = Modifier.size(14.dp).clickable(onClick = onDelete),
             )
         }
-        Spacer(Modifier.height(8.dp))
         // Progress is billed months over total months — both the server's.
         ProgressBar(
             progressBps = if (plan.months > 0) {
@@ -934,6 +909,7 @@ private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () 
             } else {
                 0L
             },
+            modifier = Modifier.padding(top = 8.dp),
             // One pip per instalment while they still fit; past two years the
             // web falls back to a plain bar, and so does this.
             segments = plan.months.takeIf { it in 1..24 },
@@ -942,7 +918,6 @@ private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () 
         // "3 of 12 instalments · next one on the 5th", or "· paid off" once the
         // last instalment has been billed. The web keeps it as one line.
         val done = plan.billedMonths >= plan.months
-        Spacer(Modifier.height(6.dp))
         val progress = text(
             R.string.credit_msi_progress,
             "billed" to plan.billedMonths,
@@ -962,8 +937,9 @@ private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () 
         }
         Text(
             if (tail != null) "$progress · $tail" else progress,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.bodySmall,
             color = colors.fgSubtle,
+            modifier = Modifier.padding(top = 6.dp),
         )
     }
 }

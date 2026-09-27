@@ -742,12 +742,19 @@ private fun niceCeiling(peak: Long): Long {
  */
 @Composable
 private fun bucketLabel(key: String, unit: String): String {
-    val locale = java.util.Locale.forLanguageTag(LocalAppSettings.current.locale)
+    // `Intl.DateTimeFormat` with `{ month: "short", year: "2-digit" }` in
+    // es-MX / en-US, capitalised: "Sep 26". The JDK's own short Spanish month
+    // is "sept.", which is not what the browser prints.
+    val locale = java.util.Locale.forLanguageTag(
+        if (LocalAppSettings.current.locale == "en") "en-US" else "es-MX",
+    )
     return if (unit == "month") {
         runCatching {
-            val (y, m) = key.split("-").let { it[0].toInt() to it[1].toInt() }
-            java.time.Month.of(m).getDisplayName(java.time.format.TextStyle.SHORT, locale) +
-                " " + (y % 100)
+            val date = java.time.LocalDate.parse("$key-01")
+            val millis = date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+            val format = android.icu.text.DateFormat.getInstanceForSkeleton("MMMyy", locale)
+            format.timeZone = android.icu.util.TimeZone.GMT_ZONE
+            format.format(java.util.Date(millis)).replaceFirstChar { it.uppercase(locale) }
         }.getOrDefault(key)
     } else {
         key.takeLast(2)

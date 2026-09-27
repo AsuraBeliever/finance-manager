@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -93,6 +94,7 @@ fun HomeScaffold(
     // live in their own windows, pick it up too), and it must not drop you
     // back on the dashboard — the web keeps the route when it remounts.
     var tab by rememberSaveable { mutableStateOf(Tab.Dashboard) }
+    var tabVisit by remember { mutableStateOf(0) }
     // A planning destination shown over the current tab, and whether the sheet
     // that offers them is open — the web navigates to a route and closes the
     // sheet, which is what these two together reproduce.
@@ -117,6 +119,9 @@ fun HomeScaffold(
                 // routes away from it; drawn over the top it let the dashboard
                 // show through.
                 if (moreTarget == null) {
+                // Tapping the tab you are on goes back to its first page, the
+                // way a NavLink to the route does on the web.
+                key(tab, tabVisit) {
                 when (tab) {
                     Tab.Dashboard -> DashboardScreen(
                         repository = repository,
@@ -141,6 +146,7 @@ fun HomeScaffold(
                         onOpenCategories = { moreTarget = MoreDestination.Categories },
                     )
                     Tab.More -> Unit
+                }
                 }
                 }
 
@@ -168,6 +174,7 @@ fun HomeScaffold(
                     if (it == Tab.More) {
                         moreOpen = true
                     } else {
+                        if (it == tab && moreTarget == null) tabVisit++
                         moreTarget = null
                         tab = it
                     }

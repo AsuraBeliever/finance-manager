@@ -27,6 +27,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,11 +91,16 @@ fun FormSheet(
     fields: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = Broke.colors
+    // The web never greys Save out for an unfinished form: pressing it is what
+    // tells you what is missing. Only a save in flight disables it.
+    var missing by remember { mutableStateOf(false) }
+    if (canSave) missing = false
+    val requiredText = stringResource(R.string.common_required)
     // The web's `<form className="grid gap-4">`, footer included.
     ModalCard(title = title, onDismiss = onDismiss, bodySpacing = 16.dp) {
         fields()
 
-        error?.let {
+        (error ?: requiredText.takeIf { missing })?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
@@ -104,16 +113,12 @@ fun FormSheet(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (busy) {
-                CircularProgressIndicator(
-                    color = colors.accent,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(20.dp),
-                )
-            } else {
-                GhostButton(stringResource(R.string.common_cancel), onDismiss)
-                PrimaryButton(text = saveLabel, onClick = onSave, enabled = canSave)
-            }
+            GhostButton(stringResource(R.string.common_cancel), onDismiss)
+            PrimaryButton(
+                text = saveLabel,
+                onClick = { if (canSave) onSave() else missing = true },
+                enabled = !busy,
+            )
         }
     }
 }

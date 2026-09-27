@@ -891,7 +891,6 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                     ),
                     color = colors.fgSubtle,
                 )
-                Spacer(Modifier.height(2.dp))
                 Text(
                     maskIfHidden(
                         if (single != null) formatMoney(single.cents, single.currencyCode)
@@ -902,7 +901,7 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                     // not `font-display`, unlike the dashboard's heroes.
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontSize = 24.sp,
-                        lineHeight = 30.sp,
+                        lineHeight = 32.sp,
                         fontWeight = FontWeight.SemiBold,
                     ).tabular(),
                     // Income in the accent, expense in the danger colour, as on
@@ -917,18 +916,17 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                 Text(
                     if (totals.count == 1L) stringResource(R.string.dashboard_movement_one)
                     else text(R.string.dashboard_movements_count, "n" to totals.count),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
                 )
                 if (single == null) {
-                    Spacer(Modifier.height(2.dp))
                     Text(
                         stringResource(R.string.transactions_total_converted) + " · " +
                             totals.byCurrency.joinToString(" · ") {
                                 maskIfHidden(formatMoney(it.cents, it.currencyCode), hide) +
                                     " " + it.currencyCode
                             },
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                        style = MaterialTheme.typography.bodySmall.tabular(),
                         color = colors.fgSubtle,
                         textAlign = TextAlign.End,
                     )
