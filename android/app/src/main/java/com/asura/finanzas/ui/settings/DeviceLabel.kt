@@ -1,5 +1,7 @@
 package com.asura.finanzas.ui.settings
 
+import com.asura.finanzas.ui.LocalAppSettings
+
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.asura.finanzas.R
@@ -64,14 +66,57 @@ fun relativeFromUtc(utc: String?): String {
     val instant = runCatching {
         LocalDateTime.parse(utc.replace(" ", "T")).atZone(ZoneId.of("UTC")).toInstant()
     }.getOrNull() ?: return utc
-    val minutes = Duration.between(instant, java.time.Instant.now()).toMinutes().coerceAtLeast(0)
+    val seconds = Duration.between(instant, java.time.Instant.now()).seconds.coerceAtLeast(0)
+    return formatDistanceToNow(seconds, LocalAppSettings.current.locale.startsWith("en"))
+}
+
+/**
+ * date-fns' `formatDistanceToNow(date, { addSuffix: true })`, which the web
+ * prints these with — thresholds and wording from its `es` / `en-US` locales
+ * ("hace alrededor de 3 horas", "about 3 hours ago"), not a coarser version.
+ */
+private fun formatDistanceToNow(seconds: Long, english: Boolean): String {
+    val minutes = Math.round(seconds / 60.0).toInt()
+    fun pick(one: String, other: String, n: Int) = if (n == 1) one else other.replace("{n}", n.toString())
+    val body = if (english) {
+        when {
+            minutes < 2 -> if (minutes == 0) "less than a minute" else "1 minute"
+            minutes < 45 -> "$minutes minutes"
+            minutes < 90 -> "about 1 hour"
+            minutes < 1440 -> pick("about 1 hour", "about {n} hours", Math.round(minutes / 60.0).toInt())
+            minutes < 2520 -> "1 day"
+            minutes < 43200 -> pick("1 day", "{n} days", Math.round(minutes / 1440.0).toInt())
+            minutes < 86400 -> pick("about 1 month", "about {n} months", Math.round(minutes / 43200.0).toInt())
+            else -> yearsPhrase(minutes, english = true)
+        }
+    } else {
+        when {
+            minutes < 2 -> if (minutes == 0) "menos de un minuto" else "1 minuto"
+            minutes < 45 -> "$minutes minutos"
+            minutes < 90 -> "alrededor de 1 hora"
+            minutes < 1440 -> pick("alrededor de 1 hora", "alrededor de {n} horas", Math.round(minutes / 60.0).toInt())
+            minutes < 2520 -> "1 día"
+            minutes < 43200 -> pick("1 día", "{n} días", Math.round(minutes / 1440.0).toInt())
+            minutes < 86400 -> pick("alrededor de 1 mes", "alrededor de {n} meses", Math.round(minutes / 43200.0).toInt())
+            else -> yearsPhrase(minutes, english = false)
+        }
+    }
+    return if (english) "$body ago" else "hace $body"
+}
+
+private fun yearsPhrase(minutes: Int, english: Boolean): String {
+    val months = minutes / 43200
+    if (months < 12) {
+        val n = Math.round(minutes / 43200.0).toInt()
+        return if (english) (if (n == 1) "1 month" else "$n months") else (if (n == 1) "1 mes" else "$n meses")
+    }
+    val years = months / 12
+    val rest = months % 12
     return when {
-        minutes < 1 -> text(R.string.account_moments_ago)
-        minutes < 2 -> text(R.string.account_minute_ago)
-        minutes < 60 -> text(R.string.account_minutes_ago, "n" to minutes)
-        minutes < 120 -> text(R.string.account_hour_ago)
-        minutes < 60 * 24 -> text(R.string.account_hours_ago, "n" to minutes / 60)
-        minutes < 60 * 48 -> text(R.string.account_day_ago)
-        else -> text(R.string.account_days_ago, "n" to minutes / (60 * 24))
+        rest < 3 -> if (english) (if (years == 1) "about 1 year" else "about $years years")
+        else (if (years == 1) "alrededor de 1 año" else "alrededor de $years años")
+        rest < 9 -> if (english) (if (years == 1) "over 1 year" else "over $years years")
+        else (if (years == 1) "más de 1 año" else "más de $years años")
+        else -> if (english) "almost ${years + 1} years" else "casi ${years + 1} años"
     }
 }

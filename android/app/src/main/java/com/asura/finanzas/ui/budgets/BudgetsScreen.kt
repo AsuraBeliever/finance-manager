@@ -177,7 +177,8 @@ private fun BudgetList(
             // No back link in the browser: this is a top-level page there,
             // reached from the nav. The system gesture is what goes back.
             BackHandler(onBack = onBack)
-            PageHeader(stringResource(R.string.budgets_title)) {
+            // The header's `mb-7`: 28, of which the list's gap gives 12.
+            PageHeader(stringResource(R.string.budgets_title), Modifier.padding(bottom = 16.dp)) {
                 PrivacyToggle()
                 PrimaryButton(
                     text = stringResource(R.string.budgets_new_budget),

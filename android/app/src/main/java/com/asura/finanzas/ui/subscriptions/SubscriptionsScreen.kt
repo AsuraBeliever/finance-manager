@@ -223,7 +223,8 @@ private fun SubscriptionContent(
     ) {
         item {
             BackHandler(onBack = onBack)
-            PageHeader(stringResource(R.string.subscriptions_title)) {
+            // The header's `mb-7`: 28, of which the list's gap gives 12.
+            PageHeader(stringResource(R.string.subscriptions_title), Modifier.padding(bottom = 16.dp)) {
                 PrivacyToggle()
                 PrimaryButton(
                     text = stringResource(R.string.subscriptions_new_subscription),
@@ -238,18 +239,21 @@ private fun SubscriptionContent(
         }
 
         item {
-            // A quiet line on the web, not a hero card.
-            Row(verticalAlignment = Alignment.Bottom) {
+            // A quiet line on the web, not a hero card: `mb-4 text-sm`, the
+            // figure a `font-display text-base font-semibold` span.
+            Row(Modifier.padding(bottom = 4.dp)) {
                 Text(
                     stringResource(R.string.subscriptions_monthly_total) + ": ",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = Broke.colors.fgMuted,
+                    modifier = Modifier.alignByBaseline(),
                 )
                 Text(
                     maskIfHidden(formatMoney(data.monthlyTotalMxnCents), hide),
-                    style = MaterialTheme.typography.displayLarge
-                        .copy(fontSize = 16.sp, lineHeight = 20.sp).tabular(),
+                    style = MaterialTheme.typography.headlineMedium
+                        .copy(fontSize = 16.sp, lineHeight = 24.sp).tabular(),
                     color = Broke.colors.fg,
+                    modifier = Modifier.alignByBaseline(),
                 )
             }
         }
@@ -312,8 +316,10 @@ private fun SubscriptionCard(
         ) {
             // The web's badge: a colour tile carrying the service's logo, and
             // only its initial when there is no logo for the name.
+            // `items-center`: every piece sits on the row's middle.
             Box(
                 Modifier
+                    .align(Alignment.CenterVertically)
                     .size(40.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(tint),
@@ -337,7 +343,7 @@ private fun SubscriptionCard(
                     )
                 }
             }
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).align(Alignment.CenterVertically)) {
                 Text(
                     subscription.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -352,7 +358,7 @@ private fun SubscriptionCard(
                         else R.string.subscriptions_monthly,
                     ) + " · " + stringResource(R.string.subscriptions_next_charge) +
                         ": " + subscription.nextChargeDate,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
                 )
             }
@@ -361,11 +367,13 @@ private fun SubscriptionCard(
                     formatMoney(subscription.amountCents, subscription.currencyCode),
                     hide,
                 ),
+                // `font-medium` at the base size.
                 style = MaterialTheme.typography.titleMedium.tabular(),
                 color = colors.fg,
+                modifier = Modifier.align(Alignment.CenterVertically),
             )
             // Register a payment, pause/resume, edit, delete.
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.align(Alignment.CenterVertically)) {
                 RowAction(Lucide.Receipt, subscription.walletId != null) { onPay(subscription) }
                 RowAction(if (subscription.isActive) Lucide.Pause else Lucide.Play) {
                     onToggle(subscription)

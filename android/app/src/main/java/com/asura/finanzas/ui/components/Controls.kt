@@ -83,7 +83,7 @@ fun <T> SegmentedControl(
         SegStyle.Pill -> colors.surfaceOverlay
         SegStyle.Modes -> colors.surfaceRaised
     }
-    val chipGap = if (style == SegStyle.Pill) 4.dp else 0.dp
+    val chipGap = if (style == SegStyle.Pill || style == SegStyle.Theme) 4.dp else 0.dp
     val chipPadding = when (style) {
         SegStyle.Theme -> 10.dp
         SegStyle.Modes -> 16.dp
@@ -136,6 +136,8 @@ fun <T> SegmentedControl(
                 text = label(option),
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontSize = fontSize,
+                    // `text-xs` carries a 16 px line, `text-sm` a 20 px one.
+                    lineHeight = if (fontSize == 12.sp) 16.sp else 20.sp,
                     // The tray shape only bolds the chosen option ("text-sm"
                     // vs "text-sm font-medium"); the others always do.
                     fontWeight = if (style == SegStyle.Tray && !isSelected) {

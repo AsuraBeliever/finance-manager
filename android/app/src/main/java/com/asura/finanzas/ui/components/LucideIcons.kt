@@ -357,6 +357,17 @@ object Lucide {
         )
     }
 
+    val KeyRound by lazy {
+        icon(
+            "M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z",
+            "M17 7.5a.5.5 0 1 1-1 0 .5.5 0 1 1 1 0z",
+        )
+    }
+
+    val LogOut by lazy { icon("m16 17 5-5-5-5", "M21 12H9", "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4") }
+
+    val Info by lazy { icon("M22 12a10 10 0 1 1-20 0 10 10 0 1 1 20 0z", "M12 16v-4", "M12 8h.01") }
+
     val ArchiveRestore by lazy {
         icon(
             "M3 3h18a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z",
