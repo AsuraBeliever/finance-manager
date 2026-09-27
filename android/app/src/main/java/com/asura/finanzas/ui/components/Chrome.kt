@@ -483,6 +483,8 @@ fun HeroAmount(
     text: String,
     modifier: Modifier = Modifier,
     fontSize: androidx.compose.ui.unit.TextUnit = 40.sp,
+    /** `text-4xl` is 36 over 40; `text-3xl` 30 over 36. */
+    lineHeight: androidx.compose.ui.unit.TextUnit = fontSize * 1.1111f,
 ) {
     val colors = Broke.colors
     // `--hero-gradient`: 110deg, the two violets swapping places between the
@@ -494,8 +496,7 @@ fun HeroAmount(
         text = text,
         style = MaterialTheme.typography.displayLarge.tabular().copy(
             fontSize = fontSize,
-            // `text-4xl` is 2.25rem over a 2.5rem line box.
-            lineHeight = fontSize * 1.1111f,
+            lineHeight = lineHeight,
             // `font-semibold` on the money heroes; the headers stay medium.
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             brush = brush,
@@ -508,7 +509,7 @@ fun HeroAmount(
             ),
         ),
         maxLines = 1,
-        modifier = modifier.cssLineBox(with(androidx.compose.ui.platform.LocalDensity.current) { (fontSize * 1.1111f).toDp() }),
+        modifier = modifier.cssLineBox(with(androidx.compose.ui.platform.LocalDensity.current) { lineHeight.toDp() }),
     )
 }
 

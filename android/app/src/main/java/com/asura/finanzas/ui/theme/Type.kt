@@ -239,6 +239,9 @@ private fun familiesFor(key: String): Pair<FontFamily, FontFamily> = when (key) 
     else -> Sora to HankenGrotesk
 }
 
+/** The display face of a pairing — what the web sets each font option's label in. */
+fun fontPreviewFamily(key: String): FontFamily = familiesFor(key).first
+
 /**
  * The base typography restyled for the chosen pairing: display sizes keep the
  * display family, everything else takes the UI family. Sizes and weights are
