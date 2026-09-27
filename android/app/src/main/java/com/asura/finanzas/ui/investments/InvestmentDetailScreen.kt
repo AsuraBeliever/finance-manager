@@ -58,6 +58,12 @@ import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.ConfirmDialog
 import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import com.asura.finanzas.ui.components.PanelCard
+import com.asura.finanzas.ui.components.GhostButton
+import com.asura.finanzas.ui.components.FlexShrinkRow
+import com.asura.finanzas.ui.components.WebPositive
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
@@ -87,7 +93,6 @@ fun InvestmentDetailScreen(
     var reloadKey by remember { mutableStateOf(0) }
     var addingMovement by remember { mutableStateOf<String?>(null) }
     var addingSnapshot by remember { mutableStateOf(false) }
-    var movementActions by remember { mutableStateOf<InvestmentMovement?>(null) }
     var editingMovement by remember { mutableStateOf<InvestmentMovement?>(null) }
     var editingInvestment by remember { mutableStateOf(false) }
     // Non-null while a "delete this?" confirmation is up. The web asks before
@@ -121,7 +126,8 @@ fun InvestmentDetailScreen(
         },
         // Deleting takes its snapshots with it, so it asks first.
         onDelete = { deletingInvestment = true },
-        onMovementLongPress = { movementActions = it },
+        onEditMovement = { editingMovement = it },
+        onDeleteMovement = { deletingMovement = it },
         modifier = modifier,
     )
 
@@ -142,33 +148,6 @@ fun InvestmentDetailScreen(
             existing = movement,
             onDismiss = { editingMovement = null },
             onSaved = { editingMovement = null; reloadKey++ },
-        )
-    }
-
-    // Long press on a movement offers the same edit/delete the web keeps behind
-    // the row's own controls.
-    movementActions?.let { movement ->
-        AlertDialog(
-            onDismissRequest = { movementActions = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(movement.occurredAt, color = Broke.colors.fg) },
-            text = {
-                Column {
-                    DialogAction(stringResource(R.string.common_edit)) {
-                        movementActions = null
-                        editingMovement = movement
-                    }
-                    DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
-                        movementActions = null
-                        deletingMovement = movement
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { movementActions = null }) {
-                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
-                }
-            },
         )
     }
 
@@ -232,7 +211,8 @@ private fun DetailContent(
     onEdit: () -> Unit,
     onToggleClosed: () -> Unit,
     onDelete: () -> Unit,
-    onMovementLongPress: (InvestmentMovement) -> Unit,
+    onEditMovement: (InvestmentMovement) -> Unit,
+    onDeleteMovement: (InvestmentMovement) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -263,190 +243,211 @@ private fun DetailContent(
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
             // This page has no back link in the browser and no cyan rule
-            // either: just the name as a plain heading with the three quiet
-            // actions beside it. The system gesture is what goes back.
+            // either: `mb-6 flex items-center justify-between`, the name as a
+            // `text-2xl font-semibold` heading and three buttons. They share
+            // one row that shrinks like flexbox, so a long name wraps.
             BackHandler(onBack = onBack)
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.Center,
+            FlexShrinkRow(
+                gap = 0.dp,
+                spaceBetween = true,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
             ) {
                 Text(
                     detail.name,
-                    // `text-2xl font-semibold` — the UI face, not the display one.
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = 24.sp,
-                        lineHeight = 30.sp,
+                        lineHeight = 32.sp,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        letterSpacing = com.asura.finanzas.ui.theme.TrackingTight,
                     ),
                     color = colors.fg,
-                    modifier = Modifier.weight(1f, fill = false),
                 )
-                DetailAction(Lucide.Pencil, stringResource(R.string.common_edit)) { onEdit() }
-                // One button that flips both ways, as on the web: an open
-                // padlock to reopen, a closed one to close.
-                DetailAction(
-                    if (detail.isClosed) Lucide.LockOpen else Lucide.Lock,
-                    stringResource(
-                        if (detail.isClosed) R.string.investments_reopen
-                        else R.string.investments_close,
-                    ),
-                ) { onToggleClosed() }
-                DetailAction(
-                    Lucide.Trash,
-                    stringResource(R.string.common_delete),
-                    colors.danger,
-                ) { onDelete() }
-            }
-        }
-
-        // Four figures in a 2×2 grid, as on the web — not one hero card.
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                StatBox(
-                    stringResource(R.string.investments_current_value),
-                    maskIfHidden(formatMoney(detail.currentValueCents, detail.currencyCode), hide),
-                    modifier = Modifier.weight(1f),
-                )
-                StatBox(
-                    stringResource(R.string.investments_gain),
-                    maskIfHidden(formatDelta(detail.gainCents, detail.currencyCode), hide),
-                    // The web paints this one with `text-accent`, not the
-                    // green it uses for a positive figure elsewhere.
-                    valueColor = if (detail.gainCents >= 0) colors.accent else colors.danger,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                StatBox(
-                    stringResource(R.string.investments_net_invested),
-                    maskIfHidden(formatMoney(detail.netInvestedCents, detail.currencyCode), hide),
-                    modifier = Modifier.weight(1f),
-                )
-                // The web spends this last box on whichever fact the
-                // instrument actually has: how much crypto is held, else the
-                // maturity date, else the start date. Never two of them.
-                val crypto = cryptoHolding(detail)
-                when {
-                    crypto != null -> StatBox(
-                        stringResource(R.string.investments_quantity),
-                        crypto,
-                        modifier = Modifier.weight(1f),
+                FlexShrinkRow(gap = 8.dp) {
+                    GhostButton(stringResource(R.string.common_edit), onClick = onEdit, leadingIcon = Lucide.Pencil)
+                    // One button that flips both ways, as on the web.
+                    GhostButton(
+                        stringResource(
+                            if (detail.isClosed) R.string.investments_reopen
+                            else R.string.investments_close,
+                        ),
+                        onClick = onToggleClosed,
+                        leadingIcon = if (detail.isClosed) Lucide.LockOpen else Lucide.Lock,
                     )
-                    detail.maturityDate != null -> StatBox(
-                        stringResource(R.string.investments_maturity),
-                        detail.maturityDate,
-                        modifier = Modifier.weight(1f),
-                    )
-                    else -> StatBox(
-                        stringResource(R.string.investments_start_date),
-                        detail.startDate,
-                        modifier = Modifier.weight(1f),
+                    GhostButton(
+                        stringResource(R.string.common_delete),
+                        onClick = onDelete,
+                        leadingIcon = Lucide.Trash,
+                        tint = colors.danger,
                     )
                 }
             }
         }
 
+        // Four figures in a `grid-cols-2 gap-4`, then `mb-4`.
         item {
-            GlassCard(Modifier.fillMaxWidth()) {
-                // The web lays the whole header out as one wrapping row: the
-                // title with the rate beside it on the same baseline, then the
-                // zoom and the what-if toggle together on the right.
+            val crypto = cryptoHolding(detail)
+            Column(Modifier.padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    StatBox(
+                        stringResource(R.string.investments_current_value),
+                        maskIfHidden(formatMoney(detail.currentValueCents, detail.currencyCode), hide),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                    StatBox(
+                        stringResource(R.string.investments_gain),
+                        maskIfHidden(formatDelta(detail.gainCents, detail.currencyCode), hide),
+                        valueColor = if (detail.gainCents >= 0) colors.accent else colors.danger,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    StatBox(
+                        stringResource(R.string.investments_net_invested),
+                        maskIfHidden(formatMoney(detail.netInvestedCents, detail.currencyCode), hide),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                    // Whichever fact the instrument has: how much crypto is
+                    // held, else the maturity date, else the start date.
+                    when {
+                        crypto != null -> StatBox(
+                            stringResource(R.string.investments_quantity),
+                            crypto,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                        detail.maturityDate != null -> StatBox(
+                            stringResource(R.string.investments_maturity),
+                            detail.maturityDate,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                        else -> StatBox(
+                            stringResource(R.string.investments_start_date),
+                            detail.startDate,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            GlassCard(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                // `mb-4 flex flex-wrap items-center justify-between gap-3`: the
+                // title with the rate on its baseline, then the zoom and the
+                // what-if toggle as one group that wraps below at this width.
                 FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    FlowRow(
+                    Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.Bottom,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.padding(end = 12.dp).align(Alignment.CenterVertically),
                     ) {
                         Text(
                             stringResource(R.string.investments_projection),
                             style = MaterialTheme.typography.titleLarge,
                             color = colors.fg,
+                            modifier = Modifier.alignByBaseline(),
                         )
                         projection?.annualRateBps?.let { bps ->
                             Text(
                                 stringResource(R.string.investments_projection_at_rate)
                                     .replace("{rate}", "%.2f".format(bps / 100.0)),
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                                style = MaterialTheme.typography.bodySmall,
                                 color = colors.fgSubtle,
+                                modifier = Modifier.alignByBaseline(),
                             )
                         }
                     }
-                    // The zoom and the what-if toggle are one group on the web,
-                    // so they wrap together instead of the toggle dropping to a
-                    // line of its own.
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                    // Horizon stepper, the web's zoom control.
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
-                            .padding(2.dp),
-                    ) {
-                        Icon(
-                            Lucide.ZoomIn,
-                            contentDescription = null,
-                            tint = colors.fgMuted,
+                        // `rounded-lg border p-0.5 gap-0.5`: zoom in, the years,
+                        // "años", zoom out.
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
                             modifier = Modifier
-                                .clickable(enabled = years > 1) { years -= 1 }
-                                .padding(4.dp)
-                                .size(15.dp),
-                        )
-                        Text(
-                            "$years",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                            color = colors.fg,
-                            modifier = Modifier.padding(horizontal = 4.dp),
-                        )
-                        Text(
-                            stringResource(R.string.investments_projection_years_short),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                            color = colors.fgSubtle,
-                            modifier = Modifier.padding(end = 4.dp),
-                        )
-                        Icon(
-                            Lucide.ZoomOut,
-                            contentDescription = null,
-                            tint = colors.fgMuted,
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+                                .padding(3.dp),
+                        ) {
+                            Icon(
+                                Lucide.ZoomIn,
+                                contentDescription = null,
+                                tint = colors.fgMuted.copy(alpha = if (years > 1) 1f else 0.3f),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable(enabled = years > 1) { years -= 1 }
+                                    .padding(4.dp)
+                                    .size(15.dp),
+                            )
+                            Text(
+                                "$years",
+                                style = MaterialTheme.typography.bodySmall.tabular()
+                                    .copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+                                color = colors.fg,
+                                modifier = Modifier.width(32.dp),
+                            )
+                            Text(
+                                stringResource(R.string.investments_projection_years_short),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.fgSubtle,
+                                modifier = Modifier.padding(end = 4.dp),
+                            )
+                            Icon(
+                                Lucide.ZoomOut,
+                                contentDescription = null,
+                                tint = colors.fgMuted.copy(alpha = if (years < 50) 1f else 0.3f),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable(enabled = years < 50) { years += 1 }
+                                    .padding(4.dp)
+                                    .size(15.dp),
+                            )
+                        }
+                        // `px-3 py-1.5 gap-1.5 text-sm font-medium`, bordered.
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier
-                                .clickable(enabled = years < 50) { years += 1 }
-                                .padding(4.dp)
-                                .size(15.dp),
-                        )
-                    }
-                    OutlineButton(
-                        text = stringResource(R.string.investments_projection_sim_toggle),
-                        onClick = { simEnabled = !simEnabled },
-                        leadingIcon = Lucide.SlidersHorizontal,
-                        active = simEnabled,
-                    )
+                                .clip(RoundedCornerShape(8.dp))
+                                .then(
+                                    if (simEnabled) Modifier.background(colors.accent.copy(alpha = 0.15f))
+                                    else Modifier,
+                                )
+                                .border(
+                                    1.dp,
+                                    if (simEnabled) colors.accent.copy(alpha = 0.4f) else colors.borderMuted,
+                                    RoundedCornerShape(8.dp),
+                                )
+                                .clickable { simEnabled = !simEnabled }
+                                .padding(horizontal = 13.dp, vertical = 7.dp),
+                        ) {
+                            val tint = if (simEnabled) colors.accent else colors.fgMuted
+                            Icon(Lucide.SlidersHorizontal, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+                            Text(
+                                stringResource(R.string.investments_projection_sim_toggle),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = tint,
+                            )
+                        }
                     }
                 }
 
                 if (simEnabled) {
-                    Spacer(Modifier.height(16.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         MoneyField(
@@ -470,7 +471,6 @@ private fun DetailContent(
                 // three would just restate the plain projection.
                 if (simActive) {
                     projection?.let { p ->
-                        Spacer(Modifier.height(16.dp))
                         // One column at phone width — the web's grid only goes
                         // to three from `sm:` up.
                         MiniStat(
@@ -490,34 +490,26 @@ private fun DetailContent(
                             maskIfHidden(formatMoney(p.interestCents, detail.currencyCode), hide),
                             colors.cyan,
                         )
+                        Spacer(Modifier.height(16.dp))
                     }
                 }
 
                 val points = projection?.projection.orEmpty().ifEmpty { detail.projection }
                 if (points.size >= 2) {
-                    Spacer(Modifier.height(12.dp))
                     // Every point comes from finanzas-core; the chart only maps
                     // the given cents onto pixels.
-                    val lo = points.minOf { it.valueCents }
-                    val hi = points.maxOf { it.valueCents }
                     val today = java.time.LocalDate.now().toString()
                     val currentValueName = stringResource(R.string.investments_current_value)
                     val projectionName = stringResource(R.string.investments_projection)
                     val withContribName = stringResource(R.string.investments_projection_with_contrib)
                     LineChart(
                         values = points.map { it.valueCents },
-                        startLabel = points.first().date,
-                        endLabel = points.last().date,
-                        minLabel = maskIfHidden(formatMoney(lo, detail.currencyCode), hide),
-                        maxLabel = maskIfHidden(formatMoney(hi, detail.currencyCode), hide),
-                        forecastFrom = points.indexOfLast { it.date <= today }.takeIf { it >= 0 },
-                        ticks = if (hide) emptyList() else axisTicks(lo, hi),
+                        dates = points.map { it.date },
+                        today = today,
                         // The web's SIM_GOLD while the what-if is on: a
                         // simulated curve should not look like the real one.
-                        // Otherwise `POSITIVE`, the green the web strokes the
-                        // projection with — not the accent.
-                        color = if (simActive) Color(0xFFC9A14A) else colors.positive,
-                        dates = points.map { it.date },
+                        forecastColor = if (simActive) Color(0xFFC9A14A) else null,
+                        maskTicks = hide,
                         // The web's tooltip: the raw date, then whichever of
                         // its three series has a value there — up to today the
                         // real value, from today on the projection (or the
@@ -528,13 +520,13 @@ private fun DetailContent(
                             TooltipContent(
                                 label = point.date,
                                 items = buildList {
-                                    if (point.date <= today) add(TooltipItem(currentValueName, amount, colors.positive))
+                                    if (point.date <= today) add(TooltipItem(currentValueName, amount, WebPositive))
                                     if (point.date >= today) {
                                         add(
                                             if (simActive) {
                                                 TooltipItem(withContribName, amount, Color(0xFFC9A14A))
                                             } else {
-                                                TooltipItem(projectionName, amount, colors.positive)
+                                                TooltipItem(projectionName, amount, WebPositive)
                                             },
                                         )
                                     }
@@ -551,112 +543,120 @@ private fun DetailContent(
         // first one. The web's `movements` section, empty line and all.
         if (detail.calculator != "manual") {
             item {
-                // One card with its heading and its rows inside, the web's
-                // `section`: a stack of little cards read as a different page.
-                GlassCard(Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
+                // `mb-4 rounded-xl border p-5`: a panel, not a glass card.
+                PanelCard(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                    // `mb-3 flex items-center justify-between`: heading and
+                    // buttons shrink together, so a long heading wraps.
+                    FlexShrinkRow(
+                        gap = 0.dp,
+                        spaceBetween = true,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     ) {
                         Text(
                             stringResource(R.string.investments_movements),
-                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                            style = MaterialTheme.typography.titleMedium,
                             color = colors.fg,
-                            modifier = Modifier.weight(1f),
                         )
-                        DetailAction(
-                            Lucide.ArrowDownLeft,
-                            stringResource(R.string.investments_deposit),
-                            colors.accent,
-                        ) { onAddMovement("deposit") }
-                        Spacer(Modifier.width(8.dp))
-                        DetailAction(
-                            Lucide.ArrowUpRight,
-                            stringResource(R.string.investments_withdrawal),
-                            colors.danger,
-                        ) { onAddMovement("withdrawal") }
+                        FlexShrinkRow(gap = 8.dp) {
+                            GhostButton(
+                                stringResource(R.string.investments_deposit),
+                                onClick = { onAddMovement("deposit") },
+                                leadingIcon = Lucide.ArrowDownLeft,
+                                tint = colors.accent,
+                            )
+                            GhostButton(
+                                stringResource(R.string.investments_withdrawal),
+                                onClick = { onAddMovement("withdrawal") },
+                                leadingIcon = Lucide.ArrowUpRight,
+                                tint = colors.danger,
+                            )
+                        }
                     }
-                    Spacer(Modifier.height(12.dp))
                     if (detail.movements.isEmpty()) {
                         Text(
                             stringResource(R.string.investments_movements_empty),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = colors.fgSubtle,
                             modifier = Modifier.padding(vertical = 8.dp),
                         )
                     } else {
                         detail.movements.forEachIndexed { index, movement ->
                             if (index > 0) HairLine()
-                            MovementRow(movement, detail.currencyCode, hide, onMovementLongPress)
+                            MovementRow(movement, detail.currencyCode, hide, onEditMovement, onDeleteMovement)
                         }
                     }
                 }
             }
         }
 
-        // Snapshots are the manual calculator's whole story — there the value
-        // only moves because someone wrote it down — so the section lives and
-        // dies with it, exactly as on the web.
+        // Snapshots are the manual calculator's whole story, exactly as on the
+        // web: a panel with its heading, an add button and one row per value.
         if (detail.calculator == "manual") {
             item {
-                Spacer(Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    MicroLabel(
-                        stringResource(R.string.investments_snapshots),
-                        Modifier.weight(1f),
-                    )
-                    DetailAction(Lucide.Plus, stringResource(R.string.investments_add_snapshot)) {
-                        onAddSnapshot()
+                PanelCard(Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.investments_snapshots),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.fg,
+                            modifier = Modifier.weight(1f),
+                        )
+                        GhostButton(
+                            stringResource(R.string.investments_add_snapshot),
+                            onClick = onAddSnapshot,
+                            leadingIcon = Lucide.Plus,
+                        )
                     }
-                }
-            }
-            items(detail.snapshots, key = { "s-${it.id}" }) { snapshot ->
-                GlassCard(Modifier.fillMaxWidth(), padding = 14.dp) {
-                    Line(
-                        snapshot.asOf,
-                        maskIfHidden(formatMoney(snapshot.valueCents, detail.currencyCode), hide),
-                    )
+                    detail.snapshots.forEachIndexed { index, snapshot ->
+                        if (index > 0) HairLine()
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(snapshot.asOf, style = MaterialTheme.typography.bodyMedium, color = colors.fgMuted)
+                            Text(
+                                maskIfHidden(formatMoney(snapshot.valueCents, detail.currencyCode), hide),
+                                style = MaterialTheme.typography.bodyMedium.tabular(),
+                                color = colors.fg,
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MovementRow(
     movement: InvestmentMovement,
     currencyCode: String,
     hide: Boolean,
-    onLongPress: (InvestmentMovement) -> Unit,
+    onEdit: (InvestmentMovement) -> Unit,
+    onDelete: (InvestmentMovement) -> Unit,
 ) {
     val colors = Broke.colors
     val deposit = movement.kind == "deposit"
-    // The web's row: a round badge with the arrow, the noun, the date beside it
-    // — not under it — and the amount at the far end. Edit and delete are a
-    // long press here, where the web has two buttons that appear on hover.
+    val tint = if (deposit) colors.accent else colors.danger
+    // `flex items-center gap-3 py-2 text-sm`: badge, noun, date, the amount
+    // pushed to the end, then edit and delete — which a touch screen shows
+    // always (`touch-action-reveal`), there being no hover to reveal them.
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = { onLongPress(movement) })
-            .padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(colors.surfaceOverlay),
+            modifier = Modifier.size(28.dp).clip(CircleShape).background(colors.surfaceOverlay),
         ) {
             Icon(
                 if (deposit) Lucide.ArrowDownLeft else Lucide.ArrowUpRight,
                 contentDescription = null,
-                tint = if (deposit) colors.accent else colors.danger,
+                tint = tint,
                 modifier = Modifier.size(13.dp),
             )
         }
@@ -665,20 +665,31 @@ private fun MovementRow(
                 if (deposit) R.string.investments_deposit_noun
                 else R.string.investments_withdrawal_noun,
             ),
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium,
             color = colors.fg,
         )
         Text(
             movement.occurredAt,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium,
             color = colors.fgSubtle,
             modifier = Modifier.weight(1f),
         )
         Text(
-            (if (deposit) "+" else "−") +
-                maskIfHidden(formatMoney(movement.amountCents, currencyCode), hide),
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp).tabular(),
-            color = if (deposit) colors.accent else colors.danger,
+            (if (deposit) "+" else "−") + maskIfHidden(formatMoney(movement.amountCents, currencyCode), hide),
+            style = MaterialTheme.typography.bodyMedium.tabular(),
+            color = tint,
+        )
+        Icon(
+            Lucide.Pencil,
+            contentDescription = stringResource(R.string.common_edit),
+            tint = colors.fgSubtle,
+            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onEdit(movement) }.padding(4.dp).size(14.dp),
+        )
+        Icon(
+            Lucide.Trash,
+            contentDescription = stringResource(R.string.common_delete),
+            tint = colors.fgSubtle,
+            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onDelete(movement) }.padding(4.dp).size(14.dp),
         )
     }
 }
@@ -698,7 +709,7 @@ private fun Line(label: String, value: String, valueColor: androidx.compose.ui.g
 }
 
 
-/** One of the boxed figures the web's detail lays out in a 2×2 grid. */
+/** One of the web's `rounded-xl border p-4` figures in the 2×2 grid. */
 @Composable
 private fun StatBox(
     label: String,
@@ -707,17 +718,18 @@ private fun StatBox(
     valueColor: androidx.compose.ui.graphics.Color? = null,
 ) {
     val colors = Broke.colors
-    GlassCard(modifier, padding = 16.dp) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.8.sp),
-            color = colors.fgMuted,
-        )
-        Spacer(Modifier.height(4.dp))
+    PanelCard(modifier, padding = 16.dp) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = colors.fgSubtle)
         Text(
             value,
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 20.sp, lineHeight = 28.sp),
+            // `mt-1 text-xl font-semibold`, the body face.
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 20.sp,
+                lineHeight = 28.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            ).tabular(),
             color = valueColor ?: colors.fg,
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }

@@ -70,25 +70,29 @@ import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.GlassCard
+import com.asura.finanzas.ui.components.GhostButton
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.LoadingBox
+import com.asura.finanzas.ui.components.keepingPrevious
+import com.asura.finanzas.ui.components.WebNegative
+import com.asura.finanzas.ui.components.WebPositive
+import com.asura.finanzas.ui.components.BarSeries
+import com.asura.finanzas.ui.components.RechartsBarChart
 import com.asura.finanzas.ui.components.MicroLabel
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.PeriodLabel
-import com.asura.finanzas.ui.components.PeriodPickerDialog
+import com.asura.finanzas.ui.components.PeriodPicker
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.components.ChartHit
 import com.asura.finanzas.ui.components.ChartTooltip
 import com.asura.finanzas.ui.components.TooltipContent
 import com.asura.finanzas.ui.components.TooltipItem
-import com.asura.finanzas.ui.components.bandCursor
 import com.asura.finanzas.ui.components.chartTap
 import com.asura.finanzas.ui.components.rememberChartHit
 import com.asura.finanzas.ui.components.shown
@@ -100,19 +104,6 @@ import com.asura.finanzas.ui.theme.TrackingWide
 import com.asura.finanzas.ui.theme.tabular
 
 private val rpcJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-
-/** The line box of a chart's axis tick (`labelSmall`), used to centre it. */
-private val TICK_LABEL_HEIGHT = 16.5.dp
-
-// The plot box recharts lays out, which is what decides how fat a bar is: a
-// band is the plot divided by the number of buckets. Letting the chart run to
-// the card's own edges made the band a fifth wider here than in the browser.
-/** `<YAxis width={40}>` — the strip the tick labels live in. */
-private val AXIS_WIDTH = 40.dp
-/** Of that strip, what stays clear between the label and the axis line. */
-private val AXIS_TICK_GAP = 9.dp
-/** Recharts' default `margin` of 5 on every side. */
-private val CHART_MARGIN = 5.dp
 
 /** Where a widget's "View all" sends you. */
 enum class DashboardTarget { Budgets, Goals, Subscriptions }
@@ -129,7 +120,6 @@ fun DashboardScreen(
 ) {
     val (key, reload) = rememberReloadKey()
     val scope = rememberCoroutineScope()
-    var showPeriod by remember { mutableStateOf(false) }
     // Which breakdown slice is open, as (kind, target).
     var drillInto by remember { mutableStateOf<Pair<String, CategoryDetailTarget>?>(null) }
     // Widget order, shared with the web through the account.
@@ -148,18 +138,22 @@ fun DashboardScreen(
     val walletsState by loadSynced("wallets" to false, refetch = key) { repository.wallets() }
     val walletsForDrill = (walletsState as? Load.Ready)?.data ?: emptyList()
 
-    val summaryState by loadSynced("dashboard" to period, refetch = key) {
+    val summaryState = loadSynced("dashboard" to period, refetch = key) {
         repository.dashboard(period.toJson())
-    }
-    val trendsState by loadSynced("trends" to period, refetch = key) {
+    }.value.keepingPrevious()
+
+    val trendsState = loadSynced("trends" to period, refetch = key) {
         repository.spendingTrends(period.toJson())
-    }
-    val expenseState by loadSynced("breakdownExpense" to period, refetch = key) {
+    }.value.keepingPrevious()
+
+    val expenseState = loadSynced("breakdownExpense" to period, refetch = key) {
         repository.categoryBreakdown("expense", period.toJson())
-    }
-    val incomeState by loadSynced("breakdownIncome" to period, refetch = key) {
+    }.value.keepingPrevious()
+
+    val incomeState = loadSynced("breakdownIncome" to period, refetch = key) {
         repository.categoryBreakdown("income", period.toJson())
-    }
+    }.value.keepingPrevious()
+
 
     val trends = (trendsState as? Load.Ready)?.data
     val expenseBreakdown = (expenseState as? Load.Ready)?.data
@@ -191,7 +185,7 @@ fun DashboardScreen(
             subscriptions = subscriptions,
             fromCache = current.fromCache,
             period = period,
-            onPickPeriod = { showPeriod = true },
+            onPeriodChange = onPeriodChange,
             onViewAll = onViewAll,
             onResetLayout = {
                 scope.launch {
@@ -239,15 +233,6 @@ fun DashboardScreen(
         )
     }
 
-    if (showPeriod) {
-        PeriodPickerDialog(
-            selected = period,
-            // Parameters are edited inline, so a pick applies without closing.
-            onSelect = onPeriodChange,
-            onDismiss = { showPeriod = false },
-            allowAll = true,
-        )
-    }
 }
 
 @Composable
@@ -261,7 +246,7 @@ private fun DashboardContent(
     subscriptions: SubscriptionList?,
     fromCache: Boolean,
     period: Period,
-    onPickPeriod: () -> Unit,
+    onPeriodChange: (Period) -> Unit,
     onViewAll: (DashboardTarget) -> Unit,
     onSlice: (String, CategorySlice) -> Unit,
     onResetLayout: () -> Unit,
@@ -379,41 +364,24 @@ private fun DashboardContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            PageHeader(stringResource(R.string.dashboard_title)) {
-                ChipButton(
-                    text = PeriodLabel(period),
-                    onClick = onPickPeriod,
-                    leadingIcon = Lucide.CalendarRange,
-                    trailingIcon = Lucide.ChevronDown,
-                )
+            // The header's `mb-7`: 28, of which the list's gap gives 16.
+            PageHeader(
+                stringResource(R.string.dashboard_title),
+                modifier = Modifier.padding(bottom = 12.dp),
+                actionGap = 8.dp,
+            ) {
+                PeriodPicker(value = period, onChange = onPeriodChange, allowAll = true)
                 // Clears both the phone order and the desktop grid layout, so
-                // every device snaps back to the defaults together.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onResetLayout() }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                ) {
-                    Icon(
-                        Lucide.RotateCcw,
-                        contentDescription = null,
-                        tint = colors.fg,
-                        modifier = Modifier.size(15.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(R.string.dashboard_reset_layout),
-                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-                        color = colors.fg,
-                    )
-                }
+                // every device snaps back to the defaults together. A ghost
+                // button on the web.
+                GhostButton(
+                    stringResource(R.string.dashboard_reset_layout),
+                    onClick = onResetLayout,
+                    leadingIcon = Lucide.RotateCcw,
+                )
             }
         }
 
-        if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
-        }
 
         // Nothing to summarise yet: the web swaps every widget for one line
         // saying so, rather than a column of empty cards and $0.00 donuts.
@@ -566,182 +534,34 @@ private fun FlowRow(
  */
 @Composable
 private fun FlowChart(trends: SpendingTrends) {
-    val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
-    val buckets = trends.buckets.takeLast(24)
-    val peak = buckets.maxOfOrNull { maxOf(it.incomeMxnCents, it.expenseMxnCents) }
-        ?.coerceAtLeast(1) ?: 1
-    // The chart library the web uses rounds the axis up to a friendly number and
-    // labels four even steps; a raw peak gave ticks like "824.74".
-    val max = niceCeiling(peak)
-    val axisColor = colors.borderMuted
-    val axisLabelHeight = 20.dp
-    val hit = rememberChartHit()
-    val plotPx = with(LocalDensity.current) { 150.dp.toPx() }
-    val cursorColor = colors.borderMuted
-
-    Row(modifier = Modifier.fillMaxWidth().height(170.dp)) {
-        // Vertical scale, hidden with the balances like every other figure.
-        if (!hide) {
-            // Each tick label sits centred on its gridline, as in the browser.
-            // Spacing five labels inside the plot's own 150 dp instead drops the
-            // top one half a line, and a full-height bar then overshoots it.
-            Column(
-                modifier = Modifier
-                    .padding(start = CHART_MARGIN)
-                    .width(AXIS_WIDTH - AXIS_TICK_GAP)
-                    .height(150.dp + TICK_LABEL_HEIGHT)
-                    .offset(y = -TICK_LABEL_HEIGHT / 2),
-                verticalArrangement = Arrangement.SpaceBetween,
-                horizontalAlignment = Alignment.End,
-            ) {
-                listOf(1f, 0.75f, 0.5f, 0.25f, 0f).forEach { fraction ->
-                    Text(
-                        ((max * fraction).toLong() / 100).toString(),
-                        style = MaterialTheme.typography.labelSmall
-                            .copy(fontSize = 11.sp, lineHeight = 16.5.sp),
-                        color = colors.fgSubtle,
-                    )
-                }
-            }
-            Spacer(Modifier.width(AXIS_TICK_GAP))
-        }
-
-        // The chart draws its axes as hairlines; without them the bars floated.
-        Box(
-            Modifier
-                .width(1.dp)
-                .height(150.dp)
-                .background(colors.borderMuted),
-        )
-        // Tapping a bucket reads it out — the web's tooltip, with the band
-        // under the finger shaded.
-        Box(Modifier.weight(1f).padding(end = CHART_MARGIN)) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .chartTap(hit, buckets) { tap, size ->
-                    if (buckets.isEmpty() || tap.y > plotPx) {
-                        null
-                    } else {
-                        val band = size.width / buckets.size.toFloat()
-                        ChartHit((tap.x / band).toInt().coerceIn(0, buckets.lastIndex), tap)
-                    }
-                }
-                .drawBehind {
-                    hit.shown?.let { h ->
-                        val band = size.width / buckets.size.toFloat()
-                        bandCursor(h.index * band, band, plotPx, cursorColor)
-                    }
-                    val y = size.height - axisLabelHeight.toPx()
-                    drawLine(
-                        color = axisColor,
-                        start = Offset(0f, y),
-                        end = Offset(size.width, y),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                },
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            buckets.forEach { bucket ->
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom,
-                ) {
-                    // A bar is as wide as its share of the band, not a fixed
-                    // sliver: recharts keeps `barCategoryGap` — 10% of the
-                    // band at *each* end — clear and splits the rest between
-                    // the two series, so with few buckets the bars are fat.
-                    // Pinning them to 5 dp drew hairlines where the web drew
-                    // columns. (`FlowRangeCard` reads 0.55 for the same reason:
-                    // one band at `barCategoryGap="22%"`.)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(0.8f).height(150.dp),
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Bar(bucket.incomeMxnCents, max, colors.positive, Modifier.weight(1f))
-                        Bar(bucket.expenseMxnCents, max, colors.danger, Modifier.weight(1f))
-                    }
-                    Text(
-                        bucketLabel(bucket.key, trends.bucketUnit),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.fgSubtle,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-        val picked = hit.shown?.takeIf { it.index in buckets.indices }
-        val incomes = stringResource(R.string.dashboard_incomes)
-        val expenses = stringResource(R.string.dashboard_expenses)
-        ChartTooltip(
-            anchor = picked?.anchor,
-            content = picked?.let {
-                val bucket = buckets[it.index]
-                TooltipContent(
-                    label = bucketLongLabel(bucket.key, trends.bucketUnit),
-                    items = listOf(
-                        TooltipItem(incomes, maskIfHidden(formatMoney(bucket.incomeMxnCents), hide), colors.positive),
-                        TooltipItem(expenses, maskIfHidden(formatMoney(bucket.expenseMxnCents), hide), colors.danger),
-                    ),
-                )
-            },
-            modifier = Modifier.fillMaxWidth().height(150.dp),
-        )
-        }
-    }
-
-    Spacer(Modifier.height(12.dp))
-    // Expenses first, the order the web's legend uses.
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
-    ) {
-        ChartLegend(colors.danger, stringResource(R.string.dashboard_expenses))
-        ChartLegend(colors.positive, stringResource(R.string.dashboard_incomes))
-    }
-}
-
-/** One legend entry: the chart library marks series with a small square. */
-@Composable
-private fun ChartLegend(color: androidx.compose.ui.graphics.Color, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .size(12.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(color),
-        )
-        Text(
-            label,
-            // Recharts writes each series' name in the series' own colour, at
-            // the card's base size — muted grey read as a caption, not a key.
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
-            color = color,
-            modifier = Modifier.padding(start = 6.dp),
-        )
-    }
-}
-
-/**
- * Rounds a peak up to the next 1/2/2.5/5 × 10ⁿ, so the axis reads 250 · 500 ·
- * 750 · 1000 instead of quarters of whatever the tallest bar happened to be.
- * Works on whole cents; nothing here is money arithmetic, it is axis furniture.
- */
-private fun niceCeiling(peak: Long): Long {
-    val pesos = peak / 100.0
-    if (pesos <= 0) return 100
-    // Recharts rounds the *step*, not the top: the rough step (a quarter of the
-    // range, for its five ticks) goes up to the next twentieth of its own order
-    // of magnitude, and the axis ends at four of those. That is why the web
-    // labels 550 · 1100 · 1650 · 2200 rather than a flat 2500.
-    val rough = pesos / 4.0
-    val digitCount = Math.floor(Math.log10(rough)).toInt() + 1
-    val unit = Math.pow(10.0, digitCount.toDouble()) * if (digitCount != 1) 0.05 else 0.1
-    val step = Math.ceil(rough / unit) * unit
-    return Math.round(step * 4 * 100)
+    val buckets = trends.buckets
+    val incomes = stringResource(R.string.dashboard_incomes)
+    val expenses = stringResource(R.string.dashboard_expenses)
+    val labels = buckets.map { bucketLabel(it.key, trends.bucketUnit) }
+    val longLabels = buckets.map { bucketLongLabel(it.key, trends.bucketUnit) }
+    // Pesos, the unit the web hands recharts, so the ticks come out the same.
+    RechartsBarChart(
+        height = 214.dp,
+        categories = buckets.size,
+        series = listOf(
+            BarSeries(incomes, WebPositive, buckets.map { it.incomeMxnCents / 100.0 }),
+            BarSeries(expenses, WebNegative, buckets.map { it.expenseMxnCents / 100.0 }),
+        ),
+        xLabel = { labels[it] },
+        hideValues = hide,
+        tooltipAt = { i ->
+            val bucket = buckets[i]
+            TooltipContent(
+                label = longLabels[i],
+                items = listOf(
+                    // recharts sorts the payload by name, as the legend: "Gastos" first.
+                    TooltipItem(expenses, maskIfHidden(formatMoney(bucket.expenseMxnCents), hide), WebNegative),
+                    TooltipItem(incomes, maskIfHidden(formatMoney(bucket.incomeMxnCents), hide), WebPositive),
+                ),
+            )
+        },
+    )
 }
 
 /**
@@ -750,12 +570,19 @@ private fun niceCeiling(peak: Long): Long {
  */
 @Composable
 private fun bucketLabel(key: String, unit: String): String {
-    val locale = java.util.Locale.forLanguageTag(LocalAppSettings.current.locale)
+    // `Intl.DateTimeFormat` with `{ month: "short", year: "2-digit" }` in
+    // es-MX / en-US, capitalised: "Sep 26". The JDK's own short Spanish month
+    // is "sept.", which is not what the browser prints.
+    val locale = java.util.Locale.forLanguageTag(
+        if (LocalAppSettings.current.locale == "en") "en-US" else "es-MX",
+    )
     return if (unit == "month") {
         runCatching {
-            val (y, m) = key.split("-").let { it[0].toInt() to it[1].toInt() }
-            java.time.Month.of(m).getDisplayName(java.time.format.TextStyle.SHORT, locale) +
-                " " + (y % 100)
+            val date = java.time.LocalDate.parse("$key-01")
+            val millis = date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+            val format = android.icu.text.DateFormat.getInstanceForSkeleton("MMMyy", locale)
+            format.timeZone = android.icu.util.TimeZone.GMT_ZONE
+            format.format(java.util.Date(millis)).replaceFirstChar { it.uppercase(locale) }
         }.getOrDefault(key)
     } else {
         key.takeLast(2)
@@ -786,29 +613,6 @@ private fun bucketLongLabel(key: String, unit: String): String {
 }
 
 /**
- * One series' bar inside a bucket. The caller sizes it across (a share of the
- * band); here it only takes its share of the 150 dp plot, so a bar worth the
- * top tick reaches that tick exactly — the way it does in the browser. Only
- * the top corners are rounded, `radius={[3, 3, 0, 0]}` on the web.
- */
-@Composable
-private fun Bar(
-    value: Long,
-    max: Long,
-    color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-) {
-    val fraction = (value.toFloat() / max.toFloat()).coerceIn(0f, 1f)
-    Box(
-        modifier
-            .fillMaxHeight(fraction)
-            .heightIn(min = if (value > 0) 2.dp else 0.dp)
-            .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-            .background(color),
-    )
-}
-
-/**
  * One draggable card on the overview. The key is the web's widget key, so the
  * order saved on the account means the same thing in both clients. The card
  * is drawn as its own card.
@@ -830,6 +634,14 @@ private fun applyOrder(keys: List<String>, order: List<String>): List<String> {
     return keys.sortedBy { rank[it] ?: Int.MAX_VALUE }
 }
 
+/** Gauss error function (Abramowitz–Stegun 7.1.26), for the blurred disc. */
+private fun erf(x: Float): Float {
+    val t = 1f / (1f + 0.3275911f * kotlin.math.abs(x))
+    val y = 1f - (((((1.061405429f * t - 1.453152027f) * t) + 1.421413741f) * t - 0.284496736f) * t + 0.254829592f) *
+        t * kotlin.math.exp(-x * x)
+    return if (x >= 0) y else -y
+}
+
 /** Patrimonio: where the period started, where it ended, and the split. */
 @Composable
 private fun NetWorthCard(
@@ -840,54 +652,100 @@ private fun NetWorthCard(
     hide: Boolean,
 ) {
     val colors = Broke.colors
-    // `p-6` on the web, not the `p-5` most cards use.
-    GlassCard(Modifier.fillMaxWidth(), padding = 24.dp) {
+    val accent = colors.accent
+    val gold = colors.cyan
+    // `p-6` on the web, not the `p-5` most cards use. Behind it, the web's two
+    // decorations: a 256 px accent/10 disc blurred by 64 px hanging off the
+    // top-right corner, and a 1 px gold/40 line fading in and out along the top.
+    GlassCard(
+        Modifier.fillMaxWidth(),
+        decoration = {
+                val px = density
+                // A disc of radius 128 blurred with σ = 64 is, radially,
+                // 0.1 × Φ((128 − r) / 64): sampled here as gradient stops.
+                val center = androidx.compose.ui.geometry.Offset(size.width + 64 * px - 128 * px, -96 * px + 128 * px)
+                val reach = 128 * px + 2.5f * 64 * px
+                val stops = (0..10).map { i ->
+                    val r = reach * i / 10f
+                    val z = (128 * px - r) / (64 * px)
+                    val phi = 0.5f * (1f + erf(z / kotlin.math.sqrt(2f)))
+                    (i / 10f) to accent.copy(alpha = 0.10f * phi)
+                }.toTypedArray()
+                drawCircle(
+                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                        colorStops = stops,
+                        center = center,
+                        radius = reach,
+                    ),
+                    radius = reach,
+                    center = center,
+                )
+                drawRect(
+                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        listOf(
+                            androidx.compose.ui.graphics.Color.Transparent,
+                            gold.copy(alpha = 0.40f),
+                            androidx.compose.ui.graphics.Color.Transparent,
+                        ),
+                    ),
+                    // Inside the border, like any absolute child of the card.
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, 1 * px),
+                    size = androidx.compose.ui.geometry.Size(size.width, 1 * px),
+                )
+        },
+        padding = 24.dp,
+    ) {
         // The eye lives here, beside the eyebrow, exactly as on the web — not
-        // up in the page header.
+        // up in the page header. `flex items-center gap-2`.
         Row(verticalAlignment = Alignment.CenterVertically) {
             MicroLabel(stringResource(R.string.dashboard_net_worth))
             Spacer(Modifier.width(8.dp))
             PrivacyToggle()
         }
-        Spacer(Modifier.height(9.dp))
 
-        MicroLabel(
-            stringResource(R.string.dashboard_period_start),
-            color = colors.fgSubtle,
-            letterSpacing = TrackingWide,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
-        )
-        Spacer(Modifier.height(2.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                maskIfHidden(formatMoney(netStart), hide),
-                style = MaterialTheme.typography.headlineMedium.tabular(),
-                color = colors.fgMuted,
-            )
+        // `mt-2 flex flex-wrap items-end gap-x-5 gap-y-3`: at phone width the
+        // start figure and its arrow share the first line and the end figure
+        // wraps under them.
+        ComposeFlowRow(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.align(Alignment.Bottom)) {
+                MicroLabel(
+                    stringResource(R.string.dashboard_period_start),
+                    color = colors.fgSubtle,
+                    letterSpacing = TrackingWide,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                )
+                Text(
+                    maskIfHidden(formatMoney(netStart), hide),
+                    style = MaterialTheme.typography.headlineMedium.tabular(),
+                    color = colors.fgMuted,
+                )
+            }
             Icon(
                 Lucide.ArrowRight,
                 contentDescription = null,
                 tint = colors.fgSubtle,
-                modifier = Modifier.padding(start = 12.dp).size(20.dp),
+                modifier = Modifier.align(Alignment.Bottom).padding(bottom = 6.dp).size(22.dp),
             )
+            Column(Modifier.align(Alignment.Bottom)) {
+                MicroLabel(
+                    stringResource(R.string.dashboard_period_end),
+                    color = colors.fgSubtle,
+                    letterSpacing = TrackingWide,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                )
+                // `text-4xl` — 36 px, not the 40 sp the other heroes use.
+                HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 36.sp)
+            }
         }
 
-        Spacer(Modifier.height(13.dp))
-        MicroLabel(
-            stringResource(R.string.dashboard_period_end),
-            color = colors.fgSubtle,
-            letterSpacing = TrackingWide,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
-        )
-        // `text-4xl` — 36 px, not the 40 sp the other heroes use.
-        HeroAmount(maskIfHidden(formatMoney(netEnd), hide), fontSize = 36.sp)
-
-        Spacer(Modifier.height(12.dp))
         // One wrapping line with a middle dot between the two, the web's
-        // `flex flex-wrap gap-x-2`. Stacking them in a column read as two
-        // separate facts and dropped the separator the web draws.
+        // `mt-3 flex flex-wrap gap-x-2 gap-y-1`.
         ComposeFlowRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -904,7 +762,7 @@ private fun NetWorthCard(
                 )
                 LegendRow(
                     color = colors.cyan,
-                    label = stringResource(R.string.nav_investments),
+                    label = stringResource(R.string.investments_total),
                     amount = maskIfHidden(formatMoney(summary.investmentsTotalMxnCents), hide),
                 )
             }
@@ -913,25 +771,31 @@ private fun NetWorthCard(
         // Only when the period actually moved money. A quiet month otherwise
         // gets a rule and two "$0.00 · −100%" rows saying nothing, which is
         // why the web gates this block the same way.
+        // `mt-4 border-t pt-4 flex flex-wrap gap-x-6 gap-y-2`.
         if (trends != null && (trends.incomeMxnCents > 0 || trends.expenseMxnCents > 0)) {
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(16.dp))
             HairLine()
             Spacer(Modifier.height(16.dp))
-            FlowRow(
-                label = stringResource(R.string.dashboard_incomes),
-                amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
-                previousCents = trends.incomePrevMxnCents,
-                trendBps = trends.incomeTrendBps,
-                upIsGood = true,
-            )
-            Spacer(Modifier.height(8.dp))
-            FlowRow(
-                label = stringResource(R.string.dashboard_expenses),
-                amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
-                previousCents = trends.expensePrevMxnCents,
-                trendBps = trends.expenseTrendBps,
-                upIsGood = false,
-            )
+            ComposeFlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FlowRow(
+                    label = stringResource(R.string.dashboard_incomes),
+                    amount = maskIfHidden(formatMoney(trends.incomeMxnCents), hide),
+                    previousCents = trends.incomePrevMxnCents,
+                    trendBps = trends.incomeTrendBps,
+                    upIsGood = true,
+                )
+                FlowRow(
+                    label = stringResource(R.string.dashboard_expenses),
+                    amount = maskIfHidden(formatMoney(trends.expenseMxnCents), hide),
+                    previousCents = trends.expensePrevMxnCents,
+                    trendBps = trends.expenseTrendBps,
+                    upIsGood = false,
+                )
+            }
         }
 
         // With a single currency the consolidated figure above already says
@@ -993,20 +857,14 @@ private fun FlowCard(trends: SpendingTrends) {
 
 /**
  * The period's income against its expenses, as two bars — the web's
- * `FlowRangeWidget`. Both figures come straight from `getSpendingTrends`; the
- * only arithmetic here is the fraction that sets each bar's height.
+ * `FlowRangeWidget`: one blank category, `barGap={0}`, `barCategoryGap="22%"`.
+ * Both figures come straight from `getSpendingTrends`.
  */
 @Composable
 private fun FlowRangeCard(
     trends: SpendingTrends,
     hide: Boolean,
 ) {
-    val colors = Broke.colors
-    // Same rounded scale as the bucket chart, so both charts on the overview
-    // label their axis the way the web's does.
-    val max = niceCeiling(maxOf(trends.incomeMxnCents, trends.expenseMxnCents).coerceAtLeast(1))
-    val axisColor = colors.borderMuted
-    val hit = rememberChartHit()
     val incomes = stringResource(R.string.dashboard_incomes)
     val expenses = stringResource(R.string.dashboard_expenses)
 
@@ -1015,125 +873,34 @@ private fun FlowRangeCard(
             Text(
                 stringResource(R.string.dashboard_income_vs_expense),
                 style = MaterialTheme.typography.titleLarge,
-                color = colors.fg,
+                color = Broke.colors.fg,
                 modifier = Modifier.weight(1f).padding(end = 28.dp),
             )
         }
-        Spacer(Modifier.height(20.dp))
-
-        // Same furniture as the bucket chart above it: a vertical scale on the
-        // left, hairline axes, and the legend underneath, expenses first.
-        Row(modifier = Modifier.fillMaxWidth().height(170.dp)) {
-            if (!hide) {
-                // Each tick label sits centred on its gridline, as in the browser.
-                // Spacing five labels inside the plot's own 150 dp instead drops the
-                // top one half a line, and a full-height bar then overshoots it.
-                Column(
-                    modifier = Modifier
-                        .padding(start = CHART_MARGIN)
-                        .width(AXIS_WIDTH - AXIS_TICK_GAP)
-                        .height(150.dp + TICK_LABEL_HEIGHT)
-                        .offset(y = -TICK_LABEL_HEIGHT / 2),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.End,
-                ) {
-                    listOf(1f, 0.75f, 0.5f, 0.25f, 0f).forEach { fraction ->
-                        Text(
-                            ((max * fraction).toLong() / 100).toString(),
-                            style = MaterialTheme.typography.labelSmall
-                            .copy(fontSize = 11.sp, lineHeight = 16.5.sp),
-                            color = colors.fgSubtle,
-                        )
-                    }
-                }
-                Spacer(Modifier.width(AXIS_TICK_GAP))
-            }
-
-            Box(
-                Modifier
-                    .width(1.dp)
-                    .height(150.dp)
-                    .background(colors.borderMuted),
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = CHART_MARGIN)
-                    .height(150.dp)
-                    // One category, so any tap on the plot reads it out and
-                    // shades the whole band, as recharts does.
-                    .chartTap(hit, trends) { tap, _ -> ChartHit(0, tap) }
-                    .drawBehind {
-                        if (hit.shown != null) {
-                            bandCursor(0f, size.width, size.height, colors.borderMuted)
-                        }
-                        drawLine(
-                            color = axisColor,
-                            start = Offset(0f, size.height),
-                            end = Offset(size.width, size.height),
-                            strokeWidth = 1.dp.toPx(),
-                        )
-                    },
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                // `barGap={0}` puts the pair shoulder to shoulder in the middle
-                // of the band, income on the left; together they take a little
-                // over half the plot.
-                Row(
-                    modifier = Modifier.fillMaxWidth(0.55f).height(150.dp),
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    TotalsBar(
-                        fraction = trends.incomeMxnCents.toFloat() / max.toFloat(),
-                        color = colors.positive,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TotalsBar(
-                        fraction = trends.expenseMxnCents.toFloat() / max.toFloat(),
-                        color = colors.danger,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                // No label line: the web's single category is named " ".
-                ChartTooltip(
-                    anchor = hit.shown?.anchor,
-                    content = hit.shown?.let {
-                        TooltipContent(
-                            label = null,
-                            items = listOf(
-                                TooltipItem(incomes, maskIfHidden(formatMoney(trends.incomeMxnCents), hide), colors.positive),
-                                TooltipItem(expenses, maskIfHidden(formatMoney(trends.expenseMxnCents), hide), colors.danger),
-                            ),
-                        )
-                    },
-                    modifier = Modifier.matchParentSize(),
+        Spacer(Modifier.height(16.dp))
+        RechartsBarChart(
+            height = 214.dp,
+            categories = 1,
+            series = listOf(
+                BarSeries(incomes, WebPositive, listOf(trends.incomeMxnCents / 100.0)),
+                BarSeries(expenses, WebNegative, listOf(trends.expenseMxnCents / 100.0)),
+            ),
+            xLabel = { " " },
+            hideValues = hide,
+            xFontSize = 12.sp,
+            xTickLine = false,
+            barCategoryGap = 0.22f,
+            barGap = 0.dp,
+            // No label line: the web's single category is named " ".
+            tooltipAt = {
+                TooltipContent(
+                    label = null,
+                    items = listOf(
+                        TooltipItem(expenses, maskIfHidden(formatMoney(trends.expenseMxnCents), hide), WebNegative),
+                        TooltipItem(incomes, maskIfHidden(formatMoney(trends.incomeMxnCents), hide), WebPositive),
+                    ),
                 )
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
-        ) {
-            ChartLegend(colors.danger, stringResource(R.string.dashboard_expenses))
-            ChartLegend(colors.positive, stringResource(R.string.dashboard_incomes))
-        }
+            },
+        )
     }
-}
-
-/** One bar of the totals chart: a plain column with a 4 px rounded top. */
-@Composable
-private fun TotalsBar(
-    fraction: Float,
-    color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier
-            .fillMaxHeight(fraction.coerceIn(0f, 1f))
-            .heightIn(min = if (fraction > 0f) 2.dp else 0.dp)
-            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-            .background(color),
-    )
 }

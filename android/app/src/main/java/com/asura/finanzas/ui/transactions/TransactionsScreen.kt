@@ -4,7 +4,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,25 +13,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,11 +36,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.components.ConfirmDialog
-import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.TX_LIST_LIMIT
@@ -57,27 +50,20 @@ import com.asura.finanzas.data.TransactionCategory
 import com.asura.finanzas.data.TxTotals
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.ChipButton
 import com.asura.finanzas.ui.components.DateField
-import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.loadCached
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.GlassCard
-import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.Lucide
-import com.asura.finanzas.ui.components.IconBadge
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.text
 import androidx.compose.ui.text.style.TextAlign
 import com.asura.finanzas.ui.components.Load
-import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.Period
-import com.asura.finanzas.ui.components.PeriodLabel
-import com.asura.finanzas.ui.components.PeriodPickerDialog
+import com.asura.finanzas.ui.components.PeriodPicker
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.PrivacyToggle
@@ -161,7 +147,6 @@ fun TransactionsScreen(
     // so switching kind clears it (web: TransactionFilters).
     var category by remember { mutableStateOf<TransactionCategory?>(null) }
     var period by remember { mutableStateOf<Period>(Period.AllTime) }
-    var showPeriod by remember { mutableStateOf(false) }
 
     // Includes the reserved categories a capture form would not offer, because a
     // movement may already be filed under one.
@@ -195,7 +180,6 @@ fun TransactionsScreen(
 
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Transaction?>(null) }
-    var actionsFor by remember { mutableStateOf<Transaction?>(null) }
     var pendingDelete by remember { mutableStateOf<Transaction?>(null) }
     var editingApartado by remember { mutableStateOf<Transaction?>(null) }
 
@@ -212,14 +196,16 @@ fun TransactionsScreen(
     val scope = rememberCoroutineScope()
 
     Box(modifier.fillMaxSize()) {
-        when (val current = state) {
-            is Load.Loading -> LoadingBox()
-            is Load.Failed -> ErrorBox(current.message, reload)
-            is Load.Ready -> TransactionList(
+        // Header and filters stay put while a new filter loads, as on the
+        // web: only the list is missing until it arrives. Swapping the whole
+        // page for a spinner also tore down an open period dropdown.
+        val current = state
+        TransactionList(
                 outbox = outbox,
                 repository = repository,
                 onSynced = reload,
-                transactions = current.data,
+                transactions = (current as? Load.Ready)?.data,
+                error = (current as? Load.Failed)?.message,
                 filter = filter,
                 onFilter = { filter = it; category = null },
                 wallets = wallets,
@@ -229,26 +215,15 @@ fun TransactionsScreen(
                 category = category,
                 onCategory = { category = it },
                 period = period,
-                onPickPeriod = { showPeriod = true },
-                fromCache = current.fromCache,
+                onPeriodChange = { period = it },
+                fromCache = (current as? Load.Ready)?.fromCache == true,
                 onNew = { showForm = true },
                 totals = totals,
-                onLongPress = { actionsFor = it },
                 onEdit = { if (it.isApartado) editingApartado = it else editing = it },
                 onDelete = { pendingDelete = it },
             )
-        }
     }
 
-    if (showPeriod) {
-        PeriodPickerDialog(
-            selected = period,
-            // Parameters are edited inline, so a pick applies without closing.
-            onSelect = { period = it },
-            onDismiss = { showPeriod = false },
-            allowAll = true,
-        )
-    }
 
     if (showForm) {
         TransactionFormSheet(
@@ -278,38 +253,6 @@ fun TransactionsScreen(
         )
     }
 
-    actionsFor?.let { target ->
-        AlertDialog(
-            onDismissRequest = { actionsFor = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = {
-                Text(
-                    target.description?.takeIf { it.isNotBlank() }
-                        ?: seedName(target.categoryName).orEmpty(),
-                    color = Broke.colors.fg,
-                )
-            },
-            text = {
-                Column {
-                    // Transfers included: the edit sheet loads both legs and
-                    // saves them together, so the pair can never unbalance.
-                    DialogAction(stringResource(R.string.common_edit)) {
-                        actionsFor = null
-                        if (target.isApartado) editingApartado = target else editing = target
-                    }
-                    DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
-                        actionsFor = null
-                        pendingDelete = target
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { actionsFor = null }) {
-                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
-                }
-            },
-        )
-    }
 
     pendingDelete?.let { target ->
         ConfirmDialog(
@@ -352,7 +295,10 @@ private fun TransactionList(
     outbox: Outbox,
     repository: BrokeRepository,
     onSynced: () -> Unit,
-    transactions: List<Transaction>,
+    /** Null while the current filters load — the web draws no list then. */
+    transactions: List<Transaction>?,
+    /** `text-sm text-danger` above where the list would be. */
+    error: String?,
     filter: KindFilter,
     onFilter: (KindFilter) -> Unit,
     wallets: List<Wallet>,
@@ -362,11 +308,10 @@ private fun TransactionList(
     category: TransactionCategory?,
     onCategory: (TransactionCategory?) -> Unit,
     period: Period,
-    onPickPeriod: () -> Unit,
+    onPeriodChange: (Period) -> Unit,
     fromCache: Boolean,
     onNew: () -> Unit,
     totals: TxTotals?,
-    onLongPress: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
 ) {
@@ -375,15 +320,20 @@ private fun TransactionList(
 
     // The server applies the filters; the list arrives ready to render.
     // Both legs of a transfer read as one line, like the web's list.
-    val shown = foldTransfers(transactions)
+    val shown = transactions?.let(::foldTransfers)
 
+    // No uniform gap: the web stacks these with their own margins — the
+    // header's mb-7, the filter column's gap-3 and mb-4, the total's mb-4 —
+    // and one spacing for all of them put the list 4 dp off and the tabs 2.
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            PageHeader(stringResource(R.string.transactions_title)) {
+            PageHeader(
+                stringResource(R.string.transactions_title),
+                modifier = Modifier.padding(bottom = 28.dp),
+            ) {
                 PrivacyToggle()
                 PrimaryButton(
                     text = stringResource(R.string.transactions_new_transaction),
@@ -393,9 +343,6 @@ private fun TransactionList(
             }
         }
 
-        if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
-        }
 
         item {
             OutboxPanel(
@@ -403,7 +350,7 @@ private fun TransactionList(
                 repository = repository,
                 wallets = wallets,
                 onSynced = onSynced,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             )
         }
 
@@ -416,7 +363,7 @@ private fun TransactionList(
                 optionLabel = { it?.name ?: allWalletsLabel() },
                 onSelect = onWallet,
                 emptyLabel = stringResource(R.string.transactions_all_wallets),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             )
         }
 
@@ -426,7 +373,7 @@ private fun TransactionList(
                 selected = filter,
                 label = { stringResource(it.labelRes) },
                 onSelect = onFilter,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 fillEqually = true,
             )
         }
@@ -437,7 +384,8 @@ private fun TransactionList(
             item {
                 val ofKind = categories.filter { it.kind == filter.wire }
                 PickerField(
-                    label = stringResource(R.string.transactions_category),
+                    // Bare on the web too: the "all categories" option is its label.
+                    label = "",
                     options = listOf<TransactionCategory?>(null) + ofKind,
                     selected = category,
                     optionLabel = {
@@ -446,23 +394,36 @@ private fun TransactionList(
                     },
                     onSelect = onCategory,
                     emptyLabel = stringResource(R.string.transactions_all_categories),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 )
             }
         }
 
         item {
-            ChipButton(
-                text = PeriodLabel(period),
-                onClick = onPickPeriod,
-                leadingIcon = Lucide.CalendarRange,
-                trailingIcon = Lucide.ChevronDown,
+            PeriodPicker(
+                value = period,
+                onChange = onPeriodChange,
+                allowAll = true,
+                modifier = Modifier.padding(bottom = 16.dp),
             )
         }
 
-        totals?.let { summary -> item { TransactionTotal(summary, hide, filter.wire == "income") } }
+        totals?.let { summary ->
+            item {
+                Box(Modifier.padding(bottom = 16.dp)) {
+                    TransactionTotal(summary, hide, filter.wire == "income")
+                }
+            }
+        }
 
-        if (shown.isEmpty()) {
+        error?.let { message ->
+            item {
+                Text(message, style = MaterialTheme.typography.bodyMedium, color = colors.danger)
+            }
+        }
+        if (shown == null || transactions == null) {
+            // Still loading, or failed: nothing where the list goes.
+        } else if (shown.isEmpty()) {
             // "Nothing matches" is a different message from "nothing here yet",
             // and telling them apart is the whole point: with a filter on, an
             // empty list is about the filter, not the account.
@@ -486,7 +447,6 @@ private fun TransactionList(
                 TransactionListCard(
                     transactions = transactions,
                     hide = hide,
-                    onLongPress = onLongPress,
                     onEdit = onEdit,
                     onDelete = onDelete,
                 )
@@ -500,7 +460,7 @@ private fun TransactionList(
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                         color = colors.fgSubtle,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     )
                 }
             }
@@ -515,7 +475,6 @@ private fun TransactionRow(
     /** The `transfer_in` leg, only on folded transfer rows. */
     toLeg: Transaction?,
     hide: Boolean,
-    onLongPress: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
     showWallet: Boolean,
@@ -543,7 +502,7 @@ private fun TransactionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = { onLongPress(tx) })
+            
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -746,6 +705,10 @@ private fun ApartadoEditSheet(
     val cents = parseAmountToCents(amount)
     val canSave = !busy && cents != null && cents > 0
 
+    // `autoFocus` on the amount, as the web's modal opens.
+    val amountFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { amountFocus.requestFocus() } }
+
     FormSheet(
         title = stringResource(R.string.transactions_apartado_edit_title),
         busy = busy,
@@ -787,6 +750,7 @@ private fun ApartadoEditSheet(
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
+            focusRequester = amountFocus,
         )
         DateField(
             label = stringResource(R.string.transactions_date),
@@ -809,7 +773,6 @@ private fun ApartadoEditSheet(
 fun TransactionListCard(
     transactions: List<Transaction>,
     hide: Boolean,
-    onLongPress: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
     modifier: Modifier = Modifier,
@@ -823,11 +786,13 @@ fun TransactionListCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(colors.surfaceRaised)
-            .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp)),
+            .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
+            // The list's own 1 px border, which the rows sit inside of.
+            .padding(1.dp),
     ) {
         rows.forEachIndexed { index, row ->
             if (index > 0) HairLine()
-            TransactionRow(row.tx, row.toLeg, hide, onLongPress, onEdit, onDelete, showWallet)
+            TransactionRow(row.tx, row.toLeg, hide, onEdit, onDelete, showWallet)
         }
     }
 }
@@ -847,7 +812,7 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
             .clip(RoundedCornerShape(12.dp))
             .background(colors.surfaceRaised)
             .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 17.dp, vertical = 13.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -871,7 +836,6 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                     ),
                     color = colors.fgSubtle,
                 )
-                Spacer(Modifier.height(2.dp))
                 Text(
                     maskIfHidden(
                         if (single != null) formatMoney(single.cents, single.currencyCode)
@@ -882,7 +846,7 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                     // not `font-display`, unlike the dashboard's heroes.
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontSize = 24.sp,
-                        lineHeight = 30.sp,
+                        lineHeight = 32.sp,
                         fontWeight = FontWeight.SemiBold,
                     ).tabular(),
                     // Income in the accent, expense in the danger colour, as on
@@ -897,18 +861,17 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                 Text(
                     if (totals.count == 1L) stringResource(R.string.dashboard_movement_one)
                     else text(R.string.dashboard_movements_count, "n" to totals.count),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
                 )
                 if (single == null) {
-                    Spacer(Modifier.height(2.dp))
                     Text(
                         stringResource(R.string.transactions_total_converted) + " · " +
                             totals.byCurrency.joinToString(" · ") {
                                 maskIfHidden(formatMoney(it.cents, it.currencyCode), hide) +
                                     " " + it.currencyCode
                             },
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                        style = MaterialTheme.typography.bodySmall.tabular(),
                         color = colors.fgSubtle,
                         textAlign = TextAlign.End,
                     )

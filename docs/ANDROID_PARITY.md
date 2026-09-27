@@ -291,6 +291,83 @@ Diferencias conocidas que se dejaron a propósito:
   del renglón son los dos `surface-overlay`. Es un rasgo de la web, reproducido
   a propósito: se comprobó con captura lado a lado.
 
+## Quinto barrido (2026-09-26): idioma, pantalla por pantalla
+
+Empezó por un reporte: con la app en español, cosas de Transacciones salían en
+inglés. Terminó en un repaso de cada pestaña medido contra la web.
+
+- **El idioma va a nivel de Activity, no de Composable.** Los `Dialog` y
+  `Popup` de Compose abren su propia ventana y toman `LocalContext` /
+  `Configuration` de la Activity, no del `CompositionLocal` que las envuelve:
+  todo diálogo salía en el idioma del sistema. `MainActivity` aplica el locale
+  en `attachBaseContext` (+ `applyOverrideConfiguration`) y se recrea al
+  cambiarlo en Ajustes.
+- **`ss01` en todo.** La web pone `font-feature-settings: "ss01"` global (la
+  «g» de Hanken, varias letras y el 7 de Sora). Va en todos los estilos de
+  `Type.kt`; `tabular()` es `"ss01, tnum"`.
+- **Fuentes estáticas por peso.** Android no aplicaba el eje `wght` de los
+  archivos variables en todos los caminos: se cambiaron por instancias
+  estáticas (fontTools `instancer`), recortadas a los mismos rangos unicode que
+  sirve Google Fonts — así un carácter fuera de rango (→) cae a la fuente del
+  sistema igual que en el navegador.
+- **Cajas de línea CSS.** `LineHeightStyle(Center, Trim.None)` imita el
+  half-leading; `cssLineBox` fuerza la altura cuando Compose no quiere encoger
+  la línea por debajo del alto de la fuente. El borde de 1 px cuenta dentro de
+  la caja en CSS: los paddings son +1 dp (`px-3 py-2` → 13/9).
+- **Flex.** `FlexShrinkRow` (encoger con intrínsecos + `space-between`),
+  `FlexOneRow` (`flex-1` a min-content) y `pullUp` (márgenes negativos).
+- **recharts portado, no imitado** (`components/Recharts.kt`):
+  `getNiceTickValues`, `preserveEnd` con `minTickGap`, `monotoneX`, márgenes y
+  anchos de eje por defecto, y ahora también `BarChart` (bandas,
+  `barCategoryGap`/`barGap` con tamaño redondeado, leyenda por defecto de 24 px
+  ordenada por nombre, `#34d399`/`#fb7185`). El tooltip también ordena por
+  nombre: «Gastos» antes que «Ingresos».
+- **Popups.** Un `Popup` recorta lo que dibuja: el `shadow-2xl` necesita un
+  margen transparente alrededor (`PopupShadowBox`). Dentro de otro popup el
+  ancla llega relativa a la ventana del padre pero la posición se aplica en
+  pantalla: `CalendarPosition`/`SelectPosition` suman el origen de la ventana.
+- **Selector de periodo = desplegable anclado**, no diálogo. En «Un mes» la
+  web usa su `Select` propio (14 px, «…», popover) y no el `<select>` nativo;
+  es el único lugar. Etiquetas con `Intl`: «septiembre de 2026», «27 de
+  septiembre de 2026».
+- **Cargas sin parpadeo.** Transacciones mantiene encabezado y filtros
+  mientras carga un filtro nuevo (la web sólo deja la lista vacía); Resumen
+  conserva los datos anteriores al cambiar de periodo (`keepingPrevious()`,
+  el `placeholderData: (p) => p` de TanStack).
+- **Formularios revisados**: login/registro (fondo mesh, `max-w-sm`), hoja de
+  aportar/retirar (título por tipo, sin «Tipo», mínimo = inicio; la edición es
+  `MovementEditModal`), compra a MSI (monto y meses lado a lado), detalle de
+  categoría (`Modal solid fixedHeight`), convertir meta en cartera con el
+  formulario completo, categorías con renombrar en línea.
+- **Se quitaron cosas que la web no tiene**: la pantalla de Monedas y el
+  selector de cartera en el alta de inversión.
+- Modo oscuro revisado en Ajustes, Resumen y Transacciones.
+- **Estados vacíos** con una cuenta nueva, pantalla por pantalla: Inversiones
+  ya no pinta el portafolio en $0 y Suscripciones no muestra «Total mensual»
+  sobre una lista vacía (la web los oculta). El ícono lleva `ring-1` por fuera.
+- **Sin conexión = franja global**, no tarjeta por pantalla: la web pinta
+  `bg-amber-500/15 … text-amber-300` arriba de todo mientras
+  `navigator.onLine` es falso; el APK igual (`OfflineStrip` + `rememberOnline`
+  sobre `ConnectivityManager`). Al volver la red se vacía la cola de pendientes
+  (el evento `online` de la web) y todo lo visible se vuelve a pedir
+  (`QueryCache.invalidateAll`, el `invalidateQueries()` de TanStack). Guardar
+  sin red ya no abre un diálogo: la web sólo cierra el formulario.
+- **Bug de la web corregido**: TanStack pausa las mutaciones sin conexión
+  (`networkMode: "online"`), así que una captura sin red nunca llegaba a la
+  cola y el formulario se quedaba con «Guardar» deshabilitado. Ahora
+  `mutations.networkMode = "always"`.
+- **Sin menús de pulsación larga.** La web no tiene gesto equivalente y cada
+  acción ya está a la vista (lápiz, bote, botones de la tarjeta); además el
+  `combinedClickable(onClick = {})` hacía destellar la fila al tocarla.
+- La apariencia (acento, fuentes) se guarda por dispositivo en las dos
+  superficies: al cambiar de cuenta se conserva hasta que la cuenta traiga una
+  más nueva. No es diferencia.
+
+Para medir: `uiautomator dump` del emulador contra `getBoundingClientRect` de
+Playwright a 448×997 @3x, alineando por el primer texto común. Chromium en
+Linux redondea avances de glifo (~3% más ancho): diferencias de ancho o de
+corte de línea de ese orden no son de la app.
+
 Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 
 ## Sesión
@@ -396,13 +473,12 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Web | Android | Estado |
 |---|---|---|
 | Versión / acerca de | `ui/settings` | ✅ |
-| Idioma (es/en) | `ui/settings` + `ProvideAppLocale` | ✅ |
+| Idioma (es/en) | `ui/settings` + locale en `MainActivity` (diálogos incluidos) | ✅ |
 | Tema claro / oscuro / auto | `ui/settings` | ✅ |
 | Apariencia: acento, fondo, tipografía, logo, ícono | `ui/settings/AppearanceScreen` | ✅ (sincronizada con la cuenta) |
 | Zona horaria | `ui/settings` | ✅ |
 | Formato de reloj 12/24 h | `ui/settings` + lista de movimientos | ✅ |
 | Categorías de cartera | `ui/settings` | ✅ (solo lectura, igual que la web) |
-| Monedas y tipos de cambio | `ui/settings/CurrenciesScreen` | ✅ ver, refrescar y fijar a mano — **la web no tiene esta pantalla** |
 | Novedades (changelog in-app) | `WhatsNewScreen` (asset **generado**) | ✅ con enlace «Ver novedades» y estado vacío |
 | Aviso de versión nueva | `components/UpdateBanner` + `data/ApkUpdate` | ✅ la misma barra con «Actualizar», sobre la barra de pestañas (arriba sin sesión); el botón baja el APK del release y abre el instalador |
 
@@ -485,10 +561,6 @@ final del orden en vez de perderse. «Restablecer vista» limpia los dos ajustes
   la primera vez, permitir la app como origen (`REQUEST_INSTALL_PACKAGES`).
   CI sube el APK unos minutos después del tag: si todavía no está, la barra lo
   dice y el botón se queda para reintentar.
-- **Pantalla de monedas**: existe en Android y **no** en la web. El comando
-  `set_exchange_rate` ya existía en el worker y `setSetting`/`getSetting` lo
-  exponen, pero ninguna vista web lo usa. Si se quiere paridad estricta, toca
-  subir la pantalla a la web, no quitarla del teléfono.
 - **Tipografías**: la web las carga de Google Fonts; Android usa
   *downloadable fonts* del mismo proveedor, así que la primera vez que se elige
   una pareja tarda un instante y mientras tanto se ven las fuentes empaquetadas.

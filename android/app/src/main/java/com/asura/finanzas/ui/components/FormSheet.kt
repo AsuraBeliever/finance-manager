@@ -27,6 +27,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,10 +91,16 @@ fun FormSheet(
     fields: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = Broke.colors
-    ModalCard(title = title, onDismiss = onDismiss) {
+    // The web never greys Save out for an unfinished form: pressing it is what
+    // tells you what is missing. Only a save in flight disables it.
+    var missing by remember { mutableStateOf(false) }
+    if (canSave) missing = false
+    val requiredText = stringResource(R.string.common_required)
+    // The web's `<form className="grid gap-4">`, footer included.
+    ModalCard(title = title, onDismiss = onDismiss, bodySpacing = 16.dp) {
         fields()
 
-        error?.let {
+        (error ?: requiredText.takeIf { missing })?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
@@ -98,22 +108,17 @@ fun FormSheet(
             )
         }
 
-        Spacer(Modifier.height(2.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (busy) {
-                CircularProgressIndicator(
-                    color = colors.accent,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(20.dp),
-                )
-            } else {
-                GhostButton(stringResource(R.string.common_cancel), onDismiss)
-                PrimaryButton(text = saveLabel, onClick = onSave, enabled = canSave)
-            }
+            GhostButton(stringResource(R.string.common_cancel), onDismiss)
+            PrimaryButton(
+                text = saveLabel,
+                onClick = { if (canSave) onSave() else missing = true },
+                enabled = !busy,
+            )
         }
     }
 }
@@ -152,9 +157,13 @@ fun ModalCard(
                 // the screen, unreachable however far the body is scrolled —
                 // which is exactly what a long form (a credit card) hits.
                 .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.9f)
+                .cardShadow()
                 .clip(RoundedCornerShape(16.dp))
-                .background(colors.surfaceOverlay)
+                .background(colors.surfaceRaised)
+                .cardHighlight()
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
+                // The card's own 1 px border, which everything sits inside.
+                .padding(1.dp)
                 .imePadding(),
         ) {
             Row(
@@ -165,8 +174,7 @@ fun ModalCard(
             ) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.displayLarge
-                        .copy(fontSize = 18.sp, lineHeight = 24.sp),
+                    style = MaterialTheme.typography.titleLarge,
                     color = colors.fg,
                     modifier = Modifier.weight(1f),
                 )
@@ -197,19 +205,39 @@ fun ModalCard(
     }
 }
 
-/** The web's `variant="ghost"` button: text only, no fill. */
+/**
+ * The web's `variant="ghost"` button (and `variant="danger"` with [tint]):
+ * `rounded-lg px-4 py-2 text-sm`, no fill, and — unlike the primary one — no
+ * `font-medium`. An optional 15 px glyph sits `gap-2` before the label.
+ */
 @Composable
-fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
+fun GhostButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    tint: androidx.compose.ui.graphics.Color? = null,
+    enabled: Boolean = true,
+    /** Most buttons carry a 15 px glyph `gap-2` away; a few use 14 and `gap-1.5`. */
+    iconSize: Dp = 15.dp,
+    iconGap: Dp = 8.dp,
+) {
+    val color = (tint ?: Broke.colors.fg).let { if (enabled) it else it.copy(alpha = it.alpha * 0.5f) }
+    Row(
         modifier
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(iconGap),
     ) {
+        leadingIcon?.let {
+            Icon(it, contentDescription = null, tint = color, modifier = Modifier.size(iconSize))
+        }
         Text(
             text,
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-            color = Broke.colors.fg,
+            style = MaterialTheme.typography.bodyMedium,
+            color = color,
         )
     }
 }
@@ -240,9 +268,16 @@ fun DialogAction(
 fun PlainSheet(
     title: String,
     onDismiss: () -> Unit,
+    /** The web Modal's `solid`: the opaque overlay token instead of glass. */
+    solid: Boolean = false,
+    /** `fixedHeight`: locked to 80% of the screen, the body scrolling inside. */
+    fixedHeight: Boolean = false,
+    /** Gap between the body's children; 0 where they carry their own margins. */
+    spacing: androidx.compose.ui.unit.Dp = 8.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = Broke.colors
+    val screenH = LocalConfiguration.current.screenHeightDp.dp
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         DialogBlurBehind()
         Column(
@@ -250,9 +285,15 @@ fun PlainSheet(
                 .padding(16.dp)
                 .widthIn(max = 448.dp)
                 .fillMaxWidth()
+                // `max-h-[90dvh]`, like every modal on the web.
+                .heightIn(max = screenH * 0.9f)
+                .then(if (fixedHeight) Modifier.height(screenH * 0.8f) else Modifier)
+                .cardShadow()
                 .clip(RoundedCornerShape(16.dp))
-                .background(colors.surfaceOverlay)
-                .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp)),
+                .background(if (solid) colors.surfaceOverlay else colors.surfaceRaised)
+                .then(if (solid) Modifier else Modifier.cardHighlight())
+                .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
+                .padding(1.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
@@ -260,8 +301,7 @@ fun PlainSheet(
             ) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.displayLarge
-                        .copy(fontSize = 18.sp, lineHeight = 24.sp),
+                    style = MaterialTheme.typography.titleLarge,
                     color = colors.fg,
                     modifier = Modifier.weight(1f),
                 )
@@ -279,10 +319,10 @@ fun PlainSheet(
             HairLine()
             Column(
                 modifier = Modifier
-                    .weight(1f, fill = false)
+                    .weight(1f, fill = fixedHeight)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing),
                 content = content,
             )
         }

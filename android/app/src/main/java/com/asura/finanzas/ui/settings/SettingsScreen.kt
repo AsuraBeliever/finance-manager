@@ -57,6 +57,10 @@ import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.SettingRow
 import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.theme.Broke
+import androidx.compose.foundation.border
+import com.asura.finanzas.ui.components.WebCheckbox
+import com.asura.finanzas.ui.components.GhostButton
+import com.asura.finanzas.ui.components.PanelCard
 import kotlinx.coroutines.launch
 
 private enum class Locale(val label: String, val tag: String) {
@@ -78,7 +82,6 @@ fun SettingsScreen(
     val colors = Broke.colors
     val settings = LocalAppSettings.current
     val scope = rememberCoroutineScope()
-    var showCurrencies by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
     var showWhatsNew by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
@@ -112,14 +115,6 @@ fun SettingsScreen(
         return
     }
 
-    if (showCurrencies) {
-        CurrenciesScreen(
-            repository = repository,
-            onBack = { showCurrencies = false },
-            modifier = modifier,
-        )
-        return
-    }
 
 
     // A modal over the settings page, as on the web — not a page of its own.
@@ -136,7 +131,6 @@ fun SettingsScreen(
         return
     }
 
-    val onOpenCurrencies = { showCurrencies = true }
 
     val themeIcon: (ThemeChoice) -> ImageVector = {
         when (it) {
@@ -155,16 +149,18 @@ fun SettingsScreen(
         )
     }
 
+    // `[&>section]:mb-6`: 24 between cards, the header's `mb-7` above them.
     Column(
         modifier = modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp)),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        PageHeader(stringResource(R.string.settings_title))
+        PageHeader(stringResource(R.string.settings_title), Modifier.padding(bottom = 4.dp))
 
-        GlassCard(Modifier.fillMaxWidth()) {
+        // `flex flex-wrap items-center justify-between gap-3`.
+        PanelCard(Modifier.fillMaxWidth()) {
             SettingRow(stringResource(R.string.theme_label)) {
                 SegmentedControl(
                     style = SegStyle.Theme,
@@ -178,7 +174,7 @@ fun SettingsScreen(
             }
         }
 
-        GlassCard(Modifier.fillMaxWidth()) {
+        PanelCard(Modifier.fillMaxWidth()) {
             SettingRow(stringResource(R.string.settings_language)) {
                 SegmentedControl(
                     style = SegStyle.Tray,
@@ -190,19 +186,19 @@ fun SettingsScreen(
             }
         }
 
-        GlassCard(Modifier.fillMaxWidth()) {
+        PanelCard(Modifier.fillMaxWidth()) {
             Text(
                 stringResource(R.string.settings_timezone),
                 style = MaterialTheme.typography.titleMedium,
                 color = colors.fg,
+                modifier = Modifier.padding(bottom = 4.dp),
             )
-            Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.settings_timezone_hint),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = colors.fgSubtle,
+                modifier = Modifier.padding(bottom = 12.dp),
             )
-            Spacer(Modifier.height(12.dp))
             // The web's select sits bare under the hint — no second label.
             PickerField(
                 label = "",
@@ -213,9 +209,7 @@ fun SettingsScreen(
                 onSelect = { scope.launch { appearanceSync.saveTimezone(it) } },
                 modifier = Modifier.fillMaxWidth(),
             )
-            // Clock format lives inside this card on the web, not in one of its
-            // own; and there is no "hide balance" row at all — the eye in the
-            // headers is the control, on both surfaces.
+            // `mt-4 flex items-center justify-between gap-3`.
             Spacer(Modifier.height(16.dp))
             SettingRow(stringResource(R.string.settings_clock), subtle = true) {
                 SegmentedControl(
@@ -230,254 +224,120 @@ fun SettingsScreen(
             }
         }
 
-        GlassCard(Modifier.fillMaxWidth().clickable { showAppearance = true }) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Lucide.Palette,
-                    contentDescription = null,
-                    tint = colors.fgSubtle,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.appearance_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.fg,
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.appearance_settings_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.appearance_manage),
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-                    color = colors.accent,
-                )
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    Lucide.ChevronRight,
-                    contentDescription = null,
-                    tint = colors.accent,
-                    modifier = Modifier.size(15.dp),
-                )
-            }
-        }
+        LinkCard(
+            icon = Lucide.Palette,
+            title = stringResource(R.string.appearance_title),
+            hint = stringResource(R.string.appearance_settings_hint),
+            link = stringResource(R.string.appearance_manage),
+            onClick = { showAppearance = true },
+        )
 
-        // The web keeps a shortcut to the category manager here as well as in
-        // the planning sheet; the phone only had the sheet.
-        GlassCard(Modifier.fillMaxWidth().clickable { onOpenCategories() }) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Lucide.Tags,
-                    contentDescription = null,
-                    tint = colors.fgSubtle,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.categories_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.fg,
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.categories_settings_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.categories_manage),
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-                    color = colors.accent,
-                )
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    Lucide.ChevronRight,
-                    contentDescription = null,
-                    tint = colors.accent,
-                    modifier = Modifier.size(15.dp),
-                )
-            }
-        }
-
-        GlassCard(Modifier.fillMaxWidth().clickable { onOpenCurrencies() }) {
-            Text(
-                stringResource(R.string.settings_currencies),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.settings_currencies_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
-            )
-        }
+        LinkCard(
+            icon = Lucide.Tags,
+            title = stringResource(R.string.categories_title),
+            hint = stringResource(R.string.categories_settings_hint),
+            link = stringResource(R.string.categories_manage),
+            onClick = onOpenCategories,
+        )
 
         if (walletCategories.isNotEmpty()) {
-            GlassCard(Modifier.fillMaxWidth()) {
+            PanelCard(Modifier.fillMaxWidth()) {
                 Text(
                     stringResource(R.string.settings_wallet_categories),
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.fg,
+                    modifier = Modifier.padding(bottom = 12.dp),
                 )
-                Spacer(Modifier.height(10.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // `flex flex-wrap gap-2`, pills `rounded-full px-3 py-1 text-sm`.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     walletCategories.forEach { category ->
                         Text(
                             seedName(category.name, category.isSystem).orEmpty(),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = colors.fgMuted,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.fg,
                             modifier = Modifier
-                                .padding(bottom = 8.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(999.dp))
                                 .background(colors.surfaceOverlay)
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
                         )
                     }
                 }
             }
         }
 
-        if (sessions.isNotEmpty()) {
-            GlassCard(Modifier.fillMaxWidth()) {
-                Text(
-                    stringResource(R.string.account_devices),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.fg,
-                )
-                Spacer(Modifier.height(6.dp))
-                sessions.forEach { session ->
-                    SessionRow(
-                        session = session,
-                        onRevoke = {
-                            scope.launch {
-                                runCatching { repository.revokeSession(session.id) }
-                                reloadSessions++
-                            }
-                        },
-                    )
-                }
-                if (sessions.count { !it.current } > 0) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        stringResource(R.string.account_revoke_others),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = colors.danger,
-                        modifier = Modifier.clickable {
-                            scope.launch {
-                                runCatching { repository.revokeOtherSessions() }
-                                reloadSessions++
-                            }
-                        },
-                    )
-                }
+        PanelCard(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+                Icon(Lucide.Smartphone, contentDescription = null, tint = colors.fgSubtle, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.account_devices), style = MaterialTheme.typography.titleMedium, color = colors.fg)
             }
-        }
-
-        GlassCard(Modifier.fillMaxWidth()) {
-            Text(
-                stringResource(R.string.whats_new_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.whats_new_settings_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
-            )
-            Spacer(Modifier.height(10.dp))
-            // The web puts the way in on its own accent link with a chevron,
-            // rather than leaving the heading quietly tappable.
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { showWhatsNew = true },
-            ) {
-                Text(
-                    stringResource(R.string.whats_new_view),
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-                    color = colors.accent,
-                )
-                Icon(
-                    Lucide.ChevronRight,
-                    contentDescription = null,
-                    tint = colors.accent,
-                    modifier = Modifier.padding(start = 2.dp).size(15.dp),
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.whats_new_notify_on_update),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.fgMuted,
-                    modifier = Modifier.weight(1f),
-                )
-                Switch(
-                    checked = settings.changelogEnabled,
-                    onCheckedChange = {
-                        scope.launch { appearanceSync.saveChangelogEnabled(it) }
+            sessions.forEachIndexed { index, session ->
+                if (index > 0) com.asura.finanzas.ui.components.HairLine()
+                SessionRow(
+                    session = session,
+                    onRevoke = {
+                        scope.launch {
+                            runCatching { repository.revokeSession(session.id) }
+                            reloadSessions++
+                        }
                     },
                 )
             }
+            if (sessions.count { !it.current } > 0) {
+                GhostButton(
+                    stringResource(R.string.account_revoke_others),
+                    onClick = {
+                        scope.launch {
+                            runCatching { repository.revokeOtherSessions() }
+                            reloadSessions++
+                        }
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
 
-        GlassCard(Modifier.fillMaxWidth().clickable { showPassword = true }) {
-            Text(
-                stringResource(R.string.account_change_password),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.account_password_settings_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
-            )
+        // A link card on the web: key, title over hint, chevron. It is an
+        // `<a>`, not a `<section>`, so the `mb-6` the sections get skips it and
+        // it sits flush on the session card below — kept that way.
+        Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.surfaceRaised)
+                .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
+                .clickable { showPassword = true }
+                .padding(21.dp),
+        ) {
+            Icon(Lucide.KeyRound, contentDescription = null, tint = colors.fgSubtle, modifier = Modifier.size(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.account_change_password),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.fg,
+                )
+                Text(
+                    stringResource(R.string.account_password_settings_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.fgSubtle,
+                )
+            }
+            Icon(Lucide.ChevronRight, contentDescription = null, tint = colors.fgSubtle, modifier = Modifier.size(16.dp))
         }
 
-        GlassCard(Modifier.fillMaxWidth()) {
-            Text(
-                stringResource(R.string.settings_about),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.fg,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "${stringResource(R.string.settings_version)} ${BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.fgMuted,
-            )
-            Text(
-                BuildConfig.API_BASE,
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.fgSubtle,
-            )
-            Spacer(Modifier.height(16.dp))
-            com.asura.finanzas.ui.components.CheckForUpdatesButton(repository)
-        }
-
-        GlassCard(Modifier.fillMaxWidth()) {
+        PanelCard(Modifier.fillMaxWidth()) {
             Text(
                 stringResource(R.string.settings_session),
                 style = MaterialTheme.typography.titleMedium,
                 color = colors.fg,
+                modifier = Modifier.padding(bottom = 12.dp),
             )
-            Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -485,29 +345,141 @@ fun SettingsScreen(
             ) {
                 Text(
                     user?.email.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colors.fgMuted,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.fg,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
-                Text(
+                GhostButton(
                     stringResource(R.string.auth_logout),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.danger,
-                    modifier = Modifier.clickable {
-                        scope.launch { repository.logout(); onSignedOut() }
-                    },
+                    onClick = { scope.launch { repository.logout(); onSignedOut() } },
+                    leadingIcon = Lucide.LogOut,
+                    iconSize = 16.dp,
                 )
             }
+        }
+
+        }
+
+        PanelCard(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+                Icon(Lucide.Sparkles, contentDescription = null, tint = colors.fgSubtle, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.whats_new_title), style = MaterialTheme.typography.titleMedium, color = colors.fg)
+            }
+            Text(
+                stringResource(R.string.whats_new_settings_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.fgSubtle,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            // `flex flex-wrap items-center justify-between gap-3`: the link, then
+            // the checkbox with its label.
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(end = 12.dp).align(Alignment.CenterVertically).clickable { showWhatsNew = true },
+                ) {
+                    Text(
+                        stringResource(R.string.whats_new_view),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.accent,
+                    )
+                    Icon(Lucide.ChevronRight, contentDescription = null, tint = colors.accent, modifier = Modifier.size(15.dp))
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.align(Alignment.CenterVertically).clickable {
+                        scope.launch { appearanceSync.saveChangelogEnabled(!settings.changelogEnabled) }
+                    },
+                ) {
+                    WebCheckbox(
+                        checked = settings.changelogEnabled,
+                        onCheckedChange = { scope.launch { appearanceSync.saveChangelogEnabled(it) } },
+                    )
+                    Text(
+                        stringResource(R.string.whats_new_notify_on_update),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.fgMuted,
+                    )
+                }
+            }
+        }
+
+        PanelCard(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+                Icon(Lucide.Info, contentDescription = null, tint = colors.fgSubtle, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium, color = colors.fg)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.settings_version), style = MaterialTheme.typography.bodyMedium, color = colors.fgMuted)
+                Text(
+                    "v${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                    color = colors.fg,
+                )
+            }
+            // Android only (asked for on 2026-09-26): the web updates itself.
+            Spacer(Modifier.height(16.dp))
+            com.asura.finanzas.ui.components.CheckForUpdatesButton(repository)
         }
     }
 }
 
-/** One signed-in device, with its own sign-out unless it is this one. */
+/**
+ * The web's appearance / categories cards: an icon heading, a hint, and an
+ * accent link with a chevron that is the way in.
+ */
+@Composable
+private fun LinkCard(
+    icon: ImageVector,
+    title: String,
+    hint: String,
+    link: String,
+    onClick: () -> Unit,
+) {
+    val colors = Broke.colors
+    PanelCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+            Icon(icon, contentDescription = null, tint = colors.fgSubtle, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, color = colors.fg)
+        }
+        Text(
+            hint,
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.fgSubtle,
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.clickable(onClick = onClick),
+        ) {
+            Text(link, style = MaterialTheme.typography.labelLarge, color = colors.accent)
+            Icon(Lucide.ChevronRight, contentDescription = null, tint = colors.accent, modifier = Modifier.size(15.dp))
+        }
+    }
+}
+
+/** One signed-in device (`flex items-center gap-3 py-2.5 text-sm`). */
 @Composable
 private fun SessionRow(session: SessionInfo, onRevoke: () -> Unit) {
     val colors = Broke.colors
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
             if (isMobileDevice(session.userAgent)) Lucide.Smartphone else Lucide.Monitor,
@@ -515,32 +487,45 @@ private fun SessionRow(session: SessionInfo, onRevoke: () -> Unit) {
             tint = colors.fgSubtle,
             modifier = Modifier.size(18.dp),
         )
-        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(
-                deviceLabel(session.userAgent),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                color = colors.fg,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    deviceLabel(session.userAgent),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.fg,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (session.current) {
+                    Text(
+                        stringResource(R.string.account_this_device),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 15.sp),
+                        color = colors.accent,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(colors.accentDim.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
+                }
+            }
             Text(
                 stringResource(R.string.account_last_seen) + ": " +
                     relativeFromUtc(session.lastSeenAt ?: session.createdAt),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.bodySmall,
                 color = colors.fgSubtle,
             )
         }
-        if (session.current) {
-            Text(
-                stringResource(R.string.account_this_device),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.accent,
-            )
-        } else {
+        if (!session.current) {
+            // `variant="danger" className="px-3 py-1.5"`.
             Text(
                 stringResource(R.string.account_revoke),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.danger,
-                modifier = Modifier.clickable(onClick = onRevoke),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onRevoke)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
     }

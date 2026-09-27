@@ -118,7 +118,7 @@ fun WhatsNewAuto(preferences: AppPreferences) {
         // No scrolling column here: `PlainSheet` already scrolls its content,
         // and a second one inside it is handed an infinite height, which
         // Compose refuses — it took the app down on the update notice.
-        entries.forEach { entry -> ChangelogEntryBlock(entry, locale) }
+        entries.forEachIndexed { i, entry -> ChangelogEntryBlock(entry, locale, first = i == 0) }
     }
 }
 
@@ -127,37 +127,44 @@ fun WhatsNewAuto(preferences: AppPreferences) {
  * the modal and nowhere else, so both places here share it.
  */
 @Composable
-private fun ChangelogEntryBlock(entry: ChangelogEntry, locale: String) {
+private fun ChangelogEntryBlock(entry: ChangelogEntry, locale: String, first: Boolean = true) {
     val colors = Broke.colors
-    Row {
-        Text(
-            "v${entry.version}",
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.fg,
-        )
-        Spacer(Modifier.width(10.dp))
-        MicroLabel(entry.date, color = colors.fgSubtle)
-    }
-    Spacer(Modifier.height(10.dp))
-    val lines = if (locale == "en") entry.en else entry.es
-    lines.forEach { line ->
+    // `space-y-5` between releases (the sheet's own gap gives 8 of the 20).
+    Column(Modifier.padding(top = if (first) 0.dp else 12.dp)) {
+        // `mb-2 flex items-baseline gap-2`: the version in the display face,
+        // the date small and plain beside it.
         Row(Modifier.padding(bottom = 8.dp)) {
-            // The web marks each line with a sparkles glyph, not a bullet.
-            Icon(
-                Lucide.Sparkles,
-                contentDescription = null,
-                tint = colors.accent,
-                modifier = Modifier.padding(top = 3.dp).size(14.dp),
+            Text(
+                "v${entry.version}",
+                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 16.sp, lineHeight = 24.sp),
+                color = colors.fg,
+                modifier = Modifier.alignByBaseline(),
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                line,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.fgMuted,
+                entry.date,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.fgSubtle,
+                modifier = Modifier.alignByBaseline(),
             )
         }
+        val lines = if (locale == "en") entry.en else entry.es
+        // `space-y-1.5`; each line `flex gap-2 text-sm`, sparkles `mt-0.5`.
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            lines.forEach { line ->
+                Row {
+                    Icon(
+                        Lucide.Sparkles,
+                        contentDescription = null,
+                        tint = colors.accent,
+                        modifier = Modifier.padding(top = 2.dp).size(14.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(line, style = MaterialTheme.typography.bodyMedium, color = colors.fgMuted)
+                }
+            }
+        }
     }
-    Spacer(Modifier.height(8.dp))
 }
 
 @Composable
@@ -181,7 +188,7 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                 color = Broke.colors.fgSubtle,
             )
-            else -> list.forEach { entry -> ChangelogEntryBlock(entry, locale) }
+            else -> list.forEachIndexed { i, entry -> ChangelogEntryBlock(entry, locale, first = i == 0) }
         }
     }
 }

@@ -7,30 +7,22 @@ import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.PageHeader
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -54,18 +46,13 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Subscription
 import com.asura.finanzas.data.SubscriptionList
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.ConfirmDialog
-import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.PrimaryButton
-import com.asura.finanzas.ui.components.HeroAmount
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.MicroLabel
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatMoney
@@ -87,7 +74,6 @@ fun SubscriptionsScreen(
 
     var creating by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Subscription?>(null) }
-    var actionsFor by remember { mutableStateOf<Subscription?>(null) }
     // Deleting asks first, as it does in the browser.
     var deleting by remember { mutableStateOf<Subscription?>(null) }
 
@@ -99,7 +85,6 @@ fun SubscriptionsScreen(
             fromCache = current.fromCache,
             onBack = onBack,
             onNew = { creating = true },
-            onLongPress = { actionsFor = it },
             onPay = { target ->
                 scope.launch {
                     runCatching { repository.registerSubscriptionPayment(target.id) }
@@ -132,56 +117,6 @@ fun SubscriptionsScreen(
         )
     }
 
-    actionsFor?.let { target ->
-        AlertDialog(
-            onDismissRequest = { actionsFor = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(target.name, color = Broke.colors.fg) },
-            text = {
-                Column {
-                    // Posting the charge needs a wallet to take it from, so the
-                    // action is only offered when one is set — same rule as the
-                    // server's.
-                    if (target.walletId != null) {
-                        DialogAction(stringResource(R.string.subscriptions_register_payment)) {
-                            actionsFor = null
-                            scope.launch {
-                                runCatching { repository.registerSubscriptionPayment(target.id) }
-                                reload()
-                            }
-                        }
-                    }
-                    DialogAction(stringResource(R.string.common_edit)) {
-                        actionsFor = null
-                        editing = target
-                    }
-                    DialogAction(
-                        stringResource(
-                            if (target.isActive) R.string.subscriptions_pause
-                            else R.string.subscriptions_resume,
-                        ),
-                    ) {
-                        actionsFor = null
-                        scope.launch {
-                            runCatching {
-                                repository.setSubscriptionActive(target.id, !target.isActive)
-                            }
-                            reload()
-                        }
-                    }
-                    DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
-                        actionsFor = null
-                        deleting = target
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { actionsFor = null }) {
-                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
-                }
-            },
-        )
-    }
 
     deleting?.let { target ->
         ConfirmDialog(
@@ -205,7 +140,6 @@ private fun SubscriptionContent(
     fromCache: Boolean,
     onBack: () -> Unit,
     onNew: () -> Unit,
-    onLongPress: (Subscription) -> Unit,
     onPay: (Subscription) -> Unit,
     onToggle: (Subscription) -> Unit,
     onEdit: (Subscription) -> Unit,
@@ -223,7 +157,8 @@ private fun SubscriptionContent(
     ) {
         item {
             BackHandler(onBack = onBack)
-            PageHeader(stringResource(R.string.subscriptions_title)) {
+            // The header's `mb-7`: 28, of which the list's gap gives 12.
+            PageHeader(stringResource(R.string.subscriptions_title), Modifier.padding(bottom = 16.dp)) {
                 PrivacyToggle()
                 PrimaryButton(
                     text = stringResource(R.string.subscriptions_new_subscription),
@@ -233,23 +168,24 @@ private fun SubscriptionContent(
             }
         }
 
-        if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
-        }
 
-        item {
-            // A quiet line on the web, not a hero card.
-            Row(verticalAlignment = Alignment.Bottom) {
+        // Only over a list, as on the web (`list.length > 0`).
+        if (data.subscriptions.isNotEmpty()) item {
+            // A quiet line on the web, not a hero card: `mb-4 text-sm`, the
+            // figure a `font-display text-base font-semibold` span.
+            Row(Modifier.padding(bottom = 4.dp)) {
                 Text(
                     stringResource(R.string.subscriptions_monthly_total) + ": ",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = Broke.colors.fgMuted,
+                    modifier = Modifier.alignByBaseline(),
                 )
                 Text(
                     maskIfHidden(formatMoney(data.monthlyTotalMxnCents), hide),
-                    style = MaterialTheme.typography.displayLarge
-                        .copy(fontSize = 16.sp, lineHeight = 20.sp).tabular(),
+                    style = MaterialTheme.typography.headlineMedium
+                        .copy(fontSize = 16.sp, lineHeight = 24.sp).tabular(),
                     color = Broke.colors.fg,
+                    modifier = Modifier.alignByBaseline(),
                 )
             }
         }
@@ -269,7 +205,6 @@ private fun SubscriptionContent(
         itemsIndexed(data.subscriptions, key = { _, it -> it.id }) { index, subscription ->
             SubscriptionCard(
                 subscription, hide, index,
-                onLongPress = onLongPress,
                 onPay = onPay,
                 onToggle = onToggle,
                 onEdit = onEdit,
@@ -285,7 +220,6 @@ private fun SubscriptionCard(
     subscription: Subscription,
     hide: Boolean,
     index: Int,
-    onLongPress: (Subscription) -> Unit,
     onPay: (Subscription) -> Unit,
     onToggle: (Subscription) -> Unit,
     onEdit: (Subscription) -> Unit,
@@ -300,7 +234,7 @@ private fun SubscriptionCard(
         Modifier
             .fillMaxWidth()
             .alpha(alpha)
-            .combinedClickable(onClick = {}, onLongClick = { onLongPress(subscription) }),
+            ,
         padding = 16.dp,
     ) {
         // One wrapping row for the lot, as the web lays it out — the four
@@ -312,8 +246,10 @@ private fun SubscriptionCard(
         ) {
             // The web's badge: a colour tile carrying the service's logo, and
             // only its initial when there is no logo for the name.
+            // `items-center`: every piece sits on the row's middle.
             Box(
                 Modifier
+                    .align(Alignment.CenterVertically)
                     .size(40.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(tint),
@@ -337,7 +273,7 @@ private fun SubscriptionCard(
                     )
                 }
             }
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).align(Alignment.CenterVertically)) {
                 Text(
                     subscription.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -352,7 +288,7 @@ private fun SubscriptionCard(
                         else R.string.subscriptions_monthly,
                     ) + " · " + stringResource(R.string.subscriptions_next_charge) +
                         ": " + subscription.nextChargeDate,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
                 )
             }
@@ -361,11 +297,13 @@ private fun SubscriptionCard(
                     formatMoney(subscription.amountCents, subscription.currencyCode),
                     hide,
                 ),
+                // `font-medium` at the base size.
                 style = MaterialTheme.typography.titleMedium.tabular(),
                 color = colors.fg,
+                modifier = Modifier.align(Alignment.CenterVertically),
             )
             // Register a payment, pause/resume, edit, delete.
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.align(Alignment.CenterVertically)) {
                 RowAction(Lucide.Receipt, subscription.walletId != null) { onPay(subscription) }
                 RowAction(if (subscription.isActive) Lucide.Pause else Lucide.Play) {
                     onToggle(subscription)

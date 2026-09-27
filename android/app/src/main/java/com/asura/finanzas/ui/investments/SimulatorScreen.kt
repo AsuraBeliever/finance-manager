@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -55,6 +56,7 @@ import com.asura.finanzas.ui.components.StackedAreaChart
 import com.asura.finanzas.ui.components.chartColor
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
+import com.asura.finanzas.ui.components.cssLineBox
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.theme.Broke
@@ -66,15 +68,18 @@ private enum class SimMode { Project, Goal, Compare }
 private val CADENCES = listOf("monthly", "biweekly", "weekly", "none")
 
 /** Percent typed as text -> basis points, the unit the API speaks. */
-private fun rateToBps(text: String): Long? =
-    text.trim().replace(',', '.').toDoubleOrNull()
-        ?.takeIf { it >= 0 && it < 1000 }
-        ?.let { Math.round(it * 100) }
+/**
+ * JavaScript's `Number(s)`, which the web parses these boxes with: blank is 0,
+ * anything unparsable is NaN (and the web then falls back to 0).
+ */
+private fun jsNumber(text: String): Double? =
+    text.trim().let { if (it.isEmpty()) 0.0 else it.toDoubleOrNull() }?.takeIf { it.isFinite() }
 
-private fun yearsToMonths(text: String): Int? =
-    text.trim().replace(',', '.').toDoubleOrNull()
-        ?.takeIf { it > 0 && it <= 100 }
-        ?.let { Math.round(it * 12).toInt() }
+/** The web's `rateToBps`: a percentage to basis points, 0 when unreadable. */
+private fun rateToBps(text: String): Long = jsNumber(text)?.let { Math.round(it * 100) } ?: 0
+
+/** The web's `yearsToMonths`: 0 when unreadable. */
+private fun yearsToMonths(text: String): Int = jsNumber(text)?.let { Math.round(it * 12).toInt() } ?: 0
 
 /**
  * What-if projections. Nothing here touches the account: the inputs are typed,
@@ -108,9 +113,11 @@ fun SimulatorScreen(
         item {
             // The web titles this page with the question, not the word
             // "Simulator", and keeps a link back to investments above it.
+            // The header's `mb-7`: 28, of which the list's gap gives 16.
             BackHeader(
                 stringResource(R.string.simulator_subtitle),
                 onBack,
+                Modifier.padding(bottom = 12.dp),
                 backLabel = stringResource(R.string.simulator_back),
             )
         }
@@ -130,7 +137,8 @@ fun SimulatorScreen(
                     )
                 },
                 onSelect = { mode = it },
-                modifier = Modifier.fillMaxWidth(),
+                // `inline-flex mb-5`: as wide as its three options.
+                modifier = Modifier.padding(bottom = 4.dp),
             )
         }
 
@@ -188,19 +196,21 @@ private fun PlainField(labelRes: Int, value: String, onChange: (String) -> Unit)
 @Composable
 private fun RateField(rate: String, onRate: (String) -> Unit) {
     val colors = Broke.colors
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // A fragment in the form's `grid gap-4`: the presets sit 16 under it.
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         PlainField(R.string.simulator_rate, rate, onRate)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("Nu" to "15", "CETES" to "10", "BONDDIA" to "6.5").forEach { (label, value) ->
                 Text(
                     "$label $value%",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    // `rounded-full border px-3 py-1 text-xs`.
+                    style = MaterialTheme.typography.bodySmall,
                     color = colors.fgMuted,
                     modifier = Modifier
                         .clip(RoundedCornerShape(percent = 50))
                         .border(1.dp, colors.borderMuted, RoundedCornerShape(percent = 50))
                         .clickable { onRate(value) }
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                        .padding(horizontal = 13.dp, vertical = 5.dp),
                 )
             }
         }
@@ -239,12 +249,13 @@ private fun Stat(label: String, cents: Long?, color: Color) {
     GlassCard(Modifier.fillMaxWidth(), padding = 16.dp) {
         Text(
             label,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+            style = MaterialTheme.typography.bodySmall,
             color = Broke.colors.fgSubtle,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            cents?.let { maskIfHidden(formatMoney(it), hide) } ?: "—",
+            // Hypothetical money: the web prints it even in privacy mode.
+            cents?.let { formatMoney(it) } ?: "—",
             style = MaterialTheme.typography.headlineMedium.copy(fontSize = 20.sp, lineHeight = 28.sp).tabular(),
             color = color,
         )
@@ -286,10 +297,13 @@ private fun LazyListScope.projectMode(
                 RateField(rate, onRate)
                 PlainField(R.string.simulator_years, years, onYears)
                 // Rule of 72: a rough doubling time, as the web shows it.
-                rate.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { pct ->
+                jsNumber(rate)?.takeIf { it > 0 }?.let { pct ->
                     Text(
-                        text(R.string.simulator_doubles_in, "years" to "%.1f".format(72.0 / pct)),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        text(
+                            R.string.simulator_doubles_in,
+                            "years" to java.math.BigDecimal(72.0 / pct).setScale(1, java.math.RoundingMode.HALF_UP).toPlainString(),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
                         color = Broke.colors.fgSubtle,
                     )
                 }
@@ -297,7 +311,8 @@ private fun LazyListScope.projectMode(
         }
     }
 
-    item { ProjectResult(repository, initial, contribution, cadence, rate, years) }
+    // `grid gap-5` between the form and the results.
+    item { Box(Modifier.padding(top = 4.dp)) { ProjectResult(repository, initial, contribution, cadence, rate, years) } }
 }
 
 @Composable
@@ -318,7 +333,8 @@ private fun ProjectResult(
     val result by produceState<SimResult?>(
         null, initialCents, contributionCents, cadence, bps, months,
     ) {
-        value = if (bps == null || months == null) {
+        // The web only asks while 0 < months <= 1200, keeping the last answer.
+        value = if (months !in 1..1200) {
             value // keep the last answer while the input is half-typed
         } else {
             runCatching {
@@ -330,7 +346,8 @@ private fun ProjectResult(
     }
 
     val data = result
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    // `space-y-4` around a `grid gap-3` of the three figures.
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Stat(stringResource(R.string.simulator_final_value), data?.finalValueCents, colors.accent)
         Stat(
             stringResource(R.string.simulator_total_contributed),
@@ -343,7 +360,7 @@ private fun ProjectResult(
             colors.cyan,
         )
 
-        GlassCard(Modifier.fillMaxWidth()) {
+        GlassCard(Modifier.fillMaxWidth().padding(top = 4.dp)) {
             ChartTitle(R.string.simulator_growth_title)
             StackedAreaChart(
                 contributed = data?.points?.map { it.contributedCents } ?: emptyList(),
@@ -384,7 +401,7 @@ private fun LazyListScope.goalMode(
         // the web, where GoalMode owns the state.
         var target by remember { mutableStateOf("100000") }
 
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
             GlassCard(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     AmountField(R.string.simulator_goal_target, target) { target = it }
@@ -413,7 +430,7 @@ private fun GoalResult(
     val months = yearsToMonths(years)
 
     val result by produceState<SolveResult?>(null, initialCents, targetCents, bps, months) {
-        value = if (bps == null || months == null || targetCents <= 0) {
+        value = if (months <= 0 || targetCents <= 0) {
             value
         } else {
             runCatching {
@@ -431,9 +448,10 @@ private fun GoalResult(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            monthly?.let { maskIfHidden(formatMoney(it), hide) } ?: "—",
+            monthly?.let { formatMoney(it) } ?: "—",
             style = MaterialTheme.typography.headlineMedium.copy(fontSize = 36.sp, lineHeight = 40.sp).tabular(),
             color = Broke.colors.accent,
+            modifier = Modifier.cssLineBox(40.dp),
         )
         if (monthly == 0L) {
             // The starting amount already gets there on its own.
@@ -492,7 +510,7 @@ private fun LazyListScope.compareMode(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
             GlassCard(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     AmountField(R.string.simulator_initial, initial, onInitial)
@@ -500,10 +518,11 @@ private fun LazyListScope.compareMode(
                     CadenceField(cadence, onCadence)
                     PlainField(R.string.simulator_years, years, onYears)
 
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // `space-y-2 pt-1`, captioned like a field label.
+                    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             stringResource(R.string.simulator_presets),
-                            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+                            style = MaterialTheme.typography.labelMedium,
                             color = Broke.colors.fgMuted,
                         )
                         instruments.forEachIndexed { index, inst ->
@@ -515,7 +534,7 @@ private fun LazyListScope.compareMode(
                         }
                         Text(
                             stringResource(R.string.simulator_compare_hint),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                            style = MaterialTheme.typography.bodySmall,
                             color = Broke.colors.fgSubtle,
                         )
                     }
@@ -532,19 +551,21 @@ private fun Double.trimmed(): String =
 
 @Composable
 private fun InstrumentRow(inst: Instrument, onRate: (String) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    // `flex items-center gap-2`: swatch, a `w-20` name, the rate box, "%".
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Spacer(
             Modifier
                 .size(10.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(2.dp))
                 .background(inst.color),
         )
         Text(
             inst.name,
             style = MaterialTheme.typography.bodyMedium,
             color = Broke.colors.fg,
-            modifier = Modifier.padding(horizontal = 8.dp).width(72.dp),
+            modifier = Modifier.width(80.dp),
             maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         FormField(
             label = "",
@@ -556,9 +577,8 @@ private fun InstrumentRow(inst: Instrument, onRate: (String) -> Unit) {
         )
         Text(
             "%",
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+            style = MaterialTheme.typography.bodySmall,
             color = Broke.colors.fgSubtle,
-            modifier = Modifier.padding(start = 6.dp),
         )
     }
 }
@@ -581,11 +601,11 @@ private fun CompareResult(
     val results by produceState<List<Pair<Instrument, SimResult>>>(
         emptyList(), initialCents, contributionCents, cadence, months, ratesKey,
     ) {
-        value = if (months == null) {
+        value = if (months !in 1..1200) {
             value
         } else {
             instruments.mapNotNull { inst ->
-                val bps = rateToBps(inst.rate) ?: return@mapNotNull null
+                val bps = rateToBps(inst.rate)
                 runCatching {
                     repository.simulateInvestment(
                         initialCents, contributionCents, cadence, bps, months,
@@ -596,33 +616,33 @@ private fun CompareResult(
     }
 
     val series = results
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         series.forEach { (inst, sim) ->
             GlassCard(Modifier.fillMaxWidth(), padding = 16.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(
                         Modifier
                             .size(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(2.dp))
                             .background(inst.color),
                     )
                     Text(
                         "${inst.name} · ${inst.rate}%",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        style = MaterialTheme.typography.bodySmall,
                         color = Broke.colors.fgSubtle,
                         modifier = Modifier.padding(start = 6.dp),
                     )
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    maskIfHidden(formatMoney(sim.finalValueCents), hide),
+                    formatMoney(sim.finalValueCents),
                     style = MaterialTheme.typography.headlineMedium.copy(fontSize = 18.sp, lineHeight = 28.sp).tabular(),
                     color = Broke.colors.fg,
                 )
             }
         }
 
-        GlassCard(Modifier.fillMaxWidth()) {
+        GlassCard(Modifier.fillMaxWidth().padding(top = 4.dp)) {
             ChartTitle(R.string.simulator_compare_title)
             MultiLineChart(
                 series.map { (inst, sim) ->

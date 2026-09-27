@@ -6,6 +6,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import com.asura.finanzas.ui.maskIfHidden
+import com.asura.finanzas.ui.formatMoney
+import com.asura.finanzas.ui.text
+import com.asura.finanzas.ui.components.ConfirmDialog
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -46,40 +53,30 @@ fun WalletGoalsSection(
 
     var editing by remember { mutableStateOf<SavingsGoal?>(null) }
     var contributing by remember { mutableStateOf<SavingsGoal?>(null) }
+    // The web asks before each of these, as the goals page does.
+    var confirmDelete by remember { mutableStateOf<SavingsGoal?>(null) }
+    var confirmUse by remember { mutableStateOf<SavingsGoal?>(null) }
+    var converting by remember { mutableStateOf<SavingsGoal?>(null) }
 
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // `mb-6`: an `h3 mb-3 font-medium`, then the cards `gap-4`.
+    Column(modifier.fillMaxWidth()) {
         Text(
             stringResource(R.string.goals_wallet_section_title),
             style = MaterialTheme.typography.titleMedium,
             color = Broke.colors.fg,
+            modifier = Modifier.padding(bottom = 12.dp),
         )
-        linked.forEach { goal ->
+        linked.forEachIndexed { index, goal ->
+            if (index > 0) Spacer(Modifier.height(16.dp))
             GoalCard(
                 goal = goal,
                 hide = hide,
-                onLongPress = {},
                 walletName = walletName,
                 onContribute = { contributing = it },
-                onUse = { target ->
-                    scope.launch {
-                        runCatching {
-                            if (target.goalKind == "fund") {
-                                repository.convertGoalToWallet(target.id, null, target.color, null)
-                            } else {
-                                repository.useGoal(target.id)
-                            }
-                        }
-                        onChanged()
-                    }
-                },
+                onUse = { target -> if (target.goalKind == "fund") converting = target else confirmUse = target },
                 onAdjustDate = { editing = it },
                 onEdit = { editing = it },
-                onDelete = { target ->
-                    scope.launch {
-                        runCatching { repository.deleteGoal(target.id) }
-                        onChanged()
-                    }
-                },
+                onDelete = { confirmDelete = it },
             )
         }
     }
@@ -98,6 +95,53 @@ fun WalletGoalsSection(
             goal = goal,
             onDismiss = { contributing = null },
             onSaved = { contributing = null; onChanged() },
+        )
+    }
+    confirmDelete?.let { target ->
+        ConfirmDialog(
+            title = stringResource(R.string.common_delete),
+            message = stringResource(R.string.goals_delete_confirm),
+            onConfirm = {
+                confirmDelete = null
+                scope.launch {
+                    runCatching { repository.deleteGoal(target.id) }
+                    onChanged()
+                }
+            },
+            onDismiss = { confirmDelete = null },
+        )
+    }
+    confirmUse?.let { target ->
+        ConfirmDialog(
+            title = stringResource(R.string.goals_buy),
+            message = if (target.linkedWalletId != null) {
+                text(
+                    R.string.goals_use_confirm_apartado,
+                    "amount" to maskIfHidden(formatMoney(target.savedCents, target.currencyCode), hide),
+                    "wallet" to walletName(target.linkedWalletId).orEmpty(),
+                )
+            } else {
+                stringResource(R.string.goals_use_confirm_track)
+            },
+            confirmLabel = stringResource(R.string.goals_buy),
+            onConfirm = {
+                confirmUse = null
+                scope.launch {
+                    runCatching { repository.useGoal(target.id) }
+                    onChanged()
+                }
+            },
+            onDismiss = { confirmUse = null },
+        )
+    }
+    converting?.let { target ->
+        com.asura.finanzas.ui.wallets.WalletFormSheet(
+            repository = repository,
+            existing = null,
+            wallets = wallets,
+            onDismiss = { converting = null },
+            onSaved = { converting = null; onChanged() },
+            convert = goalConvert(target, wallets),
         )
     }
 }

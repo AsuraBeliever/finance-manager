@@ -41,6 +41,7 @@ import com.asura.finanzas.ui.LocalAppSettings
 import java.time.format.TextStyle
 import java.util.Locale
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
@@ -59,6 +60,8 @@ import com.asura.finanzas.ui.components.WebCheckbox
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
+import androidx.compose.foundation.background
+import com.asura.finanzas.ui.components.pullUp
 import kotlinx.coroutines.launch
 
 /**
@@ -98,6 +101,8 @@ fun WalletFormSheet(
     parentDefault: Wallet? = null,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
+    /** Graduating a fund goal: the web's `convert` mode of this same form. */
+    convert: GoalConvert? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -106,7 +111,7 @@ fun WalletFormSheet(
     var categories by remember { mutableStateOf<List<WalletCategory>>(emptyList()) }
     var currencies by remember { mutableStateOf<List<Currency>>(emptyList()) }
 
-    var name by remember { mutableStateOf(existing?.name.orEmpty()) }
+    var name by remember { mutableStateOf(convert?.name ?: existing?.name.orEmpty()) }
     var category by remember { mutableStateOf<WalletCategory?>(null) }
     var currency by remember { mutableStateOf<Currency?>(null) }
     var initial by remember {
@@ -128,7 +133,12 @@ fun WalletFormSheet(
     var skinId by remember { mutableStateOf(existing?.skin) }
     var earnsYield by remember { mutableStateOf(existing?.yieldRateBps != null) }
     var yieldRate by remember {
-        mutableStateOf(existing?.yieldRateBps?.let { "%.2f".format(it / 100.0) }.orEmpty())
+        // `String(bps / 100)`, as the web fills it: "13", "3.5".
+        mutableStateOf(
+            existing?.yieldRateBps?.let {
+                java.math.BigDecimal(it).movePointLeft(2).stripTrailingZeros().toPlainString()
+            }.orEmpty(),
+        )
     }
     // Same default as the web form and as the server's own fallback.
     var yieldFrequency by remember { mutableStateOf(existing?.yieldFrequency ?: "weekly") }
@@ -148,6 +158,9 @@ fun WalletFormSheet(
         )
     }
     var parent by remember { mutableStateOf(parentDefault) }
+    // The colour the custom-gradient tile starts from, as the web seeds it.
+    val customSeed = convert?.color ?: existing?.skin?.takeIf { it.startsWith("grad:") }
+        ?.removePrefix("grad:")?.substringBefore(",") ?: existing?.color
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -164,10 +177,13 @@ fun WalletFormSheet(
     LaunchedEffect(Unit) {
         categories = runCatching { repository.walletCategories() }.getOrDefault(emptyList())
         currencies = runCatching { repository.currencies() }.getOrDefault(emptyList())
-        category = categories.firstOrNull { it.id == existing?.categoryId } ?: categories.firstOrNull()
-        currency = currencies.firstOrNull { it.code == (existing?.currencyCode ?: "MXN") }
-            ?: currencies.firstOrNull()
-        parent = wallets.firstOrNull { it.id == existing?.parentWalletId }
+        // A new apartado and a graduating goal inherit category and currency
+        // (from the parent, or the wallet the goal was saved in).
+        val inheritCategory = convert?.sourceCategoryId ?: parentDefault?.categoryId ?: existing?.categoryId
+        val inheritCurrency = convert?.currencyCode ?: parentDefault?.currencyCode ?: existing?.currencyCode ?: "MXN"
+        category = categories.firstOrNull { it.id == inheritCategory } ?: categories.firstOrNull()
+        currency = currencies.firstOrNull { it.code == inheritCurrency } ?: currencies.firstOrNull()
+        parent = wallets.firstOrNull { it.id == (convert?.sourceWalletId ?: parentDefault?.id ?: existing?.parentWalletId) }
     }
 
     val isCredit = category?.name == CREDIT_CATEGORY
@@ -176,6 +192,30 @@ fun WalletFormSheet(
     fun save() {
         val chosenCategory = category ?: return
         val chosenCurrency = currency ?: return
+
+        if (convert != null) {
+            busy = true
+            error = null
+            scope.launch {
+                runCatching {
+                    repository.convertGoalToWallet(
+                        id = convert.goalId,
+                        name = name,
+                        color = walletColorFor(skinId, chosenCategory.name),
+                        categoryId = chosenCategory.id,
+                        skin = skinId,
+                        notes = notes.trim().ifEmpty { null },
+                        parentWalletId = parent?.id,
+                    )
+                }
+                    .onSuccess { onSaved() }
+                    .onFailure {
+                        error = if (it is NetworkException) offlineError else it.message ?: genericError
+                        busy = false
+                    }
+            }
+            return
+        }
 
         val cents = parseAmountToCents(initial) ?: 0
         // Percent in the field, basis points on the wire.
@@ -246,9 +286,10 @@ fun WalletFormSheet(
                     // On a card the field reads "what I owe"; it is stored as a
                     // negative opening balance.
                     initialBalanceCents = if (isCredit) -cents else cents,
-                    color = existing?.color,
+                    // The web derives the wallet's colour from its design.
+                    color = walletColorFor(skinId, chosenCategory.name),
                     skin = skinId,
-                    notes = notes,
+                    notes = notes.trim(),
                     yieldRateBps = rateBps,
                     yieldFrequency = if (rateBps != null) yieldFrequency else null,
                     parentWalletId = parent?.id,
@@ -271,8 +312,13 @@ fun WalletFormSheet(
 
     FormSheet(
         title = stringResource(
-            if (existing == null) R.string.wallets_new_wallet else R.string.wallets_edit_wallet,
+            when {
+                convert != null -> R.string.goals_convert_to_wallet
+                existing == null -> R.string.wallets_new_wallet
+                else -> R.string.wallets_edit_wallet
+            },
         ),
+        saveLabel = stringResource(if (convert != null) R.string.goals_convert_to_wallet else R.string.common_save),
         busy = busy,
         error = error,
         canSave = canSave,
@@ -280,10 +326,14 @@ fun WalletFormSheet(
         onDismiss = onDismiss,
     ) {
         run {
+            // `autoFocus` on the web's name box.
+            val nameFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+            androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { nameFocus.requestFocus() } }
             FormField(
                 label = stringResource(R.string.wallets_name),
                 value = name,
                 onValueChange = { name = it; error = null },
+                focusRequester = nameFocus,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 placeholder = stringResource(R.string.wallets_name_placeholder),
@@ -291,6 +341,8 @@ fun WalletFormSheet(
 
             // Web order: name, what it nests under (with its hint), then the
             // category and currency side by side.
+            // The select and its `mt-1` hint are one field.
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             PickerField(
                 label = stringResource(R.string.wallets_parent_wallet),
                 options = listOf<Wallet?>(null) + wallets.filter {
@@ -298,7 +350,14 @@ fun WalletFormSheet(
                 },
                 selected = parent,
                 optionLabel = { it?.name ?: parentNone },
-                onSelect = { parent = it },
+                onSelect = { chosen ->
+                    parent = chosen
+                    // An apartado inherits its parent's category and currency.
+                    chosen?.let { p ->
+                        categories.firstOrNull { it.id == p.categoryId }?.let { category = it }
+                        currencies.firstOrNull { it.code == p.currencyCode }?.let { currency = it }
+                    }
+                },
                 // Nothing picked is not nothing: it is "a wallet of its own".
                 emptyLabel = parentNone,
                 modifier = Modifier.fillMaxWidth(),
@@ -309,7 +368,11 @@ fun WalletFormSheet(
                     else R.string.wallets_parent_hint,
                 ),
             )
+            }
 
+            // An apartado inherits its parent's category and currency, so
+            // those are only asked of a wallet of its own.
+            if (parent == null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -330,12 +393,28 @@ fun WalletFormSheet(
                     selected = currency,
                     optionLabel = { "${it.code} — " + seedName(it.name).orEmpty() },
                     onSelect = { currency = it },
-                    // Currency is fixed once there are movements.
-                    enabled = existing == null,
                     modifier = Modifier.weight(1f),
                 )
             }
+            }
 
+            if (convert != null) {
+                // The balance arrives by transfer, so there is nothing to type:
+                // `rounded-lg bg-surface-overlay px-3 py-2 text-xs text-fg-muted`.
+                Text(
+                    com.asura.finanzas.ui.text(
+                        R.string.goals_convert_moves,
+                        "amount" to formatMoney(convert.savedCents, convert.currencyCode),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.fgMuted,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colors.surfaceOverlay)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            } else {
             // On a card this box is "what do you owe", not an opening balance,
             // and it says so — the sign flip happens at save time.
             MoneyField(
@@ -348,7 +427,8 @@ fun WalletFormSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             if (isCredit) {
-                FieldHint(stringResource(R.string.credit_initial_debt_hint))
+                FieldHint(stringResource(R.string.credit_initial_debt_hint), Modifier.pullUp(12.dp))
+            }
             }
 
             // Card design: the same catalogue the web offers, in its groups.
@@ -357,6 +437,7 @@ fun WalletFormSheet(
                 selected = skinId,
                 categoryName = category?.name,
                 onSelect = { skinId = it },
+                customSeed = customSeed,
             )
 
             FormField(
@@ -366,36 +447,45 @@ fun WalletFormSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            // The web frames this as a bordered card with a checkbox and a
-            // paragraph explaining it, not a bare switch row.
+            // Not offered when graduating a goal (set it by editing later).
+            if (convert == null) {
+            // The web frames this as a bordered card (`rounded-lg border p-3`)
+            // with a 16 px checkbox, its label and, under the label's words,
+            // the paragraph explaining it.
             Column(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
-                    .padding(14.dp),
+                    .padding(13.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.clickable { earnsYield = !earnsYield },
+                ) {
                     WebCheckbox(
                         checked = earnsYield,
                         onCheckedChange = { earnsYield = it },
+                        boxSize = 16.dp,
+                        modifier = Modifier.padding(top = 2.dp),
                     )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        stringResource(R.string.wallets_yield_enable),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                        color = colors.fg,
-                    )
+                    Column {
+                        Text(
+                            stringResource(R.string.wallets_yield_enable),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.fg,
+                        )
+                        Text(
+                            stringResource(R.string.wallets_yield_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.fgSubtle,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    stringResource(R.string.wallets_yield_hint),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                    color = colors.fgSubtle,
-                )
                 if (earnsYield) {
+                    // `mt-3 space-y-2`, rate and cadence in a 2-column grid.
                     Spacer(Modifier.height(12.dp))
-                    // Rate and cadence side by side, as in the web's 2-column grid.
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -430,7 +520,9 @@ fun WalletFormSheet(
                 }
             }
 
-            if (isCredit) {
+            }
+
+            if (convert == null && isCredit) {
                 CreditCardSection(
                     cutDay = cutDay,
                     onCutDay = { cutDay = it; error = null },
@@ -459,6 +551,17 @@ fun WalletFormSheet(
     }
 }
 
+/** What the web's `WalletConvert` carries into the form. */
+data class GoalConvert(
+    val goalId: Long,
+    val name: String,
+    val color: String?,
+    val currencyCode: String,
+    val savedCents: Long,
+    val sourceCategoryId: Long?,
+    val sourceWalletId: Long?,
+)
+
 /**
  * The card settings the web reveals the moment the credit-card category is
  * picked: a bordered block with its explanation, the cut day and grace days
@@ -486,28 +589,27 @@ private fun CreditCardSection(
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
-            .padding(14.dp),
+            .padding(13.dp),
     ) {
         Text(
             stringResource(R.string.credit_title),
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium,
             color = colors.fg,
         )
-        Spacer(Modifier.height(6.dp))
         Text(
             stringResource(R.string.credit_form_hint),
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+            style = MaterialTheme.typography.bodySmall,
             color = colors.fgSubtle,
+            modifier = Modifier.padding(top = 2.dp),
         )
 
+        // `mt-3 space-y-3`; each hint sits `mt-1` under its field.
         Spacer(Modifier.height(12.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Each column carries its own hint, so they have to align at the
-            // top: the two hints are different lengths and wrap differently.
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 FormField(
                     label = stringResource(R.string.credit_cut_day),
                     value = cutDay,
@@ -519,7 +621,7 @@ private fun CreditCardSection(
                 )
                 FieldHint(stringResource(R.string.credit_cut_day_hint))
             }
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 FormField(
                     label = stringResource(R.string.credit_due_days),
                     value = dueDays,
@@ -540,6 +642,7 @@ private fun CreditCardSection(
             onValueChange = onCreditLimit,
             modifier = Modifier.fillMaxWidth(),
         )
+        Spacer(Modifier.height(4.dp))
         FieldHint(stringResource(R.string.credit_limit_hint))
 
         Spacer(Modifier.height(12.dp))
@@ -554,9 +657,10 @@ private fun CreditCardSection(
                 options = listOf<Int?>(null) + (1..12).toList(),
                 selected = annivMonth,
                 optionLabel = { month ->
+                    // `toLocaleDateString(…, { month: "long" })`: lower-case
+                    // in Spanish, as the browser writes it.
                     month?.let {
                         java.time.Month.of(it).getDisplayName(TextStyle.FULL, locale)
-                            .replaceFirstChar { c -> c.uppercase(locale) }
                     } ?: anniversaryNone
                 },
                 onSelect = { onAnnivMonth(it) },

@@ -4,9 +4,7 @@ import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.PageHeader
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,18 +13,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -48,14 +42,11 @@ import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.ConfirmDialog
-import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.ProgressBar
-import com.asura.finanzas.ui.components.formatBps
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatMoney
@@ -77,7 +68,6 @@ fun BudgetsScreen(
 
     var creating by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Budget?>(null) }
-    var actionsFor by remember { mutableStateOf<Budget?>(null) }
     // Deleting asks first, as it does in the browser.
     var deleting by remember { mutableStateOf<Budget?>(null) }
 
@@ -89,7 +79,6 @@ fun BudgetsScreen(
             fromCache = current.fromCache,
             onBack = onBack,
             onNew = { creating = true },
-            onLongPress = { actionsFor = it },
             onDelete = { target ->
                 scope.launch {
                     runCatching { repository.deleteBudget(target.id) }
@@ -109,36 +98,6 @@ fun BudgetsScreen(
         )
     }
 
-    actionsFor?.let { target ->
-        AlertDialog(
-            onDismissRequest = { actionsFor = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = {
-                Text(
-                    target.categoryName?.let { seedName(it) }
-                        ?: stringResource(R.string.budgets_overall),
-                    color = Broke.colors.fg,
-                )
-            },
-            text = {
-                Column {
-                    DialogAction(stringResource(R.string.common_edit)) {
-                        actionsFor = null
-                        editing = target
-                    }
-                    DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
-                        actionsFor = null
-                        deleting = target
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { actionsFor = null }) {
-                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
-                }
-            },
-        )
-    }
 
     deleting?.let { target ->
         ConfirmDialog(
@@ -162,7 +121,6 @@ private fun BudgetList(
     fromCache: Boolean,
     onBack: () -> Unit,
     onNew: () -> Unit,
-    onLongPress: (Budget) -> Unit,
     onDelete: (Budget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -177,7 +135,8 @@ private fun BudgetList(
             // No back link in the browser: this is a top-level page there,
             // reached from the nav. The system gesture is what goes back.
             BackHandler(onBack = onBack)
-            PageHeader(stringResource(R.string.budgets_title)) {
+            // The header's `mb-7`: 28, of which the list's gap gives 12.
+            PageHeader(stringResource(R.string.budgets_title), Modifier.padding(bottom = 16.dp)) {
                 PrivacyToggle()
                 PrimaryButton(
                     text = stringResource(R.string.budgets_new_budget),
@@ -187,9 +146,6 @@ private fun BudgetList(
             }
         }
 
-        if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
-        }
 
         if (budgets.isEmpty()) {
             item {
@@ -202,7 +158,7 @@ private fun BudgetList(
         }
 
         items(budgets, key = { it.id }) { budget ->
-            BudgetCard(budget, hide, onLongPress, onDelete)
+            BudgetCard(budget, hide, onDelete)
         }
     }
 }
@@ -212,7 +168,6 @@ private fun BudgetList(
 private fun BudgetCard(
     budget: Budget,
     hide: Boolean,
-    onLongPress: (Budget) -> Unit,
     onDelete: (Budget) -> Unit,
 ) {
     val colors = Broke.colors
@@ -223,7 +178,7 @@ private fun BudgetCard(
     val tint = parseHexColor(budget.color) ?: colors.cyan
 
     GlassCard(
-        Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = { onLongPress(budget) }),
+        Modifier.fillMaxWidth(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Dot(tint, 12.dp)

@@ -143,7 +143,7 @@ private fun LogoPickerBody(
     Column(Modifier.fillMaxWidth()) {
         Text(
             stringResource(R.string.appearance_logo),
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium,
             color = colors.fgMuted,
         )
         Spacer(Modifier.height(8.dp))
@@ -153,14 +153,16 @@ private fun LogoPickerBody(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            GhostChip(Lucide.Upload, stringResource(R.string.appearance_upload_logo), onPickImage)
+            GhostChip(Lucide.Upload, stringResource(R.string.appearance_upload_logo), onPickImage, Modifier.align(Alignment.CenterVertically))
             if (logo.isNotBlank()) {
-                GhostChip(Lucide.X, stringResource(R.string.appearance_remove_logo), onClear)
+                GhostChip(Lucide.X, stringResource(R.string.appearance_remove_logo), onClear, Modifier.align(Alignment.CenterVertically))
             }
+            // `flex-wrap items-center`: the hint sits on the buttons' middle.
             Text(
                 stringResource(R.string.appearance_logo_hint),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.bodySmall,
                 color = colors.fgSubtle,
+                modifier = Modifier.align(Alignment.CenterVertically),
             )
         }
     }
@@ -172,17 +174,18 @@ private fun GhostChip(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     text: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Icon(icon, contentDescription = null, tint = colors.fg, modifier = Modifier.size(15.dp))
-        Text(text, style = MaterialTheme.typography.labelLarge, color = colors.fg)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = colors.fg)
     }
 }

@@ -53,184 +53,24 @@ import kotlin.math.roundToLong
  * No money is computed here. Every cent arrives from `finanzas-core`; this
  * only maps it to pixels.
  */
-private val SIM_PLOT_HEIGHT = 240.dp
-
-/** Five labels down the axis, matching recharts' default tick count. */
-private const val Y_ROWS = 4
-
 /** One curve of the comparison chart. */
 data class SimSeries(val name: String, val color: Color, val values: List<Long>)
 
 /**
- * Rounds the top of the scale up so every tick lands on a round number — what
- * recharts' "auto" domain does, and what turns "95k · 71k · 48k" into
- * "100k · 75k · 50k".
- *
- * The rule is recharts': divide the data into [Y_ROWS] intervals, then round
- * that rough step up to the next half of its own magnitude. A step of 23.5k
- * becomes 25k, one of 27.4k becomes 30k.
+ * The web's `yearTicks`: a tick every `stride` years (so at most six), on the
+ * month that closes each year. recharts then thins them with `minTickGap`.
  */
-private fun niceMax(max: Long): Long {
-    if (max <= 0) return 1
-    val rough = max.toDouble() / Y_ROWS
-    val half = 10.0.pow(floor(log10(rough))) / 2
-    return (ceil(rough / half) * half * Y_ROWS).roundToLong().coerceAtLeast(1)
-}
-
-/** Cents to the web's `(v / 1000).toFixed(0) + "k"` tick label. */
-private fun thousandsLabel(cents: Long): String = "${(cents / 100_000.0).roundToInt()}k"
-
-/**
- * A year tick every 12 months, thinned out until the labels stop crowding —
- * recharts' `minTickGap`.
- */
-private fun yearTicks(months: Int): List<Pair<String, Float>> {
-    if (months <= 0) return emptyList()
+private fun yearTicks(months: Int): List<Int> {
     val years = months / 12
     if (years < 1) return emptyList()
     val stride = ceil(years / 6.0).toInt().coerceAtLeast(1)
-    return (stride..years step stride).map { y ->
-        "${y}a" to (y * 12f / months)
-    }
+    return (stride..years step stride).map { it * 12 }
 }
 
 /**
- * The grid, axes and labels shared by both charts. [plot] receives the plot
- * size and a mapper from cents to a y pixel, and draws the data on top.
- */
-@Composable
-private fun ChartFrame(
-    maxCents: Long,
-    xLabels: List<Pair<String, Float>>,
-    modifier: Modifier = Modifier,
-    /** How many points share the x axis; a tap snaps to the nearest one. */
-    count: Int = 0,
-    /** The tooltip for point `i`, the web's `<Tooltip>`. */
-    tooltipAt: ((Int) -> TooltipContent?)? = null,
-    /** Where recharts puts its active dots on point `i`: value and colour. */
-    dotsAt: (Int) -> List<Pair<Long, Color>> = { emptyList() },
-    plot: DrawScope.(Float, Float, (Long) -> Float) -> Unit,
-) {
-    val colors = Broke.colors
-    val grid = colors.borderMuted
-    val top = niceMax(maxCents)
-    val ticks = (Y_ROWS downTo 0).map { thousandsLabel(top * it / Y_ROWS) }
-
-    Column(modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.height(SIM_PLOT_HEIGHT),
-                verticalArrangement = Arrangement.SpaceBetween,
-                horizontalAlignment = Alignment.End,
-            ) {
-                ticks.forEach {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                        color = colors.fgSubtle,
-                    )
-                }
-            }
-            Spacer(Modifier.width(8.dp))
-
-            Column(Modifier.weight(1f)) {
-                val hit = rememberChartHit()
-                val picked = hit.shown?.takeIf { it.index in 0 until count }
-                val content = picked?.let { tooltipAt?.invoke(it.index) }
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(SIM_PLOT_HEIGHT)
-                        .then(
-                            if (tooltipAt == null || count < 2) {
-                                Modifier
-                            } else {
-                                Modifier.chartTap(hit, count to maxCents) { tap, size ->
-                                    val stepX = size.width / (count - 1f)
-                                    ChartHit((tap.x / stepX).roundToInt().coerceIn(0, count - 1), tap)
-                                }
-                            },
-                        ),
-                ) {
-                Canvas(Modifier.matchParentSize()) {
-                    val dashed = PathEffect.dashPathEffect(
-                        floatArrayOf(3.dp.toPx(), 3.dp.toPx()),
-                    )
-                    for (i in 0..Y_ROWS) {
-                        val y = size.height * i / Y_ROWS
-                        drawLine(
-                            color = grid,
-                            start = Offset(0f, y),
-                            end = Offset(size.width, y),
-                            strokeWidth = 1.dp.toPx(),
-                            pathEffect = dashed,
-                        )
-                    }
-                    xLabels.forEach { (_, at) ->
-                        val x = at * size.width
-                        drawLine(
-                            color = grid,
-                            start = Offset(x, 0f),
-                            end = Offset(x, size.height),
-                            strokeWidth = 1.dp.toPx(),
-                            pathEffect = dashed,
-                        )
-                    }
-
-                    // The two solid axis lines, with recharts' outward ticks.
-                    drawLine(
-                        color = grid,
-                        start = Offset(0f, 0f),
-                        end = Offset(0f, size.height),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                    drawLine(
-                        color = grid,
-                        start = Offset(0f, size.height),
-                        end = Offset(size.width, size.height),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                    for (i in 0..Y_ROWS) {
-                        val y = size.height * i / Y_ROWS
-                        drawLine(
-                            color = grid,
-                            start = Offset(-6.dp.toPx(), y),
-                            end = Offset(0f, y),
-                            strokeWidth = 1.dp.toPx(),
-                        )
-                    }
-
-                    // Canvas y grows downward, so the top of the scale is 0 px.
-                    val toY: (Long) -> Float = { cents ->
-                        size.height - (cents.toFloat() / top.toFloat()) * size.height
-                    }
-                    plot(size.width, size.height, toY)
-
-                    if (picked != null && content != null) {
-                        val x = picked.index * size.width / (count - 1f)
-                        lineCursor(x)
-                        dotsAt(picked.index).forEach { (cents, color) ->
-                            activeDot(Offset(x, toY(cents)), color)
-                        }
-                    }
-                }
-                ChartTooltip(
-                    anchor = picked?.anchor,
-                    content = content,
-                    modifier = Modifier.matchParentSize(),
-                )
-                }
-                AxisLabels(xLabels)
-            }
-        }
-    }
-}
-
-/**
- * The projection: what was put in, and the interest stacked on top of it.
- *
- * The two bands are drawn in stacking order, each filled with the same fade
- * the web uses and stroked along its own top edge.
+ * The projection: what was put in, and the interest stacked on top of it —
+ * the web's `AreaChart` (320 px, `[0, auto]`, `monotone`, each band filled
+ * with the same fade and stroked along its own top edge).
  */
 @Composable
 fun StackedAreaChart(
@@ -247,14 +87,19 @@ fun StackedAreaChart(
     names: Pair<String, String>? = null,
 ) {
     if (contributed.size < 2 || total.size != contributed.size) return
-    val max = total.max()
     val years = stringResource(R.string.simulator_years)
+    val low = contributed.map { it / 100.0 }
+    val high = total.map { it / 100.0 }
 
-    ChartFrame(
-        maxCents = max,
-        xLabels = yearTicks(contributed.size - 1),
-        modifier = modifier,
+    RechartsFrame(
+        height = 320.dp,
         count = contributed.size,
+        scale = niceScale(0.0, high.max(), fromZero = true),
+        yLabel = { thousandsTick(it, 0) },
+        xCandidates = yearTicks(contributed.size - 1),
+        xLabel = { "${it / 12}a" },
+        minTickGap = 28.dp,
+        modifier = modifier,
         tooltipAt = if (names == null || interest.size != contributed.size) {
             null
         } else {
@@ -269,18 +114,16 @@ fun StackedAreaChart(
             }
         },
         // Stacked: the lower dot on the contributions, the upper one on top.
-        dotsAt = { i -> listOf(contributed[i] to lowerColor, total[i] to upperColor) },
-    ) { width, height, toY ->
-        val stepX = width / (contributed.size - 1)
-        fun curve(values: List<Long>) = Path().apply {
-            moveTo(0f, toY(values[0]))
-            values.forEachIndexed { i, v -> if (i > 0) lineTo(i * stepX, toY(v)) }
-        }
+        dotsAt = { i -> listOf(low[i] to lowerColor, high[i] to upperColor) },
+    ) { xOf, yOf ->
+        val lowPts = low.indices.map { Offset(xOf(it), yOf(low[it])) }
+        val highPts = high.indices.map { Offset(xOf(it), yOf(high[it])) }
+        val base = yOf(0.0)
 
         // Lower band: the baseline up to what was contributed.
-        val lower = curve(contributed).apply {
-            lineTo(width, height)
-            lineTo(0f, height)
+        val lower = monotonePath(lowPts).apply {
+            lineTo(lowPts.last().x, base)
+            lineTo(lowPts.first().x, base)
             close()
         }
         drawPath(
@@ -290,14 +133,10 @@ fun StackedAreaChart(
                 1f to lowerColor.copy(alpha = 0.08f),
             ),
         )
-
         // Upper band: from the contributions to the total — the interest.
-        val upper = Path().apply {
-            moveTo(0f, toY(total[0]))
-            total.forEachIndexed { i, v -> if (i > 0) lineTo(i * stepX, toY(v)) }
-            for (i in contributed.indices.reversed()) {
-                lineTo(i * stepX, toY(contributed[i]))
-            }
+        val upper = monotonePath(highPts).apply {
+            lineTo(lowPts.last().x, lowPts.last().y)
+            monotonePath(lowPts.reversed(), this, moveFirst = false)
             close()
         }
         drawPath(
@@ -307,13 +146,12 @@ fun StackedAreaChart(
                 1f to upperColor.copy(alpha = 0.1f),
             ),
         )
-
-        drawPath(curve(contributed), color = lowerColor, style = Stroke(width = 2.dp.toPx()))
-        drawPath(curve(total), color = upperColor, style = Stroke(width = 2.dp.toPx()))
+        drawPath(monotonePath(lowPts), color = lowerColor, style = Stroke(width = 2.dp.toPx()))
+        drawPath(monotonePath(highPts), color = upperColor, style = Stroke(width = 2.dp.toPx()))
     }
 }
 
-/** The comparison: one 2 px line per instrument, on a shared scale. */
+/** The comparison: one 2 px `monotone` line per instrument, on a shared scale. */
 @Composable
 fun MultiLineChart(series: List<SimSeries>, modifier: Modifier = Modifier) {
     val drawable = series.filter { it.values.size >= 2 }
@@ -322,26 +160,26 @@ fun MultiLineChart(series: List<SimSeries>, modifier: Modifier = Modifier) {
     val max = drawable.maxOf { it.values.take(length).max() }
     val years = stringResource(R.string.simulator_years)
 
-    ChartFrame(
-        maxCents = max,
-        xLabels = yearTicks(length - 1),
-        modifier = modifier,
+    RechartsFrame(
+        height = 320.dp,
         count = length,
+        scale = niceScale(0.0, max / 100.0, fromZero = true),
+        yLabel = { thousandsTick(it, 0) },
+        xCandidates = yearTicks(length - 1),
+        xLabel = { "${it / 12}a" },
+        minTickGap = 28.dp,
+        modifier = modifier,
         tooltipAt = { i ->
             TooltipContent(
                 label = yearsLabel(i, years),
                 items = drawable.map { TooltipItem(it.name, formatMoney(it.values[i]), it.color) },
             )
         },
-        dotsAt = { i -> drawable.map { it.values[i] to it.color } },
-    ) { width, _, toY ->
-        val stepX = width / (length - 1)
+        dotsAt = { i -> drawable.map { it.values[i] / 100.0 to it.color } },
+    ) { xOf, yOf ->
         drawable.forEach { s ->
-            val path = Path().apply {
-                moveTo(0f, toY(s.values[0]))
-                for (i in 1 until length) lineTo(i * stepX, toY(s.values[i]))
-            }
-            drawPath(path, color = s.color, style = Stroke(width = 2.dp.toPx()))
+            val pts = (0 until length).map { Offset(xOf(it), yOf(s.values[it] / 100.0)) }
+            drawPath(monotonePath(pts), color = s.color, style = Stroke(width = 2.dp.toPx()))
         }
     }
 }
@@ -367,12 +205,12 @@ fun ChartLegend(items: List<Pair<Color, String>>, modifier: Modifier = Modifier)
                 Spacer(
                     Modifier
                         .size(10.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(2.dp))
                         .background(color),
                 )
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.bodySmall,
                     color = Broke.colors.fgSubtle,
                     modifier = Modifier.padding(start = 6.dp),
                 )

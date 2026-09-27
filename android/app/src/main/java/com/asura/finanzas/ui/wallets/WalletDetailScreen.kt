@@ -1,10 +1,8 @@
 package com.asura.finanzas.ui.wallets
 
 import com.asura.finanzas.ui.components.SegmentedControl
-import com.asura.finanzas.ui.components.PeriodPickerDialog
-import com.asura.finanzas.ui.components.PeriodLabel
+import com.asura.finanzas.ui.components.PeriodPicker
 import com.asura.finanzas.ui.components.Period
-import com.asura.finanzas.ui.components.ChipButton
 import com.asura.finanzas.ui.theme.tabular
 import com.asura.finanzas.ui.transactions.TransactionTotal
 import com.asura.finanzas.ui.transactions.KindFilter
@@ -31,25 +29,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.size
 import com.asura.finanzas.data.SavingsGoal
@@ -72,9 +70,7 @@ import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.ProgressBar
-import com.asura.finanzas.ui.components.formatBps
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
@@ -83,6 +79,12 @@ import androidx.compose.ui.text.style.TextAlign
 import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.theme.Broke
 import kotlinx.coroutines.launch
+import com.asura.finanzas.ui.components.PanelCard
+import com.asura.finanzas.ui.components.cssLineBox
+import com.asura.finanzas.data.TransactionCategory
+import com.asura.finanzas.ui.components.PickerField
+import com.asura.finanzas.ui.components.GhostButton
+import androidx.compose.foundation.lazy.itemsIndexed
 
 /**
  * One wallet: what it holds, its credit-card panel when it is a card, and its
@@ -96,6 +98,8 @@ fun WalletDetailScreen(
     onBack: () -> Unit,
     onEdit: (Wallet) -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens another wallet's page — an apartado card here is a link. */
+    onOpenWallet: (Long) -> Unit = {},
 ) {
     val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
@@ -123,22 +127,30 @@ fun WalletDetailScreen(
     // The web filters this page's ledger just like the movements page does.
     var txKind by remember { mutableStateOf<KindFilter>(KindFilter.All) }
     var txPeriod by remember { mutableStateOf<Period>(Period.AllTime) }
-    var showPeriod by remember { mutableStateOf(false) }
     var totals by remember { mutableStateOf<TxTotals?>(null) }
+    // The shared filter bar's category select, for income/expense.
+    var txCategory by remember { mutableStateOf<TransactionCategory?>(null) }
+    var categories by remember { mutableStateOf<List<TransactionCategory>>(emptyList()) }
+    var confirmingDelete by remember { mutableStateOf(false) }
 
-    LaunchedEffect(walletId, reloadKey, txKind, txPeriod) {
+    LaunchedEffect(Unit) {
+        categories = runCatching { repository.filterCategories() }.getOrDefault(emptyList())
+    }
+
+    LaunchedEffect(walletId, reloadKey, txKind, txPeriod, txCategory) {
         wallet = runCatching { repository.wallet(walletId) }.getOrNull()
         movements = runCatching {
             repository.transactions(
                 walletId = walletId,
                 kind = txKind.wire,
+                categoryId = txCategory?.id,
                 period = txPeriod.toJson(),
             ).value
         }.getOrDefault(emptyList())
         // The web only totals a single-kind filter; "all" has nothing to add up.
         totals = txKind.wire?.takeIf { it == "income" || it == "expense" }?.let { kind ->
             runCatching {
-                repository.transactionTotals(kind, walletId, null, txPeriod.toJson())
+                repository.transactionTotals(kind, walletId, txCategory?.id, txPeriod.toJson())
             }.getOrNull()
         }
         credit = wallet?.takeIf { it.creditCutDay != null }
@@ -157,10 +169,12 @@ fun WalletDetailScreen(
         return
     }
 
+    // No uniform gap: each block carries the web's own margin — the header's
+    // mb-7, the balance card's and each section's mb-6, a heading's mb-3, the
+    // filter column's gap-3 + mb-4, the total's mb-4.
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
             BackHandler(onBack = onBack)
@@ -168,34 +182,36 @@ fun WalletDetailScreen(
             // hands them to `PageHeader` as `actions`, so they ride the title's
             // line and only drop below when the name is long enough to push
             // them off it.
-            PageHeader(current.name, actionGap = 8.dp) {
-                Action(Lucide.Pencil, stringResource(R.string.common_edit)) { onEdit(current) }
-                Action(
-                    Lucide.Archive,
+            PageHeader(current.name, Modifier.padding(bottom = 28.dp), actionGap = 8.dp) {
+                GhostButton(
+                    stringResource(R.string.common_edit),
+                    onClick = { onEdit(current) },
+                    leadingIcon = Lucide.Pencil,
+                )
+                GhostButton(
                     stringResource(
                         if (current.isArchived) R.string.wallets_unarchive
                         else R.string.wallets_archive,
                     ),
-                ) {
-                    scope.launch {
-                        runCatching { repository.archiveWallet(current.id, !current.isArchived) }
-                        reloadKey++
-                    }
-                }
-                Action(
-                    Lucide.Trash,
+                    onClick = {
+                        scope.launch {
+                            runCatching { repository.archiveWallet(current.id, !current.isArchived) }
+                            reloadKey++
+                        }
+                    },
+                    leadingIcon = if (current.isArchived) Lucide.ArchiveRestore else Lucide.Archive,
+                )
+                // Deleting takes the whole history with it, so it asks first.
+                GhostButton(
                     stringResource(R.string.common_delete),
-                    colors.danger,
-                ) {
-                    scope.launch {
-                        runCatching { repository.deleteWallet(current.id) }
-                        onBack()
-                    }
-                }
+                    onClick = { confirmingDelete = true },
+                    leadingIcon = Lucide.Trash,
+                    tint = colors.danger,
+                )
             }
         }
 
-        item { BalanceCard(current, credit, pockets, hide) }
+        item { BalanceCard(current, credit, pockets, hide, Modifier.padding(bottom = 24.dp)) }
 
         credit?.let { summary ->
             item {
@@ -208,6 +224,7 @@ fun WalletDetailScreen(
                     // Deleting a plan also deletes the instalments it already
                     // posted, so it asks first — the web does too.
                     onDeletePlan = { deletingMsi = it },
+                    modifier = Modifier.padding(bottom = 24.dp),
                 )
             }
         }
@@ -219,10 +236,16 @@ fun WalletDetailScreen(
                 SectionHeader(
                     stringResource(R.string.wallets_apartados_label),
                     stringResource(R.string.wallets_add_apartado),
+                    Modifier.padding(bottom = if (pockets.isEmpty()) 24.dp else 12.dp),
                 ) { addingPocket = true }
             }
-            items(pockets, key = { "pocket-${it.id}" }) { pocket ->
-                WalletCard(pocket, hide, onOpen = {}, onLongPress = {})
+            itemsIndexed(pockets, key = { _, it -> "pocket-${it.id}" }) { index, pocket ->
+                Box(
+                    Modifier.padding(bottom = if (index == pockets.lastIndex) 24.dp else 16.dp),
+                ) {
+                    // A link on the web: it opens that apartado's own page.
+                    WalletCard(pocket, hide, onOpen = { onOpenWallet(it.id) })
+                }
             }
         }
 
@@ -234,6 +257,7 @@ fun WalletDetailScreen(
                     goals = goals,
                     wallets = allWallets,
                     onChanged = { reloadKey++ },
+                    modifier = Modifier.padding(bottom = 24.dp),
                 )
             }
         }
@@ -242,6 +266,7 @@ fun WalletDetailScreen(
             SectionHeader(
                 stringResource(R.string.transactions_title),
                 stringResource(R.string.transactions_new_transaction),
+                Modifier.padding(bottom = 12.dp),
             ) { addingTx = true }
         }
         item {
@@ -249,27 +274,47 @@ fun WalletDetailScreen(
                 options = KindFilter.entries,
                 selected = txKind,
                 label = { stringResource(it.labelRes) },
-                onSelect = { txKind = it },
-                modifier = Modifier.fillMaxWidth(),
+                onSelect = { txKind = it; txCategory = null },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 fillEqually = true,
             )
         }
+        // Category only applies to income/expense, scoped to the chosen kind.
+        if (txKind == KindFilter.Income || txKind == KindFilter.Expense) {
+            item {
+                PickerField(
+                    label = "",
+                    options = listOf<TransactionCategory?>(null) +
+                        categories.filter { it.kind == txKind.wire },
+                    selected = txCategory,
+                    optionLabel = {
+                        it?.let { c -> seedName(c.name, c.isSystem) }
+                            ?: stringResource(R.string.transactions_all_categories)
+                    },
+                    onSelect = { txCategory = it },
+                    emptyLabel = stringResource(R.string.transactions_all_categories),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                )
+            }
+        }
         item {
-            ChipButton(
-                text = PeriodLabel(txPeriod),
-                onClick = { showPeriod = true },
-                leadingIcon = Lucide.CalendarRange,
-                trailingIcon = Lucide.ChevronDown,
+            PeriodPicker(
+                value = txPeriod,
+                onChange = { txPeriod = it },
+                allowAll = true,
+                modifier = Modifier.padding(bottom = 16.dp),
             )
         }
         totals?.let { summary ->
-            item { TransactionTotal(summary, hide, income = txKind.wire == "income") }
+            item {
+                Box(Modifier.padding(bottom = 16.dp)) {
+                    TransactionTotal(summary, hide, income = txKind.wire == "income")
+                }
+            }
         }
         if (movements.isEmpty()) {
             // The web swaps the list for an empty state here, and says a
-            // different thing when a filter is what emptied it. Without this
-            // the screen just stopped after the period chip, with nothing to
-            // explain the gap.
+            // different thing when a filter is what emptied it.
             item {
                 val filtered = txKind != KindFilter.All || txPeriod != Period.AllTime
                 EmptyState(
@@ -289,7 +334,6 @@ fun WalletDetailScreen(
                 TransactionListCard(
                     transactions = movements,
                     hide = hide,
-                    onLongPress = {},
                     onEdit = { editingTx = it },
                     onDelete = { deletingTx = it },
                     // Every row here belongs to this wallet already.
@@ -300,24 +344,31 @@ fun WalletDetailScreen(
                 item {
                     Text(
                         text(R.string.transactions_list_capped, "n" to TX_LIST_LIMIT),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        style = MaterialTheme.typography.bodySmall,
                         color = colors.fgSubtle,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     )
                 }
             }
         }
     }
 
-    if (showPeriod) {
-        PeriodPickerDialog(
-            selected = txPeriod,
-            onSelect = { txPeriod = it; showPeriod = false },
-            onDismiss = { showPeriod = false },
-            allowAll = true,
+    if (confirmingDelete) {
+        ConfirmDialog(
+            title = stringResource(R.string.wallets_delete_confirm_title),
+            message = stringResource(R.string.wallets_delete_confirm_message),
+            onConfirm = {
+                confirmingDelete = false
+                scope.launch {
+                    runCatching { repository.deleteWallet(current.id) }
+                    onBack()
+                }
+            },
+            onDismiss = { confirmingDelete = false },
         )
     }
+
 
     if (addingPocket) {
         WalletFormSheet(
@@ -359,6 +410,8 @@ fun WalletDetailScreen(
             wallets = allWallets,
             onDismiss = { addingTx = false },
             onSaved = { addingTx = false; reloadKey++ },
+            // Opened from a wallet, the form starts on that wallet.
+            defaultWalletId = current.id,
         )
     }
 
@@ -475,6 +528,7 @@ private fun BalanceCard(
     credit: CreditCardSummary?,
     pockets: List<Wallet>,
     hide: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
     // Same reading as the card in the list, so the figure does not change when
@@ -485,9 +539,11 @@ private fun BalanceCard(
         .sumOf { it.balanceCents }
     val reserved = wallet.reservedCents + pocketsCents
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    // Not a GlassCard: `rounded-xl border bg-surface-raised p-5`, no shadow.
+    PanelCard(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Dot(parseHexColor(wallet.color) ?: colors.fgSubtle, 12.dp)
+            // `#a8a29e` when the wallet has no colour of its own.
+            Dot(parseHexColor(wallet.color) ?: androidx.compose.ui.graphics.Color(0xFFA8A29E), 12.dp)
             Spacer(Modifier.width(8.dp))
             Text(
                 // Seeded category names arrive in Spanish whatever the app's
@@ -508,8 +564,14 @@ private fun BalanceCard(
                 ),
                 hide,
             ),
-            style = MaterialTheme.typography.displayLarge.copy(fontSize = 30.sp).tabular(),
+            // `text-3xl font-semibold` in the body face, not the display one.
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 30.sp,
+                lineHeight = 36.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            ).tabular(),
             color = colors.fg,
+            modifier = Modifier.cssLineBox(36.dp),
         )
         credit?.creditLimitCents?.let { limit ->
             Text(
@@ -517,7 +579,7 @@ private fun BalanceCard(
                     "{limit}",
                     maskIfHidden(formatMoney(limit, wallet.currencyCode), hide),
                 ),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = MaterialTheme.typography.bodySmall.tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -531,7 +593,7 @@ private fun BalanceCard(
                         hide,
                     ) + " · " + stringResource(R.string.wallets_reserved) + " " +
                     maskIfHidden(formatMoney(reserved, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = MaterialTheme.typography.bodySmall.tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -546,7 +608,7 @@ private fun BalanceCard(
                             formatMoney(-wallet.initialBalanceCents, wallet.currencyCode),
                             hide,
                         ),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                    style = MaterialTheme.typography.bodySmall.tabular(),
                     color = colors.fgSubtle,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -555,7 +617,7 @@ private fun BalanceCard(
             Text(
                 stringResource(R.string.wallets_initial_balance) + ": " +
                     maskIfHidden(formatMoney(wallet.initialBalanceCents, wallet.currencyCode), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = MaterialTheme.typography.bodySmall.tabular(),
                 color = colors.fgSubtle,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -581,15 +643,20 @@ private fun CreditPanel(
     onPay: () -> Unit,
     onAddPlan: () -> Unit,
     onDeletePlan: (MsiPlan) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
     val st = summary.statement
     // The web colours this block red once the deadline is inside three days.
     val urgent = st.remainingCents > 0 && st.daysToDue <= 3
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    // `text-xs uppercase tracking-[0.12em] text-fg-subtle` — the panel's own
+    // caption, lighter and tighter than the `.eyebrow`.
+    val caption = MaterialTheme.typography.bodySmall.copy(letterSpacing = 0.12.em)
+    val xs = MaterialTheme.typography.bodySmall
+    PanelCard(modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -610,58 +677,44 @@ private fun CreditPanel(
             Text(
                 "${stringResource(R.string.credit_next_cut)}: " +
                     formatDayMonth(summary.nextCutDate) + " · " + inDays(summary.daysToCut),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = xs,
                 color = colors.fgSubtle,
             )
         }
 
-        Spacer(Modifier.height(14.dp))
-        MicroLabel(stringResource(R.string.credit_debt))
+        Text(stringResource(R.string.credit_debt).uppercase(), style = caption, color = colors.fgSubtle)
         Text(
             maskIfHidden(formatMoney(summary.debtCents, currency), hide),
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = 24.sp,
+                lineHeight = 32.sp,
                 fontWeight = FontWeight.SemiBold,
             ).tabular(),
             color = if (summary.debtCents > 0) colors.danger else colors.fg,
+            modifier = Modifier.padding(top = 4.dp),
         )
         if (summary.pendingMsiCents > 0) {
             Text(
                 "${stringResource(R.string.credit_msi_pending_total)}: " +
                     maskIfHidden(formatMoney(summary.pendingMsiCents, currency), hide),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = xs.tabular(),
                 color = colors.fgSubtle,
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
-        // Paying the card is a transfer into it. The web offers it here always,
-        // even at zero debt — paying ahead of the cut is a fine move — and the
-        // phone had no way to do it at all.
-        Spacer(Modifier.height(8.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .offset(x = (-16).dp)
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onPay)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            Icon(
-                Lucide.ArrowDownToLine,
-                contentDescription = null,
-                tint = colors.fg,
-                modifier = Modifier.size(15.dp),
-            )
-            Text(
-                stringResource(R.string.credit_pay_action),
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.fg,
-            )
-        }
+        // Paying the card is a transfer into it, offered here always — even at
+        // zero debt, paying ahead of the cut is a fine move. `mt-2 -ml-4`.
+        GhostButton(
+            stringResource(R.string.credit_pay_action),
+            onClick = onPay,
+            leadingIcon = Lucide.ArrowDownToLine,
+            modifier = Modifier.padding(top = 8.dp).offset(x = (-16).dp),
+        )
 
-        Spacer(Modifier.height(16.dp))
+        // `mt-4 rounded-lg px-3 py-2.5 text-sm`, red once it is urgent.
         Column(
             Modifier
+                .padding(top = 16.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(if (urgent) colors.danger.copy(alpha = 0.10f) else colors.surfaceOverlay)
@@ -677,28 +730,25 @@ private fun CreditPanel(
                     } else {
                         ""
                     },
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                style = xs.tabular(),
                 color = colors.fgSubtle,
             )
-            Spacer(Modifier.height(4.dp))
             Text(
                 statementLine(st, currency, hide),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                ),
+                style = MaterialTheme.typography.labelLarge,
                 color = if (urgent) colors.danger else colors.fgMuted,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
 
         summary.utilizationBps?.let { bps ->
             val fraction = bps / 10_000f
-            Spacer(Modifier.height(16.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                MicroLabel(stringResource(R.string.credit_utilization))
+                Text(stringResource(R.string.credit_utilization).uppercase(), style = caption, color = colors.fgSubtle)
                 Text(
                     "${Math.round(fraction * 100)}% · " + text(
                         R.string.credit_utilization_of,
@@ -711,17 +761,18 @@ private fun CreditPanel(
                             hide,
                         ),
                     ),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp).tabular(),
+                    style = xs.tabular(),
                     color = colors.fgMuted,
                 )
             }
-            Spacer(Modifier.height(6.dp))
             ProgressBar(bps, color = usageColor(fraction))
         }
 
         summary.nextAnniversary?.let { day ->
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
                 Icon(
                     Lucide.CalendarClock,
                     contentDescription = null,
@@ -731,17 +782,17 @@ private fun CreditPanel(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     "${stringResource(R.string.credit_next_anniversary)}: " + formatDayMonth(day),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = xs,
                     color = colors.fgSubtle,
                 )
             }
         }
 
+        // `mt-5 border-t pt-4`, then a `mb-2` heading row.
         Spacer(Modifier.height(20.dp))
         HairLine()
-        Spacer(Modifier.height(16.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -750,37 +801,21 @@ private fun CreditPanel(
                 style = MaterialTheme.typography.labelLarge,
                 color = colors.fg,
             )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onAddPlan() }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Icon(
-                    Lucide.Plus,
-                    contentDescription = null,
-                    tint = colors.fg,
-                    modifier = Modifier.size(15.dp),
-                )
-                Text(
-                    stringResource(R.string.credit_msi_add),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.fg,
-                )
-            }
+            GhostButton(
+                stringResource(R.string.credit_msi_add),
+                onClick = onAddPlan,
+                leadingIcon = Lucide.Plus,
+            )
         }
         if (summary.msiPlans.isEmpty()) {
-            Spacer(Modifier.height(8.dp))
             Text(
                 stringResource(R.string.credit_msi_empty),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = xs,
                 color = colors.fgSubtle,
             )
         }
-        summary.msiPlans.forEach { plan ->
-            Spacer(Modifier.height(8.dp))
+        summary.msiPlans.forEachIndexed { i, plan ->
+            if (i > 0) Spacer(Modifier.height(8.dp))
             MsiRow(plan, currency, hide) { onDeletePlan(plan) }
         }
     }
@@ -818,37 +853,39 @@ private fun usageColor(fraction: Float) = when {
 @Composable
 private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () -> Unit) {
     val colors = Broke.colors
+    // `rounded-lg bg-surface-overlay px-3 py-2.5`.
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(colors.surfaceOverlay)
-            .padding(12.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
                 plan.description,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = colors.fg,
-                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
             Text(
                 text(
                     R.string.credit_msi_monthly,
                     "amount" to maskIfHidden(formatMoney(plan.monthlyCents, currency), hide),
                 ),
-                style = MaterialTheme.typography.labelLarge.tabular(),
+                style = MaterialTheme.typography.bodyMedium.tabular(),
                 color = colors.fgMuted,
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
             Icon(
                 Lucide.Trash,
                 contentDescription = stringResource(R.string.common_delete),
                 tint = colors.fgSubtle,
-                modifier = Modifier.width(20.dp).clickable(onClick = onDelete),
+                modifier = Modifier.size(14.dp).clickable(onClick = onDelete),
             )
         }
-        Spacer(Modifier.height(8.dp))
         // Progress is billed months over total months — both the server's.
         ProgressBar(
             progressBps = if (plan.months > 0) {
@@ -856,6 +893,7 @@ private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () 
             } else {
                 0L
             },
+            modifier = Modifier.padding(top = 8.dp),
             // One pip per instalment while they still fit; past two years the
             // web falls back to a plain bar, and so does this.
             segments = plan.months.takeIf { it in 1..24 },
@@ -864,7 +902,6 @@ private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () 
         // "3 of 12 instalments · next one on the 5th", or "· paid off" once the
         // last instalment has been billed. The web keeps it as one line.
         val done = plan.billedMonths >= plan.months
-        Spacer(Modifier.height(6.dp))
         val progress = text(
             R.string.credit_msi_progress,
             "billed" to plan.billedMonths,
@@ -884,42 +921,33 @@ private fun MsiRow(plan: MsiPlan, currency: String, hide: Boolean, onDelete: () 
         }
         Text(
             if (tail != null) "$progress · $tail" else progress,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.bodySmall,
             color = colors.fgSubtle,
+            modifier = Modifier.padding(top = 6.dp),
         )
     }
 }
 
-/** Section heading with its action, the pair the web puts above each block. */
+/**
+ * Section heading with its action, the pair the web puts above each block:
+ * `flex items-center justify-between`, an h3 in `font-medium` and a ghost
+ * button with a plus.
+ */
 @Composable
-private fun SectionHeader(title: String, action: String, onAction: () -> Unit) {
+private fun SectionHeader(
+    title: String,
+    action: String,
+    modifier: Modifier = Modifier,
+    onAction: () -> Unit,
+) {
     val colors = Broke.colors
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = colors.fg)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onAction)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-        ) {
-            Icon(
-                Lucide.Plus,
-                contentDescription = null,
-                tint = colors.fg,
-                modifier = Modifier.size(15.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                action,
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-                color = colors.fg,
-            )
-        }
+        GhostButton(action, onClick = onAction, leadingIcon = Lucide.Plus)
     }
 }
 

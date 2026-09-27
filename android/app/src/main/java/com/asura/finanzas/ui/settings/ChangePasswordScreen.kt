@@ -60,7 +60,10 @@ fun ChangePasswordScreen(
     val offlineError = stringResource(R.string.offline_banner)
     val mismatch = stringResource(R.string.account_password_mismatch)
 
-    val canSave = !busy && current.isNotBlank() && next.isNotBlank() && confirm.isNotBlank()
+    // The web's `required` / `minLength={8}`: checked on press, never by
+    // greying the button out.
+    val requiredText = stringResource(R.string.common_required)
+    val minLengthText = stringResource(R.string.auth_password_hint)
 
     Column(
         modifier = modifier
@@ -68,11 +71,12 @@ fun ChangePasswordScreen(
             .verticalScroll(rememberScrollState())
             .imePadding()
             .padding(PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp)),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         BackHeader(
             stringResource(R.string.account_change_password),
             onBack,
+            // The header's `mb-7`.
+            Modifier.padding(bottom = 28.dp),
             // "Back to settings", the wording the web's link uses here.
             backLabel = stringResource(R.string.settings_back),
         )
@@ -80,7 +84,7 @@ fun ChangePasswordScreen(
         // The web keeps the whole form — fields, note and button — inside one
         // card; loose fields with the note floated to the top read as a
         // different screen.
-        GlassCard(Modifier.fillMaxWidth(), padding = 20.dp) {
+        com.asura.finanzas.ui.components.PanelCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         FormField(
             label = stringResource(R.string.account_current_password),
@@ -117,19 +121,26 @@ fun ChangePasswordScreen(
             Text(
                 stringResource(R.string.account_password_changed),
                 style = MaterialTheme.typography.bodyMedium,
-                color = colors.positive,
+                color = colors.accent,
             )
         }
 
-        if (busy) {
-            CircularProgressIndicator(color = colors.accent, strokeWidth = 2.dp)
-        } else {
+        run {
             PrimaryButton(
                 // The web's button says what it does, and is only as wide as
-                // its label.
+                // its label; only a save in flight disables it.
                 text = stringResource(R.string.account_change_password),
-                enabled = canSave,
+                enabled = !busy,
                 onClick = {
+                    done = false
+                    if (current.isBlank() || next.isBlank() || confirm.isBlank()) {
+                        error = requiredText
+                        return@PrimaryButton
+                    }
+                    if (next.length < 8 || confirm.length < 8) {
+                        error = minLengthText
+                        return@PrimaryButton
+                    }
                     if (next != confirm) {
                         error = mismatch
                         return@PrimaryButton

@@ -155,11 +155,15 @@ private fun SimpleEditSheet(
             onSelect = { wallet = it },
             modifier = Modifier.fillMaxWidth(),
         )
+        // `autoFocus`, like the web's amount box.
+        val amountFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { amountFocus.requestFocus() } }
         MoneyField(
             label = stringResource(R.string.transactions_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
+            focusRequester = amountFocus,
         )
         // Date and time share a row, in this order, exactly as the web form
         // lays them out — this is the same modal there, not a second one.
@@ -314,11 +318,15 @@ private fun TransferEditSheet(
             emptyLabel = stringResource(R.string.transactions_pick_to_wallet_hint),
             modifier = Modifier.fillMaxWidth(),
         )
+        // `autoFocus`, like the web's amount box.
+        val amountFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { amountFocus.requestFocus() } }
         MoneyField(
             label = stringResource(R.string.transactions_amount),
             value = amountFrom,
             onValueChange = { amountFrom = it; error = null },
             modifier = Modifier.fillMaxWidth(),
+            focusRequester = amountFocus,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),

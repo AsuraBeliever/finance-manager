@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -84,17 +85,24 @@ fun ColorPicker(
 
     @Composable
     fun ringed(active: Boolean, content: @Composable () -> Unit) {
+        // `ring-2 ring-accent ring-offset-2`: box-shadows, so they float clear
+        // of the swatch and take no room — the row keeps its 24 px pitch.
         Box(
             Modifier
-                .size(if (active) 32.dp else 24.dp)
+                .size(24.dp)
                 .then(
                     if (active) {
-                        // `ring-2 ring-accent ring-offset-2`: the ring floats
-                        // clear of the swatch, it does not hug it.
-                        Modifier
-                            .clip(CircleShape)
-                            .border(2.dp, colors.accent, CircleShape)
-                            .padding(4.dp)
+                        Modifier.drawBehind {
+                            val r = size.minDimension / 2
+                            // `ring-offset-surface-raised`: the offset is painted
+                            // in the card's own glass, not left see-through.
+                            drawCircle(colors.surfaceRaised, radius = r + 2.dp.toPx())
+                            drawCircle(
+                                colors.accent,
+                                radius = r + 3.dp.toPx(),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()),
+                            )
+                        }
                     } else {
                         Modifier
                     },
@@ -162,7 +170,7 @@ fun ColorPicker(
  * strip, a shade square, and the result in hex.
  */
 @Composable
-private fun CustomColorDialog(
+internal fun CustomColorDialog(
     initial: Color,
     onDismiss: () -> Unit,
     onPick: (String) -> Unit,

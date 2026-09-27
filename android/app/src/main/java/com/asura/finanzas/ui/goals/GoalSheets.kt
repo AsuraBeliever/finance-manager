@@ -22,6 +22,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.components.FieldHint
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import com.asura.finanzas.ui.components.pullUp
 import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import androidx.compose.foundation.border
@@ -150,8 +156,9 @@ fun GoalFormSheet(
         // wallet to reserve from (+hint) · deadline card · colour.
         Column {
             FieldLabel(stringResource(R.string.goals_kind_label))
+            // `flex gap-1 rounded-xl bg-surface-overlay p-1`, raised chip.
             SegmentedControl(
-                style = SegStyle.Tray,
+                style = SegStyle.Pill,
                 options = listOf("purchase", "fund"),
                 selected = kind,
                 label = {
@@ -163,14 +170,12 @@ fun GoalFormSheet(
                 modifier = Modifier.fillMaxWidth(),
                 fillEqually = true,
             )
-            Spacer(Modifier.height(6.dp))
-            Text(
+            Spacer(Modifier.height(4.dp))
+            FieldHint(
                 stringResource(
                     if (kind == "fund") R.string.goals_kind_fund_hint
                     else R.string.goals_kind_purchase_hint,
                 ),
-                style = MaterialTheme.typography.labelSmall,
-                color = Broke.colors.fgSubtle,
             )
         }
 
@@ -191,6 +196,8 @@ fun GoalFormSheet(
                 modifier = Modifier.weight(1f),
                 enabled = false,
                 readOnly = true,
+                // A disabled input keeps `text-fg` on the web.
+                valueColor = Broke.colors.fg,
             )
         }
 
@@ -203,43 +210,54 @@ fun GoalFormSheet(
                 onSelect = { wallet = it },
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             FieldHint(stringResource(R.string.goals_apartado_hint))
         }
 
-        // The deadline is a bordered card with a checkbox, as on the web.
+        // The deadline is a bordered card with a checkbox, as on the web:
+        // `rounded-lg border p-3`, the label `items-start gap-2.5` with a
+        // 16 px box and the hint indented under its words.
         Column(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(8.dp))
-                .padding(14.dp),
+                .padding(13.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.clickable { hasDeadline = !hasDeadline },
+            ) {
                 WebCheckbox(
                     checked = hasDeadline,
                     onCheckedChange = { hasDeadline = it },
+                    boxSize = 16.dp,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    stringResource(R.string.goals_enable_deadline),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                    color = Broke.colors.fg,
-                )
+                Column {
+                    Text(
+                        stringResource(R.string.goals_enable_deadline),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Broke.colors.fg,
+                    )
+                    Text(
+                        stringResource(R.string.goals_deadline_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Broke.colors.fgSubtle,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(R.string.goals_deadline_hint),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                color = Broke.colors.fgSubtle,
-            )
             if (hasDeadline) {
+                // `mt-3 grid gap-3`; the date cannot be before today.
                 Spacer(Modifier.height(12.dp))
                 DateField(
                     label = stringResource(R.string.goals_deadline_date_label),
                     value = targetDate,
                     onChange = { targetDate = it },
+                    min = java.time.LocalDate.now(),
                 )
+                Spacer(Modifier.height(12.dp))
                 PickerField(
                     label = stringResource(R.string.goals_cadence_label),
                     options = listOf("daily", "weekly", "monthly", "yearly"),
@@ -346,8 +364,9 @@ fun ContributeSheet(
             }
         },
     ) {
+        // `flex gap-1 rounded-xl bg-surface-overlay p-1`, chips `py-2`.
         SegmentedControl(
-            style = SegStyle.Tray,
+            style = SegStyle.Pill,
             // Release only shows once there is something to give back, as on
             // the web — an empty goal has nothing to release.
             options = if (canRelease) listOf(false, true) else listOf(false),
@@ -358,27 +377,32 @@ fun ContributeSheet(
             onSelect = { release = it },
             modifier = Modifier.fillMaxWidth(),
             fillEqually = true,
+            chipVerticalPadding = 8.dp,
         )
 
         // Where the money comes from and how much of it there is; on release,
-        // how much is reserved to give back.
+        // how much is reserved to give back. The names and figures are
+        // `font-medium text-fg` inside the muted sentence.
+        val fgStyle = SpanStyle(color = Broke.colors.fg, fontWeight = FontWeight.Medium)
         val context = when {
-            !release && apartadoWallet != null && availableCents != null ->
-                stringResource(R.string.goals_apartado_of) + " " + apartadoWallet.name + " · " +
-                    stringResource(R.string.goals_available) + " " +
-                    maskIfHidden(
-                        formatMoney(availableCents, apartadoWallet.currencyCode),
-                        hide,
-                    )
-            release ->
-                stringResource(R.string.goals_reserved_label) + " " +
-                    maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide)
+            !release && apartadoWallet != null && availableCents != null -> buildAnnotatedString {
+                append(stringResource(R.string.goals_apartado_of) + " ")
+                withStyle(fgStyle) { append(apartadoWallet.name) }
+                append(" · " + stringResource(R.string.goals_available) + " ")
+                withStyle(fgStyle) {
+                    append(maskIfHidden(formatMoney(availableCents, apartadoWallet.currencyCode), hide))
+                }
+            }
+            release -> buildAnnotatedString {
+                append(stringResource(R.string.goals_reserved_label) + " ")
+                withStyle(fgStyle) { append(maskIfHidden(formatMoney(goal.savedCents, goal.currencyCode), hide)) }
+            }
             else -> null
         }
         context?.let {
             Text(
                 it,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.bodySmall.tabular(),
                 color = Broke.colors.fgMuted,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -388,28 +412,38 @@ fun ContributeSheet(
             )
         }
 
+        // `autoFocus`, like the web's amount box.
+        val amountFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+        androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { amountFocus.requestFocus() } }
         MoneyField(
             label = stringResource(R.string.goals_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
+            focusRequester = amountFocus,
         )
 
-        // One tap fills in what this period asks for.
+        // One tap fills in what this period asks for: `-mt-2 self-start
+        // rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium`.
         if (suggested > 0) {
             Text(
                 stringResource(R.string.goals_suggested_chip) + " " +
                     maskIfHidden(formatMoney(suggested, goal.currencyCode), hide),
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp).tabular(),
+                style = MaterialTheme.typography.labelSmall.tabular(),
                 color = Broke.colors.accent,
                 modifier = Modifier
+                    .pullUp(8.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Broke.colors.accent.copy(alpha = 0.1f))
-                    .clickable { amount = formatMoney(suggested, withSymbol = false) }
+                    .clickable {
+                        amount = java.math.BigDecimal(suggested).movePointLeft(2).toPlainString()
+                    }
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
 
+        // `-mt-1`.
+        Box(Modifier.pullUp(4.dp)) {
         FieldHint(
             stringResource(
                 when {
@@ -420,5 +454,6 @@ fun ContributeSheet(
                 },
             ),
         )
+        }
     }
 }

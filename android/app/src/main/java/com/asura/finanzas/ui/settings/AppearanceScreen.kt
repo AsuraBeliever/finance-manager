@@ -85,7 +85,8 @@ fun AppearanceScreen(
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        // `flex flex-col gap-6` between the three cards; the hint's `mb-5`
+        // above the first.
     ) {
         item {
             BackHeader(
@@ -95,24 +96,26 @@ fun AppearanceScreen(
             ) {
                 // Reset is a ghost action up in the header on the web, not a
                 // primary button parked at the bottom of the page.
-                GhostAction(
-                    icon = Lucide.RotateCcw,
-                    text = stringResource(R.string.appearance_reset),
+                com.asura.finanzas.ui.components.GhostButton(
+                    stringResource(R.string.appearance_reset),
                     onClick = { scope.launch { sync.save(Appearance()) } },
+                    leadingIcon = Lucide.RotateCcw,
                 )
             }
-            Spacer(Modifier.height(4.dp))
+            // `mb-5 -mt-3 text-sm`: 16 under the header, 20 over the cards.
+            Spacer(Modifier.height(16.dp))
             Text(
                 stringResource(R.string.appearance_settings_hint),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.fgSubtle,
+                modifier = Modifier.padding(bottom = 20.dp),
             )
         }
 
         // Colours, with the money headline as its own live sample — the web
         // puts the preview inside this card rather than above the page.
         item {
-            GlassCard(Modifier.fillMaxWidth()) {
+            com.asura.finanzas.ui.components.PanelCard(Modifier.fillMaxWidth().padding(top = 0.dp)) {
                 SectionTitle(stringResource(R.string.appearance_colors))
                 Spacer(Modifier.height(16.dp))
                 FlowRow(
@@ -124,22 +127,24 @@ fun AppearanceScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    HeroAmount("$12,345.00", fontSize = 30.sp)
+                    HeroAmount("$12,345.00", fontSize = 30.sp, lineHeight = 36.sp, modifier = Modifier.align(Alignment.CenterVertically))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.align(Alignment.CenterVertically),
                     ) {
                         Dot(colors.accent, 12.dp)
                         Text(
                             stringResource(R.string.appearance_accent),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = colors.fgMuted,
                         )
+                        // `ml-3` on the second dot, on top of the `gap-1.5`.
                         Spacer(Modifier.width(6.dp))
                         Dot(colors.cyan, 12.dp)
                         Text(
                             stringResource(R.string.appearance_secondary),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = colors.fgMuted,
                         )
                     }
@@ -170,7 +175,7 @@ fun AppearanceScreen(
 
         // Typography: named chips, each set in its own face, not a dropdown.
         item {
-            GlassCard(Modifier.fillMaxWidth()) {
+            com.asura.finanzas.ui.components.PanelCard(Modifier.fillMaxWidth().padding(top = 24.dp)) {
                 SectionTitle(stringResource(R.string.appearance_font))
                 Spacer(Modifier.height(12.dp))
                 FlowRow(
@@ -179,9 +184,13 @@ fun AppearanceScreen(
                 ) {
                     APPEARANCE_FONTS.forEach { key ->
                         val chosen = current.font == key
+                        // Each option is set in its own display face, as on the
+                        // web (`style={{ fontFamily: FONTS[key].display }}`).
                         Text(
                             fontLabel(key),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = com.asura.finanzas.ui.theme.fontPreviewFamily(key),
+                            ),
                             color = if (chosen) colors.accent else colors.fg,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
@@ -195,7 +204,8 @@ fun AppearanceScreen(
                                     RoundedCornerShape(8.dp),
                                 )
                                 .clickable { update { it.copy(font = key) } }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                // `px-3 py-2` plus the border.
+                                .padding(horizontal = 13.dp, vertical = 9.dp),
                         )
                     }
                 }
@@ -204,7 +214,7 @@ fun AppearanceScreen(
 
         // Brand and logo, with its own small preview inside the card.
         item {
-            GlassCard(Modifier.fillMaxWidth()) {
+            com.asura.finanzas.ui.components.PanelCard(Modifier.fillMaxWidth().padding(top = 24.dp)) {
                 SectionTitle(stringResource(R.string.appearance_brand))
                 Spacer(Modifier.height(16.dp))
                 Row(
@@ -232,7 +242,12 @@ fun AppearanceScreen(
                     Spacer(Modifier.width(10.dp))
                     Text(
                         current.appName.ifBlank { stringResource(R.string.app_name) },
-                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 20.sp, lineHeight = 28.sp),
+                        // `font-display text-xl font-semibold tracking-tight`.
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontSize = 20.sp,
+                            lineHeight = 28.sp,
+                            letterSpacing = com.asura.finanzas.ui.theme.TrackingTight,
+                        ),
                         color = colors.fg,
                         maxLines = 1,
                     )
@@ -304,7 +319,7 @@ private fun SwatchRow(
             Spacer(Modifier.height(6.dp))
             Text(
                 it,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.bodySmall,
                 color = Broke.colors.fgSubtle,
             )
         }
@@ -317,7 +332,7 @@ private fun IconRow(selected: String, onSelect: (String) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         Text(
             stringResource(R.string.appearance_icon),
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium,
             color = colors.fgMuted,
         )
         Spacer(Modifier.height(8.dp))

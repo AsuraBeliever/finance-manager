@@ -7,36 +7,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
@@ -94,6 +83,8 @@ fun TransactionFormSheet(
     defaultKind: TxKind = TxKind.Income,
     defaultToWalletId: Long? = null,
     defaultAmountText: String = "",
+    /** The wallet the form opens on — a wallet's own page passes itself. */
+    defaultWalletId: Long? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -104,7 +95,10 @@ fun TransactionFormSheet(
     var kind by remember { mutableStateOf(defaultKind) }
     var wallet by remember {
         // Never default the source to the card being paid.
-        mutableStateOf(spendable.firstOrNull { it.id != defaultToWalletId })
+        mutableStateOf(
+            spendable.firstOrNull { it.id == defaultWalletId && it.id != defaultToWalletId }
+                ?: spendable.firstOrNull { it.id != defaultToWalletId },
+        )
     }
     var toWallet by remember {
         mutableStateOf(spendable.firstOrNull { it.id == defaultToWalletId })
@@ -134,7 +128,6 @@ fun TransactionFormSheet(
     var msiEnabled by remember { mutableStateOf(false) }
     var msiMonths by remember { mutableStateOf("12") }
     var savedMsi by remember { mutableStateOf<MsiSchedulePreview?>(null) }
-    var queued by remember { mutableStateOf(false) }
     var categories by remember { mutableStateOf<List<TransactionCategory>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -234,9 +227,8 @@ fun TransactionFormSheet(
                 .onSuccess {
                     when {
                         savedMsi != null -> busy = false
-                        // Queued rather than sent: say so instead of closing
-                        // silently, or it looks like nothing happened.
-                        wasQueued -> queued = true
+                        // Queued or sent, the web just closes: the outbox
+                        // panel behind it already lists the pending capture.
                         else -> onSaved()
                     }
                 }
@@ -507,26 +499,6 @@ fun TransactionFormSheet(
             )
 
         }
-    }
-
-    if (queued) {
-        AlertDialog(
-            onDismissRequest = { queued = false; onSaved() },
-            containerColor = colors.surfaceOverlay,
-            title = { Text(stringResource(R.string.common_offline), color = colors.fg) },
-            text = {
-                Text(
-                    stringResource(R.string.offline_saved_pending),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.fgMuted,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { queued = false; onSaved() }) {
-                    Text(stringResource(R.string.common_close), color = colors.fgMuted)
-                }
-            },
-        )
     }
 
     // Saving an MSI plan ends on a confirmation: nothing visible happens at

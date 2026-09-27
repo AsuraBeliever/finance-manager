@@ -57,8 +57,11 @@ import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
+import androidx.compose.ui.text.font.FontWeight
+import com.asura.finanzas.ui.components.WebNegative
+import com.asura.finanzas.ui.components.WebPositive
+import com.asura.finanzas.ui.components.PanelCard
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.WebCheckbox
@@ -162,24 +165,14 @@ private fun InvestmentList(
     ) {
         item {
             // Same order and shapes as the web: eye, the "show closed" checkbox,
-            // the outlined simulator link, then the primary action.
-            PageHeader(stringResource(R.string.investments_title)) {
+            // the outlined simulator link, then the primary action. Four
+            // controls do not fit this width; the header's row shrinks them
+            // the way flexbox does, so the labels break onto a second line.
+            PageHeader(stringResource(R.string.investments_title), Modifier.padding(bottom = 12.dp)) {
                 PrivacyToggle()
-                // Four controls do not fit this width laid out at their natural
-                // size. In the browser they are flex children, so they shrink
-                // and let their labels run onto a second line rather than
-                // pushing the last one down to a row of its own.
-                //
-                // `IntrinsicSize.Min` is that behaviour exactly: a flex item
-                // will not shrink past its min-content width, which for a label
-                // is its longest word. Hand-picked `weight` fractions used to
-                // stand in for this, and being a few dp short left the primary
-                // action reading "New investmen".
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .width(IntrinsicSize.Min)
-                        .clickable { onToggleClosed() },
+                    modifier = Modifier.clickable { onToggleClosed() },
                 ) {
                     WebCheckbox(
                         checked = showClosed,
@@ -196,23 +189,21 @@ private fun InvestmentList(
                     text = stringResource(R.string.simulator_open),
                     onClick = onSimulator,
                     leadingIcon = Lucide.Calculator,
-                    modifier = Modifier.width(IntrinsicSize.Min),
                 )
                 PrimaryButton(
                     text = stringResource(R.string.investments_new_investment),
                     onClick = onNew,
                     leadingIcon = Lucide.Plus,
-                    modifier = Modifier.width(IntrinsicSize.Min),
                 )
             }
         }
 
-        if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
-        }
 
-        if (portfolio != null) {
-            item { PortfolioCard(portfolio, hide) }
+        // Like the web: no summary card over an empty list (`items.length > 0`
+        // and `PortfolioSummary`'s own `slices.length === 0` bail-out).
+        if (portfolio != null && shown.isNotEmpty() && portfolio.slices.isNotEmpty()) {
+            // `mb-6`: 24, of which the list's gap gives 16.
+            item { PortfolioCard(portfolio, hide, Modifier.padding(bottom = 8.dp)) }
         }
 
         if (shown.isEmpty()) {
@@ -235,11 +226,12 @@ private fun InvestmentList(
  * particular is finanzas-core's XIRR, never recomputed here.
  */
 @Composable
-private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
+private fun PortfolioCard(portfolio: Portfolio, hide: Boolean, modifier: Modifier = Modifier) {
     val colors = Broke.colors
 
-    GlassCard(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth()) {
+    // `grid gap-4 p-5` with the metrics in a `grid-cols-2 gap-4`.
+    GlassCard(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Stat(
                 stringResource(R.string.investments_portfolio_value),
                 maskIfHidden(formatMoney(portfolio.totalValueCents), hide),
@@ -254,11 +246,12 @@ private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
             )
         }
         Spacer(Modifier.height(16.dp))
-        Row(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // The web's POSITIVE / NEGATIVE, the same two in both themes.
             Stat(
                 stringResource(R.string.investments_portfolio_gain),
                 maskIfHidden(formatMoney(portfolio.totalGainCents), hide),
-                if (portfolio.totalGainCents >= 0) colors.positive else colors.danger,
+                if (portfolio.totalGainCents >= 0) WebPositive else WebNegative,
                 Modifier.weight(1f),
             )
             Stat(
@@ -267,41 +260,46 @@ private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
                     // Basis points to a percentage is presentation only.
                     ?.let { (if (it >= 0) "+" else "") + "%.1f%%".format(it / 100.0) }
                     ?: "—",
-                if ((portfolio.annualizedReturnBps ?: 0) >= 0) colors.positive else colors.danger,
+                when {
+                    portfolio.annualizedReturnBps == null -> colors.fg
+                    portfolio.annualizedReturnBps >= 0 -> WebPositive
+                    else -> WebNegative
+                },
                 Modifier.weight(1f),
             )
         }
 
-        if (portfolio.slices.isNotEmpty()) {
+        if (portfolio.slices.any { it.currentValueCents > 0 }) {
             Spacer(Modifier.height(16.dp))
-            // A small ring beside its key, the way the web draws it — not a big
-            // centred donut with the total in the hole.
+            // `flex items-center gap-4`: a 120 px ring beside its key.
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val open = portfolio.slices.filter { it.currentValueCents > 0 }
                 MiniDonut(
-                    slices = portfolio.slices.map { it.currentValueCents },
-                    names = portfolio.slices.map { it.name },
-                    formatted = portfolio.slices.map {
+                    slices = open.map { it.currentValueCents },
+                    names = open.map { it.name },
+                    formatted = open.map {
                         maskIfHidden(formatMoney(it.currentValueCents), hide)
                     },
                     // Above the key beside it: a tooltip wider than the ring
                     // overhangs the legend, as on the web.
-                    modifier = Modifier.size(112.dp).zIndex(1f),
+                    modifier = Modifier.size(120.dp).zIndex(1f),
                 )
                 Spacer(Modifier.width(16.dp))
+                // `space-y-1 text-xs text-fg-muted`, squares `rounded-sm`.
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     // The web lists at most five, truncated.
-                    portfolio.slices.take(5).forEachIndexed { index, slice ->
+                    open.take(5).forEachIndexed { index, slice ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 Modifier
                                     .size(10.dp)
-                                    .clip(RoundedCornerShape(4.dp))
+                                    .clip(RoundedCornerShape(2.dp))
                                     .background(chartColor(index)),
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 slice.name,
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                                style = MaterialTheme.typography.bodySmall,
                                 color = colors.fgMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -314,6 +312,7 @@ private fun PortfolioCard(portfolio: Portfolio, hide: Boolean) {
     }
 }
 
+/** The web's `Metric`: a `text-xs` caption over a `font-display text-lg` figure. */
 @Composable
 private fun Stat(
     label: String,
@@ -322,26 +321,31 @@ private fun Stat(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = Broke.colors.fgMuted)
-        Spacer(Modifier.height(2.dp))
+        Text(label, style = MaterialTheme.typography.bodySmall, color = Broke.colors.fgSubtle)
         Text(
             value,
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp, lineHeight = 29.33.sp),
+            style = MaterialTheme.typography.headlineMedium.tabular()
+                .copy(fontSize = 18.sp, lineHeight = 28.sp),
             color = valueColor,
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }
 
 /**
  * Name, value, gain, then the calculator and maturity as a caption — the web's
- * card, which leads with the money rather than the currency code.
+ * `rounded-xl border bg-surface-raised p-4` card, not a glass one.
  */
 @Composable
 private fun InvestmentCard(investment: Investment, hide: Boolean, onOpen: (Investment) -> Unit) {
     val colors = Broke.colors
+    val gain = if (investment.gainCents >= 0) colors.accent else colors.danger
 
-    GlassCard(Modifier.fillMaxWidth().clickable { onOpen(investment) }) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+    PanelCard(Modifier.fillMaxWidth().clickable { onOpen(investment) }, padding = 16.dp) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        ) {
             Text(
                 investment.name,
                 style = MaterialTheme.typography.titleMedium,
@@ -350,45 +354,47 @@ private fun InvestmentCard(investment: Investment, hide: Boolean, onOpen: (Inves
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            // A closed investment wears a pill up here, not a word appended to
-            // the caption — the web puts it at the end of the name's row.
+            // A closed investment wears a pill up here (`ml-auto`), not a word
+            // appended to the caption.
             if (investment.isClosed) {
                 Spacer(Modifier.weight(1f))
                 Text(
                     stringResource(R.string.investments_closed),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
                     modifier = Modifier
+                        .padding(start = 8.dp)
                         .clip(RoundedCornerShape(999.dp))
                         .background(colors.surfaceOverlay)
                         .padding(horizontal = 8.dp, vertical = 2.dp),
                 )
             }
         }
-        Spacer(Modifier.height(8.dp))
+        // `text-xl font-semibold`, the body face.
         Text(
             maskIfHidden(formatMoney(investment.currentValueCents, investment.currencyCode), hide),
-            style = MaterialTheme.typography.headlineMedium.tabular(),
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 20.sp,
+                lineHeight = 28.sp,
+                fontWeight = FontWeight.SemiBold,
+            ).tabular(),
             color = colors.fg,
         )
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
             Icon(
-                // Losing money points down, as on the web; the same arrow in
-                // red read as a gain at a glance.
+                // Losing money points down, as on the web.
                 if (investment.gainCents >= 0) Lucide.TrendingUp else Lucide.TrendingDown,
                 contentDescription = null,
-                tint = if (investment.gainCents >= 0) colors.accent else colors.danger,
+                tint = gain,
                 modifier = Modifier.size(14.dp),
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(4.dp))
             Text(
                 maskIfHidden(formatDelta(investment.gainCents, investment.currencyCode), hide),
-                style = MaterialTheme.typography.bodyLarge.tabular(),
-                color = if (investment.gainCents >= 0) colors.accent else colors.danger,
+                style = MaterialTheme.typography.bodyMedium.tabular(),
+                color = gain,
             )
         }
-        Spacer(Modifier.height(6.dp))
         Text(
             listOfNotNull(
                 // A crypto holding says how much of the coin it is, not that it
@@ -402,8 +408,9 @@ private fun InvestmentCard(investment: Investment, hide: Boolean, onOpen: (Inves
                     "${stringResource(R.string.investments_maturity)}: $it"
                 },
             ).joinToString(" · "),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.bodySmall,
             color = colors.fgSubtle,
+            modifier = Modifier.padding(top = 8.dp),
         )
     }
 }
@@ -452,24 +459,24 @@ private fun MiniDonut(
     // the slice's own colour here (this chart sets no `itemStyle`).
     val hit = rememberChartHit()
     val density = LocalDensity.current
-    // recharts' view box starts 5 px into a 120 px box; this ring's box is the
-    // ring itself (112), so that edge sits 1 dp in.
-    val inset = with(density) { 1.dp.toPx() }
+    // The web's box is 120 px and the ring inside it has fixed radii — 56 out,
+    // 34 in — so this box is the web's box, not the ring.
+    val inset = 0f
     Box(
         modifier.chartTap(hit, slices) { tap, size ->
-            val outer = size.width / 2f
+            val outer = with(density) { 56.dp.toPx() }
             donutHit(
                 tap = tap,
                 center = Offset(size.width / 2f, size.height / 2f),
-                innerRadius = outer * 34f / 56f,
+                innerRadius = with(density) { 34.dp.toPx() },
                 outerRadius = outer,
                 values = slices,
             )
         },
     ) {
     Canvas(Modifier.matchParentSize()) {
-        val stroke = (56f - 34f) / 56f * (size.minDimension / 2f)
-        val radius = size.minDimension / 2f - stroke / 2f
+        val stroke = (56 - 34).dp.toPx()
+        val radius = 45.dp.toPx()
         // Recharts measures angles the way maths does — anticlockwise from three
         // o'clock — and `Pie` defaults to startAngle 0. Compose's drawArc is the
         // mirror of that (clockwise, same origin), hence the negated angles.
@@ -497,7 +504,7 @@ private fun MiniDonut(
                 items = listOf(TooltipItem(names[it.index], formatted[it.index], colors[it.index])),
             )
         },
-        modifier = Modifier.matchParentSize().padding(start = 1.dp, top = 1.dp),
+        modifier = Modifier.matchParentSize(),
     )
     }
 }

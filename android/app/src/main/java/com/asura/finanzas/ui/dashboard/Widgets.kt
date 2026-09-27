@@ -30,6 +30,7 @@ import com.asura.finanzas.ui.components.BreakdownDonut
 import com.asura.finanzas.ui.components.LegendBelowDonut
 import com.asura.finanzas.ui.components.DonutSlice
 import com.asura.finanzas.ui.components.GlassCard
+import com.asura.finanzas.ui.components.cssLineBox
 import com.asura.finanzas.ui.components.ProgressBar
 import com.asura.finanzas.ui.components.RingGauge
 import com.asura.finanzas.ui.components.chartColor
@@ -65,7 +66,8 @@ private fun WidgetHeader(title: String, onViewAll: (() -> Unit)? = null) {
         if (onViewAll != null) {
             Text(
                 stringResource(R.string.dashboard_view_all),
-                style = MaterialTheme.typography.labelLarge,
+                // `text-xs font-medium`.
+                style = MaterialTheme.typography.labelSmall,
                 color = colors.accent,
                 modifier = Modifier.padding(start = 12.dp).clickable { onViewAll() },
             )
@@ -160,7 +162,11 @@ fun ByInvestmentWidget(
     }
 }
 
-/** Budgets, shown as the web's "spending limit" list. */
+/**
+ * Budgets, shown as the web's "spending limit" card: the overall limit (when
+ * there is one) as a big figure over a ten-pip bar, then every category's
+ * limit as a labelled bar.
+ */
 @Composable
 fun BudgetWidget(
     budgets: List<Budget>,
@@ -168,18 +174,55 @@ fun BudgetWidget(
     onViewAll: () -> Unit,
 ) {
     val colors = Broke.colors
+    val overall = budgets.firstOrNull { it.categoryId == null }
+    val perCategory = budgets.filter { it.categoryId != null }
     GlassCard(Modifier.fillMaxWidth()) {
         WidgetHeader(stringResource(R.string.budgets_spending_limit), onViewAll)
-        budgets.take(6).forEach { budget ->
-            val over = budget.spentMxnCents > budget.limitCents
+        if (overall != null) {
+            // `mb-4`: a figure in `font-display text-3xl`, and its limit in a
+            // `text-sm` span that keeps the display face.
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    maskIfHidden(formatMoney(overall.spentMxnCents), hide),
+                    style = MaterialTheme.typography.headlineMedium.tabular()
+                        .copy(fontSize = 30.sp, lineHeight = 36.sp),
+                    color = colors.fg,
+                    modifier = Modifier.alignByBaseline().cssLineBox(36.dp),
+                )
+                Text(
+                    "${stringResource(R.string.goals_of)} " +
+                        maskIfHidden(formatMoney(overall.limitCents), hide),
+                    style = MaterialTheme.typography.headlineMedium.tabular().copy(
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                    ),
+                    color = colors.fgSubtle,
+                    modifier = Modifier.padding(start = 8.dp).alignByBaseline(),
+                )
+            }
+            ProgressBar(
+                overall.progressBps,
+                modifier = Modifier.padding(top = 12.dp),
+                color = colors.cyan,
+                segments = 10,
+            )
+            Spacer(Modifier.height(16.dp))
+        }
+        // `space-y-3`, each row `mb-1` above its bar.
+        perCategory.forEachIndexed { index, budget ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (index == 0) 0.dp else 12.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Dot(parseHexColor(budget.color) ?: colors.accent)
-                Spacer(Modifier.width(10.dp))
+                parseHexColor(budget.color)?.let {
+                    Dot(it)
+                    Spacer(Modifier.width(8.dp))
+                }
                 Text(
-                    seedName(budget.categoryName) ?: stringResource(R.string.budgets_overall),
+                    seedName(budget.categoryName).orEmpty(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.fgMuted,
                     modifier = Modifier.weight(1f),
@@ -187,12 +230,11 @@ fun BudgetWidget(
                 Text(
                     maskIfHidden(formatMoney(budget.spentMxnCents), hide) + " / " +
                         maskIfHidden(formatMoney(budget.limitCents), hide),
-                    style = MaterialTheme.typography.labelSmall.tabular(),
-                    color = if (over) colors.danger else colors.fgSubtle,
+                    style = MaterialTheme.typography.bodyMedium.tabular(),
+                    color = colors.fgSubtle,
                 )
             }
-            Spacer(Modifier.height(6.dp))
-            ProgressBar(budget.progressBps, over = over)
+            ProgressBar(budget.progressBps, color = parseHexColor(budget.color))
         }
     }
 }
@@ -217,10 +259,11 @@ fun GoalsWidget(
                 " · ${lead.name}",
             color = parseHexColor(lead.color),
         )
-        // The web lists three runners-up, each in its own colour.
+        // The web lists three runners-up, each in its own colour: `mt-4
+        // space-y-3`, each row `mb-1` above its bar.
         goals.drop(1).take(3).forEachIndexed { index, goal ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = if (index == 0) 16.dp else 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
