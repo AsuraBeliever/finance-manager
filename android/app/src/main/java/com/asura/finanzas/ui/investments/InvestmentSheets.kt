@@ -90,8 +90,21 @@ fun InvestmentMovementSheet(
     val cents = parseAmountToCents(amount)
     val canSave = !busy && cents != null && cents > 0
 
+    val amountFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { amountFocus.requestFocus() } }
+
+    // Two different modals on the web: a new movement is titled by its kind
+    // (the button you pressed already chose it), an edit is `MovementEditModal`
+    // with the investment named and the kind open to change.
     FormSheet(
-        title = stringResource(R.string.investments_movements),
+        title = if (existing != null) {
+            stringResource(R.string.investments_movement_edit_title)
+        } else {
+            stringResource(
+                if (kind == "withdrawal") R.string.investments_withdrawal_noun
+                else R.string.investments_deposit_noun,
+            )
+        },
         busy = busy,
         error = error,
         canSave = canSave,
@@ -127,12 +140,12 @@ fun InvestmentMovementSheet(
             }
         },
     ) {
+        if (existing != null) {
         Text(
             investment.name,
             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
             color = Broke.colors.fgMuted,
         )
-        // A labelled picker with the two nouns, the way the web asks for it.
         PickerField(
             label = stringResource(R.string.investments_movement_kind),
             options = listOf("deposit", "withdrawal"),
@@ -146,17 +159,21 @@ fun InvestmentMovementSheet(
             onSelect = { kind = it },
             modifier = Modifier.fillMaxWidth(),
         )
+        }
         MoneyField(
             label = stringResource(R.string.investments_movement_amount),
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
+            focusRequester = amountFocus,
         )
         DateField(
             label = stringResource(R.string.investments_movement_date),
             value = date,
             onChange = { date = it },
             modifier = Modifier.fillMaxWidth(),
+            // Nothing before the investment existed.
+            min = runCatching { LocalDate.parse(investment.startDate) }.getOrNull(),
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             PickerField(
