@@ -314,3 +314,174 @@ private fun plotRect(width: Float, height: Float, density: Float): Rect {
 /** `(v / 1000).toFixed(digits) + "k"`, the web's tick formatter. */
 fun thousandsTick(pesos: Double, digits: Int): String =
     "%.${digits}f".format(java.util.Locale.ROOT, pesos / 1000.0) + "k"
+
+/** One `<Bar>`: its legend name, its fill and a value (pesos) per category. */
+data class BarSeries(val name: String, val color: Color, val values: List<Double>)
+
+/** A number as JavaScript prints it: "550", "0.5", never "550.0". */
+fun jsNumber(v: Double): String =
+    if (v == kotlin.math.floor(v) && abs(v) < 1e15) v.toLong().toString()
+    else v.toBigDecimal().stripTrailingZeros().toPlainString()
+
+/**
+ * recharts' `BarChart` as the web configures it: 5 px margins, a 40 px Y axis
+ * (8 px and no ticks with balances hidden), a 30 px category X axis, the
+ * default `<Legend />` along the bottom — 24 px, series sorted by name, each a
+ * 14 × 10.5 swatch and its name in its own colour at 16 px — and bars laid out
+ * by `barCategoryGap` / `barGap` with `radius={[3, 3, 0, 0]}`. No grid.
+ */
+@Composable
+fun RechartsBarChart(
+    height: Dp,
+    categories: Int,
+    series: List<BarSeries>,
+    xLabel: (Int) -> String,
+    hideValues: Boolean,
+    modifier: Modifier = Modifier,
+    xFontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
+    xTickLine: Boolean = true,
+    /** Share of each band left clear at each end: `barCategoryGap`. */
+    barCategoryGap: Float = 0.1f,
+    barGap: Dp = 4.dp,
+    tooltipAt: ((Int) -> TooltipContent?)? = null,
+) {
+    val chrome = chartChrome()
+    val colors = Broke.colors
+    val measurer = rememberTextMeasurer()
+    fun style(size: androidx.compose.ui.unit.TextUnit, color: Color) = TextStyle(
+        fontFamily = com.asura.finanzas.ui.theme.HankenGrotesk,
+        fontSize = size,
+        fontFeatureSettings = "ss01",
+        color = color,
+    )
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val yWidth = if (hideValues) 8f else 40f
+    val legend = remember(series) { series.sortedBy { it.name } }
+    val scale = remember(series) {
+        niceScale(0.0, series.flatMap { it.values }.maxOrNull() ?: 0.0, fromZero = true)
+    }
+    val hit = rememberChartHit()
+    val picked = hit.shown?.takeIf { it.index in 0 until categories }
+    val content = picked?.let { tooltipAt?.invoke(it.index) }
+    val cursor = colors.borderMuted.copy(alpha = colors.borderMuted.alpha * 0.4f)
+
+    fun plot(w: Float, h: Float): Rect {
+        val m = 5 * density
+        return Rect(m + yWidth * density, m, w - m, h - m - 24 * density - 30 * density)
+    }
+
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(height)
+            .then(
+                if (tooltipAt == null || categories == 0) {
+                    Modifier
+                } else {
+                    Modifier.chartTap(hit, categories to series) { tap, size ->
+                        val rect = plot(size.width.toFloat(), size.height.toFloat())
+                        if (tap.x < rect.left || tap.y > rect.bottom) {
+                            null
+                        } else {
+                            val band = rect.width / categories
+                            ChartHit(((tap.x - rect.left) / band).toInt().coerceIn(0, categories - 1), tap)
+                        }
+                    }
+                },
+            ),
+    ) {
+        Canvas(Modifier.matchParentSize()) {
+            val px = density
+            val rect = plot(size.width, size.height)
+            val span = (scale.max - scale.min).takeIf { it > 0 } ?: 1.0
+            val yOf: (Double) -> Float = { v -> (rect.bottom - (v - scale.min) / span * rect.height).toFloat() }
+            val band = rect.width / categories.coerceAtLeast(1)
+
+            picked?.let {
+                drawRect(cursor, Offset(rect.left + it.index * band, rect.top), androidx.compose.ui.geometry.Size(band, rect.height))
+            }
+
+            // Bars: recharts' getBarSizeList / getBarPosition.
+            val k = series.size.coerceAtLeast(1)
+            val gap = barGap.toPx()
+            val offset = band * barCategoryGap
+            val barW = ((band - 2 * offset - (k - 1) * gap) / k / px).roundToInt().coerceAtLeast(1) * px
+            val sum = k * barW + (k - 1) * gap
+            val start = (band - sum) / 2
+            val r = 3 * px
+            for (c in 0 until categories) {
+                series.forEachIndexed { s, ser ->
+                    val v = ser.values.getOrNull(c) ?: 0.0
+                    if (v <= 0.0) return@forEachIndexed
+                    val x = rect.left + c * band + start + s * (barW + gap)
+                    val top = yOf(v)
+                    val hgt = rect.bottom - top
+                    val rr = minOf(r, barW / 2, hgt)
+                    val path = Path().apply {
+                        addRoundRect(
+                            androidx.compose.ui.geometry.RoundRect(
+                                left = x, top = top, right = x + barW, bottom = rect.bottom,
+                                topLeftCornerRadius = androidx.compose.ui.geometry.CornerRadius(rr, rr),
+                                topRightCornerRadius = androidx.compose.ui.geometry.CornerRadius(rr, rr),
+                            ),
+                        )
+                    }
+                    drawPath(path, ser.color)
+                }
+            }
+
+            // Axes.
+            drawLine(chrome.axis, Offset(rect.left, rect.top), Offset(rect.left, rect.bottom), px)
+            drawLine(chrome.axis, Offset(rect.left, rect.bottom), Offset(rect.right, rect.bottom), px)
+            val yStyle = style(11.sp, chrome.axis)
+            if (!hideValues) {
+                val em = 11.sp.toPx()
+                scale.ticks.forEach { v ->
+                    val y = yOf(v)
+                    drawLine(chrome.axis, Offset(rect.left - 6 * px, y), Offset(rect.left, y), px)
+                    val layout = measurer.measure(jsNumber(v), yStyle)
+                    drawText(
+                        layout,
+                        topLeft = Offset(rect.left - 8 * px - layout.size.width, y + 0.355f * em - layout.firstBaseline),
+                    )
+                }
+            }
+            val xStyle = style(xFontSize, chrome.axis)
+            val xLayouts = (0 until categories).associateWith { measurer.measure(xLabel(it), xStyle) }
+            val shown = preserveEndTicks(
+                candidates = (0 until categories).toList(),
+                coordOf = { rect.left + (it + 0.5f) * band },
+                widthOf = { xLayouts.getValue(it).size.width.toFloat() },
+                start = rect.left,
+                end = rect.right,
+                gap = 5 * px,
+            )
+            val xem = xFontSize.toPx()
+            shown.forEach { (i, coord) ->
+                val x = rect.left + (i + 0.5f) * band
+                if (xTickLine) drawLine(chrome.axis, Offset(x, rect.bottom), Offset(x, rect.bottom + 6 * px), px)
+                val layout = xLayouts.getValue(i)
+                drawText(
+                    layout,
+                    topLeft = Offset(coord - layout.size.width / 2f, rect.bottom + 8 * px + 0.71f * xem - layout.firstBaseline),
+                )
+            }
+
+            // Legend: centred, each item `margin-right: 10px`, the trailing one included.
+            val legendTop = size.height - 5 * px - 24 * px
+            val items = legend.map { it to measurer.measure(it.name, style(16.sp, it.color)) }
+            val total = items.sumOf { (_, l) -> (14 * px + 4 * px + l.size.width + 10 * px).toDouble() }.toFloat()
+            var x = 5 * px + (size.width - 10 * px - total) / 2
+            items.forEach { (ser, layout) ->
+                drawRect(ser.color, Offset(x, legendTop + 7.85f * px), androidx.compose.ui.geometry.Size(14 * px, 10.5f * px))
+                drawText(layout, topLeft = Offset(x + 18 * px, legendTop + px + (21 * px - layout.size.height) / 2))
+                x += 18 * px + layout.size.width + 10 * px
+            }
+        }
+        ChartTooltip(
+            anchor = picked?.anchor,
+            content = content,
+            modifier = Modifier.matchParentSize(),
+        )
+    }
+}

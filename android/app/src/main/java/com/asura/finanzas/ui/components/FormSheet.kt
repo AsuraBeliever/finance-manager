@@ -268,9 +268,16 @@ fun DialogAction(
 fun PlainSheet(
     title: String,
     onDismiss: () -> Unit,
+    /** The web Modal's `solid`: the opaque overlay token instead of glass. */
+    solid: Boolean = false,
+    /** `fixedHeight`: locked to 80% of the screen, the body scrolling inside. */
+    fixedHeight: Boolean = false,
+    /** Gap between the body's children; 0 where they carry their own margins. */
+    spacing: androidx.compose.ui.unit.Dp = 8.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = Broke.colors
+    val screenH = LocalConfiguration.current.screenHeightDp.dp
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         DialogBlurBehind()
         Column(
@@ -279,11 +286,12 @@ fun PlainSheet(
                 .widthIn(max = 448.dp)
                 .fillMaxWidth()
                 // `max-h-[90dvh]`, like every modal on the web.
-                .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.9f)
+                .heightIn(max = screenH * 0.9f)
+                .then(if (fixedHeight) Modifier.height(screenH * 0.8f) else Modifier)
                 .cardShadow()
                 .clip(RoundedCornerShape(16.dp))
-                .background(colors.surfaceRaised)
-                .cardHighlight()
+                .background(if (solid) colors.surfaceOverlay else colors.surfaceRaised)
+                .then(if (solid) Modifier else Modifier.cardHighlight())
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
                 .padding(1.dp),
         ) {
@@ -311,10 +319,10 @@ fun PlainSheet(
             HairLine()
             Column(
                 modifier = Modifier
-                    .weight(1f, fill = false)
+                    .weight(1f, fill = fixedHeight)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing),
                 content = content,
             )
         }

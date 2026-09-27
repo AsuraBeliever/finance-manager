@@ -1,6 +1,16 @@
 package com.asura.finanzas.ui.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,12 +19,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -30,7 +36,6 @@ import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.PlainSheet
-import com.asura.finanzas.ui.components.IconBadge
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
@@ -84,56 +89,61 @@ fun CategoryDetailDialog(
         seedName(target.name).orEmpty()
     }
 
-    // The web opens this as one of its own modals — titled card, X, hairline —
-    // not as a platform alert with a Close button under it.
-    PlainSheet(title = title, onDismiss = onDismiss) {
-        run {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        when {
-                            loaded == null -> stringResource(R.string.common_loading)
-                            loaded.size == 1 -> stringResource(R.string.dashboard_movement_one)
-                            else -> text(
-                                R.string.dashboard_movements_count,
-                                "n" to loaded.size,
-                            )
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = colors.fgSubtle,
-                    )
-                    Text(
-                        maskIfHidden(formatMoney(target.mxnCents), hide),
-                        style = MaterialTheme.typography.titleMedium.tabular(),
-                        color = colors.fg,
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                HairLine()
+    // The web's `Modal solid fixedHeight`: an opaque card locked to 80% of
+    // the screen, its list scrolling under a pinned title.
+    PlainSheet(title = title, onDismiss = onDismiss, solid = true, fixedHeight = true, spacing = 16.dp) {
+        // `flex items-baseline justify-between border-b pb-3`
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    when {
+                        loaded == null -> ""
+                        loaded.size == 1 -> stringResource(R.string.dashboard_movement_one)
+                        else -> text(R.string.dashboard_movements_count, "n" to loaded.size)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.fgSubtle,
+                    modifier = Modifier.alignByBaseline(),
+                )
+                // `font-display text-lg font-semibold tabular-nums`
+                Text(
+                    maskIfHidden(formatMoney(target.mxnCents), hide),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.sp,
+                    ).tabular(),
+                    color = colors.fg,
+                    modifier = Modifier.alignByBaseline(),
+                )
+            }
+            HairLine()
+        }
 
-                if (loaded != null && loaded.isEmpty()) {
-                    Text(
-                        stringResource(R.string.dashboard_no_period_data),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.fgSubtle,
-                        modifier = Modifier.padding(vertical = 16.dp),
+        when {
+            // `py-6 text-center text-sm text-fg-subtle`, for both.
+            loaded == null || loaded.isEmpty() -> Text(
+                stringResource(
+                    if (loaded == null) R.string.common_loading else R.string.dashboard_no_period_data,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.fgSubtle,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+            )
+            // `divide-y divide-border-muted`
+            else -> Column {
+                loaded.forEachIndexed { i, tx ->
+                    if (i > 0) HairLine()
+                    CategoryDetailRow(
+                        tx = tx,
+                        kind = kind,
+                        fallbackName = title,
+                        currency = currencyByWallet[tx.walletId] ?: "MXN",
+                        hide = hide,
                     )
-                } else if (loaded != null) {
-                    LazyColumn(Modifier.heightIn(max = 360.dp)) {
-                        items(loaded, key = { it.id }) { tx ->
-                            CategoryDetailRow(
-                                tx = tx,
-                                kind = kind,
-                                fallbackName = title,
-                                currency = currencyByWallet[tx.walletId] ?: "MXN",
-                                hide = hide,
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -153,40 +163,48 @@ private fun CategoryDetailRow(
     val tint = if (income) colors.accent else colors.danger
     val time = transactionTimeLabel(tx)
 
+    // `flex items-center gap-3 py-2.5`
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconBadge(
-            if (income) Lucide.ArrowDownLeft else Lucide.ArrowUpRight,
-            tint = tint,
-            // `h-7 w-7` here, smaller than the one the movements list uses.
-            size = 28.dp,
-        )
-        Spacer(Modifier.width(12.dp))
+        // `h-7 w-7 rounded-full bg-surface-overlay`, a 13 px arrow.
+        Box(
+            Modifier.size(28.dp).clip(CircleShape).background(colors.surfaceOverlay),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (income) Lucide.ArrowDownLeft else Lucide.ArrowUpRight,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(13.dp),
+            )
+        }
         Column(Modifier.weight(1f)) {
             Text(
                 tx.description?.takeIf { it.isNotBlank() } ?: fallbackName,
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.fg,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            // `text-xs text-fg-subtle`, free to wrap.
             Text(
                 buildString {
                     append(tx.occurredAt)
                     if (time != null) append(" · $time")
                     append(" · ${tx.walletName}")
                 },
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = colors.fgSubtle,
-                maxLines = 1,
             )
         }
-        Spacer(Modifier.width(8.dp))
+        // `text-sm font-medium tabular-nums`
         Text(
             (if (income) "+" else "−") +
                 maskIfHidden(formatMoney(tx.amountCents, currency), hide),
-            style = MaterialTheme.typography.bodyMedium.tabular(),
+            style = MaterialTheme.typography.labelLarge.tabular(),
             color = tint,
         )
     }
