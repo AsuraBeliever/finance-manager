@@ -429,6 +429,16 @@ fun Modifier.cssLineBox(height: androidx.compose.ui.unit.Dp): Modifier = layout 
     }
 }
 
+/**
+ * A negative top margin (`-mt-2`): the box is drawn [amount] higher and takes
+ * that much less room, pulling itself into the gap above it.
+ */
+fun Modifier.pullUp(amount: androidx.compose.ui.unit.Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val px = amount.roundToPx()
+    layout(placeable.width, (placeable.height - px).coerceAtLeast(0)) { placeable.place(0, -px) }
+}
+
 /** The hero money figure: display face with the violet→cyan gradient. */
 @Composable
 fun HeroAmount(

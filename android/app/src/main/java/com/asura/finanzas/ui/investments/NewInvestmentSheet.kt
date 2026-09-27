@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.components.FieldLabel
 import com.asura.finanzas.ui.components.PlainSheet
+import com.asura.finanzas.ui.components.pullUp
 import com.asura.finanzas.ui.components.formatBps
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
@@ -53,6 +54,7 @@ import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
+import com.asura.finanzas.ui.theme.tabular
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -299,9 +301,10 @@ fun NewInvestmentSheet(
         // Editing keeps the type fixed and says so; creating offers the way
         // back to the catalogue. Same pair, same place, as on the web.
         if (existing == null) {
+            // `text-sm text-accent`, regular weight.
             Text(
                 stringResource(R.string.investments_catalog_back),
-                style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.accent,
                 modifier = Modifier.clickable { step = "catalog" },
             )
@@ -317,10 +320,14 @@ fun NewInvestmentSheet(
             )
         }
 
+        // `autoFocus` on the web's name box.
+        val nameFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+        androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { nameFocus.requestFocus() } }
         FormField(
             label = stringResource(R.string.investments_name),
             value = name,
             onValueChange = { name = it; error = null },
+            focusRequester = nameFocus,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             placeholder = stringResource(R.string.investments_name_placeholder),
@@ -376,7 +383,8 @@ fun NewInvestmentSheet(
 
         // One tap fills the rate in from the source that publishes it.
         banxicoKind?.let { kind ->
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // `-mt-2`: it tucks up under the rate it fills in.
+            Column(Modifier.pullUp(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -396,7 +404,7 @@ fun NewInvestmentSheet(
                     },
                 ) {
                     Icon(
-                        Lucide.RotateCcw,
+                        Lucide.RefreshCw,
                         contentDescription = null,
                         tint = colors.accent,
                         modifier = Modifier.size(13.dp),
@@ -407,7 +415,7 @@ fun NewInvestmentSheet(
                         } else {
                             stringResource(R.string.investments_banxico_objetivo)
                         },
-                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                        style = MaterialTheme.typography.bodyMedium,
                         color = colors.accent,
                     )
                 }
@@ -499,7 +507,8 @@ fun NewInvestmentSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { reinvest = !reinvest },
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                // `items-start gap-3`.
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 WebCheckbox(
                     checked = reinvest,
@@ -509,7 +518,8 @@ fun NewInvestmentSheet(
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.investments_reinvest),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                        // `text-sm font-medium`.
+                        style = MaterialTheme.typography.labelLarge,
                         color = colors.fg,
                     )
                     FieldHint(stringResource(R.string.investments_reinvest_hint))
@@ -527,19 +537,6 @@ fun NewInvestmentSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-
-        // Android-only: the wallet the money comes out of. The web leaves the
-        // link empty here, but dropping the picker would take away the only way
-        // to tie an investment to a wallet from the phone.
-        PickerField(
-            label = stringResource(R.string.investments_movement_wallet),
-            options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
-            selected = wallet,
-            optionLabel = { it?.name ?: noWallet },
-            onSelect = { wallet = it },
-            emptyLabel = noWallet,
-            modifier = Modifier.fillMaxWidth(),
-        )
 
         FormField(
             label = stringResource(R.string.investments_notes),
@@ -696,18 +693,19 @@ private fun CatalogSheet(
                     .background(colors.surface)
                     .border(1.dp, colors.borderMuted, RoundedCornerShape(12.dp))
                     .clickable { onPick(item) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 17.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         catalogName(item),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                        // `block font-medium` at the base size.
+                        style = MaterialTheme.typography.titleMedium,
                         color = colors.fg,
                     )
                     Text(
                         catalogDescription(item),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        style = MaterialTheme.typography.bodySmall,
                         color = colors.fgSubtle,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -719,13 +717,16 @@ private fun CatalogSheet(
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
                             formatBps(bps),
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            // `font-semibold tabular-nums`, base size.
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                            ).tabular(),
                             color = colors.accent,
                         )
                         item.rateDate?.let {
                             Text(
                                 stringResource(R.string.investments_catalog_rate_as_of) + " " + it,
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                                style = MaterialTheme.typography.bodySmall,
                                 color = colors.fgSubtle,
                             )
                         }
@@ -733,7 +734,7 @@ private fun CatalogSheet(
                 } else if (item.id == "nu_cajita" || item.id == "fixed_rate") {
                     Text(
                         stringResource(R.string.investments_catalog_no_rate),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                        style = MaterialTheme.typography.bodySmall,
                         color = colors.fgSubtle,
                     )
                 }

@@ -162,6 +162,8 @@ fun ModalCard(
                 .background(colors.surfaceRaised)
                 .cardHighlight()
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
+                // The card's own 1 px border, which everything sits inside.
+                .padding(1.dp)
                 .imePadding(),
         ) {
             Row(
@@ -277,7 +279,8 @@ fun PlainSheet(
                 .clip(RoundedCornerShape(16.dp))
                 .background(colors.surfaceRaised)
                 .cardHighlight()
-                .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp)),
+                .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
+                .padding(1.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
