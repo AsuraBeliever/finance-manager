@@ -108,7 +108,7 @@ internal fun <T> loadSyncedWith(
         )
     }
 
-    LaunchedEffect(id, refetch) {
+    LaunchedEffect(id, refetch, cache.generation.intValue) {
         runCatching { fetch() }.fold(
             onSuccess = {
                 cache.put(id, it, serializer)

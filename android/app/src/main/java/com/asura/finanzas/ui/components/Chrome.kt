@@ -15,9 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,8 +28,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import kotlin.math.roundToInt
@@ -535,25 +534,6 @@ fun cssLinearGradient(angleDeg: Float, stops: List<Pair<Float, androidx.compose.
         }
     }
 
-/** Thin "sin conexión — datos del último sync" strip. */
-@Composable
-fun OfflineNotice(text: String, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(Broke.colors.surfaceOverlay)
-            .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = Broke.colors.fgMuted,
-        )
-    }
-}
-
 /** Section heading inside a page, in the display face. */
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
@@ -624,9 +604,20 @@ fun EmptyState(
         Box(
             modifier = Modifier
                 .size(56.dp)
+                // `ring-1 ring-accent/20`: a box-shadow ring outside the tile,
+                // not a border eating into it.
+                .drawBehind {
+                    val w = 1.dp.toPx()
+                    drawRoundRect(
+                        color = colors.accent.copy(alpha = 0.2f),
+                        topLeft = Offset(-w / 2, -w / 2),
+                        size = androidx.compose.ui.geometry.Size(size.width + w, size.height + w),
+                        cornerRadius = CornerRadius(16.dp.toPx() + w / 2),
+                        style = Stroke(width = w),
+                    )
+                }
                 .clip(shape)
-                .background(colors.accentDim.copy(alpha = 0.15f))
-                .border(1.dp, colors.accent.copy(alpha = 0.2f), shape),
+                .background(colors.accentDim.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

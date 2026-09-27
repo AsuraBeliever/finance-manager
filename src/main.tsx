@@ -37,6 +37,11 @@ const queryClient = new QueryClient({
     queries: {
       gcTime: CACHE_MAX_AGE, // must be >= persister maxAge or entries drop early
     },
+    // The default ("online") pauses every mutation while offline, so a capture
+    // never reached `submitOrQueue` and the form sat on a disabled "Guardar"
+    // until the connection came back. Run them: captures queue in the outbox,
+    // anything else fails fast with its own error — as on Android.
+    mutations: { networkMode: "always" },
   },
 });
 

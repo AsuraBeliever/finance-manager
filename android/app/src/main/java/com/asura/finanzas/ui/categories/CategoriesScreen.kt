@@ -3,7 +3,6 @@ package com.asura.finanzas.ui.categories
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import com.asura.finanzas.ui.components.CATEGORY_PALETTE
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,19 +15,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -53,18 +49,12 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.TransactionCategory
 import com.asura.finanzas.ui.components.BackHeader
 import com.asura.finanzas.ui.components.Dot
-import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.ConfirmDialog
-import com.asura.finanzas.ui.components.DialogAction
-import com.asura.finanzas.ui.components.GlassCard
 import androidx.compose.ui.draw.alpha
 import com.asura.finanzas.ui.components.ColorPicker
-import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.MicroLabel
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.ReorderHandle
 import com.asura.finanzas.ui.components.ReorderState
 import com.asura.finanzas.ui.components.rememberReorderState
@@ -86,7 +76,6 @@ fun CategoriesScreen(
     val scope = rememberCoroutineScope()
 
     var editing by remember { mutableStateOf<TransactionCategory?>(null) }
-    var actionsFor by remember { mutableStateOf<TransactionCategory?>(null) }
     // Hiding a seed row or deleting a user one asks first, as the web does;
     // restoring a hidden one is harmless and goes straight through.
     var deleting by remember { mutableStateOf<TransactionCategory?>(null) }
@@ -98,7 +87,6 @@ fun CategoriesScreen(
             categories = current.data,
             fromCache = current.fromCache,
             onBack = onBack,
-            onLongPress = { actionsFor = it },
             // The row's own buttons, as on the web: restore a hidden one,
             // ask before hiding a seed or deleting your own, rename in place.
             onRestore = { target ->
@@ -137,52 +125,6 @@ fun CategoriesScreen(
         )
     }
 
-    actionsFor?.let { target ->
-        AlertDialog(
-            onDismissRequest = { actionsFor = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(seedName(target.name, target.isSystem).orEmpty(), color = Broke.colors.fg) },
-            text = {
-                Column {
-                    // Seeded categories are shared across accounts: the server
-                    // will not rename them, so only hiding is offered.
-                    if (!target.isSystem) {
-                        DialogAction(stringResource(R.string.categories_rename)) {
-                            actionsFor = null
-                            editing = target
-                        }
-                    }
-                    if (target.isHidden) {
-                        // A hidden seed comes back into the pickers; the web
-                        // offers the same undo on the row itself.
-                        DialogAction(stringResource(R.string.categories_restore)) {
-                            actionsFor = null
-                            scope.launch {
-                                runCatching { repository.restoreCategory(target.id) }
-                                reload()
-                            }
-                        }
-                    } else {
-                        DialogAction(
-                            stringResource(
-                                if (target.isSystem) R.string.categories_hide
-                                else R.string.categories_delete,
-                            ),
-                            Broke.colors.danger,
-                        ) {
-                            actionsFor = null
-                            deleting = target
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { actionsFor = null }) {
-                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
-                }
-            },
-        )
-    }
 
     deleting?.let { target ->
         ConfirmDialog(
@@ -213,7 +155,6 @@ private fun CategoryList(
     categories: List<TransactionCategory>,
     fromCache: Boolean,
     onBack: () -> Unit,
-    onLongPress: (TransactionCategory) -> Unit,
     onRestore: (TransactionCategory) -> Unit,
     onAskDelete: (TransactionCategory) -> Unit,
     onRename: (TransactionCategory, String, String?) -> Unit,
@@ -284,9 +225,6 @@ private fun CategoryList(
             )
         }
 
-        if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
-        }
 
         // Both sections always render: the add row lives inside each one, so an
         // empty kind still needs somewhere to add to — same as the web's cards.
@@ -304,7 +242,6 @@ private fun CategoryList(
                 if (index > 0) HairLine()
                 CategoryRow(
                     category = category,
-                    onLongPress = onLongPress,
                     reorderState = incomeReorder,
                     rowKey = "i-${category.id}",
                     onRestore = onRestore,
@@ -334,7 +271,6 @@ private fun CategoryList(
                 if (index > 0) HairLine()
                 CategoryRow(
                     category = category,
-                    onLongPress = onLongPress,
                     reorderState = expenseReorder,
                     rowKey = "e-${category.id}",
                     onRestore = onRestore,
@@ -423,7 +359,6 @@ private fun Modifier.sideBorders(bottom: Boolean = false): Modifier {
 @Composable
 private fun CategoryRow(
     category: TransactionCategory,
-    onLongPress: (TransactionCategory) -> Unit,
     reorderState: ReorderState,
     rowKey: String,
     onRestore: (TransactionCategory) -> Unit,
@@ -493,7 +428,7 @@ private fun CategoryRow(
             .zIndex(if (dragging) 1f else 0f)
             .graphicsLayer { translationY = if (dragging) reorderState.offsetY else 0f }
             .alpha(alpha)
-            .combinedClickable(onClick = {}, onLongClick = { onLongPress(category) })
+            
             .padding(vertical = 10.dp),
     ) {
         ReorderHandle(state = reorderState, key = rowKey)

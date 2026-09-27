@@ -507,9 +507,16 @@ private fun SkinTile(
  */
 private fun encodeImageSkin(context: android.content.Context, uri: android.net.Uri): String? =
     runCatching {
-        val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
-        val bitmap = android.graphics.ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-            decoder.isMutableRequired = false
+        // ImageDecoder is API 28; minSdk is 26, where BitmapFactory does it.
+        val bitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+            android.graphics.ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                decoder.isMutableRequired = false
+            }
+        } else {
+            context.contentResolver.openInputStream(uri)!!.use {
+                android.graphics.BitmapFactory.decodeStream(it)!!
+            }
         }
         // 640 px on the long edge is plenty for a card and keeps the row small.
         val scale = 640f / maxOf(bitmap.width, bitmap.height).toFloat()

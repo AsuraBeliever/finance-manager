@@ -4,7 +4,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,25 +13,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,11 +36,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.components.ConfirmDialog
-import com.asura.finanzas.ui.components.FormField
 import com.asura.finanzas.ui.components.MoneyField
 import com.asura.finanzas.R
 import com.asura.finanzas.data.TX_LIST_LIMIT
@@ -57,26 +50,19 @@ import com.asura.finanzas.data.TransactionCategory
 import com.asura.finanzas.data.TxTotals
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
-import com.asura.finanzas.ui.components.ChipButton
 import com.asura.finanzas.ui.components.DateField
-import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.loadCached
 import com.asura.finanzas.ui.components.FormSheet
 import com.asura.finanzas.ui.components.GlassCard
-import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.Lucide
-import com.asura.finanzas.ui.components.IconBadge
 import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.text
 import androidx.compose.ui.text.style.TextAlign
 import com.asura.finanzas.ui.components.Load
-import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.Period
-import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.PeriodPicker
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.PrimaryButton
@@ -194,7 +180,6 @@ fun TransactionsScreen(
 
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Transaction?>(null) }
-    var actionsFor by remember { mutableStateOf<Transaction?>(null) }
     var pendingDelete by remember { mutableStateOf<Transaction?>(null) }
     var editingApartado by remember { mutableStateOf<Transaction?>(null) }
 
@@ -234,7 +219,6 @@ fun TransactionsScreen(
                 fromCache = (current as? Load.Ready)?.fromCache == true,
                 onNew = { showForm = true },
                 totals = totals,
-                onLongPress = { actionsFor = it },
                 onEdit = { if (it.isApartado) editingApartado = it else editing = it },
                 onDelete = { pendingDelete = it },
             )
@@ -269,38 +253,6 @@ fun TransactionsScreen(
         )
     }
 
-    actionsFor?.let { target ->
-        AlertDialog(
-            onDismissRequest = { actionsFor = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = {
-                Text(
-                    target.description?.takeIf { it.isNotBlank() }
-                        ?: seedName(target.categoryName).orEmpty(),
-                    color = Broke.colors.fg,
-                )
-            },
-            text = {
-                Column {
-                    // Transfers included: the edit sheet loads both legs and
-                    // saves them together, so the pair can never unbalance.
-                    DialogAction(stringResource(R.string.common_edit)) {
-                        actionsFor = null
-                        if (target.isApartado) editingApartado = target else editing = target
-                    }
-                    DialogAction(stringResource(R.string.common_delete), Broke.colors.danger) {
-                        actionsFor = null
-                        pendingDelete = target
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { actionsFor = null }) {
-                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
-                }
-            },
-        )
-    }
 
     pendingDelete?.let { target ->
         ConfirmDialog(
@@ -360,7 +312,6 @@ private fun TransactionList(
     fromCache: Boolean,
     onNew: () -> Unit,
     totals: TxTotals?,
-    onLongPress: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
 ) {
@@ -392,14 +343,6 @@ private fun TransactionList(
             }
         }
 
-        if (fromCache) {
-            item {
-                OfflineNotice(
-                    stringResource(R.string.offline_banner),
-                    Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                )
-            }
-        }
 
         item {
             OutboxPanel(
@@ -504,7 +447,6 @@ private fun TransactionList(
                 TransactionListCard(
                     transactions = transactions,
                     hide = hide,
-                    onLongPress = onLongPress,
                     onEdit = onEdit,
                     onDelete = onDelete,
                 )
@@ -533,7 +475,6 @@ private fun TransactionRow(
     /** The `transfer_in` leg, only on folded transfer rows. */
     toLeg: Transaction?,
     hide: Boolean,
-    onLongPress: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
     showWallet: Boolean,
@@ -561,7 +502,7 @@ private fun TransactionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = { onLongPress(tx) })
+            
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -764,6 +705,10 @@ private fun ApartadoEditSheet(
     val cents = parseAmountToCents(amount)
     val canSave = !busy && cents != null && cents > 0
 
+    // `autoFocus` on the amount, as the web's modal opens.
+    val amountFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { amountFocus.requestFocus() } }
+
     FormSheet(
         title = stringResource(R.string.transactions_apartado_edit_title),
         busy = busy,
@@ -805,6 +750,7 @@ private fun ApartadoEditSheet(
             value = amount,
             onValueChange = { amount = it; error = null },
             modifier = Modifier.fillMaxWidth(),
+            focusRequester = amountFocus,
         )
         DateField(
             label = stringResource(R.string.transactions_date),
@@ -827,7 +773,6 @@ private fun ApartadoEditSheet(
 fun TransactionListCard(
     transactions: List<Transaction>,
     hide: Boolean,
-    onLongPress: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
     modifier: Modifier = Modifier,
@@ -847,7 +792,7 @@ fun TransactionListCard(
     ) {
         rows.forEachIndexed { index, row ->
             if (index > 0) HairLine()
-            TransactionRow(row.tx, row.toLeg, hide, onLongPress, onEdit, onDelete, showWallet)
+            TransactionRow(row.tx, row.toLeg, hide, onEdit, onDelete, showWallet)
         }
     }
 }

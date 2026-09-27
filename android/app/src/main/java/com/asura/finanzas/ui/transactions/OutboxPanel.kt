@@ -32,6 +32,7 @@ import com.asura.finanzas.data.OutboxItem
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.LocalAppSettings
 import com.asura.finanzas.ui.components.Lucide
+import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.theme.Broke
@@ -61,81 +62,97 @@ fun OutboxPanel(
     val hide = LocalAppSettings.current.hideBalances
     val currencyByWallet = wallets.associate { it.id to it.currencyCode }
 
+    // `rounded-xl border border-amber-500/30 bg-amber-500/5 p-4`, amber in
+    // both themes as on the web.
+    val amber = androidx.compose.ui.graphics.Color(0xFFF59E0B)
+    val amberText = androidx.compose.ui.graphics.Color(0xFFFCD34D)
     Column(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.warning.copy(alpha = 0.06f))
-            .border(1.dp, colors.warning.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-            .padding(14.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .background(amber.copy(alpha = 0.05f))
+            .border(1.dp, amber.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(17.dp),
     ) {
+        // `flex items-center gap-2 text-sm font-medium text-amber-300`
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 Lucide.CloudOff,
                 contentDescription = null,
-                tint = colors.warning,
-                modifier = Modifier.size(16.dp),
+                tint = amberText,
+                modifier = Modifier.size(15.dp),
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 "${stringResource(R.string.offline_pending_title)} (${items.size})",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.warning,
+                style = MaterialTheme.typography.labelLarge,
+                color = amberText,
             )
         }
-        Spacer(Modifier.height(4.dp))
+        // `mt-1 text-xs text-fg-subtle`
         Text(
             stringResource(R.string.offline_pending_hint),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.bodySmall,
             color = colors.fgSubtle,
+            modifier = Modifier.padding(top = 4.dp),
         )
 
-        items.forEach { item ->
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        itemSummary(item, currencyByWallet, hide),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.fg,
-                        maxLines = 1,
-                    )
-                    if (item.status == "error") {
+        // `mt-3 divide-y divide-border-muted`, each row `py-2 gap-3 text-sm`.
+        Column(Modifier.padding(top = 12.dp)) {
+            items.forEachIndexed { index, item ->
+                if (index > 0) HairLine()
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
                         Text(
-                            "${stringResource(R.string.offline_sync_error)}: ${item.errorMsg.orEmpty()}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.danger,
+                            itemSummary(item, currencyByWallet, hide),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.fg,
                             maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                        if (item.status == "error") {
+                            Text(
+                                "${stringResource(R.string.offline_sync_error)}: ${item.errorMsg.orEmpty()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.danger,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (item.status == "error") {
+                        // `rounded-md p-1.5`, a 15 px icon.
+                        Icon(
+                            Lucide.RotateCw,
+                            contentDescription = stringResource(R.string.offline_retry),
+                            tint = colors.fgMuted,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    scope.launch {
+                                        outbox.retry(item.id)
+                                        if (repository.flushOutbox() > 0) onSynced()
+                                    }
+                                }
+                                .padding(6.dp)
+                                .size(15.dp),
                         )
                     }
-                }
-                if (item.status == "error") {
                     Icon(
-                        Lucide.RotateCw,
-                        contentDescription = stringResource(R.string.offline_retry),
+                        Lucide.Trash,
+                        contentDescription = stringResource(R.string.offline_discard),
                         tint = colors.fgMuted,
                         modifier = Modifier
-                            .size(20.dp)
-                            .clickable {
-                                scope.launch {
-                                    outbox.retry(item.id)
-                                    if (repository.flushOutbox() > 0) onSynced()
-                                }
-                            },
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { scope.launch { outbox.discard(item.id) } }
+                            .padding(6.dp)
+                            .size(15.dp),
                     )
                 }
-                Icon(
-                    Lucide.Trash,
-                    contentDescription = stringResource(R.string.offline_discard),
-                    tint = colors.fgMuted,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable { scope.launch { outbox.discard(item.id) } },
-                )
             }
         }
     }

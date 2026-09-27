@@ -46,6 +46,18 @@ class QueryCache(private val file: File? = null) {
 
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
 
+    /**
+     * Bumped by [invalidateAll]; every live reader keys on it, so a bump makes
+     * each screen on display fetch again — TanStack's `invalidateQueries()`.
+     * What is on screen stays up until the fresh answer lands.
+     */
+    val generation = androidx.compose.runtime.mutableIntStateOf(0)
+
+    /** Refetch everything that is being shown (e.g. after the outbox drains). */
+    fun invalidateAll() {
+        androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { generation.intValue++ }
+    }
+
     init {
         // Read once, before the first frame: a few hundred KB at most, and the
         // whole point is having it when the first screen composes.

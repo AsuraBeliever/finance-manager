@@ -55,6 +55,8 @@ import com.asura.finanzas.data.AppearanceSync
 import com.asura.finanzas.data.Outbox
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.ui.components.MeshBackground
+import com.asura.finanzas.ui.components.OfflineStrip
+import com.asura.finanzas.ui.components.rememberOnline
 import com.asura.finanzas.ui.dashboard.DashboardScreen
 import com.asura.finanzas.ui.dashboard.DashboardTarget
 import com.asura.finanzas.ui.components.UpdateBanner
@@ -109,12 +111,16 @@ fun HomeScaffold(
         dashboardPeriod = Period.fromJson(preferences.dashboardPeriod.first())
     }
 
+    val online by rememberOnline()
+
     MeshBackground {
       Box(Modifier.fillMaxSize()) {
         // `backdrop-blur-sm` behind the "More" sheet: the page goes soft
         // under the scrim, as it does in the browser.
         Column(Modifier.fillMaxSize().then(if (moreOpen) Modifier.blur(4.dp) else Modifier)) {
             Spacer(Modifier.statusBarsPadding())
+            // The web's offline strip, above every page.
+            if (!online) OfflineStrip()
             // Pops once after an update, like the web's WhatsNewAuto.
             WhatsNewAuto(preferences)
             Box(Modifier.weight(1f)) {

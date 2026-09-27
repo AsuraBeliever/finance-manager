@@ -342,6 +342,26 @@ inglés. Terminó en un repaso de cada pestaña medido contra la web.
 - **Se quitaron cosas que la web no tiene**: la pantalla de Monedas y el
   selector de cartera en el alta de inversión.
 - Modo oscuro revisado en Ajustes, Resumen y Transacciones.
+- **Estados vacíos** con una cuenta nueva, pantalla por pantalla: Inversiones
+  ya no pinta el portafolio en $0 y Suscripciones no muestra «Total mensual»
+  sobre una lista vacía (la web los oculta). El ícono lleva `ring-1` por fuera.
+- **Sin conexión = franja global**, no tarjeta por pantalla: la web pinta
+  `bg-amber-500/15 … text-amber-300` arriba de todo mientras
+  `navigator.onLine` es falso; el APK igual (`OfflineStrip` + `rememberOnline`
+  sobre `ConnectivityManager`). Al volver la red se vacía la cola de pendientes
+  (el evento `online` de la web) y todo lo visible se vuelve a pedir
+  (`QueryCache.invalidateAll`, el `invalidateQueries()` de TanStack). Guardar
+  sin red ya no abre un diálogo: la web sólo cierra el formulario.
+- **Bug de la web corregido**: TanStack pausa las mutaciones sin conexión
+  (`networkMode: "online"`), así que una captura sin red nunca llegaba a la
+  cola y el formulario se quedaba con «Guardar» deshabilitado. Ahora
+  `mutations.networkMode = "always"`.
+- **Sin menús de pulsación larga.** La web no tiene gesto equivalente y cada
+  acción ya está a la vista (lápiz, bote, botones de la tarjeta); además el
+  `combinedClickable(onClick = {})` hacía destellar la fila al tocarla.
+- La apariencia (acento, fuentes) se guarda por dispositivo en las dos
+  superficies: al cambiar de cuenta se conserva hasta que la cuenta traiga una
+  más nueva. No es diferencia.
 
 Para medir: `uiautomator dump` del emulador contra `getBoundingClientRect` de
 Playwright a 448×997 @3x, alineando por el primer texto común. Chromium en

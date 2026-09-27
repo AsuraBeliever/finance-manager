@@ -2,9 +2,7 @@ package com.asura.finanzas.ui.wallets
 
 import com.asura.finanzas.ui.components.SegmentedControl
 import com.asura.finanzas.ui.components.PeriodPicker
-import com.asura.finanzas.ui.components.PeriodLabel
 import com.asura.finanzas.ui.components.Period
-import com.asura.finanzas.ui.components.ChipButton
 import com.asura.finanzas.ui.theme.tabular
 import com.asura.finanzas.ui.transactions.TransactionTotal
 import com.asura.finanzas.ui.transactions.KindFilter
@@ -31,19 +29,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,9 +70,7 @@ import com.asura.finanzas.ui.components.Dot
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.HairLine
 import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.MicroLabel
 import com.asura.finanzas.ui.components.ProgressBar
-import com.asura.finanzas.ui.components.formatBps
 import com.asura.finanzas.ui.formatMoney
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
@@ -249,7 +244,7 @@ fun WalletDetailScreen(
                     Modifier.padding(bottom = if (index == pockets.lastIndex) 24.dp else 16.dp),
                 ) {
                     // A link on the web: it opens that apartado's own page.
-                    WalletCard(pocket, hide, onOpen = { onOpenWallet(it.id) }, onLongPress = {})
+                    WalletCard(pocket, hide, onOpen = { onOpenWallet(it.id) })
                 }
             }
         }
@@ -339,7 +334,6 @@ fun WalletDetailScreen(
                 TransactionListCard(
                     transactions = movements,
                     hide = hide,
-                    onLongPress = {},
                     onEdit = { editingTx = it },
                     onDelete = { deletingTx = it },
                     // Every row here belongs to this wallet already.

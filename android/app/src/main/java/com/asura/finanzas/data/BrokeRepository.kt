@@ -584,7 +584,11 @@ class BrokeRepository(
     /** Drain whatever the outbox is still holding; returns how many synced. */
     suspend fun flushOutbox(): Int {
         val synced = outbox.flush()
-        if (synced > 0) cache.invalidateReads()
+        if (synced > 0) {
+            cache.invalidateReads()
+            // Whatever screen is up refetches, as the web's `invalidateQueries()`.
+            queries.invalidateAll()
+        }
         return synced
     }
 

@@ -71,7 +71,6 @@ fun WalletGoalsSection(
             GoalCard(
                 goal = goal,
                 hide = hide,
-                onLongPress = {},
                 walletName = walletName,
                 onContribute = { contributing = it },
                 onUse = { target -> if (target.goalKind == "fund") converting = target else confirmUse = target },

@@ -96,6 +96,12 @@ fun AppRoot(
         }
     }
 
+    // …and whenever the connection comes back, the web's `online` event.
+    val online by com.asura.finanzas.ui.components.rememberOnline()
+    LaunchedEffect(online, state) {
+        if (online && state == AuthState.SignedIn) runCatching { repository.flushOutbox() }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()

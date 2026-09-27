@@ -82,7 +82,6 @@ import com.asura.finanzas.ui.components.WebPositive
 import com.asura.finanzas.ui.components.BarSeries
 import com.asura.finanzas.ui.components.RechartsBarChart
 import com.asura.finanzas.ui.components.MicroLabel
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.Period
@@ -383,9 +382,6 @@ private fun DashboardContent(
             }
         }
 
-        if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
-        }
 
         // Nothing to summarise yet: the web swaps every widget for one line
         // saying so, rather than a column of empty cards and $0.00 donuts.

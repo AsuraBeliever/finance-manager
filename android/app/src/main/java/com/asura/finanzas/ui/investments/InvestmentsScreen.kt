@@ -57,7 +57,6 @@ import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import androidx.compose.ui.text.font.FontWeight
 import com.asura.finanzas.ui.components.WebNegative
@@ -199,11 +198,10 @@ private fun InvestmentList(
             }
         }
 
-        if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
-        }
 
-        if (portfolio != null) {
+        // Like the web: no summary card over an empty list (`items.length > 0`
+        // and `PortfolioSummary`'s own `slices.length === 0` bail-out).
+        if (portfolio != null && shown.isNotEmpty() && portfolio.slices.isNotEmpty()) {
             // `mb-6`: 24, of which the list's gap gives 16.
             item { PortfolioCard(portfolio, hide, Modifier.padding(bottom = 8.dp)) }
         }

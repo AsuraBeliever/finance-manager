@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,19 +29,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,14 +65,10 @@ import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.LucideThin
 import com.asura.finanzas.ui.components.ErrorBox
-import com.asura.finanzas.ui.components.GlassCard
 import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.LoadingBox
-import com.asura.finanzas.ui.components.MicroLabel
-import com.asura.finanzas.ui.components.OfflineNotice
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.cardShadow
-import com.asura.finanzas.ui.components.DialogAction
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.PrivacyToggle
 import com.asura.finanzas.ui.components.ReorderHandle
@@ -100,7 +93,6 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
 
     var editing by remember { mutableStateOf<Wallet?>(null) }
     var creating by remember { mutableStateOf(false) }
-    var actionsFor by remember { mutableStateOf<Wallet?>(null) }
     // A stack, like the browser's history: an apartado opened from its
     // parent's page goes back to that page, not to the list.
     var openStack by remember { mutableStateOf<List<Long>>(emptyList()) }
@@ -140,7 +132,6 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
             fromCache = current.fromCache,
             onNew = { creating = true },
             onOpen = { openStack = listOf(it.id) },
-            onLongPress = { actionsFor = it },
             showArchived = showArchived,
             onToggleArchived = { showArchived = !showArchived },
             // Only top-level wallets reorder; apartados follow their parent.
@@ -160,45 +151,6 @@ fun WalletsScreen(repository: BrokeRepository, modifier: Modifier = Modifier) {
     }
 
     // Long press opens the actions the web keeps behind the card's overflow.
-    actionsFor?.let { target ->
-        AlertDialog(
-            onDismissRequest = { actionsFor = null },
-            containerColor = Broke.colors.surfaceOverlay,
-            title = { Text(target.name, color = Broke.colors.fg) },
-            text = {
-                Column {
-                    DialogAction(stringResource(R.string.common_edit)) {
-                        actionsFor = null
-                        editing = target
-                    }
-                    DialogAction(
-                        stringResource(
-                            if (target.isArchived) R.string.wallets_unarchive
-                            else R.string.wallets_archive,
-                        ),
-                    ) {
-                        actionsFor = null
-                        scope.launch {
-                            runCatching { repository.archiveWallet(target.id, !target.isArchived) }
-                            reload()
-                        }
-                    }
-                    DialogAction(
-                        stringResource(R.string.wallets_delete_wallet),
-                        color = Broke.colors.danger,
-                    ) {
-                        actionsFor = null
-                        confirmDelete = target
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { actionsFor = null }) {
-                    Text(stringResource(R.string.common_close), color = Broke.colors.fgMuted)
-                }
-            },
-        )
-    }
 
     confirmDelete?.let { target ->
         ConfirmDialog(
@@ -223,7 +175,6 @@ private fun WalletList(
     fromCache: Boolean,
     onNew: () -> Unit,
     onOpen: (Wallet) -> Unit,
-    onLongPress: (Wallet) -> Unit,
     showArchived: Boolean,
     onToggleArchived: () -> Unit,
     onReorder: (List<Long>) -> Unit,
@@ -292,9 +243,6 @@ private fun WalletList(
             }
         }
 
-        if (fromCache) {
-            item { OfflineNotice(stringResource(R.string.offline_banner), Modifier.fillMaxWidth()) }
-        }
 
         if (roots.isEmpty()) {
             item {
@@ -315,7 +263,7 @@ private fun WalletList(
             ) {
                 val children = pockets[wallet.id].orEmpty()
                 WalletCard(
-                    wallet, hide, onOpen, onLongPress,
+                    wallet, hide, onOpen,
                     pockets = children,
                     handle = { ReorderHandle(state = reorderState, key = wallet.id, onArtwork = true) },
                 )
@@ -385,7 +333,6 @@ fun WalletCard(
     wallet: Wallet,
     hide: Boolean,
     onOpen: (Wallet) -> Unit,
-    onLongPress: (Wallet) -> Unit,
     /** The wallet's apartados, which the headline folds back in — see below. */
     pockets: List<Wallet> = emptyList(),
     /** The drag grip, drawn in the corner; a tap anywhere else still opens. */
@@ -414,7 +361,7 @@ fun WalletCard(
             .cardShadow()
             .clip(RoundedCornerShape(16.dp))
             .drawBehind { drawRect(skin.brushFor(size)) }
-            .combinedClickable(onClick = { onOpen(wallet) }, onLongClick = { onLongPress(wallet) }),
+            .clickable { onOpen(wallet) },
     ) {
         // An imported photo sits under everything, cropped to fill like the
         // web's `center / cover`.
