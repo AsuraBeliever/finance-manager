@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.43.1",
+    date: "2026-09-27",
+    es: [
+      "La app de Android ya respeta el idioma en todas partes: con la app en español, los formularios, calendarios y avisos de Transacciones (y de cualquier otra pantalla) ya no salen en inglés.",
+      "La app de Android ahora se ve y funciona igual que la web, pantalla por pantalla: la misma tipografía, los mismos espacios, las mismas gráficas, el selector de periodo como menú desplegable, y los mismos formularios para entrar, aportar a una inversión, comprar a meses o ver el detalle de una categoría.",
+      "Sin conexión, la web y la app muestran la misma franja arriba de todo, y lo que capturas se guarda como pendiente y se envía solo en cuanto vuelve la señal. En la web, capturar sin conexión ya no deja el formulario atorado.",
+    ],
+    en: [
+      "The Android app now honors your language everywhere: with the app in Spanish, the forms, calendars and notices in Transactions (and every other screen) no longer show up in English.",
+      "The Android app now looks and works like the web, screen by screen: the same type, the same spacing, the same charts, the period picker as a dropdown, and the same forms to sign in, add to an investment, buy in installments or see a category's detail.",
+      "When offline, the web and the app show the same strip across the top, and what you capture is saved as pending and sent by itself as soon as you're back online. On the web, capturing offline no longer leaves the form stuck.",
+    ],
+  },
+  {
     version: "2.43.0",
     date: "2026-09-26",
     es: [
