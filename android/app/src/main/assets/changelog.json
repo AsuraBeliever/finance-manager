@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.45.1",
+    "date": "2026-09-28",
+    "es": [
+      "En la app de Android, las gráficas de «Ingresos y gastos» e «Ingresos vs gastos» (y las demás) ya muestran cifras redondas en su eje, como 3000 o 12000, en lugar de números larguísimos llenos de ceros."
+    ],
+    "en": [
+      "In the Android app, the \"Income and expenses\" and \"Income vs expenses\" charts (and the rest) now show round numbers on their axis, like 3000 or 12000, instead of very long numbers full of zeros."
+    ]
+  },
+  {
     "version": "2.45.0",
     "date": "2026-09-28",
     "es": [
