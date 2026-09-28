@@ -907,6 +907,7 @@ class BrokeRepository(
         targetDate: String?,
         cadence: String?,
         goalKind: String,
+        tracksWallet: Boolean,
     ) {
         val body = buildJsonObject {
             id?.let { put("id", it) }
@@ -918,6 +919,7 @@ class BrokeRepository(
             targetDate?.let { put("targetDate", it) }
             cadence?.let { put("cadence", it) }
             put("goalKind", goalKind)
+            put("tracksWallet", tracksWallet)
         }
         rpc.call(if (id == null) "create_savings_goal" else "update_savings_goal", body)
         cache.invalidateReads()

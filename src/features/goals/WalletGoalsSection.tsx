@@ -91,7 +91,7 @@ export function WalletGoalsSection({ walletId }: { walletId: number }) {
         title={es.goals.buy}
         message={
           useGoal?.linkedWalletId
-            ? es.goals.useConfirmApartado
+            ? (useGoal.tracksWallet ? es.goals.useConfirmWallet : es.goals.useConfirmApartado)
                 .replace("{amount}", money(useGoal.savedCents, useGoal.currencyCode))
                 .replace("{wallet}", walletName(useGoal.linkedWalletId) ?? "")
             : es.goals.useConfirmTrack

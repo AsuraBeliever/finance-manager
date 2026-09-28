@@ -3,6 +3,9 @@
 //! part of that wallet's balance: contributing earmarks (no transaction, the
 //! money stays in the wallet and in net worth); only "using" a goal posts a real
 //! expense and archives it. Track-only goals (no wallet) are abstract progress.
+//! A goal can instead TRACK a whole wallet (`tracks_wallet`, migration 0037):
+//! its saved amount is that wallet's full balance, computed on read, and it
+//! reserves nothing — you advance it by moving money into the wallet.
 //! Progress in basis points, capped at 100%. All scoped by user_id.
 
 use std::collections::HashMap;
@@ -68,6 +71,9 @@ pub struct SavingsGoal {
     pub plan: Option<ContributionPlan>,
     /// True when the goal has fallen below its steady pace (drives the badge).
     pub is_behind: bool,
+    /// The goal is the whole linked wallet (saved = its balance) rather than an
+    /// apartado inside it. Such a goal can't be contributed to or graduated.
+    pub tracks_wallet: bool,
 }
 
 #[derive(Deserialize)]
@@ -92,6 +98,8 @@ struct GoalRow {
     plan_anchor_date: Option<String>,
     /// Day the goal started ('YYYY-MM-DD'); pace fallback for pre-0030 rows.
     created_at: String,
+    #[serde(default)]
+    tracks_wallet: i64,
 }
 
 fn progress_bps(saved: i64, target: i64) -> i64 {
@@ -107,6 +115,8 @@ fn progress_bps(saved: i64, target: i64) -> i64 {
 /// from 0). Progress this period = saved now − this baseline, which freezes
 /// the period quota: contributing doesn't shrink it, and releasing money that
 /// was already there before the period doesn't erase this period's effort.
+/// A goal tracking a whole wallet uses the wallet's balance the day before the
+/// period started, so this period's progress is how much the wallet grew.
 async fn period_baselines(
     db: &D1Database,
     uid: i64,
@@ -117,19 +127,26 @@ async fn period_baselines(
         goal_id: i64,
         baseline_cents: i64,
     }
-    let rows: Vec<Row> = all(
-        db,
-        "SELECT g.id AS goal_id,
-                COALESCE((SELECT s.saved_cents FROM goal_snapshots s
-                          WHERE s.goal_id = g.id
-                            AND s.as_of < CASE g.contribution_cadence
+    let period_start_sql = "CASE g.contribution_cadence
                                   WHEN 'daily' THEN ?2
                                   WHEN 'weekly' THEN ?3
                                   WHEN 'yearly' THEN ?4
-                                  ELSE ?5 END
-                          ORDER BY s.as_of DESC, s.id DESC LIMIT 1), 0) AS baseline_cents
-         FROM savings_goals g
-         WHERE g.user_id = ?1 AND g.contribution_cadence IS NOT NULL",
+                                  ELSE ?5 END";
+    let rows: Vec<Row> = all(
+        db,
+        &format!(
+            "SELECT g.id AS goal_id, {} AS baseline_cents
+             FROM savings_goals g
+             WHERE g.user_id = ?1 AND g.contribution_cadence IS NOT NULL",
+            saved_sql(
+                &format!(
+                    "COALESCE((SELECT s.saved_cents FROM goal_snapshots s
+                              WHERE s.goal_id = g.id AND s.as_of < {period_start_sql}
+                              ORDER BY s.as_of DESC, s.id DESC LIMIT 1), 0)"
+                ),
+                &format!("AND t.occurred_at < {period_start_sql}")
+            )
+        ),
         jsv![
             uid,
             today.to_string(),
@@ -194,6 +211,7 @@ fn build(r: GoalRow, today: NaiveDate, contributed_period_cents: i64) -> Savings
         .into(),
         plan,
         is_behind,
+        tracks_wallet: r.tracks_wallet != 0,
     }
 }
 
@@ -202,15 +220,39 @@ fn parse_date(s: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(s.get(..10).unwrap_or(s), "%Y-%m-%d").ok()
 }
 
-const SELECT: &str = "SELECT id, name, icon, color, currency_code, target_cents, saved_cents,
-        linked_wallet_id, target_date, contribution_cadence, goal_kind, plan_anchor_date,
-        date(created_at) AS created_at
-        FROM savings_goals";
+/// SQL for the saved amount of goal `g`: the earmark (`fallback`) for an
+/// apartado, or the linked wallet's balance (floored at 0) for a goal that
+/// tracks the whole wallet. `date_cond` optionally limits the transactions
+/// counted (e.g. `AND t.occurred_at <= ?2`) to read the balance as of a date.
+fn saved_sql(fallback: &str, date_cond: &str) -> String {
+    format!(
+        "CASE WHEN g.tracks_wallet = 1 THEN MAX(0, COALESCE((
+           SELECT w.initial_balance_cents + COALESCE((
+             SELECT SUM(CASE t.kind
+                          WHEN 'income' THEN t.amount_cents
+                          WHEN 'transfer_in' THEN t.amount_cents
+                          ELSE -t.amount_cents END)
+             FROM transactions t WHERE t.wallet_id = w.id {date_cond}), 0)
+           FROM wallets w WHERE w.id = g.linked_wallet_id), 0))
+         ELSE {fallback} END"
+    )
+}
+
+fn select_sql() -> String {
+    format!(
+        "SELECT g.id, g.name, g.icon, g.color, g.currency_code, g.target_cents,
+                {} AS saved_cents,
+                g.linked_wallet_id, g.target_date, g.contribution_cadence, g.goal_kind,
+                g.plan_anchor_date, g.tracks_wallet, date(g.created_at) AS created_at
+         FROM savings_goals g",
+        saved_sql("g.saved_cents", "")
+    )
+}
 
 async fn fetch_goal(db: &D1Database, uid: i64, id: i64) -> AppResult<SavingsGoal> {
     let row: GoalRow = first(
         db,
-        &format!("{SELECT} WHERE id = ?1 AND user_id = ?2"),
+        &format!("{} WHERE g.id = ?1 AND g.user_id = ?2", select_sql()),
         jsv![id, uid],
     )
     .await?
@@ -232,18 +274,26 @@ pub async fn list_savings_goals(
     // shouldn't appear in a past period), with `saved_cents` as of that date:
     // the latest snapshot at or before it (so it reflects the progress then —
     // 0%, partial, or already met).
+    // A goal tracking a whole wallet reads that wallet's balance at the period
+    // end straight from its transactions instead.
     let rows: Vec<GoalRow> = all(
         db,
-        "SELECT g.id, g.name, g.icon, g.color, g.currency_code, g.target_cents,
-                g.linked_wallet_id, g.target_date, g.contribution_cadence, g.goal_kind,
-                g.plan_anchor_date, date(g.created_at) AS created_at,
-                COALESCE((SELECT s.saved_cents FROM goal_snapshots s
+        &format!(
+            "SELECT g.id, g.name, g.icon, g.color, g.currency_code, g.target_cents,
+                    g.linked_wallet_id, g.target_date, g.contribution_cadence, g.goal_kind,
+                    g.plan_anchor_date, g.tracks_wallet, date(g.created_at) AS created_at,
+                    {} AS saved_cents
+             FROM savings_goals g
+             WHERE g.user_id = ?1 AND date(g.created_at) <= ?2
+               AND (g.archived_at IS NULL OR g.archived_at >= ?2)
+             ORDER BY g.sort_order, g.created_at, g.id",
+            saved_sql(
+                "COALESCE((SELECT s.saved_cents FROM goal_snapshots s
                           WHERE s.goal_id = g.id AND s.as_of <= ?2
-                          ORDER BY s.as_of DESC, s.id DESC LIMIT 1), 0) AS saved_cents
-         FROM savings_goals g
-         WHERE g.user_id = ?1 AND date(g.created_at) <= ?2
-           AND (g.archived_at IS NULL OR g.archived_at >= ?2)
-         ORDER BY g.sort_order, g.created_at, g.id",
+                          ORDER BY s.as_of DESC, s.id DESC LIMIT 1), 0)",
+                "AND t.occurred_at <= ?2"
+            )
+        ),
         jsv![uid, end],
     )
     .await?;
@@ -281,6 +331,9 @@ pub struct GoalInput {
     /// 'purchase' or 'fund' (defaults to purchase).
     #[serde(default)]
     pub goal_kind: Option<String>,
+    /// True = the goal is the whole wallet; false (default) = an apartado.
+    #[serde(default)]
+    pub tracks_wallet: bool,
 }
 
 /// Normalize the goal kind to a known value.
@@ -366,8 +419,9 @@ pub async fn create_savings_goal(
         db,
         "INSERT INTO savings_goals
            (user_id, name, icon, color, currency_code, target_cents, linked_wallet_id,
-            target_date, contribution_cadence, goal_kind, plan_anchor_date, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+            target_date, contribution_cadence, goal_kind, plan_anchor_date, tracks_wallet,
+            sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM savings_goals WHERE user_id = ?1), 0))",
         jsv![
             uid,
@@ -381,7 +435,8 @@ pub async fn create_savings_goal(
             cadence,
             goal_kind(&a),
             // The pace starts when the deadline exists (here: at creation).
-            target_date.as_ref().map(|_| today_mx().to_string())
+            target_date.as_ref().map(|_| today_mx().to_string()),
+            a.tracks_wallet as i64
         ],
     )
     .await?;
@@ -406,11 +461,14 @@ pub async fn update_savings_goal(
     validate(&a.input)?;
     let (linked_wallet_id, currency) = resolve_link(db, uid, &a.input).await?;
     let (target_date, cadence) = resolve_deadline(&a.input)?;
-    let res = exec(
+    let before = fetch_goal(db, uid, a.id).await?;
+    let today = today_mx().to_string();
+    let mut stmts = vec![stmt(
         db,
         // The pace anchor restarts whenever the deadline is set or moved (the
         // plan begins that day, not at the goal's creation), clears when the
-        // deadline is removed, and stays put otherwise.
+        // deadline is removed, and stays put otherwise. A whole-wallet goal
+        // holds no earmark, so switching to it zeroes saved_cents.
         "UPDATE savings_goals
          SET name = ?3, icon = ?4, color = ?5, currency_code = ?6, target_cents = ?7,
              linked_wallet_id = ?8,
@@ -418,7 +476,9 @@ pub async fn update_savings_goal(
                WHEN ?9 IS NULL THEN NULL
                WHEN target_date IS NULL OR target_date <> ?9 THEN ?12
                ELSE COALESCE(plan_anchor_date, ?12) END,
-             target_date = ?9, contribution_cadence = ?10, goal_kind = ?11
+             target_date = ?9, contribution_cadence = ?10, goal_kind = ?11,
+             tracks_wallet = ?13,
+             saved_cents = CASE WHEN ?13 = 1 THEN 0 ELSE saved_cents END
          WHERE id = ?1 AND user_id = ?2",
         jsv![
             a.id,
@@ -432,14 +492,24 @@ pub async fn update_savings_goal(
             target_date,
             cadence,
             goal_kind(&a.input),
-            today_mx().to_string()
+            today.clone(),
+            a.input.tracks_wallet as i64
         ],
-    )
-    .await?;
-    if changes(&res) == 0 {
-        return Err(AppError::NotFound("meta"));
+    )?];
+    // Turning an apartado into a whole-wallet goal releases its earmark (the
+    // money was in that wallet all along); log it so the history agrees.
+    if a.input.tracks_wallet && !before.tracks_wallet && before.saved_cents > 0 {
+        stmts.push(stmt(
+            db,
+            "INSERT INTO goal_contributions (goal_id, amount_cents, occurred_at)
+             VALUES (?1, ?2, ?3)",
+            jsv![a.id, -before.saved_cents, today],
+        )?);
     }
-    fetch_goal(db, uid, a.id).await
+    batch(db, stmts).await?;
+    let goal = fetch_goal(db, uid, a.id).await?;
+    snapshot_goal(db, goal.id, goal.saved_cents).await?;
+    Ok(goal)
 }
 
 #[derive(Deserialize)]
@@ -474,7 +544,8 @@ async fn wallet_available(db: &D1Database, uid: i64, wallet_id: i64) -> AppResul
                           ELSE -t.amount_cents END)
              FROM transactions t WHERE t.wallet_id = w.id), 0) AS balance_cents,
            COALESCE((SELECT SUM(g.saved_cents) FROM savings_goals g
-                     WHERE g.linked_wallet_id = w.id AND g.archived_at IS NULL), 0)
+                     WHERE g.linked_wallet_id = w.id AND g.archived_at IS NULL
+                       AND g.tracks_wallet = 0), 0)
              AS reserved_cents
          FROM wallets w WHERE w.id = ?1 AND w.user_id = ?2",
         jsv![wallet_id, uid],
@@ -496,6 +567,9 @@ pub async fn contribute_savings_goal(
         return Err(AppError::InvalidInput("el monto no puede ser cero".into()));
     }
     let goal = fetch_goal(db, uid, a.id).await?;
+    if goal.tracks_wallet {
+        return Err(tracks_wallet_err());
+    }
     // A release can't exceed what's saved — reject instead of clamping
     // silently, so the UI and the ledger always agree on what happened.
     if a.amount_cents < 0 && -a.amount_cents > goal.saved_cents {
@@ -539,6 +613,13 @@ pub async fn contribute_savings_goal(
     Ok(goal)
 }
 
+/// A whole-wallet goal has no earmark to move: it grows with the wallet.
+fn tracks_wallet_err() -> AppError {
+    AppError::InvalidInput(
+        "esta meta es toda la cartera: mete dinero a la cartera para avanzarla".into(),
+    )
+}
+
 #[derive(Deserialize)]
 struct ContributionRow {
     goal_id: i64,
@@ -567,6 +648,9 @@ async fn validate_delta(
     goal: &SavingsGoal,
     delta: i64,
 ) -> AppResult<()> {
+    if goal.tracks_wallet {
+        return Err(tracks_wallet_err());
+    }
     if delta > 0 {
         if let Some(wallet_id) = goal.linked_wallet_id {
             if delta > wallet_available(db, uid, wallet_id).await? {
@@ -745,6 +829,11 @@ pub async fn convert_goal_to_wallet(db: &D1Database, uid: i64, a: ConvertArgs) -
     let src_id = goal
         .linked_wallet_id
         .ok_or_else(|| AppError::InvalidInput("la meta no tiene cartera".into()))?;
+    if goal.tracks_wallet {
+        return Err(AppError::InvalidInput(
+            "la meta ya es toda la cartera".into(),
+        ));
+    }
     if goal.saved_cents <= 0 {
         return Err(AppError::InvalidInput(
             "la meta no tiene dinero apartado".into(),
@@ -835,8 +924,11 @@ pub async fn snapshot_all_goals(db: &D1Database) -> AppResult<()> {
     .await?;
     exec(
         db,
-        "INSERT INTO goal_snapshots (goal_id, saved_cents, as_of, source)
-         SELECT id, saved_cents, date('now'), 'auto' FROM savings_goals",
+        &format!(
+            "INSERT INTO goal_snapshots (goal_id, saved_cents, as_of, source)
+             SELECT g.id, {}, date('now'), 'auto' FROM savings_goals g",
+            saved_sql("g.saved_cents", "")
+        ),
         vec![],
     )
     .await?;

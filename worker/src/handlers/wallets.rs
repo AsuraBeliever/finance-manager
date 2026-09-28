@@ -19,7 +19,8 @@ const WALLET_SELECT: &str = "
                           ELSE -t.amount_cents END)
              FROM transactions t WHERE t.wallet_id = w.id), 0) AS balance_cents,
            COALESCE((SELECT SUM(g.saved_cents) FROM savings_goals g
-                     WHERE g.linked_wallet_id = w.id AND g.archived_at IS NULL), 0)
+                     WHERE g.linked_wallet_id = w.id AND g.archived_at IS NULL
+                       AND g.tracks_wallet = 0), 0)
              AS reserved_cents,
            w.color, w.skin, w.notes, w.parent_wallet_id, w.is_archived,
            w.yield_rate_bps, w.yield_frequency, w.yield_anchor_date,

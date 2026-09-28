@@ -314,6 +314,9 @@ CREATE TABLE goal_snapshots (         -- 0015: saved_cents de cada meta a lo lar
 -- 0016: ventana activa de suscripciones (columnas nuevas)
 ALTER TABLE subscriptions ADD COLUMN started_at TEXT;  -- 'YYYY-MM-DD'
 ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
+
+-- 0037: la meta puede ser toda su cartera en vez de un apartado
+ALTER TABLE savings_goals ADD COLUMN tracks_wallet INTEGER NOT NULL DEFAULT 0;  -- 1 = saved = saldo de la cartera
 ```
 
 - **Límite del periodo** = prorrateo diario del límite mensual vigente cada mes
@@ -341,6 +344,15 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
   (`convert_goal_to_wallet`) el nuevo wallet queda como apartado de la cartera en
   que estaba la meta. Solo un nivel de profundidad (los apartados no pueden ser
   padres en el UI).
+- **Meta = toda la cartera** (0037, `savings_goals.tracks_wallet`): el
+  usuario elige cómo se guarda el dinero de la meta. `0` (default) = apartado
+  (todo lo de arriba). `1` = la meta ES su cartera: `saved_cents` se calcula al
+  leer como el saldo de `linked_wallet_id` (initial + Σ transacciones, piso 0;
+  en periodos pasados, hasta el fin del periodo; la base del ritmo es el saldo
+  antes del inicio del periodo) y la columna queda en 0. No aparta nada (se
+  excluye de `reserved_cents`), no acepta aportes ni «pasar a cartera»; avanza
+  metiendo dinero a la cartera. Cambiar un apartado a cartera completa libera
+  su apartado y lo registra en `goal_contributions`.
 - **Tipo de meta** (0025, `savings_goals.goal_kind` = `purchase` | `fund`): toda
   meta va ligada a una cartera (se quitó el "solo seguimiento" del UI). `purchase`
   = juntar para comprar; completar (`use_savings_goal`) postea el gasto real y

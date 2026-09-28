@@ -102,8 +102,14 @@
     <string name="goals_apartado_hint">El dinero se reserva dentro de esta cartera; sigue siendo tuyo, solo apartado.</string>
     <string name="goals_apartado_none_hint">Meta abstracta, sin dinero real detrás (ideal para empezar).</string>
     <string name="goals_apartado_in">Apartado en</string>
-    <string name="goals_wallet_section_title">Metas apartadas en esta cartera</string>
+    <string name="goals_wallet_section_title">Metas en esta cartera</string>
     <string name="goals_apartado_of">Apartado de</string>
+    <string name="goals_goal_wallet">Cartera</string>
+    <string name="goals_mode_label">¿Cómo se guarda el dinero?</string>
+    <string name="goals_mode_apartado">Apartado</string>
+    <string name="goals_mode_wallet">Toda la cartera</string>
+    <string name="goals_mode_wallet_hint">La meta es el saldo completo de esta cartera: avanza sola cuando le metes dinero.</string>
+    <string name="goals_whole_wallet_of">Toda la cartera {wallet}</string>
     <string name="goals_track_only">Solo seguimiento</string>
     <string name="goals_available">disponible:</string>
     <string name="goals_kind_label">¿Para qué es la meta?</string>
@@ -117,6 +123,7 @@
     <string name="goals_convert_confirm">Se creará la cartera «{name}» con {amount} (el dinero se mueve ahí desde {wallet}) y se cierra la meta. ¿Continuar?</string>
     <string name="goals_use">Usar</string>
     <string name="goals_use_confirm_apartado">Vas a gastar {amount} apartado en {wallet} (se registra el gasto y se cierra la meta). ¿Continuar?</string>
+    <string name="goals_use_confirm_wallet">Vas a gastar {amount} de {wallet} (se registra el gasto y se cierra la meta). ¿Continuar?</string>
     <string name="goals_use_confirm_track">¿Marcar esta meta como usada y cerrarla?</string>
     <string name="goals_empty_title">Sin metas de ahorro</string>
     <string name="goals_empty_description">Crea una meta para seguir tu avance hacia un objetivo.</string>
