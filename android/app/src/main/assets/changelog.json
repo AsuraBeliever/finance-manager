@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.44.0",
+    "date": "2026-09-28",
+    "es": [
+      "Al crear o editar una meta ahora eliges cómo se guarda el dinero: como apartado dentro de una cartera (igual que antes) o como toda la cartera. Una meta de «toda la cartera» avanza sola con el saldo de esa cartera — ideal para un fondo que ya vive en su propia cajita —, sin tener que aportarle a mano. En la web y en la app de Android."
+    ],
+    "en": [
+      "When creating or editing a goal you now choose how its money is kept: as a pocket inside a wallet (as before) or as the whole wallet. A \"whole wallet\" goal grows by itself with that wallet's balance — great for a fund that already lives in its own savings box — with no manual contributions. On the web and in the Android app."
+    ]
+  },
+  {
     "version": "2.43.1",
     "date": "2026-09-27",
     "es": [
