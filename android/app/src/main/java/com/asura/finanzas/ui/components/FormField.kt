@@ -312,7 +312,10 @@ fun MoneyField(
     suffix: String = "",
     focusRequester: FocusRequester? = null,
 ) {
-    val cents = value.toBigDecimalOrNull()?.movePointRight(2)?.toLong()
+    // Edit forms prefill with `formatMoney(…, withSymbol = false)`, which
+    // groups thousands ("36,000.00"): drop the separators before parsing, or
+    // any amount from $1,000 up rendered as an empty field.
+    val cents = value.replace(",", "").toBigDecimalOrNull()?.movePointRight(2)?.toLong()
     val display = cents?.let { groupCents(it) }.orEmpty()
 
     FormField(
