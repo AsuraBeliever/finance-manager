@@ -8,6 +8,8 @@ import type {
   MsiSchedulePreview,
   DashboardSummary,
   ExchangeRate,
+  ContributionPlan,
+  GoalCadence,
   GoalInput,
   InvestmentDetail,
   InvestmentProjection,
@@ -343,6 +345,15 @@ export const convertGoalToWallet = (
 
 export const deleteSavingsGoal = (id: number) =>
   rpc<void>("delete_savings_goal", { id });
+
+/** When would a fixed contribution reach the target? (form preview; pure) */
+export const previewGoalPlan = (args: {
+  targetCents: number;
+  savedCents: number;
+  contributionCents: number;
+  cadence: GoalCadence;
+  contributedThisPeriodCents: number;
+}) => rpc<ContributionPlan>("preview_goal_plan", args);
 
 export const reorderSavingsGoals = (ids: number[]) =>
   rpc<void>("reorder_savings_goals", { ids });

@@ -4,8 +4,11 @@
 //! from the day the goal started. Pure logic over `NaiveDate`, tested natively;
 //! the worker feeds in `today_mx()` and the goal's stored dates. No money is
 //! stored from this; it's recomputed on every read.
+//!
+//! The inverse question is answered too: given a FIXED amount per period,
+//! `plan_fixed_contribution` projects the date the target would be reached.
 
-use chrono::{Datelike, Duration, NaiveDate};
+use chrono::{Datelike, Duration, Months, NaiveDate};
 use serde::Serialize;
 
 /// How often the user plans to contribute. Drives how the remaining amount is
@@ -58,6 +61,10 @@ pub struct ContributionPlan {
     /// span from start to deadline) the saved amount is right now. 0 when on or
     /// ahead of pace. Drives the "behind" badge.
     pub behind_cents: i64,
+    /// Fixed-contribution plans only: the day the target would be reached if
+    /// the user keeps putting in the same amount every period. None for
+    /// deadline plans (the deadline is the date).
+    pub projected_date: Option<NaiveDate>,
 }
 
 /// First day of the cadence period `today` falls in (weeks start on Monday).
@@ -148,6 +155,75 @@ pub fn plan_contribution(
         days_left,
         overdue,
         behind_cents: behind_cents(start, deadline, today, target_cents, saved_cents),
+        projected_date: None,
+    }
+}
+
+/// `n` cadence periods after `date` (month/year steps clamp to the month's
+/// last day, e.g. Jan 31 + 1 month = Feb 28).
+fn add_periods(date: NaiveDate, cadence: Cadence, n: i64) -> NaiveDate {
+    let n = n.max(0);
+    match cadence {
+        Cadence::Daily => date + Duration::days(n),
+        Cadence::Weekly => date + Duration::days(n * 7),
+        Cadence::Monthly => date
+            .checked_add_months(Months::new(n as u32))
+            .unwrap_or(NaiveDate::MAX),
+        Cadence::Yearly => date
+            .checked_add_months(Months::new((n * 12) as u32))
+            .unwrap_or(NaiveDate::MAX),
+    }
+}
+
+/// Plan for a goal with a FIXED contribution per period instead of a
+/// deadline: project when the target is reached.
+///
+/// This period still expects `contribution_cents` minus what already came in
+/// (`contributed_this_period_cents`); every later period brings the full
+/// amount. The goal completes in the period whose contribution covers the
+/// remainder: today if this period's pending money covers it, otherwise that
+/// many periods after today. Never behind or overdue — there's no deadline.
+pub fn plan_fixed_contribution(
+    today: NaiveDate,
+    cadence: Cadence,
+    target_cents: i64,
+    saved_cents: i64,
+    contribution_cents: i64,
+    contributed_this_period_cents: i64,
+) -> ContributionPlan {
+    let remaining = (target_cents - saved_cents).max(0);
+    let contributed = contributed_this_period_cents.max(0);
+    let amount = contribution_cents.max(1);
+    if remaining == 0 {
+        return ContributionPlan {
+            periods_left: 0,
+            per_period_cents: 0,
+            period_quota_cents: 0,
+            period_missing_cents: 0,
+            contributed_this_period_cents: contributed,
+            days_left: 0,
+            overdue: false,
+            behind_cents: 0,
+            projected_date: Some(today),
+        };
+    }
+    // This period's quota: the fixed amount, but never more than what was left
+    // when the period started (the last contribution can be smaller).
+    let quota = amount.min(remaining + contributed);
+    let missing_now = (quota - contributed).max(0);
+    // Periods after this one needed to cover what this period won't.
+    let later = div_ceil((remaining - missing_now).max(0), amount);
+    let projected = add_periods(today, cadence, later);
+    ContributionPlan {
+        periods_left: later + i64::from(missing_now > 0),
+        per_period_cents: amount,
+        period_quota_cents: quota,
+        period_missing_cents: missing_now,
+        contributed_this_period_cents: contributed,
+        days_left: (projected - today).num_days(),
+        overdue: false,
+        behind_cents: 0,
+        projected_date: Some(projected),
     }
 }
 
@@ -397,5 +473,90 @@ mod tests {
             period_start(Cadence::Yearly, d("2026-07-02")),
             d("2026-01-01")
         );
+    }
+
+    #[test]
+    fn fixed_monthly_projects_the_completion_date() {
+        // Target $36,000, saved $13,968, $1,500/month, nothing in this month.
+        // Remaining 2,203,200: this month 150,000 → 2,053,200 left →
+        // ceil(2,053,200 / 150,000) = 14 more months → 2026-09-28 + 14 = 2027-11-28.
+        let p = plan_fixed_contribution(
+            d("2026-09-28"),
+            Cadence::Monthly,
+            3_600_000,
+            1_396_800,
+            150_000,
+            0,
+        );
+        assert_eq!(p.projected_date, Some(d("2027-11-28")));
+        assert_eq!(p.periods_left, 15);
+        assert_eq!(p.per_period_cents, 150_000);
+        assert_eq!(p.period_quota_cents, 150_000);
+        assert_eq!(p.period_missing_cents, 150_000);
+        assert_eq!(p.days_left, 426);
+        assert!(!p.overdue);
+        assert_eq!(p.behind_cents, 0);
+    }
+
+    #[test]
+    fn fixed_counts_what_already_came_in_this_period() {
+        // $100.00 left, $30/week, $20 already in this week → $10 pending now,
+        // then 9,000 left → ceil(9,000 / 3,000) = 3 more weeks.
+        let p = plan_fixed_contribution(
+            d("2026-06-03"),
+            Cadence::Weekly,
+            20_000,
+            10_000,
+            3_000,
+            2_000,
+        );
+        assert_eq!(p.period_quota_cents, 3_000);
+        assert_eq!(p.period_missing_cents, 1_000);
+        assert_eq!(p.periods_left, 4);
+        assert_eq!(p.projected_date, Some(d("2026-06-24")));
+    }
+
+    #[test]
+    fn fixed_finishes_this_period_when_pending_covers_it() {
+        // $50 left and a $100 monthly contribution: the quota shrinks to the
+        // remainder and it's done today.
+        let p = plan_fixed_contribution(
+            d("2026-06-15"),
+            Cadence::Monthly,
+            100_000,
+            95_000,
+            10_000,
+            0,
+        );
+        assert_eq!(p.period_quota_cents, 5_000);
+        assert_eq!(p.period_missing_cents, 5_000);
+        assert_eq!(p.periods_left, 1);
+        assert_eq!(p.projected_date, Some(d("2026-06-15")));
+        assert_eq!(p.days_left, 0);
+    }
+
+    #[test]
+    fn fixed_covered_period_projects_from_next_one() {
+        // $1,000/month already put in this month; 5,000 left → 5 more months.
+        let p = plan_fixed_contribution(
+            d("2026-01-31"),
+            Cadence::Monthly,
+            1_000_000,
+            500_000,
+            100_000,
+            100_000,
+        );
+        assert_eq!(p.period_missing_cents, 0);
+        assert_eq!(p.periods_left, 5);
+        // Month steps clamp to month end: Jan 31 + 5 months = Jun 30.
+        assert_eq!(p.projected_date, Some(d("2026-06-30")));
+    }
+
+    #[test]
+    fn fixed_met_goal_is_done_today() {
+        let p = plan_fixed_contribution(d("2026-06-15"), Cadence::Yearly, 10_000, 12_000, 1_000, 0);
+        assert_eq!(p.periods_left, 0);
+        assert_eq!(p.period_missing_cents, 0);
+        assert_eq!(p.projected_date, Some(d("2026-06-15")));
     }
 }

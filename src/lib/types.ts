@@ -411,6 +411,9 @@ export interface ContributionPlan {
   overdue: boolean;
   /** How far below the steady pace the saved amount is (0 = on/ahead). */
   behindCents: number;
+  /** Fixed-contribution plans: the day the target would be reached at that
+   *  pace. Null for deadline plans. */
+  projectedDate: string | null;
 }
 
 export interface SavingsGoal {
@@ -428,6 +431,8 @@ export interface SavingsGoal {
   targetDate: string | null;
   /** Contribution cadence, set alongside the deadline. */
   cadence: GoalCadence | null;
+  /** Fixed amount put in every `cadence` period (instead of a deadline). */
+  contributionCents: number | null;
   /** Plan, present only when both a deadline and cadence are set. */
   plan: ContributionPlan | null;
   /** True when the goal has fallen below its steady pace. */
@@ -451,6 +456,8 @@ export interface GoalInput {
   targetDate: string | null;
   /** Contribution cadence (defaults to monthly when a deadline is set). */
   cadence: GoalCadence | null;
+  /** Fixed amount per period instead of a deadline (the date is projected). */
+  contributionCents: number | null;
   /** Purchase or fund. */
   goalKind: GoalKind;
   /** True = the goal is the whole wallet; false = an apartado inside it. */

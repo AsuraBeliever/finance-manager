@@ -69,8 +69,14 @@
     <string name="goals_suggested_chip">Aporte sugerido:</string>
     <string name="goals_deadline">Fecha límite</string>
     <string name="goals_deadline_optional">Fecha límite (opcional)</string>
-    <string name="goals_enable_deadline">Ponerle fecha límite</string>
-    <string name="goals_deadline_hint">Calcula cuánto apartar por periodo para llegar a tiempo.</string>
+    <string name="goals_enable_deadline">Ponerle un plan</string>
+    <string name="goals_deadline_hint">Elige para cuándo y te decimos cuánto apartar, o dinos cuánto aportas y te decimos cuándo llegas.</string>
+    <string name="goals_plan_mode_date">Tengo una fecha</string>
+    <string name="goals_plan_mode_amount">Sé cuánto aporto</string>
+    <string name="goals_contribution_label">¿Cuánto aportas?</string>
+    <string name="goals_preview_reach">La completarías el {date} ({n} aportes).</string>
+    <string name="goals_preview_reach_one">La completarías el {date} con un solo aporte.</string>
+    <string name="goals_preview_met">Con lo que ya tiene, la meta está completa.</string>
     <string name="goals_deadline_date_label">¿Para cuándo?</string>
     <string name="goals_no_deadline">Sin fecha límite</string>
     <string name="goals_remove_deadline">Quitar fecha</string>
@@ -82,6 +88,8 @@
     <string name="goals_plan_reserve">Aparta {amount} {cadence} para llegar el {date}.</string>
     <string name="goals_plan_progress">{period} llevas {done} de {quota}: te faltan {missing}.</string>
     <string name="goals_plan_covered">{period} ya está cubierto. Vas en camino para el {date}.</string>
+    <string name="goals_plan_fixed">Aportando {amount} {cadence}, la completas el {date}.</string>
+    <string name="goals_plan_fixed_date">A ese ritmo, la completas el {date}.</string>
     <string name="goals_period_daily">Hoy</string>
     <string name="goals_period_weekly">Esta semana</string>
     <string name="goals_period_monthly">Este mes</string>
