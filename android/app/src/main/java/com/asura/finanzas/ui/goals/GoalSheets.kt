@@ -79,6 +79,7 @@ fun GoalFormSheet(
     }
     var wallet by remember { mutableStateOf<Wallet?>(null) }
     var kind by remember { mutableStateOf(existing?.goalKind ?: "purchase") }
+    var tracksWallet by remember { mutableStateOf(existing?.tracksWallet ?: false) }
     // A deadline is optional; turning it on defaults to a monthly cadence and a
     // year out, the same defaults the web form starts from.
     var hasDeadline by remember { mutableStateOf(existing?.targetDate != null) }
@@ -134,6 +135,7 @@ fun GoalFormSheet(
                         targetDate = if (hasDeadline) targetDate.toString() else null,
                         cadence = if (hasDeadline) cadence else null,
                         goalKind = kind,
+                        tracksWallet = tracksWallet,
                     )
                 }
                     .onSuccess { onSaved() }
@@ -203,15 +205,39 @@ fun GoalFormSheet(
 
         Column {
             PickerField(
-                label = stringResource(R.string.goals_apartado_wallet),
+                label = stringResource(R.string.goals_goal_wallet),
                 options = wallets.filter { !it.isArchived },
                 selected = wallet,
                 optionLabel = { "${it.name} (${it.currencyCode})" },
                 onSelect = { wallet = it },
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        // How the money is kept: an apartado inside the wallet, or the whole
+        // wallet (progress = its balance). Same pill toggle as the purpose.
+        Column {
+            FieldLabel(stringResource(R.string.goals_mode_label))
+            SegmentedControl(
+                style = SegStyle.Pill,
+                options = listOf(false, true),
+                selected = tracksWallet,
+                label = {
+                    stringResource(
+                        if (it) R.string.goals_mode_wallet else R.string.goals_mode_apartado,
+                    )
+                },
+                onSelect = { tracksWallet = it },
+                modifier = Modifier.fillMaxWidth(),
+                fillEqually = true,
+            )
             Spacer(Modifier.height(4.dp))
-            FieldHint(stringResource(R.string.goals_apartado_hint))
+            FieldHint(
+                stringResource(
+                    if (tracksWallet) R.string.goals_mode_wallet_hint
+                    else R.string.goals_apartado_hint,
+                ),
+            )
         }
 
         // The deadline is a bordered card with a checkbox, as on the web:

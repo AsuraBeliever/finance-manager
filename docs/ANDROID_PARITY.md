@@ -416,6 +416,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | «Deuda actual» en vez de «Saldo inicial» en una tarjeta | `WalletFormSheet` | ✅ el signo se voltea al guardar |
 | Archivar / eliminar | mantener presionada la tarjeta | ✅ |
 | Convertir meta en cartera | `ui/goals` (mantener presionada la meta) | ✅ |
+| Meta = toda la cartera o apartado (selector en el formulario; sin Aportar/Pasar a cartera en las de cartera completa) | `GoalSheets` · `GoalsScreen` | ✅ |
 | Panel de tarjeta de crédito (corte, por pagar, utilización) | `WalletDetailScreen` | ✅ |
 | Planes MSI (avance, mensualidad, «Liquidado ✓», borrar con confirmación) | `WalletDetailScreen` + `MsiPlanSheet` | ✅ |
 | Skins / colores de cartera | `ui/wallets/WalletSkins` | ✅ catálogo + `grad:` |

@@ -220,6 +220,9 @@ data class SavingsGoal(
     val isBehind: Boolean = false,
     /** "purchase" (completing spends it) or "fund" (drawn down over time). */
     val goalKind: String = "purchase",
+    /** The goal is the whole linked wallet (saved = its balance), not an
+     *  apartado inside it: nothing to contribute or graduate. */
+    val tracksWallet: Boolean = false,
 )
 
 /**

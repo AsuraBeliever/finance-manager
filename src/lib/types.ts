@@ -434,6 +434,9 @@ export interface SavingsGoal {
   isBehind: boolean;
   /** Purchase (completing spends it) or fund (savings you draw down). */
   goalKind: GoalKind;
+  /** The goal is the whole linked wallet (saved = its balance), not an
+   *  apartado inside it: no contributing or graduating. */
+  tracksWallet: boolean;
 }
 
 export interface GoalInput {
@@ -450,6 +453,8 @@ export interface GoalInput {
   cadence: GoalCadence | null;
   /** Purchase or fund. */
   goalKind: GoalKind;
+  /** True = the goal is the whole wallet; false = an apartado inside it. */
+  tracksWallet: boolean;
 }
 
 // ---- budgets ----

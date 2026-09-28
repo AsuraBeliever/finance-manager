@@ -25,6 +25,34 @@ function defaultDeadlineISO(): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Two-way pill toggle used for the goal's purpose and storage mode. */
+function Segmented<T>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: [T, string][];
+}) {
+  return (
+    <div className="flex gap-1 rounded-xl bg-surface-overlay p-1">
+      {options.map(([val, label]) => (
+        <button
+          key={label}
+          type="button"
+          onClick={() => onChange(val)}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            value === val ? "bg-surface-raised text-fg shadow-sm" : "text-fg-subtle hover:text-fg"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function GoalFormModal({
   open,
   goal,
@@ -42,6 +70,7 @@ export function GoalFormModal({
   const [currency, setCurrency] = useState("MXN");
   const [walletId, setWalletId] = useState<number | null>(null);
   const [goalKind, setGoalKind] = useState<GoalKind>("purchase");
+  const [tracksWallet, setTracksWallet] = useState(false);
   const [color, setColor] = useState<string>(CHART_COLORS[0]);
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
   const [deadline, setDeadline] = useState<string>("");
@@ -59,6 +88,7 @@ export function GoalFormModal({
     setCurrency(goal?.currencyCode ?? "MXN");
     setWalletId(goal?.linkedWalletId ?? wallets.data?.[0]?.id ?? null);
     setGoalKind(goal?.goalKind ?? "purchase");
+    setTracksWallet(goal?.tracksWallet ?? false);
     setColor(goal?.color ?? CHART_COLORS[0]);
     setDeadlineEnabled(goal?.targetDate != null);
     setDeadline(goal?.targetDate ?? "");
@@ -89,6 +119,7 @@ export function GoalFormModal({
         targetDate: deadlineEnabled && deadline ? deadline : null,
         cadence: deadlineEnabled && deadline ? cadence : null,
         goalKind,
+        tracksWallet,
       };
       return goal ? updateSavingsGoal(goal.id, input) : createSavingsGoal(input);
     },
@@ -106,27 +137,14 @@ export function GoalFormModal({
           <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label={es.goals.kindLabel}>
-          <div className="flex gap-1 rounded-xl bg-surface-overlay p-1">
-            {(
-              [
-                ["purchase", es.goals.kindPurchase],
-                ["fund", es.goals.kindFund],
-              ] as const
-            ).map(([val, label]) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setGoalKind(val)}
-                className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  goalKind === val
-                    ? "bg-surface-raised text-fg shadow-sm"
-                    : "text-fg-subtle hover:text-fg"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            value={goalKind}
+            onChange={setGoalKind}
+            options={[
+              ["purchase", es.goals.kindPurchase],
+              ["fund", es.goals.kindFund],
+            ]}
+          />
           <span className="mt-1 block text-xs text-fg-subtle">
             {goalKind === "fund" ? es.goals.kindFundHint : es.goals.kindPurchaseHint}
           </span>
@@ -139,7 +157,7 @@ export function GoalFormModal({
             <input className={inputClass} value={effectiveCurrency} disabled readOnly />
           </Field>
         </div>
-        <Field label={es.goals.apartadoWallet}>
+        <Field label={es.goals.goalWallet}>
           <select
             className={inputClass}
             value={effectiveWalletId ?? ""}
@@ -151,7 +169,19 @@ export function GoalFormModal({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-fg-subtle">{es.goals.apartadoHint}</span>
+        </Field>
+        <Field label={es.goals.modeLabel}>
+          <Segmented
+            value={tracksWallet}
+            onChange={setTracksWallet}
+            options={[
+              [false, es.goals.modeApartado],
+              [true, es.goals.modeWallet],
+            ]}
+          />
+          <span className="mt-1 block text-xs text-fg-subtle">
+            {tracksWallet ? es.goals.modeWalletHint : es.goals.apartadoHint}
+          </span>
         </Field>
         {/* Deadline is opt-in via a clear switch; flipping it on reveals the
             date + cadence right away (prefilled), so it's configured in place. */}

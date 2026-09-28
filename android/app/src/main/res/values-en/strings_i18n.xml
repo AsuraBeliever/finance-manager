@@ -102,8 +102,14 @@
     <string name="goals_apartado_hint">The money is reserved inside this wallet; still yours, just earmarked.</string>
     <string name="goals_apartado_none_hint">An abstract goal with no real money behind it (great to start).</string>
     <string name="goals_apartado_in">Pocket in</string>
-    <string name="goals_wallet_section_title">Goals set aside in this wallet</string>
+    <string name="goals_wallet_section_title">Goals in this wallet</string>
     <string name="goals_apartado_of">Pocket of</string>
+    <string name="goals_goal_wallet">Wallet</string>
+    <string name="goals_mode_label">How is the money kept?</string>
+    <string name="goals_mode_apartado">Pocket</string>
+    <string name="goals_mode_wallet">Whole wallet</string>
+    <string name="goals_mode_wallet_hint">The goal is this wallet\'s full balance: it grows on its own as you add money to it.</string>
+    <string name="goals_whole_wallet_of">All of {wallet}</string>
     <string name="goals_track_only">Track only</string>
     <string name="goals_available">available:</string>
     <string name="goals_kind_label">What\'s the goal for?</string>
@@ -117,6 +123,7 @@
     <string name="goals_convert_confirm">A wallet “{name}” will be created with {amount} (the money moves there from {wallet}) and the goal closes. Continue?</string>
     <string name="goals_use">Use</string>
     <string name="goals_use_confirm_apartado">You\'ll spend {amount} reserved in {wallet} (an expense is booked and the goal closes). Continue?</string>
+    <string name="goals_use_confirm_wallet">You\'ll spend {amount} from {wallet} (an expense is booked and the goal closes). Continue?</string>
     <string name="goals_use_confirm_track">Mark this goal as used and close it?</string>
     <string name="goals_empty_title">No savings goals</string>
     <string name="goals_empty_description">Create a goal to track your progress toward a target.</string>

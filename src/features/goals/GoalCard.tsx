@@ -108,7 +108,11 @@ export function GoalCard({
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-display text-lg font-medium text-fg">{g.name}</h3>
           <p className="truncate text-xs text-fg-subtle">
-            {walletName ? `${es.goals.apartadoIn} ${walletName}` : es.goals.trackOnly}
+            {walletName
+              ? g.tracksWallet
+                ? es.goals.wholeWalletOf.replace("{wallet}", walletName)
+                : `${es.goals.apartadoIn} ${walletName}`
+              : es.goals.trackOnly}
           </p>
         </div>
         <div className="touch-action-reveal flex shrink-0 gap-1 transition-opacity">
@@ -149,16 +153,22 @@ export function GoalCard({
           )}
         </span>
         <div className="flex shrink-0 gap-1">
-          <Button variant="ghost" onClick={onContribute}>
-            {es.goals.contribute}
-          </Button>
+          {/* A whole-wallet goal grows with the wallet: nothing to contribute
+              and nothing to graduate (it already is a wallet). */}
+          {!g.tracksWallet && (
+            <Button variant="ghost" onClick={onContribute}>
+              {es.goals.contribute}
+            </Button>
+          )}
           {g.savedCents > 0 &&
             (g.goalKind === "fund" ? (
-              <Button variant="ghost" onClick={onConvert}>
-                <span className="flex items-center gap-1.5">
-                  <Wallet size={14} /> {es.goals.convertToWallet}
-                </span>
-              </Button>
+              !g.tracksWallet && (
+                <Button variant="ghost" onClick={onConvert}>
+                  <span className="flex items-center gap-1.5">
+                    <Wallet size={14} /> {es.goals.convertToWallet}
+                  </span>
+                </Button>
+              )
             ) : (
               <Button variant="ghost" onClick={onUse}>
                 <span className="flex items-center gap-1.5">

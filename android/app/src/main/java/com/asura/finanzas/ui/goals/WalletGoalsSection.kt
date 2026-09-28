@@ -116,7 +116,8 @@ fun WalletGoalsSection(
             title = stringResource(R.string.goals_buy),
             message = if (target.linkedWalletId != null) {
                 text(
-                    R.string.goals_use_confirm_apartado,
+                    if (target.tracksWallet) R.string.goals_use_confirm_wallet
+                    else R.string.goals_use_confirm_apartado,
                     "amount" to maskIfHidden(formatMoney(target.savedCents, target.currencyCode), hide),
                     "wallet" to walletName(target.linkedWalletId).orEmpty(),
                 )

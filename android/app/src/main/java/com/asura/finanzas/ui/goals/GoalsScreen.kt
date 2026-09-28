@@ -144,7 +144,8 @@ fun GoalsScreen(
             title = stringResource(R.string.goals_buy),
             message = if (target.linkedWalletId != null) {
                 text(
-                    R.string.goals_use_confirm_apartado,
+                    if (target.tracksWallet) R.string.goals_use_confirm_wallet
+                    else R.string.goals_use_confirm_apartado,
                     "amount" to maskIfHidden(
                         formatMoney(target.savedCents, target.currencyCode),
                         hide,
@@ -342,7 +343,10 @@ fun GoalCard(
                 )
                 Text(
                     walletName(goal.linkedWalletId)
-                        ?.let { "${stringResource(R.string.goals_apartado_in)} $it" }
+                        ?.let {
+                            if (goal.tracksWallet) text(R.string.goals_whole_wallet_of, "wallet" to it)
+                            else "${stringResource(R.string.goals_apartado_in)} $it"
+                        }
                         ?: stringResource(R.string.goals_track_only),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
@@ -426,8 +430,12 @@ fun GoalCard(
             )
             // Ghost buttons, `gap-1`: contribute, then buy or graduate.
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                GhostButton(stringResource(R.string.goals_contribute), onClick = { onContribute(goal) })
-                if (goal.savedCents > 0) {
+                // A whole-wallet goal grows with the wallet: nothing to
+                // contribute and nothing to graduate (it already is a wallet).
+                if (!goal.tracksWallet) {
+                    GhostButton(stringResource(R.string.goals_contribute), onClick = { onContribute(goal) })
+                }
+                if (goal.savedCents > 0 && !(goal.tracksWallet && goal.goalKind == "fund")) {
                     GhostButton(
                         stringResource(
                             if (goal.goalKind == "fund") R.string.goals_convert_to_wallet
