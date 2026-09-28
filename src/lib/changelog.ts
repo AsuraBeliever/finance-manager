@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.45.2",
+    date: "2026-09-28",
+    es: [
+      "En la app de Android, los formularios y ventanas emergentes ya no se ven transparentes: en celulares que apagan el efecto de desenfoque (por ahorro de batería o por accesibilidad) la pantalla de atrás se alcanzaba a leer a través de ellos. Ahora se ven sólidos, igual que en la web.",
+    ],
+    en: [
+      "In the Android app, forms and pop-ups no longer look transparent: on phones that switch the blur effect off (battery saver or accessibility) the screen behind could be read through them. They now look solid, just like on the web.",
+    ],
+  },
+  {
     version: "2.45.1",
     date: "2026-09-28",
     es: [

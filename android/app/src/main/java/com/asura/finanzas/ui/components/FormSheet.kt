@@ -42,6 +42,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
@@ -66,6 +68,22 @@ fun DialogBlurBehind(radius: Dp = 10.dp) {
         window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
         window.attributes = window.attributes.also { it.blurBehindRadius = px }
     }
+}
+
+/**
+ * What the web's glass modal shows through its translucent fill: the page
+ * dimmed by the `bg-black/70` overlay and blurred by the card's own
+ * `backdrop-filter` until it's just its average colour. Painted under
+ * `surfaceRaised` so the card reads the same whether or not the phone gives
+ * us [DialogBlurBehind] — Samsung and others switch window blurs off (battery
+ * saver, "reduce transparency"), and without this the page underneath showed
+ * through the card, sharp and legible, as if it were transparent.
+ */
+@Composable
+fun Modifier.dialogGlass(): Modifier {
+    val colors = Broke.colors
+    return background(Color.Black.copy(alpha = 0.7f).compositeOver(colors.surface))
+        .background(colors.surfaceRaised)
 }
 
 /**
@@ -159,7 +177,7 @@ fun ModalCard(
                 .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.9f)
                 .cardShadow()
                 .clip(RoundedCornerShape(16.dp))
-                .background(colors.surfaceRaised)
+                .dialogGlass()
                 .cardHighlight()
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
                 // The card's own 1 px border, which everything sits inside.
@@ -290,7 +308,7 @@ fun PlainSheet(
                 .then(if (fixedHeight) Modifier.height(screenH * 0.8f) else Modifier)
                 .cardShadow()
                 .clip(RoundedCornerShape(16.dp))
-                .background(if (solid) colors.surfaceOverlay else colors.surfaceRaised)
+                .then(if (solid) Modifier.background(colors.surfaceOverlay) else Modifier.dialogGlass())
                 .then(if (solid) Modifier else Modifier.cardHighlight())
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(16.dp))
                 .padding(1.dp),
