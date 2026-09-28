@@ -42,6 +42,14 @@ import kotlin.math.sign
  * mapped to pixels (in the web's unit, pesos, so the ticks come out the same).
  */
 
+/**
+ * Drop binary floating-point noise (3000.0000000000005 → 3000.0). recharts
+ * computes ticks with decimal.js, so the web never shows it; here 12
+ * significant digits is far more than any peso amount needs.
+ */
+private fun clean(v: Double): Double =
+    java.math.BigDecimal(v).round(java.math.MathContext(12)).toDouble()
+
 /** A value axis: its domain and the ticks drawn on it, bottom to top. */
 data class NiceScale(val min: Double, val max: Double, val ticks: List<Double>)
 
@@ -64,14 +72,14 @@ fun niceScale(dataMin: Double, dataMax: Double, fromZero: Boolean, tickCount: In
         val digitValue = 10.0.pow(digits)
         val ratio = rough / digitValue
         val scale = if (digits != 1) 0.05 else 0.1
-        return (ceil(ratio / scale) + correction) * scale * digitValue
+        return clean((ceil(ratio / scale) + correction) * scale * digitValue)
     }
     var correction = 0
     while (true) {
         val step = formatStep((hi - lo) / (tickCount - 1), correction)
         val middle = if (lo <= 0 && hi >= 0) 0.0 else {
             val m = (lo + hi) / 2
-            m - (m % step)
+            clean(m - (m % step))
         }
         var below = ceil((middle - lo) / step - 1e-9).toInt()
         var up = ceil((hi - middle) / step - 1e-9).toInt()
@@ -80,9 +88,9 @@ fun niceScale(dataMin: Double, dataMax: Double, fromZero: Boolean, tickCount: In
         if (count < tickCount) {
             if (hi > 0) up += tickCount - count else below += tickCount - count
         }
-        val tickMin = middle - below * step
-        val ticks = (0 until tickCount).map { tickMin + it * step }
-        return NiceScale(tickMin, middle + up * step, ticks)
+        val tickMin = clean(middle - below * step)
+        val ticks = (0 until tickCount).map { clean(tickMin + it * step) }
+        return NiceScale(tickMin, clean(middle + up * step), ticks)
     }
 }
 
