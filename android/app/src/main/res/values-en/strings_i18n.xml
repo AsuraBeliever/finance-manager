@@ -69,8 +69,14 @@
     <string name="goals_suggested_chip">Suggested contribution:</string>
     <string name="goals_deadline">Deadline</string>
     <string name="goals_deadline_optional">Deadline (optional)</string>
-    <string name="goals_enable_deadline">Set a deadline</string>
-    <string name="goals_deadline_hint">We\'ll work out how much to set aside each period to arrive on time.</string>
+    <string name="goals_enable_deadline">Add a plan</string>
+    <string name="goals_deadline_hint">Pick a date and we\'ll tell you how much to set aside, or tell us how much you put in and we\'ll tell you when you get there.</string>
+    <string name="goals_plan_mode_date">I have a date</string>
+    <string name="goals_plan_mode_amount">I know how much I put in</string>
+    <string name="goals_contribution_label">How much do you put in?</string>
+    <string name="goals_preview_reach">You\'d reach it on {date} ({n} contributions).</string>
+    <string name="goals_preview_reach_one">You\'d reach it on {date} with a single contribution.</string>
+    <string name="goals_preview_met">With what it already has, the goal is complete.</string>
     <string name="goals_deadline_date_label">By when?</string>
     <string name="goals_no_deadline">No deadline</string>
     <string name="goals_remove_deadline">Remove date</string>
@@ -82,6 +88,8 @@
     <string name="goals_plan_reserve">Set aside {amount} {cadence} to reach it by {date}.</string>
     <string name="goals_plan_progress">{period} you\'ve put in {done} of {quota}: {missing} to go.</string>
     <string name="goals_plan_covered">{period} is covered. You\'re on track for {date}.</string>
+    <string name="goals_plan_fixed">Putting in {amount} {cadence}, you\'ll reach it on {date}.</string>
+    <string name="goals_plan_fixed_date">At that pace, you\'ll reach it on {date}.</string>
     <string name="goals_period_daily">Today</string>
     <string name="goals_period_weekly">This week</string>
     <string name="goals_period_monthly">This month</string>

@@ -81,8 +81,15 @@ export const esDict = {
     // Deadline + cadence.
     deadline: "Fecha límite",
     deadlineOptional: "Fecha límite (opcional)",
-    enableDeadline: "Ponerle fecha límite",
-    deadlineHint: "Calcula cuánto apartar por periodo para llegar a tiempo.",
+    enableDeadline: "Ponerle un plan",
+    deadlineHint: "Elige para cuándo y te decimos cuánto apartar, o dinos cuánto aportas y te decimos cuándo llegas.",
+    planModeDate: "Tengo una fecha",
+    planModeAmount: "Sé cuánto aporto",
+    contributionLabel: "¿Cuánto aportas?",
+    // Live projection in the form. {date} {n} get replaced.
+    previewReach: "La completarías el {date} ({n} aportes).",
+    previewReachOne: "La completarías el {date} con un solo aporte.",
+    previewMet: "Con lo que ya tiene, la meta está completa.",
     deadlineDateLabel: "¿Para cuándo?",
     noDeadline: "Sin fecha límite",
     removeDeadline: "Quitar fecha",
@@ -96,6 +103,9 @@ export const esDict = {
     // Partial progress within the current period: quota stays fixed.
     planProgress: "{period} llevas {done} de {quota}: te faltan {missing}.",
     planCovered: "{period} ya está cubierto. Vas en camino para el {date}.",
+    // Fixed-contribution plan on the card.
+    planFixed: "Aportando {amount} {cadence}, la completas el {date}.",
+    planFixedDate: "A ese ritmo, la completas el {date}.",
     periodDaily: "Hoy",
     periodWeekly: "Esta semana",
     periodMonthly: "Este mes",

@@ -12,7 +12,9 @@ use std::collections::HashMap;
 
 use chrono::NaiveDate;
 use finanzas_core::error::{AppError, AppResult};
-use finanzas_core::goals::{period_start, plan_contribution, Cadence, ContributionPlan};
+use finanzas_core::goals::{
+    period_start, plan_contribution, plan_fixed_contribution, Cadence, ContributionPlan,
+};
 use finanzas_core::period::{resolve_period, Period};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
@@ -64,6 +66,9 @@ pub struct SavingsGoal {
     pub target_date: Option<String>,
     /// How often the user plans to contribute (daily|weekly|monthly|yearly).
     pub cadence: Option<String>,
+    /// Fixed amount contributed every `cadence` period — the alternative to a
+    /// deadline; the plan then projects the completion date.
+    pub contribution_cents: Option<i64>,
     /// 'purchase' (completing it spends the money) or 'fund' (savings you draw
     /// down over time, or graduate into its own wallet).
     pub goal_kind: String,
@@ -100,6 +105,8 @@ struct GoalRow {
     created_at: String,
     #[serde(default)]
     tracks_wallet: i64,
+    #[serde(default)]
+    contribution_cents: Option<i64>,
 }
 
 fn progress_bps(saved: i64, target: i64) -> i64 {
@@ -171,11 +178,24 @@ fn build(r: GoalRow, today: NaiveDate, contributed_period_cents: i64) -> Savings
         .as_deref()
         .and_then(parse_date)
         .or_else(|| parse_date(&r.created_at));
+    let cadence = r.contribution_cadence.as_deref().and_then(Cadence::parse);
     let (plan, is_behind) = match (
         r.target_date.as_deref().and_then(parse_date),
-        r.contribution_cadence.as_deref().and_then(Cadence::parse),
+        cadence,
         pace_start,
     ) {
+        // A fixed contribution projects the date instead (never "behind").
+        _ if r.contribution_cents.is_some_and(|c| c > 0) && cadence.is_some() => (
+            Some(plan_fixed_contribution(
+                today,
+                cadence.expect("checked above"),
+                r.target_cents,
+                r.saved_cents,
+                r.contribution_cents.unwrap_or(0),
+                contributed_period_cents,
+            )),
+            false,
+        ),
         (Some(deadline), Some(cadence), Some(start)) => {
             let p = plan_contribution(
                 start,
@@ -203,6 +223,7 @@ fn build(r: GoalRow, today: NaiveDate, contributed_period_cents: i64) -> Savings
         linked_wallet_id: r.linked_wallet_id,
         target_date: r.target_date,
         cadence: r.contribution_cadence,
+        contribution_cents: r.contribution_cents,
         goal_kind: if r.goal_kind == "fund" {
             "fund"
         } else {
@@ -243,7 +264,8 @@ fn select_sql() -> String {
         "SELECT g.id, g.name, g.icon, g.color, g.currency_code, g.target_cents,
                 {} AS saved_cents,
                 g.linked_wallet_id, g.target_date, g.contribution_cadence, g.goal_kind,
-                g.plan_anchor_date, g.tracks_wallet, date(g.created_at) AS created_at
+                g.plan_anchor_date, g.tracks_wallet, g.contribution_cents,
+                date(g.created_at) AS created_at
          FROM savings_goals g",
         saved_sql("g.saved_cents", "")
     )
@@ -281,8 +303,8 @@ pub async fn list_savings_goals(
         &format!(
             "SELECT g.id, g.name, g.icon, g.color, g.currency_code, g.target_cents,
                     g.linked_wallet_id, g.target_date, g.contribution_cadence, g.goal_kind,
-                    g.plan_anchor_date, g.tracks_wallet, date(g.created_at) AS created_at,
-                    {} AS saved_cents
+                    g.plan_anchor_date, g.tracks_wallet, g.contribution_cents,
+                    date(g.created_at) AS created_at, {} AS saved_cents
              FROM savings_goals g
              WHERE g.user_id = ?1 AND date(g.created_at) <= ?2
                AND (g.archived_at IS NULL OR g.archived_at >= ?2)
@@ -334,6 +356,10 @@ pub struct GoalInput {
     /// True = the goal is the whole wallet; false (default) = an apartado.
     #[serde(default)]
     pub tracks_wallet: bool,
+    /// Fixed amount per `cadence` period, instead of a deadline. When set, any
+    /// `target_date` is ignored and the completion date is projected.
+    #[serde(default)]
+    pub contribution_cents: Option<i64>,
 }
 
 /// Normalize the goal kind to a known value.
@@ -345,10 +371,27 @@ fn goal_kind(input: &GoalInput) -> &'static str {
     }
 }
 
-/// Normalize the deadline + cadence pair: drop a blank date, and when a date is
-/// present pin a valid cadence (defaulting to monthly); when no date is set,
-/// clear the cadence so the two always travel together.
-fn resolve_deadline(input: &GoalInput) -> AppResult<(Option<String>, Option<String>)> {
+/// A goal's plan as stored: (target_date, cadence, contribution_cents).
+type PlanCols = (Option<String>, Option<String>, Option<i64>);
+
+/// Normalize the plan: either a fixed contribution per period (no date) or a
+/// deadline, each with a valid cadence (defaulting to monthly). A blank date
+/// and no contribution means no plan, and clears the cadence with it.
+fn resolve_deadline(input: &GoalInput) -> AppResult<PlanCols> {
+    let cadence = || {
+        input
+            .cadence
+            .as_deref()
+            .filter(|c| Cadence::parse(c).is_some())
+            .unwrap_or("monthly")
+            .to_string()
+    };
+    if let Some(amount) = input.contribution_cents {
+        if amount <= 0 {
+            return Err(AppError::InvalidInput("el aporte debe ser positivo".into()));
+        }
+        return Ok((None, Some(cadence()), Some(amount)));
+    }
     let date = input
         .target_date
         .as_deref()
@@ -359,14 +402,9 @@ fn resolve_deadline(input: &GoalInput) -> AppResult<(Option<String>, Option<Stri
             if parse_date(d).is_none() {
                 return Err(AppError::InvalidInput("fecha límite inválida".into()));
             }
-            let cadence = input
-                .cadence
-                .as_deref()
-                .filter(|c| Cadence::parse(c).is_some())
-                .unwrap_or("monthly");
-            Ok((Some(d.to_string()), Some(cadence.to_string())))
+            Ok((Some(d.to_string()), Some(cadence()), None))
         }
-        None => Ok((None, None)),
+        None => Ok((None, None, None)),
     }
 }
 
@@ -414,14 +452,14 @@ pub async fn create_savings_goal(
 ) -> AppResult<SavingsGoal> {
     validate(&a)?;
     let (linked_wallet_id, currency) = resolve_link(db, uid, &a).await?;
-    let (target_date, cadence) = resolve_deadline(&a)?;
+    let (target_date, cadence, contribution) = resolve_deadline(&a)?;
     let res = exec(
         db,
         "INSERT INTO savings_goals
            (user_id, name, icon, color, currency_code, target_cents, linked_wallet_id,
             target_date, contribution_cadence, goal_kind, plan_anchor_date, tracks_wallet,
-            sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
+            contribution_cents, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM savings_goals WHERE user_id = ?1), 0))",
         jsv![
             uid,
@@ -436,7 +474,8 @@ pub async fn create_savings_goal(
             goal_kind(&a),
             // The pace starts when the deadline exists (here: at creation).
             target_date.as_ref().map(|_| today_mx().to_string()),
-            a.tracks_wallet as i64
+            a.tracks_wallet as i64,
+            contribution
         ],
     )
     .await?;
@@ -460,7 +499,7 @@ pub async fn update_savings_goal(
 ) -> AppResult<SavingsGoal> {
     validate(&a.input)?;
     let (linked_wallet_id, currency) = resolve_link(db, uid, &a.input).await?;
-    let (target_date, cadence) = resolve_deadline(&a.input)?;
+    let (target_date, cadence, contribution) = resolve_deadline(&a.input)?;
     let before = fetch_goal(db, uid, a.id).await?;
     let today = today_mx().to_string();
     let mut stmts = vec![stmt(
@@ -477,7 +516,7 @@ pub async fn update_savings_goal(
                WHEN target_date IS NULL OR target_date <> ?9 THEN ?12
                ELSE COALESCE(plan_anchor_date, ?12) END,
              target_date = ?9, contribution_cadence = ?10, goal_kind = ?11,
-             tracks_wallet = ?13,
+             tracks_wallet = ?13, contribution_cents = ?14,
              saved_cents = CASE WHEN ?13 = 1 THEN 0 ELSE saved_cents END
          WHERE id = ?1 AND user_id = ?2",
         jsv![
@@ -493,7 +532,8 @@ pub async fn update_savings_goal(
             cadence,
             goal_kind(&a.input),
             today.clone(),
-            a.input.tracks_wallet as i64
+            a.input.tracks_wallet as i64,
+            contribution
         ],
     )?];
     // Turning an apartado into a whole-wallet goal releases its earmark (the
@@ -510,6 +550,38 @@ pub async fn update_savings_goal(
     let goal = fetch_goal(db, uid, a.id).await?;
     snapshot_goal(db, goal.id, goal.saved_cents).await?;
     Ok(goal)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewArgs {
+    pub target_cents: i64,
+    /// What the goal already has (0 for a new apartado, the wallet's balance
+    /// for a whole-wallet goal, the current saved amount when editing).
+    pub saved_cents: i64,
+    pub contribution_cents: i64,
+    pub cadence: String,
+    /// Already put in during the current period (editing an existing goal).
+    #[serde(default)]
+    pub contributed_this_period_cents: i64,
+}
+
+/// Live preview for the goal form: when would a fixed contribution reach the
+/// target? Pure computation — nothing is read or written.
+pub fn preview_goal_plan(a: PreviewArgs) -> AppResult<ContributionPlan> {
+    let cadence = Cadence::parse(&a.cadence)
+        .ok_or_else(|| AppError::InvalidInput("frecuencia inválida".into()))?;
+    if a.contribution_cents <= 0 || a.target_cents <= 0 {
+        return Err(AppError::InvalidInput("el aporte debe ser positivo".into()));
+    }
+    Ok(plan_fixed_contribution(
+        today_mx(),
+        cadence,
+        a.target_cents,
+        a.saved_cents,
+        a.contribution_cents,
+        a.contributed_this_period_cents,
+    ))
 }
 
 #[derive(Deserialize)]

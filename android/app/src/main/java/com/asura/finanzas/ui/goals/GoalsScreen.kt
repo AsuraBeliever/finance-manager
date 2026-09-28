@@ -477,7 +477,7 @@ fun GoalCard(
  * `{ day, month: "short", year }`, as the browser writes it in es-MX / en-US.
  */
 @Composable
-private fun planDate(iso: String?): String {
+internal fun planDate(iso: String?): String {
     if (iso.isNullOrBlank()) return ""
     val locale = java.util.Locale.forLanguageTag(
         if (LocalAppSettings.current.locale.startsWith("en")) "en-US" else "es-MX",
@@ -534,7 +534,16 @@ private fun GoalPlanLines(goal: SavingsGoal, plan: ContributionPlan, hide: Boole
             text = text(R.string.goals_overdue_hint, "amount" to money(remaining)),
         )
     } else {
+        // A fixed-contribution plan names the projected date instead of a
+        // deadline; part-way it keeps the progress line and adds the date.
+        val fixed = plan.projectedDate
         val line = when {
+            fixed != null && plan.contributedThisPeriodCents <= 0 -> text(
+                R.string.goals_plan_fixed,
+                "amount" to money(plan.perPeriodCents),
+                "cadence" to cadenceAdverb(goal.cadence),
+                "date" to planDate(fixed),
+            )
             plan.contributedThisPeriodCents <= 0 -> text(
                 R.string.goals_plan_reserve,
                 "amount" to money(plan.periodQuotaCents),
@@ -551,10 +560,18 @@ private fun GoalPlanLines(goal: SavingsGoal, plan: ContributionPlan, hide: Boole
             else -> text(
                 R.string.goals_plan_covered,
                 "period" to periodNoun(goal.cadence),
-                "date" to planDate(goal.targetDate),
+                "date" to planDate(fixed ?: goal.targetDate),
             )
         }
         Text(line, style = MaterialTheme.typography.bodySmall, color = colors.fgMuted)
+        if (fixed != null && plan.contributedThisPeriodCents > 0 && plan.periodMissingCents > 0) {
+            Text(
+                text(R.string.goals_plan_fixed_date, "date" to planDate(fixed)),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.fgMuted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
 
         if (goal.isBehind) {
             BadgeLine(

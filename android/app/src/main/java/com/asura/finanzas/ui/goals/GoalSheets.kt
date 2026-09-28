@@ -60,6 +60,8 @@ import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.parseAmountToCents
 import com.asura.finanzas.ui.theme.Broke
 import com.asura.finanzas.ui.theme.tabular
+import com.asura.finanzas.data.ContributionPlan
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -82,7 +84,20 @@ fun GoalFormSheet(
     var tracksWallet by remember { mutableStateOf(existing?.tracksWallet ?: false) }
     // A deadline is optional; turning it on defaults to a monthly cadence and a
     // year out, the same defaults the web form starts from.
-    var hasDeadline by remember { mutableStateOf(existing?.targetDate != null) }
+    var hasDeadline by remember {
+        mutableStateOf(existing?.targetDate != null || existing?.contributionCents != null)
+    }
+    // Plan flavour: a deadline ("how much per period?") or a fixed
+    // contribution per period ("when do I get there?"), as on the web.
+    var planMode by remember {
+        mutableStateOf(if (existing?.contributionCents != null) "amount" else "date")
+    }
+    var contribution by remember {
+        mutableStateOf(
+            existing?.contributionCents?.let { formatMoney(it, withSymbol = false) }.orEmpty(),
+        )
+    }
+    var preview by remember { mutableStateOf<ContributionPlan?>(null) }
     var targetDate by remember {
         mutableStateOf(
             existing?.targetDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
@@ -108,7 +123,32 @@ fun GoalFormSheet(
     }
 
     val cents = parseAmountToCents(target)
-    val canSave = !busy && name.isNotBlank() && cents != null && cents > 0 && wallet != null
+    val amountMode = hasDeadline && planMode == "amount"
+    val contributionCents = parseAmountToCents(contribution)
+    val canSave = !busy && name.isNotBlank() && cents != null && cents > 0 && wallet != null &&
+        (!amountMode || (contributionCents != null && contributionCents > 0))
+
+    // Live "when would I reach it?": the server does the math; we pass what
+    // the goal already has (the wallet's balance for a whole-wallet goal, the
+    // current apartado when editing one). Debounced like the web.
+    val savedCents = when {
+        tracksWallet -> (wallet?.balanceCents ?: 0).coerceAtLeast(0)
+        existing != null && !existing.tracksWallet && existing.linkedWalletId == wallet?.id ->
+            existing.savedCents
+        else -> 0
+    }
+    val contributedThisPeriod =
+        if (existing?.cadence == cadence) existing.plan?.contributedThisPeriodCents ?: 0 else 0
+    LaunchedEffect(amountMode, cents, contributionCents, cadence, savedCents) {
+        if (!amountMode || cents == null || cents <= 0 || contributionCents == null || contributionCents <= 0) {
+            preview = null
+            return@LaunchedEffect
+        }
+        delay(300)
+        preview = runCatching {
+            repository.previewGoalPlan(cents, savedCents, contributionCents, cadence, contributedThisPeriod)
+        }.getOrNull()
+    }
 
     FormSheet(
         title = stringResource(
@@ -132,8 +172,9 @@ fun GoalFormSheet(
                         color = color,
                         // Clearing the deadline clears the cadence with it: the
                         // server only computes a plan when both are present.
-                        targetDate = if (hasDeadline) targetDate.toString() else null,
+                        targetDate = if (hasDeadline && !amountMode) targetDate.toString() else null,
                         cadence = if (hasDeadline) cadence else null,
+                        contributionCents = if (amountMode) contributionCents else null,
                         goalKind = kind,
                         tracksWallet = tracksWallet,
                     )
@@ -275,14 +316,38 @@ fun GoalFormSheet(
                 }
             }
             if (hasDeadline) {
+                Spacer(Modifier.height(12.dp))
+                SegmentedControl(
+                    style = SegStyle.Pill,
+                    options = listOf("date", "amount"),
+                    selected = planMode,
+                    label = {
+                        stringResource(
+                            if (it == "amount") R.string.goals_plan_mode_amount
+                            else R.string.goals_plan_mode_date,
+                        )
+                    },
+                    onSelect = { planMode = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    fillEqually = true,
+                )
                 // `mt-3 grid gap-3`; the date cannot be before today.
                 Spacer(Modifier.height(12.dp))
-                DateField(
-                    label = stringResource(R.string.goals_deadline_date_label),
-                    value = targetDate,
-                    onChange = { targetDate = it },
-                    min = java.time.LocalDate.now(),
-                )
+                if (amountMode) {
+                    MoneyField(
+                        label = stringResource(R.string.goals_contribution_label),
+                        value = contribution,
+                        onValueChange = { contribution = it; error = null },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    DateField(
+                        label = stringResource(R.string.goals_deadline_date_label),
+                        value = targetDate,
+                        onChange = { targetDate = it },
+                        min = java.time.LocalDate.now(),
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 PickerField(
                     label = stringResource(R.string.goals_cadence_label),
@@ -301,6 +366,24 @@ fun GoalFormSheet(
                     onSelect = { cadence = it },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                val projected = preview?.projectedDate
+                if (amountMode && projected != null) {
+                    val plan = preview!!
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        when (plan.periodsLeft) {
+                            0L -> stringResource(R.string.goals_preview_met)
+                            1L -> text(R.string.goals_preview_reach_one, "date" to planDate(projected))
+                            else -> text(
+                                R.string.goals_preview_reach,
+                                "date" to planDate(projected),
+                                "n" to plan.periodsLeft,
+                            )
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Broke.colors.fgMuted,
+                    )
+                }
             }
         }
 

@@ -1,16 +1,32 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../../components/Button";
 import { ColorPicker } from "../../components/ColorPicker";
 import { DateInput } from "../../components/DateInput";
 import { Field, inputClass } from "../../components/Field";
 import { MoneyInput } from "../../components/MoneyInput";
 import { Modal } from "../../components/Modal";
-import { createSavingsGoal, listWallets, updateSavingsGoal } from "../../lib/api";
+import {
+  createSavingsGoal,
+  listWallets,
+  previewGoalPlan,
+  updateSavingsGoal,
+} from "../../lib/api";
 import { parseToCents } from "../../lib/money";
 import { CHART_COLORS } from "../../lib/palette";
 import type { GoalCadence, GoalKind, SavingsGoal } from "../../lib/types";
 import { es } from "../../i18n/es";
+import { formatDate } from "./GoalCard";
+
+/** `value`, but only after it stopped changing for `ms` (live previews). */
+function useDebounced<T>(value: T, ms = 300): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
 
 /** Today's date as ISO 'YYYY-MM-DD' (the earliest selectable deadline). */
 function todayISO(): string {
@@ -75,6 +91,10 @@ export function GoalFormModal({
   const [deadlineEnabled, setDeadlineEnabled] = useState(false);
   const [deadline, setDeadline] = useState<string>("");
   const [cadence, setCadence] = useState<GoalCadence>("monthly");
+  // Plan flavour: a deadline ("how much per period?") or a fixed contribution
+  // per period ("when do I get there?").
+  const [planMode, setPlanMode] = useState<"date" | "amount">("date");
+  const [contribution, setContribution] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   // Reset fields whenever the modal opens for a new/edited goal. New goals
@@ -90,7 +110,9 @@ export function GoalFormModal({
     setGoalKind(goal?.goalKind ?? "purchase");
     setTracksWallet(goal?.tracksWallet ?? false);
     setColor(goal?.color ?? CHART_COLORS[0]);
-    setDeadlineEnabled(goal?.targetDate != null);
+    setDeadlineEnabled(goal?.targetDate != null || goal?.contributionCents != null);
+    setPlanMode(goal?.contributionCents != null ? "amount" : "date");
+    setContribution(goal?.contributionCents != null ? (goal.contributionCents / 100).toString() : "");
     setDeadline(goal?.targetDate ?? "");
     setCadence(goal?.cadence ?? "monthly");
     setError(null);
@@ -102,6 +124,31 @@ export function GoalFormModal({
   const linkedWallet = wallets.data?.find((w) => w.id === effectiveWalletId) ?? null;
   const effectiveCurrency = linkedWallet?.currencyCode ?? currency;
 
+  // Live "when would I reach it?" for the fixed-contribution plan. The server
+  // does the math; we only pass what the goal already has: the wallet's
+  // balance for a whole-wallet goal, the current apartado when editing one.
+  const amountMode = deadlineEnabled && planMode === "amount";
+  const targetCents = parseToCents(target);
+  const contributionCents = parseToCents(contribution);
+  const savedCents = tracksWallet
+    ? Math.max(0, linkedWallet?.balanceCents ?? 0)
+    : goal && !goal.tracksWallet && goal.linkedWalletId === effectiveWalletId
+      ? goal.savedCents
+      : 0;
+  const previewArgs = useDebounced({
+    targetCents: targetCents ?? 0,
+    savedCents,
+    contributionCents: contributionCents ?? 0,
+    cadence,
+    contributedThisPeriodCents:
+      goal?.cadence === cadence ? (goal.plan?.contributedThisPeriodCents ?? 0) : 0,
+  });
+  const preview = useQuery({
+    queryKey: ["goalPreview", previewArgs],
+    queryFn: () => previewGoalPlan(previewArgs),
+    enabled: amountMode && previewArgs.targetCents > 0 && previewArgs.contributionCents > 0,
+  });
+
   const save = useMutation({
     mutationFn: () => {
       const cents = parseToCents(target);
@@ -109,6 +156,8 @@ export function GoalFormModal({
         return Promise.reject(new Error(es.investments.invalidAmount));
       if (effectiveWalletId == null)
         return Promise.reject(new Error(es.goals.apartadoWallet));
+      if (amountMode && (contributionCents === null || contributionCents <= 0))
+        return Promise.reject(new Error(es.investments.invalidAmount));
       const input = {
         name: name.trim(),
         icon: null,
@@ -116,8 +165,9 @@ export function GoalFormModal({
         currencyCode: effectiveCurrency,
         targetCents: cents,
         walletId: effectiveWalletId,
-        targetDate: deadlineEnabled && deadline ? deadline : null,
-        cadence: deadlineEnabled && deadline ? cadence : null,
+        targetDate: deadlineEnabled && !amountMode && deadline ? deadline : null,
+        cadence: (deadlineEnabled && !amountMode && deadline) || amountMode ? cadence : null,
+        contributionCents: amountMode ? contributionCents : null,
         goalKind,
         tracksWallet,
       };
@@ -206,10 +256,28 @@ export function GoalFormModal({
           </label>
 
           {deadlineEnabled && (
+            <div className="mt-3">
+              <Segmented
+                value={planMode}
+                onChange={setPlanMode}
+                options={[
+                  ["date", es.goals.planModeDate],
+                  ["amount", es.goals.planModeAmount],
+                ]}
+              />
+            </div>
+          )}
+          {deadlineEnabled && (
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label={es.goals.deadlineDateLabel}>
-                <DateInput value={deadline} onChange={setDeadline} min={todayISO()} />
-              </Field>
+              {amountMode ? (
+                <Field label={es.goals.contributionLabel}>
+                  <MoneyInput value={contribution} onChange={setContribution} />
+                </Field>
+              ) : (
+                <Field label={es.goals.deadlineDateLabel}>
+                  <DateInput value={deadline} onChange={setDeadline} min={todayISO()} />
+                </Field>
+              )}
               <Field label={es.goals.cadenceLabel}>
                 <select
                   className={inputClass}
@@ -223,6 +291,15 @@ export function GoalFormModal({
                 </select>
               </Field>
             </div>
+          )}
+          {amountMode && preview.data?.projectedDate && (
+            <p className="mt-3 text-sm text-fg-muted">
+              {preview.data.periodsLeft === 0
+                ? es.goals.previewMet
+                : (preview.data.periodsLeft === 1 ? es.goals.previewReachOne : es.goals.previewReach)
+                    .replace("{date}", formatDate(preview.data.projectedDate))
+                    .replace("{n}", String(preview.data.periodsLeft))}
+            </p>
           )}
         </div>
         <Field label={es.common.color ?? "Color"}>

@@ -908,6 +908,7 @@ class BrokeRepository(
         cadence: String?,
         goalKind: String,
         tracksWallet: Boolean,
+        contributionCents: Long? = null,
     ) {
         val body = buildJsonObject {
             id?.let { put("id", it) }
@@ -920,10 +921,33 @@ class BrokeRepository(
             cadence?.let { put("cadence", it) }
             put("goalKind", goalKind)
             put("tracksWallet", tracksWallet)
+            contributionCents?.let { put("contributionCents", it) }
         }
         rpc.call(if (id == null) "create_savings_goal" else "update_savings_goal", body)
         cache.invalidateReads()
     }
+
+    /** When would a fixed contribution reach the target? Pure server math for
+     *  the goal form's live preview; nothing is read or written. */
+    suspend fun previewGoalPlan(
+        targetCents: Long,
+        savedCents: Long,
+        contributionCents: Long,
+        cadence: String,
+        contributedThisPeriodCents: Long,
+    ): ContributionPlan = rpc.json.decodeFromJsonElement(
+        ContributionPlan.serializer(),
+        rpc.call(
+            "preview_goal_plan",
+            buildJsonObject {
+                put("targetCents", targetCents)
+                put("savedCents", savedCents)
+                put("contributionCents", contributionCents)
+                put("cadence", cadence)
+                put("contributedThisPeriodCents", contributedThisPeriodCents)
+            },
+        ),
+    )
 
     /** Positive reserves more, negative releases. The server clamps at zero. */
     suspend fun contributeToGoal(id: Long, amountCents: Long) {

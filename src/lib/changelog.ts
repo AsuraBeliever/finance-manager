@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.45.0",
+    date: "2026-09-28",
+    es: [
+      "Al ponerle un plan a una meta ahora eliges entre «Tengo una fecha» (te decimos cuánto apartar) y «Sé cuánto aporto»: pones cuánto aportas y cada cuándo, y la app te dice en qué fecha la completarías — en vivo mientras escribes, y en la tarjeta de la meta, que se recalcula con tu avance real. En la web y en la app de Android.",
+      "En la app de Android, al editar una meta, presupuesto, transacción, inversión o suscripción de $1,000 o más, el monto ya aparece en su campo en lugar de verse vacío.",
+    ],
+    en: [
+      "When you add a plan to a goal you now choose between \"I have a date\" (we tell you how much to set aside) and \"I know how much I put in\": enter how much and how often, and the app tells you the date you'd reach it — live as you type, and on the goal's card, which updates with your real progress. On the web and in the Android app.",
+      "In the Android app, editing a goal, budget, transaction, investment or subscription of $1,000 or more now shows the amount in its field instead of an empty one.",
+    ],
+  },
+  {
     version: "2.44.0",
     date: "2026-09-28",
     es: [

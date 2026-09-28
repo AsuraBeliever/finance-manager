@@ -214,6 +214,8 @@ data class SavingsGoal(
     val linkedWalletId: Long? = null,
     val targetDate: String? = null,
     val cadence: String? = null,
+    /** Fixed amount put in every `cadence` period (instead of a deadline). */
+    val contributionCents: Long? = null,
     /** Present only when both a deadline and a cadence are set. */
     val plan: ContributionPlan? = null,
     /** True when the goal has fallen below its steady pace. */
@@ -247,6 +249,9 @@ data class ContributionPlan(
     val overdue: Boolean = false,
     /** How far below the steady pace the saved amount is (0 = on/ahead). */
     val behindCents: Long = 0,
+    /** Fixed-contribution plans: the day the target would be reached at that
+     *  pace ('YYYY-MM-DD'). Null for deadline plans. */
+    val projectedDate: String? = null,
 )
 
 @Serializable

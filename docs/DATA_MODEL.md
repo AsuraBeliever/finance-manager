@@ -317,6 +317,8 @@ ALTER TABLE subscriptions ADD COLUMN ended_at TEXT;    -- NULL = aún activa
 
 -- 0037: la meta puede ser toda su cartera en vez de un apartado
 ALTER TABLE savings_goals ADD COLUMN tracks_wallet INTEGER NOT NULL DEFAULT 0;  -- 1 = saved = saldo de la cartera
+-- 0038: plan por aporte fijo en vez de fecha límite
+ALTER TABLE savings_goals ADD COLUMN contribution_cents INTEGER;  -- NULL = plan por fecha (o sin plan)
 ```
 
 - **Límite del periodo** = prorrateo diario del límite mensual vigente cada mes
@@ -344,6 +346,14 @@ ALTER TABLE savings_goals ADD COLUMN tracks_wallet INTEGER NOT NULL DEFAULT 0;  
   (`convert_goal_to_wallet`) el nuevo wallet queda como apartado de la cartera en
   que estaba la meta. Solo un nivel de profundidad (los apartados no pueden ser
   padres en el UI).
+- **Plan por aporte fijo** (0038, `contribution_cents`): la alternativa a la
+  fecha límite. Con `contribution_cents > 0` + `contribution_cadence`,
+  `target_date` queda NULL y `finanzas_core::goals::plan_fixed_contribution`
+  proyecta al leer (nunca se almacena) el día en que se llega: este periodo
+  aporta lo que falte del monto (menos lo ya aportado en el periodo) y cada
+  periodo siguiente el monto completo; `projectedDate` = hoy + los periodos
+  posteriores necesarios. Nunca va «atrasada» ni «vencida». El formulario pide
+  la proyección en vivo con `preview_goal_plan` (cálculo puro, sin DB).
 - **Meta = toda la cartera** (0037, `savings_goals.tracks_wallet`): el
   usuario elige cómo se guarda el dinero de la meta. `0` (default) = apartado
   (todo lo de arriba). `1` = la meta ES su cartera: `saved_cents` se calcula al

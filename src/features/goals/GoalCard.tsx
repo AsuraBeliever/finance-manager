@@ -3,11 +3,11 @@ import { Check, Pencil, PiggyBank, Trash2, Wallet } from "lucide-react";
 import { Button } from "../../components/Button";
 import { ProgressBar } from "../../components/ProgressBar";
 import { useMoney } from "../../lib/hideBalance";
-import type { GoalCadence, SavingsGoal } from "../../lib/types";
+import type { ContributionPlan, GoalCadence, SavingsGoal } from "../../lib/types";
 import { es } from "../../i18n/es";
 
 /** Short, locale-aware date like "30 nov 2026" for the plan line. */
-function formatDate(iso: string): string {
+export function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",
@@ -16,7 +16,7 @@ function formatDate(iso: string): string {
 }
 
 /** Adverbial cadence ("al mes" / "a month") for the plan sentence. */
-function cadenceAdverb(c: GoalCadence | null): string {
+export function cadenceAdverb(c: GoalCadence | null): string {
   switch (c) {
     case "daily":
       return es.goals.cadenceAdvDaily;
@@ -41,6 +41,33 @@ function periodNoun(c: GoalCadence | null): string {
     default:
       return es.goals.periodMonthly;
   }
+}
+
+/** The card's plan line. The period quota is frozen at the period start, so
+ *  partial money reads as progress ("2,000 of 2,400"), never a re-spread plan.
+ *  A fixed-contribution plan (`projectedDate`) names the date it would reach
+ *  the target instead of a deadline. */
+function planSentence(g: SavingsGoal, p: ContributionPlan, amount: (cents: number) => string) {
+  const fixed = p.projectedDate;
+  if (fixed != null && p.contributedThisPeriodCents <= 0)
+    return es.goals.planFixed
+      .replace("{amount}", amount(p.perPeriodCents))
+      .replace("{cadence}", cadenceAdverb(g.cadence))
+      .replace("{date}", formatDate(fixed));
+  if (fixed == null && p.contributedThisPeriodCents <= 0)
+    return es.goals.planReserve
+      .replace("{amount}", amount(p.periodQuotaCents))
+      .replace("{cadence}", cadenceAdverb(g.cadence))
+      .replace("{date}", formatDate(g.targetDate ?? ""));
+  if (p.periodMissingCents > 0)
+    return es.goals.planProgress
+      .replace("{period}", periodNoun(g.cadence))
+      .replace("{done}", amount(p.contributedThisPeriodCents))
+      .replace("{quota}", amount(p.periodQuotaCents))
+      .replace("{missing}", amount(p.periodMissingCents));
+  return es.goals.planCovered
+    .replace("{period}", periodNoun(g.cadence))
+    .replace("{date}", formatDate(fixed ?? g.targetDate ?? ""));
 }
 
 /** Tiny inline status pill used by goal cards (behind / overdue). */
@@ -192,35 +219,15 @@ export function GoalCard({
           ) : (
             <>
               <p className="text-fg-muted">
-                {/* The period quota is frozen at the period start: partial money
-                    reads as progress ("2,000 of 2,400"), never a re-spread plan. */}
-                {g.plan.contributedThisPeriodCents <= 0
-                  ? es.goals.planReserve
-                      .replace(
-                        "{amount}",
-                        money(g.plan.periodQuotaCents, g.currencyCode),
-                      )
-                      .replace("{cadence}", cadenceAdverb(g.cadence))
-                      .replace("{date}", formatDate(g.targetDate ?? ""))
-                  : g.plan.periodMissingCents > 0
-                    ? es.goals.planProgress
-                        .replace("{period}", periodNoun(g.cadence))
-                        .replace(
-                          "{done}",
-                          money(g.plan.contributedThisPeriodCents, g.currencyCode),
-                        )
-                        .replace(
-                          "{quota}",
-                          money(g.plan.periodQuotaCents, g.currencyCode),
-                        )
-                        .replace(
-                          "{missing}",
-                          money(g.plan.periodMissingCents, g.currencyCode),
-                        )
-                    : es.goals.planCovered
-                        .replace("{period}", periodNoun(g.cadence))
-                        .replace("{date}", formatDate(g.targetDate ?? ""))}
+                {planSentence(g, g.plan, (c) => money(c, g.currencyCode))}
               </p>
+              {g.plan.projectedDate != null &&
+                g.plan.contributedThisPeriodCents > 0 &&
+                g.plan.periodMissingCents > 0 && (
+                  <p className="mt-1 text-fg-muted">
+                    {es.goals.planFixedDate.replace("{date}", formatDate(g.plan.projectedDate))}
+                  </p>
+                )}
               {g.isBehind && (
                 <p className="mt-1 text-fg-subtle">
                   <BadgeTag tone="warning">{es.goals.behindBadge}</BadgeTag>{" "}
