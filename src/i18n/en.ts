@@ -187,6 +187,10 @@ export const en: Dict = {
     emptyDescription: "Track your recurring payments so you never lose sight of them.",
     deleteConfirm: "Delete this subscription?",
     needsWallet: "Assign a wallet to log the payment.",
+    autoCharge: "Automatic charge",
+    autoChargeHint: "The expense is logged by itself on each charge date. Leave it off to log each payment yourself.",
+    autoChargeNeedsWallet: "Pick a wallet to turn on automatic charging.",
+    autoBadge: "Automatic",
   },
   common: {
     comingSoon: "Coming soon",

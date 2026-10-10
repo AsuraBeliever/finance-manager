@@ -1,6 +1,11 @@
 package com.asura.finanzas.ui.subscriptions
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import com.asura.finanzas.ui.components.WebCheckbox
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -85,6 +90,7 @@ fun SubscriptionFormSheet(
     // `onNameChange`. Only a change of brand repaints the colour, so a colour
     // picked by hand survives further typing.
     var icon by remember { mutableStateOf(existing?.icon) }
+    var autoCharge by remember { mutableStateOf(existing?.autoCharge ?: false) }
     fun onNameChange(value: String) {
         name = value
         error = null
@@ -101,6 +107,7 @@ fun SubscriptionFormSheet(
     val offlineError = stringResource(R.string.offline_banner)
     // The web labels both empty options "None" here, not "Uncategorized".
     val noneLabel = stringResource(R.string.subscriptions_none)
+    val needsWalletError = stringResource(R.string.subscriptions_auto_charge_needs_wallet)
 
     LaunchedEffect(Unit) {
         wallets = runCatching { repository.wallets().value }.getOrDefault(emptyList())
@@ -126,6 +133,10 @@ fun SubscriptionFormSheet(
         canSave = canSave,
         onDismiss = onDismiss,
         onSave = {
+            if (autoCharge && wallet == null) {
+                error = needsWalletError
+                return@FormSheet
+            }
             busy = true
             error = null
             scope.launch {
@@ -141,6 +152,7 @@ fun SubscriptionFormSheet(
                         categoryId = category?.id,
                         color = color,
                         icon = icon,
+                        autoCharge = autoCharge,
                     )
                 }
                     .onSuccess { onSaved() }
@@ -247,6 +259,40 @@ fun SubscriptionFormSheet(
             emptyLabel = noneLabel,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        // Bordered checkbox card, as on the web (`rounded-lg border p-3`).
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .border(1.dp, Broke.colors.borderMuted, RoundedCornerShape(8.dp))
+                .clickable { autoCharge = !autoCharge; error = null }
+                .padding(13.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            WebCheckbox(
+                checked = autoCharge,
+                onCheckedChange = { autoCharge = it; error = null },
+                boxSize = 16.dp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            Column {
+                Text(
+                    stringResource(R.string.subscriptions_auto_charge),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Broke.colors.fg,
+                )
+                Text(
+                    stringResource(
+                        if (autoCharge && wallet == null) R.string.subscriptions_auto_charge_needs_wallet
+                        else R.string.subscriptions_auto_charge_hint,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Broke.colors.fgSubtle,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
 
         Column {
             FieldLabel(stringResource(R.string.categories_color))

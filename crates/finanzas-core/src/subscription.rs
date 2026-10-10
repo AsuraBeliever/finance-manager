@@ -55,6 +55,35 @@ pub fn count_charges(
     }
 }
 
+/// Charge dates owed by an auto-charging subscription as of `today`: every
+/// occurrence from `next_charge` (inclusive) up to `today` (inclusive), plus the
+/// new `next_charge_date` (first occurrence after `today`). Occurrences come
+/// from the anchor, so a Jan 31 anchor goes Feb 28 → Mar 31, never drifting.
+/// Capped at `max` dates so a long-dormant subscription can't flood the ledger;
+/// when capped, the new next date is the occurrence right after the last one.
+pub fn due_charges(
+    next_charge: NaiveDate,
+    cadence_months: i32,
+    today: NaiveDate,
+    max: usize,
+) -> (Vec<NaiveDate>, NaiveDate) {
+    let step = cadence_months.max(1);
+    let occ = |k: i32| add_months(next_charge, k * step);
+    let mut due = Vec::new();
+    let mut k = 0;
+    while occ(k) <= today && due.len() < max {
+        due.push(occ(k));
+        k += 1;
+    }
+    (due, occ(k))
+}
+
+/// The charge date after `current` (one cadence step), used when a payment is
+/// registered by hand.
+pub fn next_after(current: NaiveDate, cadence_months: i32) -> NaiveDate {
+    add_months(current, cadence_months.max(1))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,5 +151,56 @@ mod tests {
             count_charges(d(2026, 6, 25), 1, d(2026, 6, 10), d(2026, 6, 10)),
             0
         );
+    }
+
+    #[test]
+    fn not_due_yet_charges_nothing() {
+        let (due, next) = due_charges(d(2026, 10, 16), 1, d(2026, 10, 10), 24);
+        assert!(due.is_empty());
+        assert_eq!(next, d(2026, 10, 16));
+    }
+
+    #[test]
+    fn due_today_charges_once_and_advances() {
+        let (due, next) = due_charges(d(2026, 10, 16), 1, d(2026, 10, 16), 24);
+        assert_eq!(due, vec![d(2026, 10, 16)]);
+        assert_eq!(next, d(2026, 11, 16));
+    }
+
+    #[test]
+    fn missed_months_are_caught_up_on_their_own_dates() {
+        // Due Aug 25, cron next ran Oct 10 → Aug 25 and Sep 25 owed; next Oct 25.
+        let (due, next) = due_charges(d(2026, 8, 25), 1, d(2026, 10, 10), 24);
+        assert_eq!(due, vec![d(2026, 8, 25), d(2026, 9, 25)]);
+        assert_eq!(next, d(2026, 10, 25));
+    }
+
+    #[test]
+    fn end_of_month_anchor_does_not_drift() {
+        // Jan 31 → Feb 28 → Mar 31 (not Mar 28, not SQLite's Mar 3).
+        let (due, next) = due_charges(d(2026, 1, 31), 1, d(2026, 3, 1), 24);
+        assert_eq!(due, vec![d(2026, 1, 31), d(2026, 2, 28)]);
+        assert_eq!(next, d(2026, 3, 31));
+    }
+
+    #[test]
+    fn yearly_advances_a_year() {
+        let (due, next) = due_charges(d(2026, 3, 1), 12, d(2026, 10, 10), 24);
+        assert_eq!(due, vec![d(2026, 3, 1)]);
+        assert_eq!(next, d(2027, 3, 1));
+    }
+
+    #[test]
+    fn catch_up_is_capped() {
+        let (due, next) = due_charges(d(2026, 1, 5), 1, d(2026, 10, 10), 3);
+        assert_eq!(due, vec![d(2026, 1, 5), d(2026, 2, 5), d(2026, 3, 5)]);
+        assert_eq!(next, d(2026, 4, 5));
+    }
+
+    #[test]
+    fn manual_payment_steps_one_cadence() {
+        assert_eq!(next_after(d(2026, 10, 16), 1), d(2026, 11, 16));
+        assert_eq!(next_after(d(2026, 1, 31), 1), d(2026, 2, 28));
+        assert_eq!(next_after(d(2026, 3, 1), 12), d(2027, 3, 1));
     }
 }

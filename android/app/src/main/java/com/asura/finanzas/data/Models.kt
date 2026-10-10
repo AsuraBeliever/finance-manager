@@ -279,6 +279,8 @@ data class Subscription(
     val walletId: Long? = null,
     val categoryId: Long? = null,
     val isActive: Boolean = true,
+    /** Booked by the daily cron on each charge date (vs. only by hand). */
+    val autoCharge: Boolean = false,
     val chargedInPeriod: Boolean = false,
 )
 

@@ -366,6 +366,10 @@ object Lucide {
 
     val LogOut by lazy { icon("m16 17 5-5-5-5", "M21 12H9", "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4") }
 
+    val Repeat by lazy {
+        icon("m17 2 4 4-4 4", "M3 11v-1a4 4 0 0 1 4-4h14", "m7 22-4-4 4-4", "M21 13v1a4 4 0 0 1-4 4H3")
+    }
+
     val Info by lazy { icon("M22 12a10 10 0 1 1-20 0 10 10 0 1 1 20 0z", "M12 16v-4", "M12 8h.01") }
 
     val ArchiveRestore by lazy {

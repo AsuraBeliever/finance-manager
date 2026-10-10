@@ -87,6 +87,13 @@ página de cetesdirecto todavía muestra la fecha (y el «precio día anterior»
 día previo, así que con una sola corrida la posición en títulos iba siempre un
 día de rendimiento atrás del app de cetesdirecto.
 
+El mismo cron cobra las suscripciones con `auto_charge = 1`
+(`subscriptions::post_due_subscriptions`): un gasto por cada fecha de cargo
+vencida (fechada en esa fecha, no en la del cron; hasta 12 de rezago),
+`client_id = 'sub:<id>:<fecha>'` + guarda sobre `next_charge_date` para que las
+3 corridas diarias no dupliquen. Las suscripciones manuales sólo se cobran con
+«Registrar pago», que fecha el gasto el día en que se presiona.
+
 ## Offline (PWA)
 
 Dos mecanismos, ambos del lado de la app (el service worker sigue sin cachear

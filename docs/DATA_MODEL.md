@@ -283,10 +283,17 @@ CREATE TABLE subscriptions (     -- pagos recurrentes; "registrar pago" inserta 
   wallet_id INTEGER REFERENCES wallets(id),
   category_id INTEGER REFERENCES transaction_categories(id),
   is_active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  auto_charge INTEGER NOT NULL DEFAULT 0  -- 0039: 1 = el cron registra el gasto en cada fecha de cargo (requiere wallet_id)
 );
 ```
 
+- **subscriptions.auto_charge** (0039): opcional, elegido en el formulario. Con
+  1, el cron diario inserta un gasto por cada `next_charge_date <= hoy`
+  (fechado en la fecha de cargo, `client_id 'sub:<id>:<YYYY-MM-DD>'`,
+  `subscription_id` ligado) y avanza `next_charge_date` desde el ancla
+  (`finanzas_core::subscription::due_charges`, sin deriva de fin de mes). Con 0
+  sólo se cobra con «Registrar pago» (gasto fechado hoy).
 - **budgets.spent** nunca se almacena: se calcula al leer (gasto del periodo en MXN, general o por categoría).
 - **subscriptions** total mensual = suma de activas normalizadas a mes (anual/12) en MXN.
 

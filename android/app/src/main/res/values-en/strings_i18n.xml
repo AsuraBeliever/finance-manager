@@ -173,6 +173,10 @@
     <string name="subscriptions_empty_description">Track your recurring payments so you never lose sight of them.</string>
     <string name="subscriptions_delete_confirm">Delete this subscription?</string>
     <string name="subscriptions_needs_wallet">Assign a wallet to log the payment.</string>
+    <string name="subscriptions_auto_charge">Automatic charge</string>
+    <string name="subscriptions_auto_charge_hint">The expense is logged by itself on each charge date. Leave it off to log each payment yourself.</string>
+    <string name="subscriptions_auto_charge_needs_wallet">Pick a wallet to turn on automatic charging.</string>
+    <string name="subscriptions_auto_badge">Automatic</string>
     <string name="common_coming_soon">Coming soon</string>
     <string name="common_loading">Loading…</string>
     <string name="common_error">Something went wrong</string>

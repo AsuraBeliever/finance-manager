@@ -98,12 +98,7 @@ fun SubscriptionsScreen(
                 }
             },
             onEdit = { editing = it },
-            onDelete = { target ->
-                scope.launch {
-                    runCatching { repository.deleteSubscription(target.id) }
-                    reload()
-                }
-            },
+            onDelete = { deleting = it },
             modifier = modifier,
         )
     }
@@ -291,6 +286,33 @@ private fun SubscriptionCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
                 )
+                if (subscription.autoCharge) {
+                    // The web's pill: `rounded-full bg-accent/10 px-2 py-0.5 text-[11px]`.
+                    Row(
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(colors.accent.copy(alpha = 0.1f))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Lucide.Repeat,
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(11.dp),
+                        )
+                        Text(
+                            stringResource(R.string.subscriptions_auto_badge),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
+                            color = colors.accent,
+                        )
+                    }
+                }
             }
             Text(
                 maskIfHidden(
