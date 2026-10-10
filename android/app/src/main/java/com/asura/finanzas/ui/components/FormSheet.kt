@@ -363,21 +363,24 @@ fun ConfirmDialog(
     onDismiss: () -> Unit,
     /** The web's `confirmLabel`: not every confirmation is a deletion. */
     confirmLabel: String = stringResource(R.string.common_delete),
+    /** The web's `tone`: false for confirmations that destroy nothing. */
+    danger: Boolean = true,
 ) {
     val colors = Broke.colors
+    val badge = if (danger) colors.danger else colors.accent
     ModalCard(title = title, onDismiss = onDismiss) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(colors.danger.copy(alpha = 0.1f)),
+                    .background(badge.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Lucide.TriangleAlert,
+                    if (danger) Lucide.TriangleAlert else Lucide.Info,
                     contentDescription = null,
-                    tint = colors.danger,
+                    tint = badge,
                     modifier = Modifier.size(17.dp),
                 )
             }
@@ -395,7 +398,11 @@ fun ConfirmDialog(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             GhostButton(stringResource(R.string.common_cancel), onDismiss)
-            DangerButton(text = confirmLabel, onClick = onConfirm)
+            if (danger) {
+                DangerButton(text = confirmLabel, onClick = onConfirm)
+            } else {
+                PrimaryButton(text = confirmLabel, onClick = onConfirm)
+            }
         }
     }
 }

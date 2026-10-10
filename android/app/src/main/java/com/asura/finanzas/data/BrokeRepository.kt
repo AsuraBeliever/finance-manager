@@ -1048,6 +1048,7 @@ class BrokeRepository(
         /** Brand logo slug; sent every time, since an update without it
          *  clears the column. */
         icon: String?,
+        autoCharge: Boolean,
     ) {
         val body = buildJsonObject {
             id?.let { put("id", it) }
@@ -1060,6 +1061,7 @@ class BrokeRepository(
             walletId?.let { put("walletId", it) }
             categoryId?.let { put("categoryId", it) }
             color?.let { put("color", it) }
+            put("autoCharge", autoCharge)
         }
         rpc.call(if (id == null) "create_subscription" else "update_subscription", body)
         cache.invalidateReads()
@@ -1073,7 +1075,8 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
-    /** Posts the charge as a real expense from the subscription's wallet. */
+    /** Posts the charge as a real expense from the subscription's wallet,
+     *  dated today. */
     suspend fun registerSubscriptionPayment(id: Long) {
         rpc.call("register_subscription_payment", buildJsonObject { put("id", id) })
         cache.invalidateReads()

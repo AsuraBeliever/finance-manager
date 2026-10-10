@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { CreditCard, Pause, Pencil, Play, Plus, Receipt, Trash2 } from "lucide-react";
+import { CreditCard, Pause, Pencil, Play, Plus, Receipt, Repeat, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { BrandLogo } from "../../components/BrandLogo";
 import { ColorPicker } from "../../components/ColorPicker";
@@ -39,6 +39,8 @@ export function SubscriptionsPage() {
   const [formSub, setFormSub] = useState<Subscription | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  // Manual charges ask first and spell out that they're dated today.
+  const [payTarget, setPayTarget] = useState<Subscription | null>(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["subscriptions"] });
@@ -117,6 +119,11 @@ export function SubscriptionsPage() {
                   {" · "}
                   {es.subscriptions.nextCharge}: {sub.nextChargeDate}
                 </p>
+                {sub.autoCharge && (
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
+                    <Repeat size={11} /> {es.subscriptions.autoBadge}
+                  </span>
+                )}
               </div>
               <span className="shrink-0 tabular-nums font-medium text-fg">
                 {money(sub.amountCents, sub.currencyCode)}
@@ -125,7 +132,7 @@ export function SubscriptionsPage() {
                 <button
                   title={es.subscriptions.registerPayment}
                   disabled={!sub.walletId || pay.isPending}
-                  onClick={() => pay.mutate(sub.id)}
+                  onClick={() => setPayTarget(sub)}
                   className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-overlay hover:text-accent disabled:opacity-40"
                 >
                   <Receipt size={16} />
@@ -177,6 +184,24 @@ export function SubscriptionsPage() {
         }}
         onClose={() => setDeleteId(null)}
       />
+      <ConfirmDialog
+        open={payTarget !== null}
+        title={es.subscriptions.registerPayment}
+        message={
+          payTarget
+            ? es.subscriptions.payConfirm
+                .replace("{amount}", money(payTarget.amountCents, payTarget.currencyCode))
+                .replace("{date}", todayIso())
+            : ""
+        }
+        confirmLabel={es.subscriptions.registerPayment}
+        tone="neutral"
+        onConfirm={() => {
+          if (payTarget) pay.mutate(payTarget.id);
+          setPayTarget(null);
+        }}
+        onClose={() => setPayTarget(null)}
+      />
     </>
   );
 }
@@ -208,6 +233,7 @@ function SubscriptionFormModal({
   const [categoryId, setCategoryId] = useState<string>("");
   const [color, setColor] = useState<string>(CHART_COLORS[0]);
   const [icon, setIcon] = useState<string | null>(null);
+  const [autoCharge, setAutoCharge] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // As the name is typed, detect a known brand and adopt its logo + color.
@@ -237,6 +263,7 @@ function SubscriptionFormModal({
     setCategoryId(sub?.categoryId != null ? String(sub.categoryId) : "");
     setColor(sub?.color ?? CHART_COLORS[0]);
     setIcon(sub?.icon ?? null);
+    setAutoCharge(sub?.autoCharge ?? false);
     setError(null);
   }
 
@@ -247,6 +274,8 @@ function SubscriptionFormModal({
       const cents = parseToCents(amount);
       if (!name.trim() || cents === null || cents <= 0)
         return Promise.reject(new Error(es.investments.invalidAmount));
+      if (autoCharge && walletId === "")
+        return Promise.reject(new Error(es.subscriptions.autoChargeNeedsWallet));
       const input = {
         name: name.trim(),
         icon,
@@ -257,6 +286,7 @@ function SubscriptionFormModal({
         nextChargeDate: nextDate,
         walletId: walletId === "" ? null : Number(walletId),
         categoryId: categoryId === "" ? null : Number(categoryId),
+        autoCharge,
       };
       return sub ? updateSubscription(sub.id, input) : createSubscription(input);
     },
@@ -353,6 +383,22 @@ function SubscriptionFormModal({
             ))}
           </select>
         </Field>
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border-muted p-3">
+          <input
+            type="checkbox"
+            checked={autoCharge}
+            onChange={(e) => setAutoCharge(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-accent"
+          />
+          <span className="text-sm">
+            {es.subscriptions.autoCharge}
+            <span className="mt-0.5 block text-xs text-fg-subtle">
+              {walletId === "" && autoCharge
+                ? es.subscriptions.autoChargeNeedsWallet
+                : es.subscriptions.autoChargeHint}
+            </span>
+          </span>
+        </label>
         <Field label={es.common.color}>
           <ColorPicker value={color} onChange={setColor} />
         </Field>

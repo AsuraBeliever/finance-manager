@@ -68,6 +68,11 @@ pub async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) 
     if let Err(e) = handlers::credit::post_msi_installments(&db).await {
         console_error!("msi installment posting failed: {e}");
     }
+    // After the rate refresh above, so foreign-currency charges convert at
+    // today's rate.
+    if let Err(e) = handlers::subscriptions::post_due_subscriptions(&db).await {
+        console_error!("subscription auto-charge failed: {e}");
+    }
     if let Err(e) = handlers::goals::snapshot_all_goals(&db).await {
         console_error!("goal snapshot failed: {e}");
     }

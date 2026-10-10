@@ -196,6 +196,11 @@ export const esDict = {
     emptyDescription: "Registra tus pagos recurrentes para no perderles la pista.",
     deleteConfirm: "¿Eliminar esta suscripción?",
     needsWallet: "Asigna una cartera para registrar el pago.",
+    autoCharge: "Cobro automático",
+    autoChargeHint: "El gasto se registra solo en cada fecha de cargo. Si lo dejas apagado, tú registras cada pago.",
+    autoChargeNeedsWallet: "Elige una cartera para activar el cobro automático.",
+    autoBadge: "Automático",
+    payConfirm: "Se registrará un gasto de {amount} con fecha de hoy ({date}).",
   },
   common: {
     comingSoon: "Próximamente",

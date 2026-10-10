@@ -492,6 +492,8 @@ export interface Subscription {
   walletId: number | null;
   categoryId: number | null;
   isActive: boolean;
+  /** Booked by the daily cron on each charge date (vs. only by hand). */
+  autoCharge: boolean;
   /** Whether a charge falls inside the selected dashboard period. */
   chargedInPeriod: boolean;
 }
@@ -511,4 +513,5 @@ export interface SubInput {
   nextChargeDate: string;
   walletId: number | null;
   categoryId: number | null;
+  autoCharge: boolean;
 }

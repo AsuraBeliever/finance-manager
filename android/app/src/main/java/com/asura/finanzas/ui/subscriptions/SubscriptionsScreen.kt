@@ -56,6 +56,7 @@ import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatMoney
+import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
@@ -76,6 +77,8 @@ fun SubscriptionsScreen(
     var editing by remember { mutableStateOf<Subscription?>(null) }
     // Deleting asks first, as it does in the browser.
     var deleting by remember { mutableStateOf<Subscription?>(null) }
+    // A manual charge asks first and spells out that it's dated today.
+    var paying by remember { mutableStateOf<Subscription?>(null) }
 
     when (val current = state) {
         is Load.Loading -> LoadingBox(modifier)
@@ -85,12 +88,7 @@ fun SubscriptionsScreen(
             fromCache = current.fromCache,
             onBack = onBack,
             onNew = { creating = true },
-            onPay = { target ->
-                scope.launch {
-                    runCatching { repository.registerSubscriptionPayment(target.id) }
-                    reload()
-                }
-            },
+            onPay = { paying = it },
             onToggle = { target ->
                 scope.launch {
                     runCatching { repository.setSubscriptionActive(target.id, !target.isActive) }
@@ -98,12 +96,7 @@ fun SubscriptionsScreen(
                 }
             },
             onEdit = { editing = it },
-            onDelete = { target ->
-                scope.launch {
-                    runCatching { repository.deleteSubscription(target.id) }
-                    reload()
-                }
-            },
+            onDelete = { deleting = it },
             modifier = modifier,
         )
     }
@@ -117,6 +110,27 @@ fun SubscriptionsScreen(
         )
     }
 
+
+    paying?.let { target ->
+        ConfirmDialog(
+            title = stringResource(R.string.subscriptions_register_payment),
+            message = text(
+                R.string.subscriptions_pay_confirm,
+                "amount" to formatMoney(target.amountCents, target.currencyCode),
+                "date" to java.time.LocalDate.now().toString(),
+            ),
+            confirmLabel = stringResource(R.string.subscriptions_register_payment),
+            danger = false,
+            onConfirm = {
+                paying = null
+                scope.launch {
+                    runCatching { repository.registerSubscriptionPayment(target.id) }
+                    reload()
+                }
+            },
+            onDismiss = { paying = null },
+        )
+    }
 
     deleting?.let { target ->
         ConfirmDialog(
@@ -291,6 +305,33 @@ private fun SubscriptionCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
                 )
+                if (subscription.autoCharge) {
+                    // The web's pill: `rounded-full bg-accent/10 px-2 py-0.5 text-[11px]`.
+                    Row(
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(colors.accent.copy(alpha = 0.1f))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Lucide.Repeat,
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(11.dp),
+                        )
+                        Text(
+                            stringResource(R.string.subscriptions_auto_badge),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
+                            color = colors.accent,
+                        )
+                    }
+                }
             }
             Text(
                 maskIfHidden(

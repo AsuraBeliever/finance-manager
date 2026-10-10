@@ -173,6 +173,11 @@
     <string name="subscriptions_empty_description">Registra tus pagos recurrentes para no perderles la pista.</string>
     <string name="subscriptions_delete_confirm">¿Eliminar esta suscripción?</string>
     <string name="subscriptions_needs_wallet">Asigna una cartera para registrar el pago.</string>
+    <string name="subscriptions_auto_charge">Cobro automático</string>
+    <string name="subscriptions_auto_charge_hint">El gasto se registra solo en cada fecha de cargo. Si lo dejas apagado, tú registras cada pago.</string>
+    <string name="subscriptions_auto_charge_needs_wallet">Elige una cartera para activar el cobro automático.</string>
+    <string name="subscriptions_auto_badge">Automático</string>
+    <string name="subscriptions_pay_confirm">Se registrará un gasto de {amount} con fecha de hoy ({date}).</string>
     <string name="common_coming_soon">Próximamente</string>
     <string name="common_loading">Cargando…</string>
     <string name="common_error">Ocurrió un error</string>
