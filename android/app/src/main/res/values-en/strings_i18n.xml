@@ -177,7 +177,6 @@
     <string name="subscriptions_auto_charge_hint">The expense is logged by itself on each charge date. Leave it off to log each payment yourself.</string>
     <string name="subscriptions_auto_charge_needs_wallet">Pick a wallet to turn on automatic charging.</string>
     <string name="subscriptions_auto_badge">Automatic</string>
-    <string name="subscriptions_pay_confirm">An expense of {amount} will be logged with today\'s date ({date}).</string>
     <string name="common_coming_soon">Coming soon</string>
     <string name="common_loading">Loading…</string>
     <string name="common_error">Something went wrong</string>

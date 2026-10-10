@@ -191,7 +191,6 @@ export const en: Dict = {
     autoChargeHint: "The expense is logged by itself on each charge date. Leave it off to log each payment yourself.",
     autoChargeNeedsWallet: "Pick a wallet to turn on automatic charging.",
     autoBadge: "Automatic",
-    payConfirm: "An expense of {amount} will be logged with today's date ({date}).",
   },
   common: {
     comingSoon: "Coming soon",

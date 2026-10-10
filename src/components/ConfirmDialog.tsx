@@ -1,4 +1,4 @@
-import { Info, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 import { es } from "../i18n/es";
@@ -8,9 +8,6 @@ interface ConfirmDialogProps {
   title: string;
   message: string;
   confirmLabel?: string;
-  /** "danger" (default) for deletions; "neutral" for confirmations that
-   *  don't destroy anything (e.g. registering a payment). */
-  tone?: "danger" | "neutral";
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -22,20 +19,14 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel,
-  tone = "danger",
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
-  const danger = tone === "danger";
   return (
     <Modal title={title} open={open} onClose={onClose}>
       <div className="flex items-start gap-3">
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-            danger ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"
-          }`}
-        >
-          {danger ? <TriangleAlert size={17} /> : <Info size={17} />}
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger">
+          <TriangleAlert size={17} />
         </span>
         <p className="pt-1.5 text-sm text-fg">{message}</p>
       </div>
@@ -44,7 +35,7 @@ export function ConfirmDialog({
           {es.common.cancel}
         </Button>
         <Button
-          variant={danger ? "dangerSolid" : "primary"}
+          variant="dangerSolid"
           onClick={() => {
             onConfirm();
             onClose();

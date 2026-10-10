@@ -468,7 +468,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Metas: lista, crear, editar, aportar/liberar, borrar, reordenar, plan con fecha | `ui/goals` | ✅ |
 | Presupuestos: lista, fijar, editar, borrar | `ui/budgets` | ✅ borrar confirma |
 | Suscripciones: lista, crear, editar, pagar, pausar, borrar | `ui/subscriptions` | ✅ borrar confirma |
-| Suscripciones: check «Cobro automático» + insignia «Automático»; «Registrar pago» confirma con la fecha de hoy | `ui/subscriptions` | ✅ `ConfirmDialog(danger = false)` = `tone="neutral"` |
+| Suscripciones: check «Cobro automático» + insignia «Automático» | `ui/subscriptions` | ✅ |
 | Categorías: lista, crear, renombrar, borrar/ocultar, restaurar, reordenar | `ui/categories` | ✅ ocultar/borrar confirma, con el mensaje que toca |
 
 ## Ajustes

@@ -56,7 +56,6 @@ import com.asura.finanzas.ui.components.LoadingBox
 import com.asura.finanzas.ui.components.loadSynced
 import com.asura.finanzas.ui.components.rememberReloadKey
 import com.asura.finanzas.ui.formatMoney
-import com.asura.finanzas.ui.text
 import com.asura.finanzas.ui.maskIfHidden
 import com.asura.finanzas.ui.parseHexColor
 import com.asura.finanzas.ui.theme.Broke
@@ -77,8 +76,6 @@ fun SubscriptionsScreen(
     var editing by remember { mutableStateOf<Subscription?>(null) }
     // Deleting asks first, as it does in the browser.
     var deleting by remember { mutableStateOf<Subscription?>(null) }
-    // A manual charge asks first and spells out that it's dated today.
-    var paying by remember { mutableStateOf<Subscription?>(null) }
 
     when (val current = state) {
         is Load.Loading -> LoadingBox(modifier)
@@ -88,7 +85,12 @@ fun SubscriptionsScreen(
             fromCache = current.fromCache,
             onBack = onBack,
             onNew = { creating = true },
-            onPay = { paying = it },
+            onPay = { target ->
+                scope.launch {
+                    runCatching { repository.registerSubscriptionPayment(target.id) }
+                    reload()
+                }
+            },
             onToggle = { target ->
                 scope.launch {
                     runCatching { repository.setSubscriptionActive(target.id, !target.isActive) }
@@ -110,27 +112,6 @@ fun SubscriptionsScreen(
         )
     }
 
-
-    paying?.let { target ->
-        ConfirmDialog(
-            title = stringResource(R.string.subscriptions_register_payment),
-            message = text(
-                R.string.subscriptions_pay_confirm,
-                "amount" to formatMoney(target.amountCents, target.currencyCode),
-                "date" to java.time.LocalDate.now().toString(),
-            ),
-            confirmLabel = stringResource(R.string.subscriptions_register_payment),
-            danger = false,
-            onConfirm = {
-                paying = null
-                scope.launch {
-                    runCatching { repository.registerSubscriptionPayment(target.id) }
-                    reload()
-                }
-            },
-            onDismiss = { paying = null },
-        )
-    }
 
     deleting?.let { target ->
         ConfirmDialog(

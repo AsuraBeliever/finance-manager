@@ -39,8 +39,6 @@ export function SubscriptionsPage() {
   const [formSub, setFormSub] = useState<Subscription | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  // Manual charges ask first and spell out that they're dated today.
-  const [payTarget, setPayTarget] = useState<Subscription | null>(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["subscriptions"] });
@@ -132,7 +130,7 @@ export function SubscriptionsPage() {
                 <button
                   title={es.subscriptions.registerPayment}
                   disabled={!sub.walletId || pay.isPending}
-                  onClick={() => setPayTarget(sub)}
+                  onClick={() => pay.mutate(sub.id)}
                   className="rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-overlay hover:text-accent disabled:opacity-40"
                 >
                   <Receipt size={16} />
@@ -183,24 +181,6 @@ export function SubscriptionsPage() {
           setDeleteId(null);
         }}
         onClose={() => setDeleteId(null)}
-      />
-      <ConfirmDialog
-        open={payTarget !== null}
-        title={es.subscriptions.registerPayment}
-        message={
-          payTarget
-            ? es.subscriptions.payConfirm
-                .replace("{amount}", money(payTarget.amountCents, payTarget.currencyCode))
-                .replace("{date}", todayIso())
-            : ""
-        }
-        confirmLabel={es.subscriptions.registerPayment}
-        tone="neutral"
-        onConfirm={() => {
-          if (payTarget) pay.mutate(payTarget.id);
-          setPayTarget(null);
-        }}
-        onClose={() => setPayTarget(null)}
       />
     </>
   );
