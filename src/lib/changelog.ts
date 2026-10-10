@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.46.0",
+    date: "2026-10-10",
+    es: [
+      "Las suscripciones ahora se pueden cobrar solas: activa «Cobro automático» al crear o editar una y el gasto se registra en su cartera en cada fecha de cargo, sin que tengas que presionar nada. Si lo dejas apagado, sigues registrando cada pago tú con el botón, como hasta ahora. En la web y en la app de Android.",
+      "En la app de Android, borrar una suscripción ahora pide confirmación, igual que en la web.",
+    ],
+    en: [
+      "Subscriptions can now charge themselves: turn on \"Automatic charge\" when creating or editing one and the expense is logged in its wallet on each charge date, without you pressing anything. Leave it off and you keep logging each payment yourself with the button, as before. On the web and in the Android app.",
+      "In the Android app, deleting a subscription now asks for confirmation, just like on the web.",
+    ],
+  },
+  {
     version: "2.45.2",
     date: "2026-09-28",
     es: [
