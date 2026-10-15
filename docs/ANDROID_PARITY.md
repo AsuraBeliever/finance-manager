@@ -433,6 +433,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | «Sin resultados» distinto de «sin movimientos» | `ui/transactions` | ✅ |
 | Alta de ingreso | `TransactionFormSheet` | ✅ |
 | Alta de gasto | `TransactionFormSheet` | ✅ |
+| Reembolsos: pestaña «Reembolso» en el alta, «Registrar reembolso» desde un gasto, filtro y total de reembolsos, «Reembolsado $X» en el gasto | `TransactionFormSheet` (`refundOf`) + `TransactionEditSheet` (`FormSheet.extraAction`) + `ui/transactions` + `CategoryDetailDialog` | ✅ (2.47.0) |
 | Alta de transferencia (incl. multimoneda) | `TransactionFormSheet` | ✅ |
 | Destino agrupado: «X y sus apartados» / «Otras carteras» | `TransactionFormSheet` + `PickerField(optionGroup)` | ✅ |
 | Al pagar una tarjeta, cuánto debes y para cuándo | `TransactionFormSheet` | ✅ |

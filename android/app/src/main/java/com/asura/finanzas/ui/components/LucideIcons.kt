@@ -86,6 +86,9 @@ object Lucide {
     }
 
     val ArrowDownLeft by lazy { icon("M17 7 7 17", "M17 17H7V7") }
+    val Undo2 by lazy {
+        icon("M9 14 4 9l5-5", "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11")
+    }
 
     val ArrowUpRight by lazy { icon("M7 7h10v10", "M7 17 17 7") }
 

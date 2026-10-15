@@ -3,8 +3,8 @@ import { sumTransactions, type TxFilter } from "../../lib/api";
 import { useMoney } from "../../lib/hideBalance";
 import { es } from "../../i18n/es";
 
-/** What the filtered transactions add up to. Only meaningful for income or
- *  expense — transfers just move money between the user's own wallets — so it
+/** What the filtered transactions add up to. Only meaningful for income,
+ *  expense or refunds — transfers just move money between the user's own wallets — so it
  *  renders nothing for any other filter, and the worker never gets asked.
  *  Every figure comes from Rust; this only formats.
  *
@@ -12,7 +12,8 @@ import { es } from "../../i18n/es";
  *  follow a new, edited or deleted transaction refresh the total too. */
 export function TransactionTotal({ filter }: { filter: TxFilter }) {
   const money = useMoney();
-  const enabled = filter.kind === "income" || filter.kind === "expense";
+  const enabled =
+    filter.kind === "income" || filter.kind === "expense" || filter.kind === "refund";
 
   const totals = useQuery({
     queryKey: ["transactions", "totals", filter],
@@ -36,11 +37,15 @@ export function TransactionTotal({ filter }: { filter: TxFilter }) {
     <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl border border-border-muted bg-surface-raised px-4 py-3">
       <div>
         <p className="text-xs uppercase tracking-wide text-fg-subtle">
-          {filter.kind === "income" ? es.transactions.totalIncome : es.transactions.totalExpense}
+          {filter.kind === "income"
+            ? es.transactions.totalIncome
+            : filter.kind === "refund"
+              ? es.transactions.totalRefund
+              : es.transactions.totalExpense}
         </p>
         <p
           className={`text-2xl font-semibold tabular-nums ${
-            filter.kind === "income" ? "text-accent" : "text-danger"
+            filter.kind === "expense" ? "text-danger" : "text-accent"
           }`}
         >
           {single

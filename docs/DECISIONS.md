@@ -277,3 +277,17 @@ es el más propenso a que le falte un movimiento capturado tarde.
 Descartado: ampliar la ventana hasta hoy. Los días entre el último corte y hoy
 todavía no se pagan (Klar los abona el siguiente miércoles), así que incluirlos
 adelantaría interés no devengado.
+
+## 2026-10-14 — Los reembolsos restan del gasto; no son ingresos
+
+Registrar un reembolso como ingreso inflaba los ingresos y dejaba el gasto completo:
+el mismo dinero contaba dos veces. Ahora un reembolso es su propio tipo (`refund` en
+la API) que suma al saldo, lleva una categoría de gasto y resta del gasto de esa
+categoría **en el periodo en que llega** (no se reescriben meses cerrados). El neto
+por categoría tiene piso en cero y los totales son la suma de esos netos, para que
+dashboard, dona y presupuestos digan lo mismo. Puede ligarse opcionalmente al gasto
+original (reembolsos parciales, tope = lo gastado).
+
+Se guarda como `income` + `is_refund = 1` en lugar de un `kind` nuevo: reconstruir
+`transactions` para cambiar el CHECK borraría `investment_movements` por cascada en
+D1. Detalle en DATA_MODEL «Reembolsos».

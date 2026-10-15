@@ -390,6 +390,7 @@
     <string name="transactions_edit_transaction">Editar transacción</string>
     <string name="transactions_income">Ingreso</string>
     <string name="transactions_expense">Gasto</string>
+    <string name="transactions_refund">Reembolso</string>
     <string name="transactions_transfer">Transferencia</string>
     <string name="transactions_wallet">Cartera</string>
     <string name="transactions_from_wallet">Desde</string>
@@ -417,6 +418,13 @@
     <string name="transactions_no_match_description">Ninguna transacción coincide con los filtros.</string>
     <string name="transactions_total_income">Total de ingresos</string>
     <string name="transactions_total_expense">Total de gastos</string>
+    <string name="transactions_total_refund">Total de reembolsos</string>
+    <string name="transactions_refund_hint">Dinero que te regresan por un gasto: resta del gasto de su categoría en el mes en que llega y no cuenta como ingreso.</string>
+    <string name="transactions_refund_of">Reembolso de «{name}»</string>
+    <string name="transactions_refund_remaining">Quedan {amount} por reembolsar de {total}.</string>
+    <string name="transactions_refunded_partial">Reembolsado {amount}</string>
+    <string name="transactions_refunded_full">Reembolsado completo</string>
+    <string name="transactions_register_refund">Registrar reembolso</string>
     <string name="transactions_total_converted">Convertido a MXN</string>
     <string name="transactions_list_capped">Se muestran los {n} movimientos más recientes; el total los considera todos.</string>
     <string name="transactions_delete_confirm_title">Eliminar transacción</string>

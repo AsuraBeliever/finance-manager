@@ -106,6 +106,9 @@ fun FormSheet(
     onSave: () -> Unit,
     onDismiss: () -> Unit,
     saveLabel: String = stringResource(R.string.common_save),
+    /** A secondary action pinned to the left of the footer (the web's
+     *  `mr-auto` ghost button), e.g. "register refund" on an expense. */
+    extraAction: Pair<String, () -> Unit>? = null,
     fields: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = Broke.colors
@@ -131,6 +134,10 @@ fun FormSheet(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            extraAction?.let { (label, action) ->
+                GhostButton(label, action)
+                Spacer(Modifier.weight(1f))
+            }
             GhostButton(stringResource(R.string.common_cancel), onDismiss)
             PrimaryButton(
                 text = saveLabel,

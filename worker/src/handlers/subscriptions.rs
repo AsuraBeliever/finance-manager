@@ -358,6 +358,7 @@ pub async fn register_subscription_payment(
             occurred_time: None,
             client_id: None,
             subscription_id: Some(sub.id),
+            refund_of_id: None,
         },
     )
     .await?;

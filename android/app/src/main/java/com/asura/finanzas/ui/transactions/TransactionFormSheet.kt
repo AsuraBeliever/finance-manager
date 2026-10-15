@@ -1,5 +1,6 @@
 package com.asura.finanzas.ui.transactions
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.MsiSchedulePreview
 import com.asura.finanzas.data.NetworkException
+import com.asura.finanzas.data.Transaction
 import com.asura.finanzas.data.TransactionCategory
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
@@ -63,7 +65,7 @@ import com.asura.finanzas.ui.wallets.MsiSavedInfo
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-enum class TxKind { Income, Expense, Transfer }
+enum class TxKind { Income, Expense, Refund, Transfer }
 
 /**
  * Capture sheet for the three append-only commands. Amounts are parsed to
@@ -85,6 +87,9 @@ fun TransactionFormSheet(
     defaultAmountText: String = "",
     /** The wallet the form opens on — a wallet's own page passes itself. */
     defaultWalletId: Long? = null,
+    /** Opens as a new refund of this expense: same wallet and category, and
+     *  what is still refundable as the amount — the web's `refundOf`. */
+    refundOf: Transaction? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -92,18 +97,25 @@ fun TransactionFormSheet(
 
     val spendable = remember(wallets) { wallets.filter { !it.isArchived } }
 
-    var kind by remember { mutableStateOf(defaultKind) }
+    var kind by remember { mutableStateOf(if (refundOf != null) TxKind.Refund else defaultKind) }
     var wallet by remember {
         // Never default the source to the card being paid.
         mutableStateOf(
-            spendable.firstOrNull { it.id == defaultWalletId && it.id != defaultToWalletId }
+            spendable.firstOrNull { it.id == refundOf?.walletId }
+                ?: spendable.firstOrNull { it.id == defaultWalletId && it.id != defaultToWalletId }
                 ?: spendable.firstOrNull { it.id != defaultToWalletId },
         )
     }
     var toWallet by remember {
         mutableStateOf(spendable.firstOrNull { it.id == defaultToWalletId })
     }
-    var amount by remember { mutableStateOf(defaultAmountText) }
+    var amount by remember {
+        mutableStateOf(
+            refundOf?.refundableCents?.takeIf { it > 0 }
+                ?.let { formatMoney(it, withSymbol = false) }
+                ?: defaultAmountText,
+        )
+    }
     var amountTo by remember { mutableStateOf("") }
     var category by remember { mutableStateOf<TransactionCategory?>(null) }
     var description by remember { mutableStateOf("") }
@@ -138,7 +150,8 @@ fun TransactionFormSheet(
     val pickToWallet = stringResource(R.string.transactions_pick_to_wallet)
     val invalidAmount = stringResource(R.string.transactions_invalid_amount)
 
-    // Income and expense have separate category sets, same as the web form.
+    // Income and expense have separate category sets, same as the web form;
+    // a refund files under the expense category it gives money back to.
     LaunchedEffect(kind) {
         category = null
         categories = if (kind == TxKind.Transfer) {
@@ -146,6 +159,9 @@ fun TransactionFormSheet(
         } else {
             val wanted = if (kind == TxKind.Income) "income" else "expense"
             runCatching { repository.transactionCategories(wanted) }.getOrDefault(emptyList())
+        }
+        if (kind == TxKind.Refund && refundOf != null) {
+            category = categories.firstOrNull { it.id == refundOf.categoryId }
         }
     }
 
@@ -209,6 +225,10 @@ fun TransactionFormSheet(
                             description, time,
                         )
                     }
+                    TxKind.Refund -> wasQueued = repository.addRefund(
+                        source.id, cents, date.toString(), category?.id,
+                        description, time, refundOf?.id,
+                    )
                     TxKind.Transfer -> {
                         val target = toWallet ?: error("sin destino")
                         val received = if (crossCurrency) {
@@ -269,7 +289,9 @@ fun TransactionFormSheet(
     // where every form is a `<Modal>` with the fields inside.
     FormSheet(
         title = stringResource(
-            if (defaultToWalletId != null && toWallet?.creditCutDay != null) {
+            if (refundOf != null) {
+                R.string.transactions_register_refund
+            } else if (defaultToWalletId != null && toWallet?.creditCutDay != null) {
                 R.string.credit_pay_title
             } else {
                 R.string.transactions_new_transaction
@@ -282,16 +304,18 @@ fun TransactionFormSheet(
         onDismiss = onDismiss,
     ) {
         run {
-            // The web leads with a full-width segmented control, not three pills.
-            SegmentedControl(
+            // The web leads with a full-width segmented control, not pills. A
+            // refund of a known expense has no other kind to switch to.
+            if (refundOf == null) SegmentedControl(
                 style = SegStyle.Tray,
-                options = listOf(TxKind.Income, TxKind.Expense, TxKind.Transfer),
+                options = listOf(TxKind.Income, TxKind.Expense, TxKind.Refund, TxKind.Transfer),
                 selected = kind,
                 label = {
                     stringResource(
                         when (it) {
                             TxKind.Income -> R.string.transactions_income
                             TxKind.Expense -> R.string.transactions_expense
+                            TxKind.Refund -> R.string.transactions_refund
                             else -> R.string.transactions_transfer
                         },
                     )
@@ -300,6 +324,8 @@ fun TransactionFormSheet(
                 modifier = Modifier.fillMaxWidth(),
                 fillEqually = true,
             )
+
+            if (kind == TxKind.Refund) RefundInfo(refundOf, wallets)
 
             PickerField(
                 label = stringResource(
@@ -519,6 +545,55 @@ fun TransactionFormSheet(
                 }
             },
         )
+    }
+}
+
+/**
+ * The box atop a refund: what it is for (a linked expense and what is still
+ * refundable, both from the worker), or what a refund means when unlinked —
+ * the web's `rounded-lg bg-surface px-3 py-2 text-xs` note.
+ */
+@Composable
+private fun RefundInfo(refundOf: Transaction?, wallets: List<Wallet>) {
+    val colors = Broke.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.surface)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (refundOf != null) {
+            val currency = wallets.firstOrNull { it.id == refundOf.walletId }?.currencyCode ?: "MXN"
+            Text(
+                text(
+                    R.string.transactions_refund_of,
+                    "name" to (
+                        refundOf.description?.takeIf { it.isNotBlank() }
+                            ?: refundOf.categoryName?.let { seedName(it) }
+                            ?: stringResource(R.string.transactions_expense)
+                        ),
+                ),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = colors.fg,
+            )
+            Text(
+                text(
+                    R.string.transactions_refund_remaining,
+                    "amount" to formatMoney(refundOf.refundableCents, currency),
+                    "total" to formatMoney(refundOf.amountCents, currency),
+                ),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
+            )
+        } else {
+            Text(
+                stringResource(R.string.transactions_refund_hint),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
+            )
+        }
     }
 }
 

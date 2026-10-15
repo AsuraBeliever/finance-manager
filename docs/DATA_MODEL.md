@@ -154,12 +154,15 @@ CREATE TABLE transactions (
   occurred_time TEXT,                     -- 0031: hora local 'HH:MM' (24h) del movimiento; NULL = sin hora (legacy/apartado)
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   client_id TEXT,                         -- 0003: idempotencia del outbox offline
-  subscription_id INTEGER REFERENCES subscriptions(id)  -- 0020: gasto que pagó una suscripción (NULL = transacción normal)
+  subscription_id INTEGER REFERENCES subscriptions(id),  -- 0020: gasto que pagó una suscripción (NULL = transacción normal)
+  is_refund INTEGER NOT NULL DEFAULT 0,   -- 0040: 1 = reembolso (kind 'income' en la tabla, 'refund' en la API)
+  refund_of_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL  -- 0040: gasto que reembolsa (opcional)
 );
 CREATE INDEX idx_tx_wallet ON transactions(wallet_id, occurred_at);
 CREATE INDEX idx_tx_transfer ON transactions(transfer_group_id);
 CREATE UNIQUE INDEX idx_tx_client ON transactions(client_id) WHERE client_id IS NOT NULL;
 CREATE INDEX idx_tx_subscription ON transactions(subscription_id, occurred_at);  -- 0020: cargos reales por suscripción/periodo
+CREATE INDEX idx_tx_refund_of ON transactions(refund_of_id) WHERE refund_of_id IS NOT NULL;  -- 0040
 
 CREATE TABLE investments (
   id INTEGER PRIMARY KEY,
@@ -226,6 +229,30 @@ SELECT w.initial_balance_cents + COALESCE(SUM(
 FROM wallets w LEFT JOIN transactions t ON t.wallet_id = w.id
 WHERE w.id = ?1;
 ```
+
+## Reembolsos (migración 0040)
+
+- Un reembolso es dinero que regresa por un gasto. **No es ingreso.** Se guarda como
+  `kind = 'income'` con `is_refund = 1` (así suma al saldo sin tocar ninguna fórmula
+  de saldo) y la API lo expone como `kind = 'refund'` (lista, filtro `kind: "refund"`,
+  `sum_transactions`). El filtro `kind: "income"` excluye los reembolsos.
+- Lleva una categoría **de gasto** (validado en `add_refund`/`update_transaction`). Si
+  está ligado (`refund_of_id`) y no trae categoría, hereda la del gasto.
+- Cuenta **en la fecha en que llega**: en analytics (breakdown, tendencias, barras) y
+  presupuestos resta del gasto de su categoría en ese periodo. El neto de cada
+  categoría tiene piso en cero (`finanzas_core::refund::net_spending`) y los totales
+  son la suma de esos netos (`net_spending_total`): un reembolso nunca resta de otra
+  categoría, así el total de gastos = suma de la dona = gasto total de presupuestos.
+- Ligado a un gasto: el gasto debe ser del usuario; si ambas carteras usan la misma
+  moneda, Σ reembolsos ≤ monto del gasto (`validate_refund_amount`; con monedas
+  distintas no se puede comparar sin inventar un tipo de cambio). Cada gasto expone
+  `refundedCents`/`refundableCents`. Borrar el gasto deja el reembolso y lo desliga
+  (`ON DELETE SET NULL`).
+- En una tarjeta de crédito, un reembolso es un abono más (`income`) en «por pagar
+  del corte».
+- ¿Por qué no un `kind` nuevo en el CHECK? Cambiar el CHECK obliga a reconstruir
+  `transactions`, y en D1 el `DROP TABLE` dispararía el `ON DELETE CASCADE` de
+  `investment_movements` (no se pueden apagar las foreign keys en una migración).
 
 ## Semántica de transferencias
 

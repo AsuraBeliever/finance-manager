@@ -454,6 +454,7 @@ export const esDict = {
     editTransaction: "Editar transacción",
     income: "Ingreso",
     expense: "Gasto",
+    refund: "Reembolso",
     transfer: "Transferencia",
     wallet: "Cartera",
     fromWallet: "Desde",
@@ -482,6 +483,15 @@ export const esDict = {
     noMatchDescription: "Ninguna transacción coincide con los filtros.",
     totalIncome: "Total de ingresos",
     totalExpense: "Total de gastos",
+    totalRefund: "Total de reembolsos",
+    /** Reembolsos: dinero que regresa por un gasto; resta del gasto, no es ingreso. */
+    refundHint:
+      "Dinero que te regresan por un gasto: resta del gasto de su categoría en el mes en que llega y no cuenta como ingreso.",
+    refundOf: "Reembolso de «{name}»",
+    refundRemaining: "Quedan {amount} por reembolsar de {total}.",
+    refundedPartial: "Reembolsado {amount}",
+    refundedFull: "Reembolsado completo",
+    registerRefund: "Registrar reembolso",
     totalConverted: "Convertido a MXN",
     listCapped: "Se muestran los {n} movimientos más recientes; el total los considera todos.",
     deleteConfirmTitle: "Eliminar transacción",

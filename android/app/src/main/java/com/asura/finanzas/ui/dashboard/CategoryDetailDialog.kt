@@ -159,9 +159,13 @@ private fun CategoryDetailRow(
     hide: Boolean,
 ) {
     val colors = Broke.colors
-    val income = kind == "income"
+    // An expense slice also lists the refunds that netted against it; those
+    // read like money in.
+    val refund = tx.kind == "refund"
+    val income = kind == "income" || refund
     val tint = if (income) colors.accent else colors.danger
     val time = transactionTimeLabel(tx)
+    val refundLabel = stringResource(R.string.transactions_refund)
 
     // `flex items-center gap-3 py-2.5`
     Row(
@@ -175,7 +179,11 @@ private fun CategoryDetailRow(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                if (income) Lucide.ArrowDownLeft else Lucide.ArrowUpRight,
+                when {
+                    refund -> Lucide.Undo2
+                    income -> Lucide.ArrowDownLeft
+                    else -> Lucide.ArrowUpRight
+                },
                 contentDescription = null,
                 tint = tint,
                 modifier = Modifier.size(13.dp),
@@ -195,6 +203,7 @@ private fun CategoryDetailRow(
                     append(tx.occurredAt)
                     if (time != null) append(" · $time")
                     append(" · ${tx.walletName}")
+                    if (refund) append(" · $refundLabel")
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.fgSubtle,

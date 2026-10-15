@@ -24,7 +24,7 @@ import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 import { MsiPreviewLine, MsiSavedInfo, useMsiPreview } from "../wallets/msiSchedule";
 
-type Tab = "income" | "expense" | "transfer";
+type Tab = "income" | "expense" | "refund" | "transfer";
 
 interface TransactionFormModalProps {
   open: boolean;
@@ -38,9 +38,11 @@ interface TransactionFormModalProps {
   defaultToWalletId?: number;
   /** Prefilled amount, e.g. what clears the card's statement. */
   defaultAmountText?: string;
-  /** When set, the modal edits this transaction instead of creating one.
-   *  Only income/expense are editable (transfers are delete + recreate). */
+  /** When set, the modal edits this transaction instead of creating one. */
   transaction?: Transaction;
+  /** Opens the form as a new refund of this expense (wallet, category and the
+   *  amount still refundable come prefilled). */
+  refundOf?: Transaction;
 }
 
 export function TransactionFormModal({
@@ -50,14 +52,21 @@ export function TransactionFormModal({
   defaultTab,
   defaultToWalletId,
   defaultAmountText,
-  transaction,
+  transaction: transactionProp,
+  refundOf,
 }: TransactionFormModalProps) {
+  // Editing an expense offers "register refund", which turns this same modal
+  // into a new refund of that expense.
+  const [refundFor, setRefundFor] = useState<Transaction | null>(null);
+  const transaction = refundFor ? undefined : transactionProp;
+  const linked = refundFor ?? refundOf ?? null;
   const isEdit = transaction !== undefined;
   const isTransferEdit =
     transaction?.kind === "transfer_in" || transaction?.kind === "transfer_out";
   const tabs: { id: Tab; label: string }[] = [
     { id: "income", label: es.transactions.income },
     { id: "expense", label: es.transactions.expense },
+    { id: "refund", label: es.transactions.refund },
     { id: "transfer", label: es.transactions.transfer },
   ];
   const queryClient = useQueryClient();
@@ -103,6 +112,10 @@ export function TransactionFormModal({
   defaults.current = { defaultWalletId, defaultTab, defaultToWalletId, defaultAmountText };
 
   useEffect(() => {
+    if (!open) setRefundFor(null);
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     const { defaultWalletId, defaultTab, defaultToWalletId, defaultAmountText } =
       defaults.current;
@@ -124,14 +137,30 @@ export function TransactionFormModal({
       setDate(transaction.occurredAt);
       setTime(timeInputValue(transaction.occurredTime, transaction.createdAt, getTimezone()));
     } else if (transaction) {
-      // Edit mode: prefill from the existing income/expense.
-      setTab(transaction.kind === "expense" ? "expense" : "income");
+      // Edit mode: prefill from the existing income/expense/refund.
+      setTab(
+        transaction.kind === "expense" || transaction.kind === "refund"
+          ? transaction.kind
+          : "income",
+      );
       setWalletId(transaction.walletId);
       setAmountText((transaction.amountCents / 100).toFixed(2));
       setCategoryId(transaction.categoryId);
       setDescription(transaction.description ?? "");
       setDate(transaction.occurredAt);
       setTime(timeInputValue(transaction.occurredTime, transaction.createdAt, getTimezone()));
+    } else if (linked) {
+      // New refund of a known expense: same wallet and category, and the
+      // amount still refundable (both from Rust) as the starting amount.
+      setTab("refund");
+      setWalletId(linked.walletId);
+      setAmountText(
+        linked.refundableCents > 0 ? (linked.refundableCents / 100).toFixed(2) : "",
+      );
+      setCategoryId(linked.categoryId);
+      setDescription("");
+      setDate(todayIso());
+      setTime(nowTime(getTimezone()));
     } else {
       setTab(defaultTab ?? "income");
       setWalletId(defaultWalletId ?? null);
@@ -141,7 +170,7 @@ export function TransactionFormModal({
       setDate(todayIso());
       setTime(nowTime(getTimezone()));
     }
-  }, [open, transaction, isTransferEdit, queryClient]);
+  }, [open, transaction, linked, isTransferEdit, queryClient]);
 
   // Fill the from/to wallets and both amounts once the transfer's legs load.
   useEffect(() => {
@@ -191,7 +220,11 @@ export function TransactionFormModal({
     walletList.find((w) => w.id === fromRootId)?.name ?? "",
   );
 
-  const visibleCategories = (categories.data ?? []).filter((c) => c.kind === tab);
+  // A refund files under the expense category it gives money back to.
+  const categoryKind = tab === "refund" ? "expense" : tab;
+  const visibleCategories = (categories.data ?? []).filter((c) => c.kind === categoryKind);
+  const linkedCurrency =
+    linked && (walletList.find((w) => w.id === linked.walletId)?.currencyCode ?? "MXN");
 
   // New expenses on a configured credit card can be MSI purchases: instead of
   // one expense, an MSI plan is created and each installment posts itself on
@@ -274,6 +307,8 @@ export function TransactionFormModal({
       // queued (and replayed idempotently) when there is no connection.
       if (tab === "income") return submitOrQueue("add_income", common);
       if (tab === "expense") return submitOrQueue("add_expense", common);
+      if (tab === "refund")
+        return submitOrQueue("add_refund", { ...common, refundOfId: linked?.id ?? null });
 
       const toId = toWalletId ?? undefined;
       if (toId === undefined) throw new Error(es.transactions.pickToWallet);
@@ -334,6 +369,8 @@ export function TransactionFormModal({
       title={
         isEdit
           ? es.transactions.editTransaction
+          : linked
+            ? es.transactions.registerRefund
           : defaultToWalletId != null && payingCard
             ? es.credit.payTitle
             : es.transactions.newTransaction
@@ -341,7 +378,7 @@ export function TransactionFormModal({
       open={open}
       onClose={onClose}
     >
-      {!isEdit && (
+      {!isEdit && !linked && (
         <div className="mb-4 flex rounded-lg bg-surface p-1">
           {tabs.map((t) => (
             <button
@@ -371,6 +408,30 @@ export function TransactionFormModal({
         }}
         className="grid gap-4"
       >
+        {tab === "refund" && (
+          <div className="rounded-lg bg-surface px-3 py-2 text-xs text-fg-subtle">
+            {linked && (
+              <p className="mb-1 text-sm text-fg">
+                {es.transactions.refundOf.replace(
+                  "{name}",
+                  linked.description ||
+                    (linked.categoryName && seedName(linked.categoryName)) ||
+                    es.transactions.expense,
+                )}
+              </p>
+            )}
+            {linked ? (
+              <p>
+                {es.transactions.refundRemaining
+                  .replace("{amount}", formatCents(linked.refundableCents, linkedCurrency ?? "MXN"))
+                  .replace("{total}", formatCents(linked.amountCents, linkedCurrency ?? "MXN"))}
+              </p>
+            ) : (
+              <p>{es.transactions.refundHint}</p>
+            )}
+          </div>
+        )}
+
         <Field label={tab === "transfer" ? es.transactions.fromWallet : es.transactions.wallet}>
           <select
             className={inputClass}
@@ -547,7 +608,20 @@ export function TransactionFormModal({
 
         {error && <p className="text-sm text-danger">{error}</p>}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {transaction?.kind === "expense" && transaction.refundableCents > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="mr-auto"
+              onClick={() => {
+                setError(null);
+                setRefundFor(transaction);
+              }}
+            >
+              {es.transactions.registerRefund}
+            </Button>
+          )}
           <Button type="button" variant="ghost" onClick={onClose}>
             {es.common.cancel}
           </Button>

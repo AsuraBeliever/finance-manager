@@ -1,6 +1,6 @@
 //! Monthly budgets / spending limits. One per (user, category); category NULL
 //! is the overall limit. "spent" is computed at read time from the selected
-//! period's expenses (MXN). The limit is scoped to the period too — prorated by
+//! period's expenses minus the refunds that landed in it (MXN). The limit is scoped to the period too — prorated by
 //! day and honoring limit changes via `budget_limit_history`.
 
 use std::collections::HashMap;
@@ -9,6 +9,7 @@ use chrono::NaiveDate;
 use finanzas_core::budget::prorated_limit;
 use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::period::{resolve_period, Period};
+use finanzas_core::refund::{net_spending, net_spending_total};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
@@ -48,7 +49,8 @@ struct BudgetRow {
 struct SpentRow {
     category_id: Option<i64>,
     currency_code: String,
-    sum_cents: i64,
+    expense_cents: i64,
+    refund_cents: i64,
 }
 
 #[derive(Deserialize)]
@@ -72,30 +74,36 @@ pub async fn list_budgets(db: &D1Database, uid: i64, a: BudgetArgs) -> AppResult
     let start = resolved.start.to_string();
     let end = resolved.end.to_string();
 
-    // Expenses within the period, per category + currency → MXN map + grand total.
+    // Expenses and refunds within the period, per category + currency → MXN.
+    // A refund carries the expense category it gives money back to, so it
+    // nets against that category (and the overall total).
     let spent_rows: Vec<SpentRow> = all(
         db,
         "SELECT t.category_id AS category_id, w.currency_code AS currency_code,
-                SUM(t.amount_cents) AS sum_cents
+                SUM(CASE WHEN t.kind = 'expense' THEN t.amount_cents ELSE 0 END) AS expense_cents,
+                SUM(CASE WHEN t.is_refund = 1 THEN t.amount_cents ELSE 0 END) AS refund_cents
          FROM transactions t JOIN wallets w ON w.id = t.wallet_id
-         WHERE w.user_id = ?1 AND t.kind = 'expense'
+         WHERE w.user_id = ?1 AND (t.kind = 'expense' OR t.is_refund = 1)
            AND t.occurred_at >= ?2 AND t.occurred_at < ?3
          GROUP BY t.category_id, w.currency_code",
         jsv![uid, start, end],
     )
     .await?;
-    let mut by_cat: HashMap<i64, i64> = HashMap::new();
-    let mut overall = 0i64;
+    // (expense, refund) in MXN per category (None = uncategorized). Each
+    // category nets on its own; the overall figure is their sum, so it matches
+    // the dashboard's expense total.
+    let mut by_cat_raw: HashMap<Option<i64>, (i64, i64)> = HashMap::new();
     for r in spent_rows {
-        let mxn = to_mxn(
-            r.sum_cents,
-            rates.get(&r.currency_code).copied().unwrap_or(0),
-        );
-        overall += mxn;
-        if let Some(cid) = r.category_id {
-            *by_cat.entry(cid).or_insert(0) += mxn;
-        }
+        let rate = rates.get(&r.currency_code).copied().unwrap_or(0);
+        let e = by_cat_raw.entry(r.category_id).or_insert((0, 0));
+        e.0 += to_mxn(r.expense_cents, rate);
+        e.1 += to_mxn(r.refund_cents, rate);
     }
+    let overall = net_spending_total(by_cat_raw.values().copied());
+    let by_cat: HashMap<i64, i64> = by_cat_raw
+        .into_iter()
+        .filter_map(|(cid, (exp, refund))| cid.map(|c| (c, net_spending(exp, refund))))
+        .collect();
 
     // Limit-change history, grouped per category and sorted ascending.
     let hist: Vec<HistRow> = all(

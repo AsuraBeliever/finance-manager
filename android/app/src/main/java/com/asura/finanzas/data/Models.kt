@@ -450,7 +450,8 @@ data class Transaction(
     val id: Long,
     val walletId: Long,
     val walletName: String = "",
-    /** "income" | "expense" | "transfer_in" | "transfer_out". */
+    /** "income" | "expense" | "refund" | "transfer_in" | "transfer_out". A
+     *  refund is money back for an expense: it is not income. */
     val kind: String,
     val amountCents: Long,
     val categoryId: Long? = null,
@@ -461,6 +462,12 @@ data class Transaction(
     /** Local wall-clock 'HH:MM' the movement happened, or null if untimed. */
     val occurredTime: String? = null,
     val createdAt: String? = null,
+    /** On a refund: the expense it gives money back for, if linked. */
+    val refundOfId: Long? = null,
+    /** On an expense: what its linked refunds returned so far. */
+    val refundedCents: Long = 0,
+    /** On an expense: what can still be refunded (computed by the worker). */
+    val refundableCents: Long = 0,
 )
 
 /**

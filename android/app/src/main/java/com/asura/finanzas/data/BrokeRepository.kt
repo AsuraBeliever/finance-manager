@@ -532,6 +532,21 @@ class BrokeRepository(
         "add_expense", walletId, amountCents, occurredAt, categoryId, description, occurredTime,
     )
 
+    /** Money back for an expense: adds to the wallet, nets against its expense
+     *  category, never counts as income. `refundOfId` links the expense. */
+    suspend fun addRefund(
+        walletId: Long,
+        amountCents: Long,
+        occurredAt: String,
+        categoryId: Long?,
+        description: String?,
+        occurredTime: String?,
+        refundOfId: Long?,
+    ): Boolean = addSimple(
+        "add_refund", walletId, amountCents, occurredAt, categoryId, description, occurredTime,
+        refundOfId,
+    )
+
     private suspend fun addSimple(
         command: String,
         walletId: Long,
@@ -540,6 +555,7 @@ class BrokeRepository(
         categoryId: Long?,
         description: String?,
         occurredTime: String?,
+        refundOfId: Long? = null,
     ): Boolean {
         val queued = outbox.submitOrQueue(
             command,
@@ -550,6 +566,7 @@ class BrokeRepository(
                 categoryId?.let { put("categoryId", it) }
                 description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
                 occurredTime?.let { put("occurredTime", it) }
+                refundOfId?.let { put("refundOfId", it) }
             },
         )
         if (!queued) cache.invalidateReads()
@@ -592,7 +609,7 @@ class BrokeRepository(
         return synced
     }
 
-    /** Totals for a filtered slice; only meaningful for income or expense. */
+    /** Totals for a filtered slice; only meaningful for income, expense or refunds. */
     suspend fun transactionTotals(
         kind: String,
         walletId: Long?,

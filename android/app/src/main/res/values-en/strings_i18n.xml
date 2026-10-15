@@ -390,6 +390,7 @@
     <string name="transactions_edit_transaction">Edit transaction</string>
     <string name="transactions_income">Income</string>
     <string name="transactions_expense">Expense</string>
+    <string name="transactions_refund">Refund</string>
     <string name="transactions_transfer">Transfer</string>
     <string name="transactions_wallet">Wallet</string>
     <string name="transactions_from_wallet">From</string>
@@ -417,6 +418,13 @@
     <string name="transactions_no_match_description">No transaction matches the filters.</string>
     <string name="transactions_total_income">Total income</string>
     <string name="transactions_total_expense">Total expense</string>
+    <string name="transactions_total_refund">Total refunds</string>
+    <string name="transactions_refund_hint">Money you get back for an expense: it reduces that category\'s spending in the month it arrives and never counts as income.</string>
+    <string name="transactions_refund_of">Refund of “{name}”</string>
+    <string name="transactions_refund_remaining">{amount} of {total} left to refund.</string>
+    <string name="transactions_refunded_partial">Refunded {amount}</string>
+    <string name="transactions_refunded_full">Fully refunded</string>
+    <string name="transactions_register_refund">Register refund</string>
     <string name="transactions_total_converted">Converted to MXN</string>
     <string name="transactions_list_capped">Showing the {n} most recent transactions; the total counts them all.</string>
     <string name="transactions_delete_confirm_title">Delete transaction</string>

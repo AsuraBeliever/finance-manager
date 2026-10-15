@@ -17,6 +17,7 @@ import { es } from "../../i18n/es";
 const commandLabel: Record<OutboxItem["command"], string> = {
   add_income: es.transactions.income,
   add_expense: es.transactions.expense,
+  add_refund: es.transactions.refund,
   add_transfer: es.transactions.transfer,
 };
 

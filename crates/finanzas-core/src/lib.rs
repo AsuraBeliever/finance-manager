@@ -11,5 +11,6 @@ pub mod investments;
 pub mod market;
 pub mod models;
 pub mod period;
+pub mod refund;
 pub mod subscription;
 pub mod wallet_yield;

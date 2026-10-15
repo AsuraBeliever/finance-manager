@@ -1,4 +1,4 @@
-// Offline capture queue (outbox), deliberately append-only: only the three
+// Offline capture queue (outbox), deliberately append-only: only the
 // transaction-capture commands can be queued, so replaying never conflicts
 // with edits made elsewhere. Each item carries a clientId the server uses for
 // idempotency — a replay after a dropped response can't insert twice.
@@ -8,7 +8,7 @@
 
 import { NetworkError, rpc } from "./api";
 
-export type OutboxCommand = "add_income" | "add_expense" | "add_transfer";
+export type OutboxCommand = "add_income" | "add_expense" | "add_refund" | "add_transfer";
 
 export interface OutboxItem {
   /** Also sent as args.clientId for server-side idempotency. */
