@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.components.ConfirmDialog
@@ -131,7 +132,21 @@ enum class KindFilter(val labelRes: Int, val wire: String?) {
     All(R.string.transactions_type_all, null),
     Income(R.string.transactions_income, "income"),
     Expense(R.string.transactions_expense, "expense"),
+    Refund(R.string.transactions_refund, "refund"),
     Transfer(R.string.transactions_transfer, "transfer"),
+    ;
+
+    /** The category kind this filter can narrow by, or null when it can't.
+     *  Refunds file under expense categories. */
+    val categoryKind: String?
+        get() = when (this) {
+            Income -> "income"
+            Expense, Refund -> "expense"
+            else -> null
+        }
+
+    /** Kinds that add up to a total (`sum_transactions`). */
+    val hasTotal: Boolean get() = categoryKind != null
 }
 
 @Composable
@@ -190,7 +205,7 @@ fun TransactionsScreen(
         fallback = null,
     ) {
         filter.wire
-            ?.takeIf { it == "income" || it == "expense" }
+            ?.takeIf { filter.hasTotal }
             ?.let { repository.transactionTotals(it, wallet?.id, category?.id, periodFilter) }
     }
     val scope = rememberCoroutineScope()
@@ -378,11 +393,11 @@ private fun TransactionList(
             )
         }
 
-        // Category only applies to income/expense, and only lists the ones that
-        // belong to the chosen kind — same rule as the web.
-        if (filter == KindFilter.Income || filter == KindFilter.Expense) {
+        // Category only applies to income/expense/refund, and only lists the
+        // ones of the chosen kind (refunds: expense ones) — same rule as the web.
+        if (filter.categoryKind != null) {
             item {
-                val ofKind = categories.filter { it.kind == filter.wire }
+                val ofKind = categories.filter { it.kind == filter.categoryKind }
                 PickerField(
                     // Bare on the web too: the "all categories" option is its label.
                     label = "",
@@ -411,7 +426,7 @@ private fun TransactionList(
         totals?.let { summary ->
             item {
                 Box(Modifier.padding(bottom = 16.dp)) {
-                    TransactionTotal(summary, hide, filter.wire == "income")
+                    TransactionTotal(summary, hide, filter.wire)
                 }
             }
         }
@@ -484,6 +499,8 @@ private fun TransactionRow(
     // expense rose.
     val (icon: ImageVector, tint: Color) = when (tx.kind) {
         "income" -> Lucide.ArrowDownLeft to colors.accent
+        // Money back for an expense: it enters the wallet, but isn't income.
+        "refund" -> Lucide.Undo2 to colors.accent
         // sky-400, the web's transfer colour — not the app's cyan token.
         "transfer_in", "transfer_out" -> Lucide.ArrowLeftRight to Color(0xFF38BDF8)
         // Apartado moves are information only: no money leaves the wallet, so
@@ -492,7 +509,7 @@ private fun TransactionRow(
         else -> Lucide.ArrowUpRight to colors.danger
     }
     val sign = when (tx.kind) {
-        "income", "transfer_in" -> "+"
+        "income", "refund", "transfer_in" -> "+"
         "transfer_out" -> ""
         "reserve" -> "→"
         "release" -> "←"
@@ -535,8 +552,10 @@ private fun TransactionRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val refunded = refundedNote(tx, hide)
             Text(
-                text = listOfNotNull(
+                text = androidx.compose.ui.text.buildAnnotatedString {
+                append(listOfNotNull(
                     // ISO date, same as the web's list.
                     tx.occurredAt.take(10),
                     transactionTimeLabel(tx),
@@ -552,7 +571,20 @@ private fun TransactionRow(
                     tx.categoryName
                         ?.takeIf { !tx.description.isNullOrBlank() && !tx.isApartado }
                         ?.let { seedName(it) },
-                ).joinToString(" · "),
+                    // A titled refund says what it is (untitled ones already
+                    // read "Reembolso" or their category).
+                    stringResource(R.string.transactions_refund).takeIf {
+                        tx.kind == "refund" &&
+                            (!tx.description.isNullOrBlank() || tx.categoryName != null)
+                    },
+                ).joinToString(" · "))
+                    // In the accent, as the web's `text-accent` span.
+                    if (refunded.isNotEmpty()) {
+                        withStyle(androidx.compose.ui.text.SpanStyle(color = colors.accent)) {
+                            append(refunded)
+                        }
+                    }
+                },
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                 color = colors.fgSubtle,
             )
@@ -611,10 +643,22 @@ private fun TransactionRow(
     }
 }
 
+/** " · Reembolsado $X" on an expense some refund already paid back. */
+@Composable
+private fun refundedNote(tx: Transaction, hide: Boolean): String = when {
+    tx.kind != "expense" || tx.refundedCents <= 0 -> ""
+    tx.refundableCents == 0L -> " · " + stringResource(R.string.transactions_refunded_full)
+    else -> " · " + text(
+        R.string.transactions_refunded_partial,
+        "amount" to maskIfHidden(formatMoney(tx.refundedCents), hide),
+    )
+}
+
 @Composable
 private fun kindLabel(kind: String): String = when (kind) {
     "income" -> stringResource(R.string.transactions_income)
     "expense" -> stringResource(R.string.transactions_expense)
+    "refund" -> stringResource(R.string.transactions_refund)
     "transfer_in", "transfer_out" -> stringResource(R.string.transactions_transfer)
     else -> kind
 }
@@ -799,7 +843,7 @@ fun TransactionListCard(
 
 /** What the filtered set adds up to — the web's `TransactionTotal`. */
 @Composable
-fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
+fun TransactionTotal(totals: TxTotals, hide: Boolean, kind: String?) {
     val colors = Broke.colors
     // One currency reads in its own money; a mix reads in MXN, with each
     // currency's real figure spelled out underneath so nothing looks invented.
@@ -826,8 +870,11 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                 // `text-[0.7rem]` eyebrow. This one is `text-xs tracking-wide`.
                 Text(
                     stringResource(
-                        if (income) R.string.transactions_total_income
-                        else R.string.transactions_total_expense,
+                        when (kind) {
+                            "income" -> R.string.transactions_total_income
+                            "refund" -> R.string.transactions_total_refund
+                            else -> R.string.transactions_total_expense
+                        },
                     ).uppercase(),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 12.sp,
@@ -851,7 +898,7 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, income: Boolean = false) {
                     ).tabular(),
                     // Income in the accent, expense in the danger colour, as on
                     // the web — the figure is the whole point of the card.
-                    color = if (income) colors.accent else colors.danger,
+                    color = if (kind == "expense") colors.danger else colors.accent,
                 )
             }
             Column(

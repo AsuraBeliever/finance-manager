@@ -170,6 +170,8 @@ export interface SimpleTxInput {
   occurredAt: string;
   /** Local wall-clock time 'HH:MM', or null to leave the movement untimed. */
   occurredTime: string | null;
+  /** add_refund only: the expense this refund gives money back for. */
+  refundOfId?: number | null;
 }
 
 export interface TransferInput {
@@ -215,6 +217,9 @@ export const addIncome = (input: SimpleTxInput) =>
 export const addExpense = (input: SimpleTxInput) =>
   rpc<number>("add_expense", { ...input });
 
+export const addRefund = (input: SimpleTxInput) =>
+  rpc<number>("add_refund", { ...input });
+
 export const addTransfer = (input: TransferInput) =>
   rpc<string>("add_transfer", { ...input });
 
@@ -234,12 +239,12 @@ export const TX_LIST_LIMIT = 100;
 export const listTransactions = (filter: TxFilter = {}) =>
   rpc<Transaction[]>("list_transactions", { filter });
 
-/** What the filtered transactions add up to. Income/expense only — the worker
+/** What the filtered transactions add up to. Income/expense/refund only — the worker
  *  rejects any other kind, since transfers and apartado moves don't total. */
 export const sumTransactions = (filter: TxFilter) =>
   rpc<TxTotals>("sum_transactions", { filter });
 
-/** Edit an income/expense transaction. Transfers aren't editable (delete + recreate). */
+/** Edit an income/expense/refund transaction. Transfers aren't editable (delete + recreate). */
 export const updateTransaction = (id: number, input: SimpleTxInput) =>
   rpc<void>("update_transaction", { id, ...input });
 

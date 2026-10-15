@@ -6,6 +6,7 @@ import {
   PiggyBank,
   Pencil,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "../../components/Button";
@@ -35,6 +36,8 @@ const kindMeta: Record<
 > = {
   income: { icon: ArrowDownLeft, sign: "+", color: "text-accent" },
   expense: { icon: ArrowUpRight, sign: "−", color: "text-danger" },
+  // Money back for an expense: enters the wallet, so "+", but it isn't income.
+  refund: { icon: Undo2, sign: "+", color: "text-accent" },
   transfer_in: { icon: ArrowLeftRight, sign: "+", color: "text-sky-400" },
   transfer_out: { icon: ArrowLeftRight, sign: "−", color: "text-sky-400" },
   // Apartado moves (info only): neutral colour, no +/−, since no money leaves
@@ -198,11 +201,9 @@ export function TransactionList({
                   : t.description ||
                     (t.categoryName && seedName(t.categoryName)) ||
                     es.transactions[
-                      t.kind === "income"
-                        ? "income"
-                        : t.kind === "expense"
-                          ? "expense"
-                          : "transfer"
+                      t.kind === "income" || t.kind === "expense" || t.kind === "refund"
+                        ? t.kind
+                        : "transfer"
                     ]}
               </p>
               <p className="text-xs text-fg-subtle">
@@ -215,6 +216,20 @@ export function TransactionList({
                   <> · {toLeg ? `${t.walletName} → ${toLeg.walletName}` : t.walletName}</>
                 )}
                 {t.categoryName && t.description && <> · {seedName(t.categoryName)}</>}
+                {t.kind === "refund" && (t.description || t.categoryName) && (
+                  <> · {es.transactions.refund}</>
+                )}
+                {t.kind === "expense" && t.refundedCents > 0 && (
+                  <span className="text-accent">
+                    {" · "}
+                    {t.refundableCents === 0
+                      ? es.transactions.refundedFull
+                      : es.transactions.refundedPartial.replace(
+                          "{amount}",
+                          money(t.refundedCents, currency),
+                        )}
+                  </span>
+                )}
               </p>
             </div>
             <span className={`text-sm font-medium tabular-nums ${meta.color}`}>

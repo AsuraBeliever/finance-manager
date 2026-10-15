@@ -21,7 +21,7 @@ interface TransactionFiltersProps {
 }
 
 /** Filter bar shared by the transactions tab and the wallet detail: type,
- *  category (only for income/expense), date window and optionally the wallet. */
+ *  category (only for income/expense/refund), date window and optionally the wallet. */
 export function TransactionFilters({
   kind,
   categoryId,
@@ -68,6 +68,7 @@ export function TransactionFilters({
             ["", es.transactions.typeAll],
             ["income", es.transactions.income],
             ["expense", es.transactions.expense],
+            ["refund", es.transactions.refund],
             ["transfer", es.transactions.transfer],
           ] as const
         ).map(([val, label]) => (
@@ -75,7 +76,7 @@ export function TransactionFilters({
             key={val || "all"}
             type="button"
             onClick={() => onChange({ kind: val, categoryId: "" })}
-            className={`flex-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none ${
+            className={`flex-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-sm font-medium transition-colors sm:flex-none sm:px-3 ${
               kind === val
                 ? "bg-surface-raised text-fg shadow-sm"
                 : "text-fg-subtle hover:text-fg"
@@ -85,8 +86,9 @@ export function TransactionFilters({
           </button>
         ))}
       </div>
-      {/* Category only applies to income/expense, scoped to the chosen kind. */}
-      {(kind === "income" || kind === "expense") && (
+      {/* Category only applies to income/expense/refund, scoped to the chosen
+          kind (refunds use expense categories). */}
+      {(kind === "income" || kind === "expense" || kind === "refund") && (
         <div className="w-full sm:w-56">
           <select
             className={inputClass}
@@ -100,7 +102,7 @@ export function TransactionFilters({
           >
             <option value="">{es.transactions.allCategories}</option>
             {categories.data
-              ?.filter((c) => c.kind === kind)
+              ?.filter((c) => c.kind === (kind === "refund" ? "expense" : kind))
               .map((c) => (
                 <option key={c.id} value={c.id}>
                   {seedName(c.name, c.isSystem)}

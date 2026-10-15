@@ -137,6 +137,10 @@ fn tx_from_row(r: &Row) -> rusqlite::Result<Transaction> {
         // Legacy desktop DB (read-only backup) never tracked a time.
         occurred_time: None,
         created_at: r.get("created_at")?,
+        // Refunds only exist in the cloud DB (migration 0040).
+        refund_of_id: None,
+        refunded_cents: 0,
+        refundable_cents: 0,
     })
 }
 

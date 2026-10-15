@@ -113,7 +113,9 @@ export interface CreditCardSummary {
   msiPlans: MsiPlan[];
 }
 
-export type TransactionKind = "income" | "expense" | "transfer_in" | "transfer_out";
+/** "refund" = money back for an expense: adds to the wallet, nets against its
+ *  (expense) category's spending, never counts as income. */
+export type TransactionKind = "income" | "expense" | "refund" | "transfer_in" | "transfer_out";
 
 /** A transaction row's kind as shown in the history. Beyond the real kinds, the
  *  list also surfaces read-only apartado moves to/from goals ("reserve" /
@@ -145,6 +147,12 @@ export interface Transaction {
   /** Local wall-clock time 'HH:MM' the movement happened, or null if untimed. */
   occurredTime: string | null;
   createdAt: string;
+  /** On a refund: the expense it gives money back for, if linked. */
+  refundOfId: number | null;
+  /** On an expense: what its linked refunds returned so far (0 if none). */
+  refundedCents: number;
+  /** On an expense: what can still be refunded (computed in Rust; 0 otherwise). */
+  refundableCents: number;
 }
 
 export interface ExchangeRate {

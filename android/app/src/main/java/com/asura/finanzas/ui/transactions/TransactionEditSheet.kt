@@ -84,6 +84,20 @@ private fun SimpleEditSheet(
     val scope = rememberCoroutineScope()
     val colors = Broke.colors
 
+    // "Register refund" on an expense turns this sheet into a new refund of
+    // it, the same swap the web modal makes.
+    var refunding by remember { mutableStateOf(false) }
+    if (refunding) {
+        TransactionFormSheet(
+            repository = repository,
+            wallets = wallets,
+            onDismiss = onDismiss,
+            onSaved = onSaved,
+            refundOf = transaction,
+        )
+        return
+    }
+
     var categories by remember { mutableStateOf<List<TransactionCategory>>(emptyList()) }
     var wallet by remember {
         mutableStateOf(wallets.firstOrNull { it.id == transaction.walletId })
@@ -109,7 +123,9 @@ private fun SimpleEditSheet(
     val noCategory = stringResource(R.string.transactions_no_category)
 
     LaunchedEffect(Unit) {
-        categories = runCatching { repository.transactionCategories(transaction.kind) }
+        // A refund files under an expense category.
+        val categoryKind = if (transaction.kind == "refund") "expense" else transaction.kind
+        categories = runCatching { repository.transactionCategories(categoryKind) }
             .getOrDefault(emptyList())
         category = categories.firstOrNull { it.id == transaction.categoryId }
     }
@@ -123,6 +139,11 @@ private fun SimpleEditSheet(
         error = error,
         canSave = canSave,
         onDismiss = onDismiss,
+        extraAction = if (transaction.kind == "expense" && transaction.refundableCents > 0) {
+            stringResource(R.string.transactions_register_refund) to { refunding = true }
+        } else {
+            null
+        },
         onSave = {
             val chosen = wallet ?: return@FormSheet
             busy = true

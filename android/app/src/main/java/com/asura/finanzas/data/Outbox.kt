@@ -12,7 +12,7 @@ import java.io.File
 import java.util.UUID
 
 /**
- * Offline capture queue, deliberately append-only: only the three capture
+ * Offline capture queue, deliberately append-only: only the capture
  * commands can be queued, so replaying one can never conflict with an edit made
  * elsewhere. Each item carries the `clientId` the server uses for idempotency
  * (unique index on `transactions.client_id`), so a replay after a dropped
@@ -28,7 +28,7 @@ import java.util.UUID
 data class OutboxItem(
     /** Also sent as `clientId`, which is what makes a retry safe. */
     val id: String,
-    /** One of add_income | add_expense | add_transfer. */
+    /** One of add_income | add_expense | add_refund | add_transfer. */
     val command: String,
     val args: JsonObject,
     val createdAt: String,

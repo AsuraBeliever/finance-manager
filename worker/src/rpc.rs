@@ -90,6 +90,7 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         // ---- transactions ----
         "add_income" => out(transactions::add_income(db, uid, args(body)?).await?),
         "add_expense" => out(transactions::add_expense(db, uid, args(body)?).await?),
+        "add_refund" => out(transactions::add_refund(db, uid, args(body)?).await?),
         "add_transfer" => out(transactions::add_transfer(db, uid, args(body)?).await?),
         "get_transfer" => out(transactions::get_transfer(db, uid, args(body)?).await?),
         "update_transfer" => out(transactions::update_transfer(db, uid, args(body)?).await?),

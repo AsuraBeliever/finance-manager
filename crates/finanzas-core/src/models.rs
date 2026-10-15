@@ -84,7 +84,9 @@ pub struct Transaction {
     pub id: i64,
     pub wallet_id: i64,
     pub wallet_name: String,
-    pub kind: String, // 'income' | 'expense' | 'transfer_in' | 'transfer_out'
+    /// 'income' | 'expense' | 'refund' | 'transfer_in' | 'transfer_out'.
+    /// 'refund' is stored as income with `is_refund = 1` (migration 0040).
+    pub kind: String,
     pub amount_cents: i64,
     pub category_id: Option<i64>,
     pub category_name: Option<String>,
@@ -95,6 +97,16 @@ pub struct Transaction {
     /// rows and apartado rows that predate/lack a time.
     pub occurred_time: Option<String>,
     pub created_at: String,
+    /// On a refund: the expense it gives money back for, if linked.
+    #[serde(default)]
+    pub refund_of_id: Option<i64>,
+    /// On an expense: what its linked refunds have returned so far (0 if none).
+    #[serde(default)]
+    pub refunded_cents: i64,
+    /// On an expense: what can still be refunded (amount − refunded, ≥ 0);
+    /// 0 on every other kind.
+    #[serde(default)]
+    pub refundable_cents: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

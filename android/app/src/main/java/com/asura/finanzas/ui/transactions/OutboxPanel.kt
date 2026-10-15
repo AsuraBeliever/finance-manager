@@ -174,6 +174,7 @@ private fun itemSummary(
     val kind = stringResource(
         when (item.command) {
             "add_income" -> R.string.transactions_income
+            "add_refund" -> R.string.transactions_refund
             "add_transfer" -> R.string.transactions_transfer
             else -> R.string.transactions_expense
         },

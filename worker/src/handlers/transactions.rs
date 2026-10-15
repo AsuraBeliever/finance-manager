@@ -5,6 +5,7 @@
 use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::models::{Transaction, TransactionCategory};
 use finanzas_core::period::{resolve_period, Period};
+use finanzas_core::refund::{remaining_refundable, validate_refund_amount};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 use worker::D1Database;
@@ -73,6 +74,10 @@ pub struct SimpleTxArgs {
     /// attribute real charges to a subscription. NULL for ordinary entries.
     #[serde(default)]
     pub subscription_id: Option<i64>,
+    /// Only for `add_refund`: the expense this refund gives money back for.
+    /// Ignored by `add_income` / `add_expense`.
+    #[serde(default)]
+    pub refund_of_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -80,15 +85,25 @@ struct IdRow {
     id: i64,
 }
 
+/// What gets stored for a simple movement. Refunds are income rows flagged
+/// `is_refund` (migration 0040) — they add to the balance like income but the
+/// API calls them 'refund' and analytics nets them against spending.
+#[derive(Clone, Copy, PartialEq)]
+enum SimpleKind {
+    Income,
+    Expense,
+    Refund,
+}
+
 async fn insert_simple(
     db: &D1Database,
     uid: i64,
-    kind: &str, // 'income' | 'expense'
-    a: SimpleTxArgs,
+    kind: SimpleKind,
+    mut a: SimpleTxArgs,
 ) -> AppResult<i64> {
     validate_amount(a.amount_cents)?;
     validate_date(&a.occurred_at)?;
-    let occurred_time = validate_time(a.occurred_time)?;
+    let occurred_time = validate_time(a.occurred_time.take())?;
     wallet_exists(db, uid, a.wallet_id).await?;
     if let Some(client_id) = &a.client_id {
         // already applied (response was lost mid-flight): return the same id
@@ -102,22 +117,121 @@ async fn insert_simple(
             return Ok(row.id);
         }
     }
+    let (db_kind, is_refund) = match kind {
+        SimpleKind::Income => ("income", 0),
+        SimpleKind::Expense => ("expense", 0),
+        SimpleKind::Refund => ("income", 1),
+    };
+    if kind == SimpleKind::Refund {
+        check_refund(db, uid, &mut a, None).await?;
+    } else {
+        a.refund_of_id = None;
+    }
     let res = exec(
         db,
-        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at, occurred_time, client_id, subscription_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-        jsv![a.wallet_id, kind, a.amount_cents, a.category_id, a.description, a.occurred_at, occurred_time, a.client_id, a.subscription_id],
+        "INSERT INTO transactions (wallet_id, kind, amount_cents, category_id, description, occurred_at, occurred_time, client_id, subscription_id, is_refund, refund_of_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        jsv![a.wallet_id, db_kind, a.amount_cents, a.category_id, a.description, a.occurred_at, occurred_time, a.client_id, a.subscription_id, is_refund, a.refund_of_id],
     )
     .await?;
     last_row_id(&res)
 }
 
+/// Validates a refund before it is written: its category must be an expense
+/// category, and when it is linked to an expense, that expense must be the
+/// caller's, and (same currency) the refunds can't return more than was spent.
+/// An unset category inherits the expense's. `editing` is the refund's own id
+/// on update, left out of what was already refunded.
+async fn check_refund(
+    db: &D1Database,
+    uid: i64,
+    a: &mut SimpleTxArgs,
+    editing: Option<i64>,
+) -> AppResult<()> {
+    a.subscription_id = None;
+    if let Some(orig_id) = a.refund_of_id {
+        #[derive(Deserialize)]
+        struct OrigRow {
+            kind: String,
+            amount_cents: i64,
+            category_id: Option<i64>,
+            currency_code: String,
+        }
+        let orig: OrigRow = first(
+            db,
+            "SELECT t.kind, t.amount_cents, t.category_id, w.currency_code
+             FROM transactions t JOIN wallets w ON w.id = t.wallet_id AND w.user_id = ?2
+             WHERE t.id = ?1",
+            jsv![orig_id, uid],
+        )
+        .await?
+        .ok_or(AppError::NotFound("gasto"))?;
+        if orig.kind != "expense" {
+            return Err(AppError::InvalidInput(
+                "sólo se puede reembolsar un gasto".into(),
+            ));
+        }
+        if a.category_id.is_none() {
+            a.category_id = orig.category_id;
+        }
+        #[derive(Deserialize)]
+        struct CurRow {
+            currency_code: String,
+        }
+        let cur: Option<CurRow> = first(
+            db,
+            "SELECT currency_code FROM wallets WHERE id = ?1",
+            jsv![a.wallet_id],
+        )
+        .await?;
+        // Amounts in different currencies can't be compared without guessing a
+        // rate, so the cap only applies when the refund lands in the same one.
+        if cur.map(|c| c.currency_code) == Some(orig.currency_code) {
+            #[derive(Deserialize)]
+            struct SumRow {
+                total: i64,
+            }
+            let refunded = first::<SumRow>(
+                db,
+                "SELECT COALESCE(SUM(amount_cents), 0) AS total FROM transactions
+                 WHERE refund_of_id = ?1 AND id <> ?2",
+                jsv![orig_id, editing.unwrap_or(0)],
+            )
+            .await?
+            .map(|r| r.total)
+            .unwrap_or(0);
+            validate_refund_amount(a.amount_cents, orig.amount_cents, refunded)?;
+        }
+    }
+    if let Some(cid) = a.category_id {
+        let ok: Option<CountRow> = first(
+            db,
+            "SELECT COUNT(*) AS n FROM transaction_categories
+             WHERE id = ?1 AND kind = 'expense' AND (user_id IS NULL OR user_id = ?2)",
+            jsv![cid, uid],
+        )
+        .await?;
+        if ok.map(|r| r.n).unwrap_or(0) == 0 {
+            return Err(AppError::InvalidInput(
+                "un reembolso va en una categoría de gasto".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub async fn add_income(db: &D1Database, uid: i64, a: SimpleTxArgs) -> AppResult<i64> {
-    insert_simple(db, uid, "income", a).await
+    insert_simple(db, uid, SimpleKind::Income, a).await
 }
 
 pub async fn add_expense(db: &D1Database, uid: i64, a: SimpleTxArgs) -> AppResult<i64> {
-    insert_simple(db, uid, "expense", a).await
+    insert_simple(db, uid, SimpleKind::Expense, a).await
+}
+
+/// Money back for an expense: adds to the wallet, nets against the spending of
+/// its (expense) category, never counts as income.
+pub async fn add_refund(db: &D1Database, uid: i64, a: SimpleTxArgs) -> AppResult<i64> {
+    insert_simple(db, uid, SimpleKind::Refund, a).await
 }
 
 #[derive(Deserialize)]
@@ -261,23 +375,25 @@ pub struct UpdateTxArgs {
     pub occurred_time: Option<String>,
 }
 
-/// Edits an income/expense transaction (amount, wallet, category, note, date).
+/// Edits an income/expense/refund transaction (amount, wallet, category, note, date).
 /// Transfers aren't editable here — they're two linked legs; delete & recreate.
 pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> AppResult<()> {
     validate_amount(a.amount_cents)?;
     validate_date(&a.occurred_at)?;
-    let occurred_time = validate_time(a.occurred_time)?;
+    let occurred_time = validate_time(a.occurred_time.clone())?;
     wallet_exists(db, uid, a.wallet_id).await?;
 
     #[derive(Deserialize)]
     struct KindRow {
         kind: String,
         transfer_group_id: Option<String>,
+        is_refund: i64,
+        refund_of_id: Option<i64>,
     }
     // Confirm ownership (JOIN wallets) and that it's a plain income/expense.
     let row: Option<KindRow> = first(
         db,
-        "SELECT t.kind, t.transfer_group_id FROM transactions t
+        "SELECT t.kind, t.transfer_group_id, t.is_refund, t.refund_of_id FROM transactions t
          JOIN wallets w ON w.id = t.wallet_id AND w.user_id = ?2
          WHERE t.id = ?1",
         jsv![a.id, uid],
@@ -288,6 +404,23 @@ pub async fn update_transaction(db: &D1Database, uid: i64, a: UpdateTxArgs) -> A
         return Err(AppError::InvalidInput(
             "las transferencias no se pueden editar; elimínala y créala de nuevo".into(),
         ));
+    }
+    let mut a = a;
+    if row.is_refund == 1 {
+        // A refund stays linked to the same expense; re-check it still fits.
+        let mut check = SimpleTxArgs {
+            wallet_id: a.wallet_id,
+            amount_cents: a.amount_cents,
+            category_id: a.category_id,
+            description: None,
+            occurred_at: String::new(),
+            occurred_time: None,
+            client_id: None,
+            subscription_id: None,
+            refund_of_id: row.refund_of_id,
+        };
+        check_refund(db, uid, &mut check, Some(a.id)).await?;
+        a.category_id = check.category_id;
     }
     let res = exec(
         db,
@@ -507,6 +640,11 @@ fn push_tx_filter(sql: &mut String, params: &mut Vec<JsValue>, f: &TxFilter) {
         if kind == "transfer" {
             // A single "transfer" filter covers both directions.
             sql.push_str(" AND t.kind IN ('transfer_in', 'transfer_out')");
+        } else if kind == "refund" {
+            sql.push_str(" AND t.is_refund = 1");
+        } else if kind == "income" {
+            // Refunds are stored as income but are never shown as such.
+            sql.push_str(" AND t.kind = 'income' AND t.is_refund = 0");
         } else {
             sql.push_str(" AND t.kind = ?");
             params.push(kind.to_js());
@@ -553,6 +691,8 @@ struct TxRow {
     #[serde(default)]
     occurred_time: Option<String>,
     created_at: String,
+    refund_of_id: Option<i64>,
+    refunded_cents: i64,
 }
 
 impl From<TxRow> for Transaction {
@@ -561,6 +701,7 @@ impl From<TxRow> for Transaction {
             id: r.id,
             wallet_id: r.wallet_id,
             wallet_name: r.wallet_name,
+            refundable_cents: refundable(&r.kind, r.amount_cents, r.refunded_cents),
             kind: r.kind,
             amount_cents: r.amount_cents,
             category_id: r.category_id,
@@ -570,7 +711,18 @@ impl From<TxRow> for Transaction {
             occurred_at: r.occurred_at,
             occurred_time: r.occurred_time,
             created_at: r.created_at,
+            refund_of_id: r.refund_of_id,
+            refunded_cents: r.refunded_cents,
         }
+    }
+}
+
+/// What an expense row can still get back; 0 for any other kind.
+pub(crate) fn refundable(kind: &str, amount_cents: i64, refunded_cents: i64) -> i64 {
+    if kind == "expense" {
+        remaining_refundable(amount_cents, refunded_cents)
+    } else {
+        0
     }
 }
 
@@ -588,11 +740,17 @@ pub async fn list_transactions(
     // where its own visible time says it belongs. created_at is UTC; -6h is
     // CDMX wall clock, the same fixed offset the rest of the backend assumes.
     let mut sql = String::from(
-        "SELECT t.id, t.wallet_id, w.name AS wallet_name, t.kind, t.amount_cents,
-                t.category_id, tc.name AS category_name, t.transfer_group_id,
+        "SELECT t.id, t.wallet_id, w.name AS wallet_name,
+                CASE WHEN t.is_refund = 1 THEN 'refund' ELSE t.kind END AS kind,
+                t.amount_cents, t.category_id, tc.name AS category_name, t.transfer_group_id,
                 t.description, t.occurred_at, t.occurred_time, t.created_at,
                 COALESCE(t.occurred_time,
-                         strftime('%H:%M', datetime(t.created_at, '-6 hours')))
+                         strftime('%H:%M', datetime(t.created_at, '-6 hours'))),
+                t.refund_of_id AS refund_of_id,
+                CASE WHEN t.kind = 'expense'
+                     THEN COALESCE((SELECT SUM(r.amount_cents) FROM transactions r
+                                    WHERE r.refund_of_id = t.id), 0)
+                     ELSE 0 END AS refunded_cents
          FROM transactions t
          JOIN wallets w ON w.id = t.wallet_id
          LEFT JOIN transaction_categories tc ON tc.id = t.category_id
@@ -611,7 +769,7 @@ pub async fn list_transactions(
              SELECT -gc.id, g.linked_wallet_id, w2.name,
                     CASE WHEN gc.amount_cents >= 0 THEN 'reserve' ELSE 'release' END,
                     ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, NULL, gc.created_at,
-                    strftime('%H:%M', datetime(gc.created_at, '-6 hours'))
+                    strftime('%H:%M', datetime(gc.created_at, '-6 hours')), NULL, 0
              FROM goal_contributions gc
              JOIN savings_goals g ON g.id = gc.goal_id
              JOIN wallets w2 ON w2.id = g.linked_wallet_id
@@ -684,10 +842,10 @@ struct TotalRow {
     n: i64,
 }
 
-/// Totals for a filtered slice of the history. Only income and expense add up
+/// Totals for a filtered slice of the history. Only income, expense and refunds add up
 /// to something meaningful — transfers move money between the user's own
 /// wallets and apartado rows never touched a balance — so the filter must name
-/// one of those two kinds.
+/// one of those kinds.
 pub async fn sum_transactions(
     db: &D1Database,
     uid: i64,
@@ -695,10 +853,10 @@ pub async fn sum_transactions(
 ) -> AppResult<TxTotals> {
     let f = args.filter;
     match f.kind.as_deref() {
-        Some("income") | Some("expense") => {}
+        Some("income") | Some("expense") | Some("refund") => {}
         _ => {
             return Err(AppError::InvalidInput(
-                "el total sólo aplica a ingresos o gastos".into(),
+                "el total sólo aplica a ingresos, gastos o reembolsos".into(),
             ))
         }
     }

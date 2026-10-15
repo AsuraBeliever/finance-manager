@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.47.0",
+    date: "2026-10-14",
+    es: [
+      "Nuevo: reembolsos. Cuando te regresan dinero de un gasto, regístralo como «Reembolso» (o desde el gasto con «Registrar reembolso» al editarlo): suma a tu cartera, pero no cuenta como ingreso, sino que resta del gasto de su categoría en el mes en que llega. Así tus ingresos ya no se inflan y tus gastos y presupuestos muestran lo que de verdad gastaste. El gasto muestra cuánto se ha reembolsado. En la web y en la app de Android.",
+    ],
+    en: [
+      "New: refunds. When you get money back for an expense, log it as a \"Refund\" (or from the expense itself with \"Register refund\" while editing it): it adds to your wallet but doesn't count as income; instead it reduces that category's spending in the month it arrives. Your income is no longer inflated, and your spending and budgets show what you really spent. The expense shows how much has been refunded. On the web and in the Android app.",
+    ],
+  },
+  {
     version: "2.46.0",
     date: "2026-10-10",
     es: [

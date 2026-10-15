@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Undo2 } from "lucide-react";
 import { Modal } from "../../../components/Modal";
 import { getCategoryTransactions, listWallets } from "../../../lib/api";
 import { transactionTime } from "../../../lib/date";
@@ -22,6 +22,8 @@ export interface CategoryDetailTarget {
 const meta = {
   income: { icon: ArrowDownLeft, sign: "+", color: "text-accent" },
   expense: { icon: ArrowUpRight, sign: "−", color: "text-danger" },
+  // An expense slice also lists the refunds that netted against it.
+  refund: { icon: Undo2, sign: "+", color: "text-accent" },
 } as const;
 
 /** Read-only list of the transactions behind one breakdown slice, over the same
@@ -52,7 +54,6 @@ export function CategoryDetailModal({
   });
 
   const rows = q.data ?? [];
-  const { icon: Icon, sign, color } = meta[kind];
   const countLabel =
     rows.length === 1
       ? es.dashboard.movementOne
@@ -84,6 +85,7 @@ export function CategoryDetailModal({
           ) : (
             <ul className="divide-y divide-border-muted">
               {rows.map((t) => {
+                const { icon: Icon, sign, color } = meta[t.kind === "refund" ? "refund" : kind];
                 const time = transactionTime(t.occurredTime, t.createdAt, tz, clock);
                 return (
                   <li key={t.id} className="flex items-center gap-3 py-2.5">
@@ -99,6 +101,7 @@ export function CategoryDetailModal({
                       <p className="text-xs text-fg-subtle">
                         {t.occurredAt}
                         {time && <> · {time}</>} · {t.walletName}
+                        {t.kind === "refund" && <> · {es.transactions.refund}</>}
                       </p>
                     </div>
                     <span className={`text-sm font-medium tabular-nums ${color}`}>

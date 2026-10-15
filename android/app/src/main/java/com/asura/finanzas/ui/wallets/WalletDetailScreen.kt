@@ -148,7 +148,7 @@ fun WalletDetailScreen(
             ).value
         }.getOrDefault(emptyList())
         // The web only totals a single-kind filter; "all" has nothing to add up.
-        totals = txKind.wire?.takeIf { it == "income" || it == "expense" }?.let { kind ->
+        totals = txKind.wire?.takeIf { txKind.hasTotal }?.let { kind ->
             runCatching {
                 repository.transactionTotals(kind, walletId, txCategory?.id, txPeriod.toJson())
             }.getOrNull()
@@ -279,13 +279,14 @@ fun WalletDetailScreen(
                 fillEqually = true,
             )
         }
-        // Category only applies to income/expense, scoped to the chosen kind.
-        if (txKind == KindFilter.Income || txKind == KindFilter.Expense) {
+        // Category only applies to income/expense/refund, scoped to the chosen
+        // kind (refunds use expense categories).
+        if (txKind.categoryKind != null) {
             item {
                 PickerField(
                     label = "",
                     options = listOf<TransactionCategory?>(null) +
-                        categories.filter { it.kind == txKind.wire },
+                        categories.filter { it.kind == txKind.categoryKind },
                     selected = txCategory,
                     optionLabel = {
                         it?.let { c -> seedName(c.name, c.isSystem) }
@@ -308,7 +309,7 @@ fun WalletDetailScreen(
         totals?.let { summary ->
             item {
                 Box(Modifier.padding(bottom = 16.dp)) {
-                    TransactionTotal(summary, hide, income = txKind.wire == "income")
+                    TransactionTotal(summary, hide, txKind.wire)
                 }
             }
         }
