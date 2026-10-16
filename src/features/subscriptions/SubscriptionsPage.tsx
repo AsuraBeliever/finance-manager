@@ -118,12 +118,15 @@ export function SubscriptionsPage() {
                 <p className="text-xs text-fg-subtle">
                   {sub.cadence === "yearly" ? es.subscriptions.yearly : es.subscriptions.monthly}
                   {" · "}
-                  {es.subscriptions.nextCharge}: {sub.nextChargeDate}
+                  {es.subscriptions.nextCharge}:{" "}
+                  <span className="whitespace-nowrap">
+                    {sub.nextChargeDate}
+                    {sub.autoCharge && sub.chargeTime && ` ${formatTime(sub.chargeTime, clock)}`}
+                  </span>
                 </p>
                 {sub.autoCharge && (
                   <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
                     <Repeat size={11} /> {es.subscriptions.autoBadge}
-                    {sub.chargeTime && ` · ${formatTime(sub.chargeTime, clock)}`}
                   </span>
                 )}
               </div>

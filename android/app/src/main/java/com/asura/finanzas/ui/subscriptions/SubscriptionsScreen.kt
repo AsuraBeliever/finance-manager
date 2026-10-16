@@ -285,7 +285,11 @@ private fun SubscriptionCard(
                         if (subscription.cadence == "yearly") R.string.subscriptions_yearly
                         else R.string.subscriptions_monthly,
                     ) + " · " + stringResource(R.string.subscriptions_next_charge) +
-                        ": " + subscription.nextChargeDate,
+                        ": " + subscription.nextChargeDate +
+                        // The automatic charge's time, kept on one line with the
+                        // date (NBSP) like the web's `whitespace-nowrap`.
+                        (chargeTimeLabel(subscription.chargeTime.takeIf { subscription.autoCharge })
+                            ?.let { "\u00A0" + it.replace(' ', '\u00A0') } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
                 )
@@ -307,8 +311,7 @@ private fun SubscriptionCard(
                             modifier = Modifier.size(11.dp),
                         )
                         Text(
-                            stringResource(R.string.subscriptions_auto_badge) +
-                                (chargeTimeLabel(subscription.chargeTime)?.let { " · $it" } ?: ""),
+                            stringResource(R.string.subscriptions_auto_badge),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
