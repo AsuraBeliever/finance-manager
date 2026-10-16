@@ -470,6 +470,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Presupuestos: lista, fijar, editar, borrar | `ui/budgets` | ✅ borrar confirma |
 | Suscripciones: lista, crear, editar, pagar, pausar, borrar | `ui/subscriptions` | ✅ borrar confirma |
 | Suscripciones: check «Cobro automático» + insignia «Automático» | `ui/subscriptions` | ✅ |
+| Suscripciones: «Hora del cobro» editable (sólo con cobro automático) + hora en la insignia («Automático · 9:00 a.m.») | `ui/subscriptions` | ✅ `TimeField` = `TimeInput`, respeta reloj 12/24 h |
 | Categorías: lista, crear, renombrar, borrar/ocultar, restaurar, reordenar | `ui/categories` | ✅ ocultar/borrar confirma, con el mensaje que toca |
 
 ## Ajustes

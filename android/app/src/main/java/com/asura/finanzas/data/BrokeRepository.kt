@@ -1066,6 +1066,8 @@ class BrokeRepository(
          *  clears the column. */
         icon: String?,
         autoCharge: Boolean,
+        /** 'HH:MM'; null = start of the day. */
+        chargeTime: String?,
     ) {
         val body = buildJsonObject {
             id?.let { put("id", it) }
@@ -1079,6 +1081,7 @@ class BrokeRepository(
             categoryId?.let { put("categoryId", it) }
             color?.let { put("color", it) }
             put("autoCharge", autoCharge)
+            chargeTime?.let { put("chargeTime", it) }
         }
         rpc.call(if (id == null) "create_subscription" else "update_subscription", body)
         cache.invalidateReads()

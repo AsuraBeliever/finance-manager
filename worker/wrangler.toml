@@ -36,7 +36,9 @@ migrations_dir = "migrations"
 #                            behind the cetesdirecto app. Two later passes catch
 #                            the page once it flips (a second one in case it
 #                            publishes late); the refresh is idempotent.
-crons = ["0 7 * * *", "0 15 * * *", "0 20 * * *"]
+# Every 5 minutes: automatic subscription charges only (each fires at its own
+#   charge_time, CDMX) — dispatched by cron string in lib.rs (SUBSCRIPTION_CRON).
+crons = ["0 7 * * *", "0 15 * * *", "0 20 * * *", "*/5 * * * *"]
 
 [vars]
 # Secrets (GOOGLE_CLIENT_SECRET) via `wrangler secret put`. Registration is open

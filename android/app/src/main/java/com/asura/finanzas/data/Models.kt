@@ -281,6 +281,8 @@ data class Subscription(
     val isActive: Boolean = true,
     /** Booked by the daily cron on each charge date (vs. only by hand). */
     val autoCharge: Boolean = false,
+    /** 'HH:MM' (Mexico City) the automatic charge fires at; null = start of day. */
+    val chargeTime: String? = null,
     val chargedInPeriod: Boolean = false,
 )
 

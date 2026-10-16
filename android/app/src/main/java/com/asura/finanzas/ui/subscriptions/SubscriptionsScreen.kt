@@ -46,6 +46,9 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Subscription
 import com.asura.finanzas.data.SubscriptionList
 import com.asura.finanzas.ui.LocalAppSettings
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.ConfirmDialog
@@ -304,7 +307,8 @@ private fun SubscriptionCard(
                             modifier = Modifier.size(11.dp),
                         )
                         Text(
-                            stringResource(R.string.subscriptions_auto_badge),
+                            stringResource(R.string.subscriptions_auto_badge) +
+                                (chargeTimeLabel(subscription.chargeTime)?.let { " · $it" } ?: ""),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
@@ -354,4 +358,17 @@ private fun RowAction(
             .padding(6.dp)
             .size(16.dp),
     )
+}
+
+/** A stored 'HH:MM' in the chosen 12/24 h clock and app language — the web's
+ *  `formatTime`. Null when there is no time. */
+@Composable
+private fun chargeTimeLabel(time: String?): String? {
+    if (time.isNullOrBlank()) return null
+    val settings = LocalAppSettings.current
+    val locale = if (settings.locale.startsWith("en")) Locale.US else Locale.forLanguageTag("es-MX")
+    val pattern = if (settings.clock24) "HH:mm" else "h:mm a"
+    return runCatching {
+        LocalTime.parse(time).format(DateTimeFormatter.ofPattern(pattern, locale))
+    }.getOrNull() ?: time
 }
