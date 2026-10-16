@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.48.0",
+    date: "2026-10-16",
+    es: [
+      "Ahora eliges a qué hora salta el cobro automático de una suscripción: al activar «Cobro automático» aparece «Hora del cobro» (hora de Ciudad de México). El gasto se registra a esa hora —a lo más unos minutos después— y queda con esa hora en tus movimientos; la lista muestra la hora junto al próximo cargo. Si la dejas vacía, se cobra al iniciar el día, como hasta ahora. En la web y en la app de Android.",
+    ],
+    en: [
+      "You can now choose what time a subscription's automatic charge fires: turning on \"Automatic charge\" shows \"Charge time\" (Mexico City time). The expense is logged at that time —at most a few minutes later— and keeps that time in your transactions; the list shows the time next to the next charge. Leave it empty and it's charged at the start of the day, as before. On the web and in the Android app.",
+    ],
+  },
+  {
     version: "2.47.0",
     date: "2026-10-14",
     es: [
