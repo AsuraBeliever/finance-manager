@@ -6,7 +6,7 @@
 //! natively. Occurrences are computed from the original anchor (one calendar
 //! clamp per step, never cumulative), so they stay strictly monotonic.
 
-use chrono::{Datelike, Months, NaiveDate};
+use chrono::{Datelike, Months, NaiveDate, NaiveTime};
 
 fn add_months(d: NaiveDate, months: i32) -> NaiveDate {
     let r = if months >= 0 {
@@ -76,6 +76,21 @@ pub fn due_charges(
         k += 1;
     }
     (due, occ(k))
+}
+
+/// Last calendar day whose charge is already owed at wall-clock `now` (Mexico
+/// City). A charge is owed on its date once `now` reaches the subscription's
+/// `charge_time`; without one (`None`) it is owed from the start of the day.
+/// Feed the result to [`due_charges`] as its `today`.
+pub fn charge_cutoff(
+    today: NaiveDate,
+    now: NaiveTime,
+    charge_time: Option<NaiveTime>,
+) -> NaiveDate {
+    match charge_time {
+        Some(t) if now < t => today.pred_opt().unwrap_or(today),
+        _ => today,
+    }
 }
 
 /// The charge date after `current` (one cadence step), used when a payment is
@@ -195,6 +210,56 @@ mod tests {
         let (due, next) = due_charges(d(2026, 1, 5), 1, d(2026, 10, 10), 3);
         assert_eq!(due, vec![d(2026, 1, 5), d(2026, 2, 5), d(2026, 3, 5)]);
         assert_eq!(next, d(2026, 4, 5));
+    }
+
+    fn t(h: u32, m: u32) -> NaiveTime {
+        NaiveTime::from_hms_opt(h, m, 0).unwrap()
+    }
+
+    #[test]
+    fn no_charge_time_is_owed_from_midnight() {
+        assert_eq!(
+            charge_cutoff(d(2026, 10, 16), t(0, 5), None),
+            d(2026, 10, 16)
+        );
+    }
+
+    #[test]
+    fn before_charge_time_today_is_not_owed_yet() {
+        // 08:55 with a 09:00 charge: today's charge waits, yesterday's is owed.
+        assert_eq!(
+            charge_cutoff(d(2026, 10, 16), t(8, 55), Some(t(9, 0))),
+            d(2026, 10, 15)
+        );
+        let (due, next) = due_charges(
+            d(2026, 10, 16),
+            1,
+            charge_cutoff(d(2026, 10, 16), t(8, 55), Some(t(9, 0))),
+            12,
+        );
+        assert!(due.is_empty());
+        assert_eq!(next, d(2026, 10, 16));
+    }
+
+    #[test]
+    fn at_or_after_charge_time_today_is_owed() {
+        assert_eq!(
+            charge_cutoff(d(2026, 10, 16), t(9, 0), Some(t(9, 0))),
+            d(2026, 10, 16)
+        );
+        assert_eq!(
+            charge_cutoff(d(2026, 10, 16), t(23, 59), Some(t(9, 0))),
+            d(2026, 10, 16)
+        );
+    }
+
+    #[test]
+    fn late_charge_time_still_catches_up_past_days() {
+        // Due Oct 15 at 22:00, cron at Oct 16 08:00 → Oct 15 owed, next Nov 15.
+        let cutoff = charge_cutoff(d(2026, 10, 16), t(8, 0), Some(t(22, 0)));
+        let (due, next) = due_charges(d(2026, 10, 15), 1, cutoff, 12);
+        assert_eq!(due, vec![d(2026, 10, 15)]);
+        assert_eq!(next, d(2026, 11, 15));
     }
 
     #[test]

@@ -6,13 +6,13 @@
 
 use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::period::{resolve_period, Period};
-use finanzas_core::subscription::{due_charges, next_after};
+use finanzas_core::subscription::{charge_cutoff, due_charges, next_after};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
 use super::dashboard::{convert, load_rates, to_mxn};
 use super::transactions::{add_expense, SimpleTxArgs};
-use crate::db::{all, batch, changes, exec, first, last_row_id, stmt, today_mx};
+use crate::db::{all, batch, changes, exec, first, last_row_id, now_mx, stmt, today_mx};
 use crate::jsv;
 
 #[derive(Deserialize, Default)]
@@ -36,8 +36,10 @@ pub struct Subscription {
     pub wallet_id: Option<i64>,
     pub category_id: Option<i64>,
     pub is_active: bool,
-    /// Charged by the daily cron on each due date (vs. only by hand).
+    /// Charged by the cron on each due date (vs. only by hand).
     pub auto_charge: bool,
+    /// 'HH:MM' (Mexico City) the automatic charge fires at; None = start of day.
+    pub charge_time: Option<String>,
     /// Whether a charge for this subscription falls inside the selected period.
     pub charged_in_period: bool,
 }
@@ -56,6 +58,7 @@ struct SubRow {
     category_id: Option<i64>,
     is_active: i64,
     auto_charge: i64,
+    charge_time: Option<String>,
 }
 
 impl From<SubRow> for Subscription {
@@ -74,12 +77,14 @@ impl From<SubRow> for Subscription {
             next_charge_date: r.next_charge_date,
             wallet_id: r.wallet_id,
             category_id: r.category_id,
+            charge_time: r.charge_time,
         }
     }
 }
 
 const SELECT: &str = "SELECT id, name, icon, color, amount_cents, currency_code, cadence,
-        next_charge_date, wallet_id, category_id, is_active, auto_charge FROM subscriptions";
+        next_charge_date, wallet_id, category_id, is_active, auto_charge, charge_time
+        FROM subscriptions";
 
 async fn fetch_sub(db: &D1Database, uid: i64, id: i64) -> AppResult<Subscription> {
     let row: SubRow = first(
@@ -189,6 +194,19 @@ pub struct SubInput {
     /// Older clients omit it → manual charging, the historical behaviour.
     #[serde(default)]
     pub auto_charge: bool,
+    /// 'HH:MM'; absent/blank = start of the day.
+    #[serde(default)]
+    pub charge_time: Option<String>,
+}
+
+/// Normalizes an optional 'HH:MM' (blank → None).
+fn parse_charge_time(time: Option<&str>) -> AppResult<Option<String>> {
+    match time.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Ok(None),
+        Some(s) => chrono::NaiveTime::parse_from_str(s, "%H:%M")
+            .map(|t| Some(t.format("%H:%M").to_string()))
+            .map_err(|_| AppError::InvalidInput("hora inválida (se espera HH:MM)".into())),
+    }
 }
 
 fn validate(a: &SubInput) -> AppResult<()> {
@@ -217,14 +235,16 @@ pub async fn create_subscription(
     a: SubInput,
 ) -> AppResult<Subscription> {
     validate(&a)?;
+    let charge_time = parse_charge_time(a.charge_time.as_deref())?;
     let res = exec(
         db,
         "INSERT INTO subscriptions
-           (user_id, name, icon, color, amount_cents, currency_code, cadence, next_charge_date, wallet_id, category_id, auto_charge, started_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, date('now'))",
+           (user_id, name, icon, color, amount_cents, currency_code, cadence, next_charge_date, wallet_id, category_id, auto_charge, charge_time, started_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, date('now'))",
         jsv![
             uid, a.name.trim(), a.icon, a.color, a.amount_cents, a.currency_code,
-            a.cadence, a.next_charge_date, a.wallet_id, a.category_id, a.auto_charge as i64
+            a.cadence, a.next_charge_date, a.wallet_id, a.category_id, a.auto_charge as i64,
+            charge_time
         ],
     )
     .await?;
@@ -246,16 +266,17 @@ pub async fn update_subscription(
 ) -> AppResult<Subscription> {
     validate(&a.input)?;
     let i = a.input;
+    let charge_time = parse_charge_time(i.charge_time.as_deref())?;
     let res = exec(
         db,
         "UPDATE subscriptions SET name = ?3, icon = ?4, color = ?5, amount_cents = ?6,
             currency_code = ?7, cadence = ?8, next_charge_date = ?9, wallet_id = ?10, category_id = ?11,
-            auto_charge = ?12
+            auto_charge = ?12, charge_time = ?13
          WHERE id = ?1 AND user_id = ?2",
         jsv![
             a.id, uid, i.name.trim(), i.icon, i.color, i.amount_cents,
             i.currency_code, i.cadence, i.next_charge_date, i.wallet_id, i.category_id,
-            i.auto_charge as i64
+            i.auto_charge as i64, charge_time
         ],
     )
     .await?;
@@ -393,8 +414,10 @@ fn parse_day(s: &str) -> AppResult<chrono::NaiveDate> {
 /// after a long outage, or a next date set far in the past).
 const MAX_CATCH_UP: usize = 12;
 
-/// Cron: books every due charge of active auto-charging subscriptions, each
-/// dated on its own charge date, and advances `next_charge_date`. Inserts and
+/// Cron (every few minutes): books every due charge of active auto-charging
+/// subscriptions, each dated on its own charge date — and timed at its
+/// `charge_time`, which also gates today's charge — and advances
+/// `next_charge_date`. Inserts and
 /// the date update share one batch; client_id 'sub:<id>:<date>' plus the
 /// `next_charge_date = old` guard keep overlapping runs from double-charging.
 pub async fn post_due_subscriptions(db: &D1Database) -> AppResult<()> {
@@ -409,13 +432,15 @@ pub async fn post_due_subscriptions(db: &D1Database) -> AppResult<()> {
         next_charge_date: String,
         wallet_id: i64,
         category_id: Option<i64>,
+        charge_time: Option<String>,
         wallet_currency: String,
     }
-    let today = today_mx();
+    let now = now_mx();
+    let today = now.date();
     let rows: Vec<DueRow> = all(
         db,
         "SELECT s.id, s.user_id, s.name, s.amount_cents, s.currency_code, s.cadence,
-                s.next_charge_date, s.wallet_id, s.category_id,
+                s.next_charge_date, s.wallet_id, s.category_id, s.charge_time,
                 w.currency_code AS wallet_currency
          FROM subscriptions s
          JOIN wallets w ON w.id = s.wallet_id AND w.user_id = s.user_id
@@ -429,35 +454,40 @@ pub async fn post_due_subscriptions(db: &D1Database) -> AppResult<()> {
     for r in rows {
         let result: AppResult<()> = async {
             use std::collections::hash_map::Entry;
+            let charge_time = r
+                .charge_time
+                .as_deref()
+                .and_then(|t| chrono::NaiveTime::parse_from_str(t, "%H:%M").ok());
+            let (due, next) = due_charges(
+                parse_day(&r.next_charge_date)?,
+                cadence_months(&r.cadence),
+                charge_cutoff(today, now.time(), charge_time),
+                MAX_CATCH_UP,
+            );
+            if due.is_empty() {
+                return Ok(());
+            }
             let rates = match rates_by_user.entry(r.user_id) {
                 Entry::Occupied(e) => e.into_mut(),
                 Entry::Vacant(e) => e.insert(load_rates(db, r.user_id).await?),
             };
             let amount_cents =
                 convert(r.amount_cents, &r.currency_code, &r.wallet_currency, rates)?;
-            let (due, next) = due_charges(
-                parse_day(&r.next_charge_date)?,
-                cadence_months(&r.cadence),
-                today,
-                MAX_CATCH_UP,
-            );
-            if due.is_empty() {
-                return Ok(());
-            }
             let mut stmts = Vec::with_capacity(due.len() + 1);
             for date in &due {
                 let date = date.to_string();
                 stmts.push(stmt(
                     db,
                     "INSERT OR IGNORE INTO transactions
-                       (wallet_id, kind, amount_cents, category_id, description, occurred_at, client_id, subscription_id)
-                     VALUES (?1, 'expense', ?2, ?3, ?4, ?5, ?6, ?7)",
+                       (wallet_id, kind, amount_cents, category_id, description, occurred_at, occurred_time, client_id, subscription_id)
+                     VALUES (?1, 'expense', ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                     jsv![
                         r.wallet_id,
                         amount_cents,
                         r.category_id,
                         r.name.clone(),
                         date.clone(),
+                        r.charge_time.clone(),
                         format!("sub:{}:{}", r.id, date),
                         r.id
                     ],

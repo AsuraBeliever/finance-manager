@@ -177,6 +177,8 @@
     <string name="subscriptions_auto_charge_hint">El gasto se registra solo en cada fecha de cargo. Si lo dejas apagado, tú registras cada pago.</string>
     <string name="subscriptions_auto_charge_needs_wallet">Elige una cartera para activar el cobro automático.</string>
     <string name="subscriptions_auto_badge">Automático</string>
+    <string name="subscriptions_charge_time">Hora del cobro</string>
+    <string name="subscriptions_charge_time_hint">Hora de Ciudad de México. Vacía = al iniciar el día.</string>
     <string name="common_coming_soon">Próximamente</string>
     <string name="common_loading">Cargando…</string>
     <string name="common_error">Ocurrió un error</string>

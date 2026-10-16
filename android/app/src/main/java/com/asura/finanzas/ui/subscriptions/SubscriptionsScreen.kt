@@ -46,6 +46,9 @@ import com.asura.finanzas.data.BrokeRepository
 import com.asura.finanzas.data.Subscription
 import com.asura.finanzas.data.SubscriptionList
 import com.asura.finanzas.ui.LocalAppSettings
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import com.asura.finanzas.ui.components.EmptyState
 import com.asura.finanzas.ui.components.ErrorBox
 import com.asura.finanzas.ui.components.ConfirmDialog
@@ -282,7 +285,11 @@ private fun SubscriptionCard(
                         if (subscription.cadence == "yearly") R.string.subscriptions_yearly
                         else R.string.subscriptions_monthly,
                     ) + " · " + stringResource(R.string.subscriptions_next_charge) +
-                        ": " + subscription.nextChargeDate,
+                        ": " + subscription.nextChargeDate +
+                        // The automatic charge's time, kept on one line with the
+                        // date (NBSP) like the web's `whitespace-nowrap`.
+                        (chargeTimeLabel(subscription.chargeTime.takeIf { subscription.autoCharge })
+                            ?.let { "\u00A0" + it.replace(' ', '\u00A0') } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.fgSubtle,
                 )
@@ -354,4 +361,17 @@ private fun RowAction(
             .padding(6.dp)
             .size(16.dp),
     )
+}
+
+/** A stored 'HH:MM' in the chosen 12/24 h clock and app language — the web's
+ *  `formatTime`. Null when there is no time. */
+@Composable
+private fun chargeTimeLabel(time: String?): String? {
+    if (time.isNullOrBlank()) return null
+    val settings = LocalAppSettings.current
+    val locale = if (settings.locale.startsWith("en")) Locale.US else Locale.forLanguageTag("es-MX")
+    val pattern = if (settings.clock24) "HH:mm" else "h:mm a"
+    return runCatching {
+        LocalTime.parse(time).format(DateTimeFormatter.ofPattern(pattern, locale))
+    }.getOrNull() ?: time
 }

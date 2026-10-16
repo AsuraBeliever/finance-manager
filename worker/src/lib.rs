@@ -43,11 +43,16 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .await
 }
 
+/// The frequent cron in wrangler.toml: only books automatic subscription
+/// charges, so a charge lands within minutes of its chosen time.
+const SUBSCRIPTION_CRON: &str = "*/5 * * * *";
+
 /// Daily market-data refresh (cron, UTC) — replaces the desktop's
-/// on-startup fetch. Failures are logged (visible via `wrangler tail`) and
-/// otherwise silent, same semantics as the desktop app.
+/// on-startup fetch — plus the frequent subscription-charge pass. Failures are
+/// logged (visible via `wrangler tail`) and otherwise silent, same semantics as
+/// the desktop app.
 #[event(scheduled)]
-pub async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
+pub async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
     console_error_panic_hook::set_once();
     let db = match env.d1("DB") {
         Ok(d) => d,
@@ -56,6 +61,12 @@ pub async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) 
             return;
         }
     };
+    if event.cron() == SUBSCRIPTION_CRON {
+        if let Err(e) = handlers::subscriptions::post_due_subscriptions(&db).await {
+            console_error!("subscription auto-charge failed: {e}");
+        }
+        return;
+    }
     if let Err(e) = market::fetch_and_store_rates(&db, false).await {
         console_error!("exchange rate auto-update failed: {e}");
     }
@@ -67,11 +78,6 @@ pub async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) 
     }
     if let Err(e) = handlers::credit::post_msi_installments(&db).await {
         console_error!("msi installment posting failed: {e}");
-    }
-    // After the rate refresh above, so foreign-currency charges convert at
-    // today's rate.
-    if let Err(e) = handlers::subscriptions::post_due_subscriptions(&db).await {
-        console_error!("subscription auto-charge failed: {e}");
     }
     if let Err(e) = handlers::goals::snapshot_all_goals(&db).await {
         console_error!("goal snapshot failed: {e}");

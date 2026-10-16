@@ -43,6 +43,7 @@ import com.asura.finanzas.data.TransactionCategory
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.components.DateField
 import com.asura.finanzas.ui.components.FormSheet
+import com.asura.finanzas.ui.components.TimeField
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.seedName
 import com.asura.finanzas.ui.components.SegmentedControl
@@ -91,6 +92,7 @@ fun SubscriptionFormSheet(
     // picked by hand survives further typing.
     var icon by remember { mutableStateOf(existing?.icon) }
     var autoCharge by remember { mutableStateOf(existing?.autoCharge ?: false) }
+    var chargeTime by remember { mutableStateOf(existing?.chargeTime) }
     fun onNameChange(value: String) {
         name = value
         error = null
@@ -153,6 +155,7 @@ fun SubscriptionFormSheet(
                         color = color,
                         icon = icon,
                         autoCharge = autoCharge,
+                        chargeTime = chargeTime.takeIf { autoCharge },
                     )
                 }
                     .onSuccess { onSaved() }
@@ -290,6 +293,23 @@ fun SubscriptionFormSheet(
                     style = MaterialTheme.typography.bodySmall,
                     color = Broke.colors.fgSubtle,
                     modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+
+        if (autoCharge) {
+            Column(Modifier.fillMaxWidth()) {
+                TimeField(
+                    label = stringResource(R.string.subscriptions_charge_time),
+                    value = chargeTime,
+                    onChange = { chargeTime = it },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(R.string.subscriptions_charge_time_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Broke.colors.fgSubtle,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }

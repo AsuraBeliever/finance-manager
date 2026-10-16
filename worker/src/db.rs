@@ -152,10 +152,15 @@ pub struct ValueRow {
 /// Business "today" in Mexico City (UTC-6 year-round; DST abolished in 2022).
 /// SQL `datetime('now')` defaults stay UTC, same as on desktop.
 pub fn today_mx() -> NaiveDate {
+    now_mx().date()
+}
+
+/// Wall-clock date and time in Mexico City (same fixed UTC-6 as `today_mx`).
+pub fn now_mx() -> chrono::NaiveDateTime {
     let ms = worker::Date::now().as_millis() as i64;
     chrono::DateTime::from_timestamp_millis(ms - 6 * 3600 * 1000)
         .expect("valid timestamp")
-        .date_naive()
+        .naive_utc()
 }
 
 #[wasm_bindgen]

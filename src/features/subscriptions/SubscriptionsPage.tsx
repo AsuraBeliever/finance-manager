@@ -9,6 +9,7 @@ import { DateInput } from "../../components/DateInput";
 import { EmptyState } from "../../components/EmptyState";
 import { Field, inputClass } from "../../components/Field";
 import { MoneyInput } from "../../components/MoneyInput";
+import { TimeInput } from "../../components/TimeInput";
 import { Modal } from "../../components/Modal";
 import { PageHeader } from "../../components/PageHeader";
 import { matchBrand } from "../../lib/brandIcons";
@@ -25,7 +26,8 @@ import {
 } from "../../lib/api";
 import { useMoney } from "../../lib/hideBalance";
 import { parseToCents } from "../../lib/money";
-import { todayIso } from "../../lib/date";
+import { formatTime, todayIso } from "../../lib/date";
+import { useClock } from "../../lib/timeFormat";
 import { CHART_COLORS } from "../../lib/palette";
 import { PrivacyToggle } from "../../components/PrivacyToggle";
 import type { Subscription } from "../../lib/types";
@@ -35,6 +37,7 @@ import { seedName } from "../../i18n/seed";
 export function SubscriptionsPage() {
   const qc = useQueryClient();
   const money = useMoney();
+  const clock = useClock();
   const subs = useQuery({ queryKey: ["subscriptions"], queryFn: () => listSubscriptions() });
   const [formSub, setFormSub] = useState<Subscription | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -115,7 +118,11 @@ export function SubscriptionsPage() {
                 <p className="text-xs text-fg-subtle">
                   {sub.cadence === "yearly" ? es.subscriptions.yearly : es.subscriptions.monthly}
                   {" · "}
-                  {es.subscriptions.nextCharge}: {sub.nextChargeDate}
+                  {es.subscriptions.nextCharge}:{" "}
+                  <span className="whitespace-nowrap">
+                    {sub.nextChargeDate}
+                    {sub.autoCharge && sub.chargeTime && ` ${formatTime(sub.chargeTime, clock)}`}
+                  </span>
                 </p>
                 {sub.autoCharge && (
                   <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
@@ -214,6 +221,7 @@ function SubscriptionFormModal({
   const [color, setColor] = useState<string>(CHART_COLORS[0]);
   const [icon, setIcon] = useState<string | null>(null);
   const [autoCharge, setAutoCharge] = useState(false);
+  const [chargeTime, setChargeTime] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   // As the name is typed, detect a known brand and adopt its logo + color.
@@ -244,6 +252,7 @@ function SubscriptionFormModal({
     setColor(sub?.color ?? CHART_COLORS[0]);
     setIcon(sub?.icon ?? null);
     setAutoCharge(sub?.autoCharge ?? false);
+    setChargeTime(sub?.chargeTime ?? "");
     setError(null);
   }
 
@@ -267,6 +276,7 @@ function SubscriptionFormModal({
         walletId: walletId === "" ? null : Number(walletId),
         categoryId: categoryId === "" ? null : Number(categoryId),
         autoCharge,
+        chargeTime: autoCharge && chargeTime !== "" ? chargeTime : null,
       };
       return sub ? updateSubscription(sub.id, input) : createSubscription(input);
     },
@@ -379,6 +389,12 @@ function SubscriptionFormModal({
             </span>
           </span>
         </label>
+        {autoCharge && (
+          <Field label={es.subscriptions.chargeTime}>
+            <TimeInput value={chargeTime} onChange={setChargeTime} />
+            <p className="mt-1 text-xs text-fg-subtle">{es.subscriptions.chargeTimeHint}</p>
+          </Field>
+        )}
         <Field label={es.common.color}>
           <ColorPicker value={color} onChange={setColor} />
         </Field>

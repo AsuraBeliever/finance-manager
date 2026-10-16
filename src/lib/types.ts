@@ -502,6 +502,8 @@ export interface Subscription {
   isActive: boolean;
   /** Booked by the daily cron on each charge date (vs. only by hand). */
   autoCharge: boolean;
+  /** 'HH:MM' (Mexico City) the automatic charge fires at; null = start of day. */
+  chargeTime: string | null;
   /** Whether a charge falls inside the selected dashboard period. */
   chargedInPeriod: boolean;
 }
@@ -522,4 +524,5 @@ export interface SubInput {
   walletId: number | null;
   categoryId: number | null;
   autoCharge: boolean;
+  chargeTime: string | null;
 }

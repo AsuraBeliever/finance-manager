@@ -200,6 +200,8 @@ export const esDict = {
     autoChargeHint: "El gasto se registra solo en cada fecha de cargo. Si lo dejas apagado, tú registras cada pago.",
     autoChargeNeedsWallet: "Elige una cartera para activar el cobro automático.",
     autoBadge: "Automático",
+    chargeTime: "Hora del cobro",
+    chargeTimeHint: "Hora de Ciudad de México. Vacía = al iniciar el día.",
   },
   common: {
     comingSoon: "Próximamente",
