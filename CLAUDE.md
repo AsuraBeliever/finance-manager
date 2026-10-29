@@ -119,8 +119,12 @@ integración, se prueba entera antes del release y llega a `main` solo con él.
 Se suman a las reglas de Arquitectura y Convenciones, que mandan sobre todo lo de aquí.
 
 1. Todo cambio, por pequeño que sea, entra por `fin-flow` y tiene ticket en Jira FIN.
-   También el trabajo que no es de producto (docs, chores, CI).
+   También el trabajo que no es de producto (docs, chores, CI). Esto sustituye al «directo a
+   `main`» de §Convenciones: un fix/chore/docs trivial también va por PR (`fin-merge` si no
+   cambia el producto).
 2. Nada se mergea a `main` sin el comentario **APROBADO** de `fin-review` posterior al último push.
+   Única excepción: el commit `chore(release)` que `fin-release` empuja justo antes del merge
+   (solo versión y changelog).
 3. Un cambio de producto (`feat`/`fix`) solo se mergea dentro de `fin-release`, y solo si
    `fin-dev-test` dio **PASA** sobre el sha exacto de la rama. Todo cambio termina publicado
    en el mismo flujo (tag + deploy + APK), salvo que el cliente pida esperar.
@@ -157,8 +161,9 @@ Gate antes de commitear: `cargo fmt --all`.
   Pruebas / Jira» (plantilla en `.github/pull_request_template.md`).
 - GitHub no deja aprobar un PR propio: la aprobación es el comentario **APROBADO** de `fin-review`
   (subagente independiente).
-- Merge con merge commit (`gh pr merge --merge`), asunto `Merge <rama> — X.Y.Z` como los
-  históricos. Producto → lo hace `fin-release`; chore/docs → `fin-merge`.
+- Merge con merge commit (`gh pr merge --merge`). Producto → lo hace `fin-release`, asunto
+  `Merge <rama> — X.Y.Z` como los históricos; chore/docs → `fin-merge`, asunto
+  `Merge <rama> (#<nº>)`, sin tag (sale con el siguiente release).
 - **No hay CI en PRs todavía** ([FIN-4](https://alansethmanjarrez.atlassian.net/browse/FIN-4)):
   mientras tanto la puerta es el informe de `fin-test` + `fin-dev-test` con todo en verde.
 
@@ -167,9 +172,13 @@ Gate antes de commitear: `cargo fmt --all`.
 Semver en `package.json` (de ahí salen web, Tauri y `versionCode`/`versionName` del APK).
 `feat` → MINOR, `fix` → PATCH, breaking → MAJOR (se confirma con el cliente). Release = commit
 `chore(release): X.Y.Z — <resumen>` en la rama (bump + entrada bilingüe en `src/lib/changelog.ts`
++ `npm run gen:android-strings` para `android/app/src/main/assets/changelog.json`
 + `docs/ANDROID_PARITY.md`) → merge del PR → tag `vX.Y.Z` → `git push origin main vX.Y.Z` →
 `npm run build` + `cd worker && npx wrangler deploy` → workflow «Release apps» del tag en verde
 con el `.apk` adjunto. Antes de tagear: `git ls-remote --tags origin vX.Y.Z` vacío.
+
+«`main` = último release» admite merges de `fin-merge` (chore/docs/ci) sin tag entre releases;
+nunca un `feat`/`fix` sin tag.
 
 - **Dev** = no hay entorno remoto: `wrangler dev` local (http://localhost:8787, D1 local
   migrada) con el build de la rama + APK debug contra él en el emulador.

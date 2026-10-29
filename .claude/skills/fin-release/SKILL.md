@@ -10,12 +10,15 @@ argument-hint: [X.Y.Z]
 GitHub, deploy y APK. Solo se verifica antes y se informa al final.
 
 ## 1. Puertas (todas, o no hay release)
-1. Hay un PR abierto contra `main` con **APROBADO** de `fin-review` posterior al último push.
+1. Hay un PR abierto contra `main` con **APROBADO** de `fin-review` posterior al último push de
+   código. El commit `chore(release)` de esta misma skill (paso 3) es la única excepción: solo trae
+   versión y changelog, y se empuja después del APROBADO.
 2. Hay un informe de `fin-dev-test` con **PASA** cuyo sha es **exactamente** `HEAD` de la rama
    (`git rev-parse --short HEAD`, igual a `origin/<rama>`). Si la rama se movió después, o no hay
    informe (release a mano), corre `fin-dev-test` primero. Lo que llega a `main` es lo que se probó.
-3. `main` = último tag (`git describe --tags --exact-match origin/main`); si no, hay trabajo sin
-   taguear y primero se resuelve eso.
+3. `main` no tiene **producto** sin publicar: `git log --format=%s $(git describe --tags --abbrev=0 origin/main)..origin/main`
+   solo puede traer merges de `fin-merge` y commits `chore`/`docs`/`ci`/`refactor` (salen en este
+   release sin más). Un `feat`/`fix` ahí es producto sin release: para y averigua de dónde salió.
 4. El cambio incluye su parte de Android y su entrada en `docs/ANDROID_PARITY.md` (regla de paridad).
 
 ## 2. Versión
@@ -30,10 +33,14 @@ Solo metadatos; si hace falta tocar código, no es un release, es otra ronda de 
 - `src/lib/changelog.ts` → entrada nueva **arriba** con `version`, `date` (hoy, `YYYY-MM-DD`), `es`
   y `en`: lo que nota el usuario, en el tono de las entradas anteriores, terminando en
   «En la web y en la app de Android.» cuando aplica.
+- `npm run gen:android-strings` → regenera `android/app/src/main/assets/changelog.json` (las
+  «Novedades» del APK). Comprueba que trae `"version": "X.Y.Z"`; sin esto el APK sale sin la
+  versión nueva (pasó en 2.39.1, `docs/ANDROID_PARITY.md`).
 - `docs/ANDROID_PARITY.md` al día. `CLAUDE.md` §Estado actual solo si cambia algo de fondo.
 - `npm run build` en verde, y:
 
-      git commit -am "chore(release): X.Y.Z — <resumen corto>" -m "Refs: FIN-n" -m "Co-Authored-By: Claude <modelo> <noreply@anthropic.com>"
+      git add package.json src/lib/changelog.ts android/app/src/main/assets/changelog.json docs/
+      git commit -m "chore(release): X.Y.Z — <resumen corto>" -m "Refs: FIN-n" -m "Co-Authored-By: Claude <modelo> <noreply@anthropic.com>"
       git push
 
 El diff de este commit contra el sha probado es solo versión y docs, así que no invalida el PASA.
