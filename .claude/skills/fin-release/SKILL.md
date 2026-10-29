@@ -16,9 +16,16 @@ GitHub, deploy y APK. Solo se verifica antes y se informa al final.
 2. Hay un informe de `fin-dev-test` con **PASA** cuyo sha es **exactamente** `HEAD` de la rama
    (`git rev-parse --short HEAD`, igual a `origin/<rama>`). Si la rama se movió después, o no hay
    informe (release a mano), corre `fin-dev-test` primero. Lo que llega a `main` es lo que se probó.
-3. `main` no tiene **producto** sin publicar: `git log --format=%s $(git describe --tags --abbrev=0 origin/main)..origin/main`
-   solo puede traer merges de `fin-merge` y commits `chore`/`docs`/`ci`/`refactor` (salen en este
-   release sin más). Un `feat`/`fix` ahí es producto sin release: para y averigua de dónde salió.
+3. `main` no tiene **producto** sin publicar. Mira solo la historia de `main`, no el interior de
+   las ramas mergeadas:
+
+       git log --first-parent --format=%s $(git describe --tags --abbrev=0 origin/main)..origin/main
+
+   Cada línea tiene que ser un merge de `fin-merge` de una rama sin producto
+   (`Merge chore/…`, `Merge docs/…`, `Merge refactor/…`, `Merge ci/…`, con su `(#n)`) o un commit
+   suelto `chore`/`docs`/`ci`/`refactor` anterior al flujo. Esos salen en este release sin más.
+   Un `Merge feat/…`/`Merge fix/…` o un `feat`/`fix` suelto es producto sin release: para y
+   averigua de dónde salió.
 4. El cambio incluye su parte de Android y su entrada en `docs/ANDROID_PARITY.md` (regla de paridad).
 
 ## 2. Versión
@@ -42,6 +49,8 @@ Solo metadatos; si hace falta tocar código, no es un release, es otra ronda de 
       git add package.json src/lib/changelog.ts android/app/src/main/assets/changelog.json docs/
       git commit -m "chore(release): X.Y.Z — <resumen corto>" -m "Refs: FIN-n" -m "Co-Authored-By: Claude <modelo> <noreply@anthropic.com>"
       git push
+      git status --porcelain     # vacío: si gen:android-strings regeneró algo más
+                                 # (strings_i18n.xml), es que faltó en fin-implement → otra ronda
 
 El diff de este commit contra el sha probado es solo versión y docs, así que no invalida el PASA.
 
