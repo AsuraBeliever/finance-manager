@@ -6,6 +6,22 @@ multiusuario (registro con código de invitación). El frontend es una PWA
 shell Tauri que carga la URL desplegada. UI en español (es-MX), código y
 comentarios en inglés.
 
+<!-- dev-flow:begin S2 -->
+> Este archivo es el contrato de trabajo: se lee al inicio de cada sesión.
+> El proceso de cada cambio está en «Flujo de desarrollo», más abajo.
+
+## Reparto de roles
+
+| Rol | Quién | Alcance |
+|---|---|---|
+| Responsable técnico | Claude | Arquitectura, código, ramas, versiones, commits, PRs, revisión, merge, releases, deploy, CI, testing (web + emulador), Jira y documentación |
+| Cliente / Product owner | Alan (AsuraBeliever) | Prueba el producto, reporta qué falta y qué falla, decide prioridades de producto |
+
+El cliente no gestiona git, Jira, el build ni el deploy. Si algo técnico requiere su
+decisión, se le presenta como opciones de producto, no como detalles de implementación.
+Cualquier cambio que pida entra por la skill `fin-flow`.
+<!-- dev-flow:end S2 -->
+
 ## Comandos
 
 ```sh
@@ -91,6 +107,131 @@ cd android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
   NUNCA. Solo se deploya un tag: si `main` tiene trabajo sin taguear, primero se
   corta el release. Regla de oro: `main` siempre = último release.
 - Tests de fórmulas financieras obligatorios, con valores de referencia calculados a mano.
+
+<!-- dev-flow:begin S3 -->
+## Flujo de desarrollo (Claude es el dev)
+
+Se adapta al modelo de git de arriba: **no hay `develop`**. La rama de trabajo es la
+integración, se prueba entera antes del release y llega a `main` solo con él.
+
+### Reglas del flujo
+
+Se suman a las reglas de Arquitectura y Convenciones, que mandan sobre todo lo de aquí.
+
+1. Todo cambio, por pequeño que sea, entra por `fin-flow` y tiene ticket en Jira FIN.
+   También el trabajo que no es de producto (docs, chores, CI).
+2. Nada se mergea a `main` sin el comentario **APROBADO** de `fin-review` posterior al último push.
+3. Un cambio de producto (`feat`/`fix`) solo se mergea dentro de `fin-release`, y solo si
+   `fin-dev-test` dio **PASA** sobre el sha exacto de la rama. Todo cambio termina publicado
+   en el mismo flujo (tag + deploy + APK), salvo que el cliente pida esperar.
+4. Nunca se reescribe historia publicada (`main`, tags). Nunca `push --force` a ellas.
+5. Nunca se abre un PR con pruebas en rojo ni se mergea con checks en rojo.
+6. Árbol sucio de origen desconocido: se para y se pregunta. Nada de `stash`, `reset` ni
+   `checkout --` sobre trabajo ajeno.
+
+### Ramas
+
+| Rama | Uso |
+|---|---|
+| `main` | Siempre = último release. Solo llega vía PR mergeado con merge commit. |
+| `feat/fin-<n>-<slug>` | Feature nueva (lleva su release) |
+| `fix/fin-<n>-<slug>` | Corrección de producto (lleva su release, PATCH) |
+| `chore/fin-<n>-<slug>` · `docs/…` · `refactor/…` | Sin cambio visible: entran con `fin-merge`, sin release |
+
+Slug en español, corto, como las ramas históricas (`feat/hora-cobro-automatico`).
+
+### Commits
+
+Conventional Commits; tipo y ámbito en inglés (`transactions`, `subscriptions`, `android`,
+`worker`, `core`, `i18n`…), resumen en español, como en `git log`. Cada commit compila.
+Nada de «WIP» en ramas que se empujan. Pie:
+
+    Refs: FIN-<n>
+    Co-Authored-By: Claude <modelo> <noreply@anthropic.com>
+
+Gate antes de commitear: `cargo fmt --all`.
+
+### PRs, revisión y merge
+
+- Base `main`; título = Conventional Commit; cuerpo con «Qué cambia / Por qué / Cómo /
+  Pruebas / Jira» (plantilla en `.github/pull_request_template.md`).
+- GitHub no deja aprobar un PR propio: la aprobación es el comentario **APROBADO** de `fin-review`
+  (subagente independiente).
+- Merge con merge commit (`gh pr merge --merge`), asunto `Merge <rama> — X.Y.Z` como los
+  históricos. Producto → lo hace `fin-release`; chore/docs → `fin-merge`.
+- **No hay CI en PRs todavía** ([FIN-4](https://alansethmanjarrez.atlassian.net/browse/FIN-4)):
+  mientras tanto la puerta es el informe de `fin-test` + `fin-dev-test` con todo en verde.
+
+### Versionado y releases
+
+Semver en `package.json` (de ahí salen web, Tauri y `versionCode`/`versionName` del APK).
+`feat` → MINOR, `fix` → PATCH, breaking → MAJOR (se confirma con el cliente). Release = commit
+`chore(release): X.Y.Z — <resumen>` en la rama (bump + entrada bilingüe en `src/lib/changelog.ts`
++ `docs/ANDROID_PARITY.md`) → merge del PR → tag `vX.Y.Z` → `git push origin main vX.Y.Z` →
+`npm run build` + `cd worker && npx wrangler deploy` → workflow «Release apps» del tag en verde
+con el `.apk` adjunto. Antes de tagear: `git ls-remote --tags origin vX.Y.Z` vacío.
+
+- **Dev** = no hay entorno remoto: `wrangler dev` local (http://localhost:8787, D1 local
+  migrada) con el build de la rama + APK debug contra él en el emulador.
+- **Producción** = https://finanzas.aseth.workers.dev (web, iPhone y escritorio a la vez) +
+  APK firmado en el GitHub Release del tag.
+
+### Testing
+
+Cada criterio del «Hecho cuando» del ticket acaba con una evidencia concreta; lo que no se
+pueda comprobar se declara «no verificado», nunca se da por bueno.
+
+- **Backend:** `cargo fmt --all -- --check`, `cargo clippy --workspace`, `cargo test --workspace`,
+  `cargo check -p finanzas-worker --target wasm32-unknown-unknown`, `npm run build`,
+  `cd android && JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew testDebugUnitTest assembleDebug`,
+  y migraciones nuevas aplicadas con `npx wrangler d1 migrations apply finanzas --local`.
+- **Uso real (web):** `wrangler dev` en segundo plano + Playwright (`node scripts/parity-shots.mjs
+  <pantallas>`, cuenta `alan@test.mx` / `test1234`) o `curl` a `/api/rpc/<comando>`.
+- **Uso real (Android):** APK debug con `-PbrokeApiBase=http://10.0.2.2:8787` en el emulador
+  (`emulator-5554`), navegación con `adb shell uiautomator dump` + `input tap` y `screencap`,
+  lado a lado con la captura web al mismo tamaño. `logcat` sin `FATAL EXCEPTION`.
+- Cada captura se abre con Read y se mira. El celular del cliente no se toca salvo que lo pida.
+
+### Jira
+
+- Sitio: https://alansethmanjarrez.atlassian.net — proyecto **Finanzas**, clave `FIN`
+- `cloudId`: `f04e906b-0ec4-4966-b049-acd498427118`
+- Acceso: MCP de Atlassian. Si pide autenticación, el cliente la hace con `/mcp`.
+- accountId del cliente: `70121:f22207c0-2104-4fb2-97e6-8f23667e6a63`
+
+| Estado | id transición | Significa |
+|---|---|---|
+| Por hacer | `11` | Pendiente |
+| En curso | `21` | Claude trabaja en ella. Con etiqueta `en-revision`: PR abierto, en revisión/prueba en dev |
+| Listo | `31` | Publicada en un release (chore/docs: mergeada) |
+
+- Tipos: `Historia` = lo que el cliente nota; `Tarea` = el resto; `Error` = fallo de producto.
+- Épicas: `Mantenimiento continuo` (FIN-2) para bugs/chores/infra; una `Release vX.Y.Z` solo si
+  se agrupan varias tareas en un release.
+- Etiquetas: ámbitos (`web`, `android`, `backend`, `core`, `ci`, `docs`…), `en-revision`,
+  `decision-cliente`.
+- Responsable: sin asignar. Al cliente solo lo que necesita **su** decisión, con `decision-cliente`.
+- Jira dice qué y en qué estado; el detalle técnico vive en `docs/`.
+
+| # | Paso | Skill |
+|---|---|---|
+| 1 | Ticket con «Hecho cuando» | `fin-ticket` |
+| 2 | Rama desde `main`, ticket En curso | `fin-branch` |
+| 3 | Código + tests + commits (web **y** Android) | `fin-implement` |
+| 4 | Pruebas backend + uso real, informe | `fin-test` |
+| 5 | Push + PR contra `main`, etiqueta `en-revision` | `fin-pr` |
+| 6 | Revisión independiente → APROBADO / CAMBIOS | `fin-review` |
+| 7 | Prueba completa en dev (local) → PASA / FALLA | `fin-dev-test` |
+| 8 | Release: bump + changelog + merge + tag + deploy + APK, ticket Listo | `fin-release` |
+| 7' | (chore/docs) merge sin release, ticket Listo | `fin-merge` |
+| — | «¿Cómo vamos?» | `fin-status` |
+
+### Inicio de sesión
+
+Al empezar: `project = FIN AND statusCategory != Done ORDER BY status, priority DESC`,
+comentarios nuevos del cliente y `gh pr list --state open`. Si una sesión quedó a medias,
+el estado del ticket, su etiqueta y la rama dicen en qué paso retomar.
+<!-- dev-flow:end S3 -->
 
 ## Estado actual
 
