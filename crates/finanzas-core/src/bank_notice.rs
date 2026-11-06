@@ -860,9 +860,13 @@ fn lex(text: &str) -> Vec<Lex> {
             let raw: String = chars[start..i].iter().collect();
             let norm: String = raw.chars().map(fold).collect();
             out.push(Lex::Word(raw, norm));
-        } else if c == '.' && chars.get(i + 1).is_none_or(|n| n.is_whitespace()) {
+        } else if c == '.'
+            && chars.get(i + 1).is_none_or(|n| n.is_whitespace())
+            && !matches!(out.last(), Some(Lex::Word(raw, _)) if raw.chars().count() <= 2)
+        {
             // a full stop ends a sentence like a line break ends a cell:
-            // "en AMAZON. Recuerda…" must not glue the next sentence on
+            // "en AMAZON. Recuerda…" must not glue the next sentence on. Not
+            // after a one/two-letter abbreviation: "7:15 p. m.", "No. 1234".
             if out.last() != Some(&Lex::Newline) {
                 out.push(Lex::Newline);
             }
@@ -1576,6 +1580,22 @@ mod tests {
         .unwrap();
         assert_eq!(n.amount_cents, 30_000);
         assert_eq!(n.merchant.as_deref(), Some("AMAZON"));
+    }
+
+    #[test]
+    fn abbreviations_are_not_sentence_ends() {
+        // review 3 of PR #2: "p. m." with a space and "No. 1234"
+        let n = read_notice(
+            "alertas@banorte.com",
+            "Cargo a tu tarjeta",
+            "Cargo por $450.50 en AMAZON MX con tu tarjeta No. 1122 el 02/11/26 a las 7:15 p. m.",
+            None,
+        )
+        .unwrap();
+        assert_eq!(n.amount_cents, 45_050);
+        assert_eq!(n.card_last4.as_deref(), Some("1122"));
+        assert_eq!(n.occurred_time.as_deref(), Some("19:15"));
+        assert_eq!(n.merchant.as_deref(), Some("AMAZON MX"));
     }
 
     #[test]
