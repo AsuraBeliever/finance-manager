@@ -6,12 +6,13 @@ use finanzas_core::error::{AppError, AppResult};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
-use worker::{D1Database, Request, Response, RouteContext};
+use worker::{D1Database, Env, Request, Response, RouteContext};
 
 use crate::error::{db_err, error_response};
+use crate::gmail::GmailConfig;
 use crate::handlers::{
-    analytics, budgets, credit, dashboard, goals, investments, settings, subscriptions,
-    transactions, wallets,
+    analytics, bank_notices, budgets, credit, dashboard, goals, investments, settings,
+    subscriptions, transactions, wallets,
 };
 use crate::market;
 
@@ -43,13 +44,19 @@ pub async fn handle(mut req: Request, ctx: RouteContext<()>) -> worker::Result<R
     } else {
         body
     };
-    match dispatch(&name, body, &db, uid).await {
+    match dispatch(&name, body, &db, uid, &ctx.env).await {
         Ok(v) => Response::from_json(&v),
         Err(e) => error_response(&e),
     }
 }
 
-async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResult<Value> {
+async fn dispatch(
+    name: &str,
+    body: Value,
+    db: &D1Database,
+    uid: i64,
+    env: &Env,
+) -> AppResult<Value> {
     match name {
         // ---- settings ----
         "list_currencies" => out(settings::list_currencies(db).await?),
@@ -200,6 +207,38 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "solve_contribution" => out(investments::solve_contribution(args(body)?)?),
         "get_portfolio" => out(investments::get_portfolio(db, uid).await?),
         "project_investment" => out(investments::project_investment(db, uid, args(body)?).await?),
+
+        // ---- bank notices ----
+        "get_bank_notice_settings" => out(bank_notices::get_bank_notice_settings(
+            db,
+            uid,
+            GmailConfig::from_env(env).is_some(),
+        )
+        .await?),
+        "connect_gmail_code" => {
+            out(
+                bank_notices::connect_gmail_code(db, &GmailConfig::require(env)?, uid, args(body)?)
+                    .await?,
+            )
+        }
+        "disconnect_gmail" => {
+            out(
+                bank_notices::disconnect_gmail(db, GmailConfig::from_env(env).as_ref(), uid)
+                    .await?,
+            )
+        }
+        "add_bank_sender" => out(bank_notices::add_bank_sender(db, uid, args(body)?).await?),
+        "update_bank_sender" => out(bank_notices::update_bank_sender(db, uid, args(body)?).await?),
+        "delete_bank_sender" => out(bank_notices::delete_bank_sender(db, uid, args(body)?).await?),
+        "set_card_wallet" => out(bank_notices::set_card_wallet(db, uid, args(body)?).await?),
+        "list_pending_transactions" => out(bank_notices::list_pending_transactions(db, uid).await?),
+        "confirm_pending_transaction" => {
+            out(bank_notices::confirm_pending_transaction(db, uid, args(body)?).await?)
+        }
+        "dismiss_pending_transaction" => {
+            out(bank_notices::dismiss_pending_transaction(db, uid, args(body)?).await?)
+        }
+        "import_bank_notice" => out(bank_notices::import_bank_notice(db, uid, args(body)?).await?),
 
         _ => Err(AppError::NotFound("comando")),
     }

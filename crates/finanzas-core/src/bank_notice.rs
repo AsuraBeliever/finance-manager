@@ -197,6 +197,37 @@ pub fn read_notice(
     })
 }
 
+/// Days apart a notice and an existing movement can be and still look like
+/// the same one (a purchase entered by hand the day after, a notice that
+/// arrives late at night).
+pub const DUPLICATE_WINDOW_DAYS: i64 = 2;
+
+/// Does an existing movement look like this notice entered by hand? Same
+/// direction, same amount, dates within `DUPLICATE_WINDOW_DAYS`.
+/// `existing_kind` is the transactions.kind ('expense', 'transfer_out'…).
+pub fn looks_like_same_movement(
+    notice_kind: NoticeKind,
+    notice_cents: i64,
+    notice_date: &str,
+    existing_kind: &str,
+    existing_cents: i64,
+    existing_date: &str,
+) -> bool {
+    let same_direction = match notice_kind {
+        NoticeKind::Expense => matches!(existing_kind, "expense" | "transfer_out"),
+        NoticeKind::Income => matches!(existing_kind, "income" | "transfer_in"),
+    };
+    let (Ok(a), Ok(b)) = (
+        NaiveDate::parse_from_str(notice_date, "%Y-%m-%d"),
+        NaiveDate::parse_from_str(existing_date, "%Y-%m-%d"),
+    ) else {
+        return false;
+    };
+    same_direction
+        && notice_cents == existing_cents
+        && (a - b).num_days().abs() <= DUPLICATE_WINDOW_DAYS
+}
+
 // ---------------------------------------------------------------- keywords --
 
 /// Movement phrases, normalized. Earliest match wins; longest at a tie.
@@ -1282,6 +1313,62 @@ mod tests {
             ),
             Err(Rejection::NotAMovement)
         );
+    }
+
+    #[test]
+    fn duplicate_window() {
+        use NoticeKind::*;
+        // same amount, 2 days apart → duplicate; 3 days → not
+        assert!(looks_like_same_movement(
+            Expense,
+            8_990,
+            "2026-11-04",
+            "expense",
+            8_990,
+            "2026-11-06"
+        ));
+        assert!(!looks_like_same_movement(
+            Expense,
+            8_990,
+            "2026-11-04",
+            "expense",
+            8_990,
+            "2026-11-07"
+        ));
+        // a SPEI entered as a transfer leg counts
+        assert!(looks_like_same_movement(
+            Expense,
+            250_000,
+            "2026-11-06",
+            "transfer_out",
+            250_000,
+            "2026-11-06"
+        ));
+        // opposite direction or different amount → not
+        assert!(!looks_like_same_movement(
+            Income,
+            8_990,
+            "2026-11-04",
+            "expense",
+            8_990,
+            "2026-11-04"
+        ));
+        assert!(!looks_like_same_movement(
+            Expense,
+            8_990,
+            "2026-11-04",
+            "expense",
+            8_991,
+            "2026-11-04"
+        ));
+        assert!(!looks_like_same_movement(
+            Expense,
+            1,
+            "bad",
+            "expense",
+            1,
+            "2026-11-04"
+        ));
     }
 
     #[test]
