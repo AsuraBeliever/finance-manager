@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.sp
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BankNoticeSettings
 import com.asura.finanzas.data.BrokeRepository
-import com.asura.finanzas.data.IngestResult
 import com.asura.finanzas.data.NetworkException
 import com.asura.finanzas.data.PendingTransaction
 import com.asura.finanzas.data.TransactionCategory
@@ -102,7 +101,6 @@ fun BankNoticesScreen(
     var wallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
     var confirming by remember { mutableStateOf<PendingTransaction?>(null) }
     var dismissing by remember { mutableStateOf<PendingTransaction?>(null) }
-    var pasting by remember { mutableStateOf(false) }
     // The web's `?gmail=ok|denied|error` banner after the consent screen.
     var gmailResult by remember { mutableStateOf<String?>(null) }
 
@@ -132,13 +130,7 @@ fun BankNoticesScreen(
         ) {
             item {
                 BackHandler(onBack = onBack)
-                PageHeader(stringResource(R.string.bank_notices_title), Modifier.padding(bottom = 16.dp)) {
-                    PrimaryButton(
-                        text = stringResource(R.string.bank_notices_paste),
-                        onClick = { pasting = true },
-                        leadingIcon = Lucide.ClipboardPaste,
-                    )
-                }
+                PageHeader(stringResource(R.string.bank_notices_title), Modifier.padding(bottom = 16.dp))
             }
             gmailResult?.let { result ->
                 item { ResultBanner(result) { gmailResult = null } }
@@ -185,9 +177,6 @@ fun BankNoticesScreen(
             onDismiss = { confirming = null },
             onSaved = { confirming = null; reload() },
         )
-    }
-    if (pasting) {
-        PasteSheet(repository, onDismiss = { pasting = false }, onAdded = reload)
     }
     dismissing?.let { p ->
         ConfirmDialog(
@@ -314,12 +303,6 @@ private fun PendingCard(
                     Pill(
                         stringResource(
                             if (income) R.string.bank_notices_income else R.string.bank_notices_expense,
-                        ),
-                    )
-                    Pill(
-                        stringResource(
-                            if (p.source == "gmail") R.string.bank_notices_via_gmail
-                            else R.string.bank_notices_via_paste,
                         ),
                     )
                     walletName?.let { Pill(it, accent = true) }
@@ -511,81 +494,6 @@ private fun ConfirmSheet(
                     color = Broke.colors.fg,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun PasteSheet(
-    repository: BrokeRepository,
-    onDismiss: () -> Unit,
-    onAdded: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    var value by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<IngestResult?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val genericError = stringResource(R.string.common_error)
-    val offlineError = stringResource(R.string.offline_banner)
-
-    FormSheet(
-        title = stringResource(R.string.bank_notices_paste_title),
-        busy = busy,
-        error = error,
-        canSave = !busy && value.isNotBlank(),
-        saveLabel = stringResource(R.string.bank_notices_read),
-        onDismiss = onDismiss,
-        onSave = {
-            busy = true
-            error = null
-            scope.launch {
-                runCatching { repository.importBankNotice(value) }
-                    .onSuccess {
-                        result = it
-                        if (it.status == "added") {
-                            value = ""
-                            onAdded()
-                        }
-                    }
-                    .onFailure {
-                        error = if (it is NetworkException) offlineError else it.message ?: genericError
-                    }
-                busy = false
-            }
-        },
-    ) {
-        Text(
-            stringResource(R.string.bank_notices_paste_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = Broke.colors.fgMuted,
-        )
-        FormField(
-            label = "",
-            value = value,
-            onValueChange = { value = it; result = null },
-            placeholder = stringResource(R.string.bank_notices_paste_placeholder),
-            singleLine = false,
-            modifier = Modifier.fillMaxWidth().testTag("paste-text"),
-        )
-        result?.let { r ->
-            val message = when (r.status) {
-                "added" -> stringResource(R.string.bank_notices_result_added)
-                "duplicate" -> stringResource(R.string.bank_notices_result_duplicate)
-                else -> stringResource(
-                    when (r.reason) {
-                        "promotion" -> R.string.bank_notices_rejected_promotion
-                        "noAmount" -> R.string.bank_notices_rejected_no_amount
-                        "ownTransfer" -> R.string.bank_notices_rejected_own_transfer
-                        else -> R.string.bank_notices_rejected_not_amovement
-                    },
-                )
-            }
-            Text(
-                message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (r.status == "added") Broke.colors.accent else Broke.colors.cyan,
-            )
         }
     }
 }

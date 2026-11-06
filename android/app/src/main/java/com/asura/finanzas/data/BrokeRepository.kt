@@ -1217,12 +1217,6 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
-    suspend fun importBankNotice(text: String): IngestResult =
-        rpc.json.decodeFromJsonElement(
-            IngestResult.serializer(),
-            rpc.call("import_bank_notice", buildJsonObject { put("text", text) }),
-        ).also { cache.invalidateReads() }
-
     private suspend fun <T> cached(
         key: String?,
         serializer: kotlinx.serialization.KSerializer<T>,

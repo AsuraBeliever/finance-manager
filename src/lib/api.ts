@@ -2,7 +2,6 @@ import { es } from "../i18n/es";
 import type {
   BankNoticeSettings,
   ConfirmPendingInput,
-  IngestResult,
   PendingTransaction,
   Budget,
   CalculatorId,
@@ -528,6 +527,3 @@ export const confirmPendingTransaction = (id: number, input: ConfirmPendingInput
 
 export const dismissPendingTransaction = (id: number) =>
   rpc<void>("dismiss_pending_transaction", { id });
-
-export const importBankNotice = (text: string) =>
-  rpc<IngestResult>("import_bank_notice", { text });

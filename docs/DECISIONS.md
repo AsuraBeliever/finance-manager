@@ -307,7 +307,8 @@ Los movimientos no se registran directo: caen en una bandeja para confirmar
 El lector es uno solo para cualquier banco: un tokenizador + transductor (máquina
 de Mealy) en `finanzas-core::bank_notice`; BBVA y Nu solo aportan remitentes y
 etiquetas. Es la pieza que comparte FIN-1 (canal de notificaciones de Android).
-Para cuentas que no son Gmail queda «Pegar aviso».
+Se probó una vía manual («Pegar aviso») y el cliente la descartó: la función es
+solo automática, así que hoy sirve únicamente con Gmail.
 
 Coste/límite: `gmail.readonly` es un scope restringido; mientras la app de Google
 no pase la verificación, solo los usuarios de prueba de la consola pueden

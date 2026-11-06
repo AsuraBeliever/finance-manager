@@ -1,8 +1,7 @@
 //! Bank notices → movements waiting for the user (FIN-5).
 //!
-//! A notice arrives either from Gmail (push → `process_push`) or pasted by
-//! the user (`import_bank_notice`); both go through `ingest`, which runs the
-//! core reader and stores a pending row. Nothing touches a balance until the
+//! A notice arrives from Gmail (push → `process_push`) and goes through
+//! `ingest`, which runs the core reader and stores a pending row. Nothing touches a balance until the
 //! user confirms it: `confirm_pending_transaction` books an ordinary
 //! income/expense through `transactions::add_*` (idempotent by client_id).
 //!
@@ -14,30 +13,22 @@
 use chrono::NaiveDateTime;
 use finanzas_core::bank_notice::{
     known_bank, looks_like_same_movement, read_notice, sender_address, sender_matches, BankNotice,
-    NoticeKind, Rejection, DUPLICATE_WINDOW_DAYS, KNOWN_BANKS,
+    NoticeKind, DUPLICATE_WINDOW_DAYS, KNOWN_BANKS,
 };
 use finanzas_core::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
-use crate::db::{all, changes, exec, first, sha256_hex, today_mx};
+use crate::db::{all, changes, exec, first, today_mx};
 use crate::gmail::{GmailConfig, HttpStatus, Tokens};
 use crate::handlers::transactions::{self, SimpleTxArgs};
 use crate::jsv;
 
 // ----------------------------------------------------------------- ingest --
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase", tag = "status")]
-pub enum Ingest {
-    /// A new pending movement.
-    Added { id: i64 },
-    /// Already received (same Gmail message / same pasted text).
-    Duplicate,
-    /// The reader turned it down.
-    Rejected { reason: Rejection },
-}
-
+/// Read one notice and store it as pending. `true` = a new pending row;
+/// `false` = already received (same message) or not a movement — the reason
+/// goes to the log (`wrangler tail`), the user never sees it.
 #[allow(clippy::too_many_arguments)]
 async fn ingest(
     db: &D1Database,
@@ -48,10 +39,13 @@ async fn ingest(
     subject: &str,
     body: &str,
     received_at: Option<NaiveDateTime>,
-) -> AppResult<Ingest> {
+) -> AppResult<bool> {
     let notice: BankNotice = match read_notice(from, subject, body, received_at) {
         Ok(n) => n,
-        Err(reason) => return Ok(Ingest::Rejected { reason }),
+        Err(reason) => {
+            worker::console_log!("notice {source_id} (user {uid}) skipped: {reason:?}");
+            return Ok(false);
+        }
     };
     let occurred_at = notice
         .occurred_at
@@ -82,11 +76,9 @@ async fn ingest(
     )
     .await?;
     if changes(&res) == 0 {
-        return Ok(Ingest::Duplicate);
+        return Ok(false);
     }
-    Ok(Ingest::Added {
-        id: crate::db::last_row_id(&res)?,
-    })
+    Ok(true)
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -96,31 +88,6 @@ fn truncate(s: &str, max: usize) -> String {
 /// Is this sender one of the user's banks (built-in or added)?
 fn is_bank_sender(senders: &[BankSender], from: &str) -> bool {
     known_bank(from).is_some() || senders.iter().any(|s| sender_matches(from, &s.pattern))
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportArgs {
-    pub text: String,
-    #[serde(default)]
-    pub sender: Option<String>,
-}
-
-/// "Paste a notice": works with any mail provider (or an SMS / app push text).
-/// The first line doubles as the subject, which is where most banks put the
-/// movement verb.
-pub async fn import_bank_notice(db: &D1Database, uid: i64, a: ImportArgs) -> AppResult<Ingest> {
-    let text = a.text.trim();
-    if text.is_empty() {
-        return Err(AppError::InvalidInput("pega el texto del aviso".into()));
-    }
-    if text.len() > 20_000 {
-        return Err(AppError::InvalidInput("el texto es demasiado largo".into()));
-    }
-    let subject = text.lines().next().unwrap_or_default();
-    let from = a.sender.unwrap_or_default();
-    let id = sha256_hex(text.as_bytes());
-    ingest(db, uid, "paste", &id, &from, subject, text, None).await
 }
 
 // ------------------------------------------------------- settings / lists --
@@ -206,7 +173,7 @@ pub struct GmailStatus {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BankNoticeSettings {
-    /// This deployment has Gmail configured (else only "paste" is offered).
+    /// This deployment has Gmail configured.
     pub gmail_available: bool,
     pub gmail: Option<GmailStatus>,
     pub known_banks: Vec<KnownBank>,
@@ -937,7 +904,7 @@ async fn read_mailbox(
                     received,
                 )
                 .await?;
-                Ok(matches!(r, Ingest::Added { .. }))
+                Ok(r)
             }
             .await;
             match step {

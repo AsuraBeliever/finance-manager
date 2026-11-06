@@ -472,7 +472,6 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Suscripciones: check «Cobro automático» + insignia «Automático» | `ui/subscriptions` | ✅ |
 | Suscripciones: «Hora del cobro» editable (sólo con cobro automático) + hora junto al próximo cargo («Próximo cargo: 2026-11-02 9:30 a.m.») | `ui/subscriptions` | ✅ `TimeField` = `TimeInput`, respeta reloj 12/24 h |
 | Avisos del banco (FIN-5): bandeja de pendientes — confirmar (cartera, monto, categoría, descripción, fecha, hora, «recordar tarjeta») o descartar (confirma), aviso de posible duplicado | `ui/banknotices` | ✅ en «Más», como en `planningItems` |
-| Avisos del banco: «Pegar aviso» con resultado (agregado / ya estaba / rechazado y por qué) | `ui/banknotices` | ✅ |
 | Avisos del banco: conectar/desconectar Gmail, bancos extra (remitente → cartera), terminación → cartera | `ui/banknotices` | ✅ la web redirige a Google; Android usa `AuthorizationClient` y manda un server auth code (`connect_gmail_code`) |
 | Transacciones: aviso «Tienes avisos del banco por confirmar (n)» → bandeja | `ui/transactions` | ✅ |
 | Ajustes: tarjeta «Avisos del banco» → bandeja | `ui/settings` | ✅ |

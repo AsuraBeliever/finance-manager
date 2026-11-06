@@ -53,8 +53,8 @@ fn secret_or_var(env: &Env, name: &str) -> Option<String> {
 }
 
 impl GmailConfig {
-    /// None when this deployment has no Gmail set up (the feature is then
-    /// offered as "paste a notice" only).
+    /// None when this deployment has no Gmail set up (the screen then says
+    /// the connection isn't available yet).
     pub fn from_env(env: &Env) -> Option<Self> {
         let token_key = STANDARD
             .decode(secret_or_var(env, "GMAIL_TOKEN_KEY")?.trim())

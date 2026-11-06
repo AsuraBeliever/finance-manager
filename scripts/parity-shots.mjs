@@ -145,7 +145,6 @@ const SCREENS = [
   { name: "sub-form", route: "/#/suscripciones", open: [/new subscription|nueva suscripción/i], steps: 3 },
   { name: "bank-notices", route: "/#/avisos", steps: 4 },
   { name: "bank-notice-confirm", route: "/#/avisos", open: [/^(confirm|confirmar)$/i], steps: 2 },
-  { name: "bank-notice-paste", route: "/#/avisos", open: [/paste notice|pegar aviso/i], steps: 1 },
   { name: "cats", route: "/#/categorias", steps: 3 },
   { name: "settings", route: "/#/ajustes", steps: 4 },
   { name: "appearance", route: "/#/apariencia", steps: 4 },

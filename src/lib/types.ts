@@ -564,7 +564,7 @@ export interface BankNoticeSettings {
 
 export interface PendingTransaction {
   id: number;
-  source: "gmail" | "paste";
+  source: "gmail";
   sender: string;
   subject: string | null;
   bankName: string | null;
@@ -584,13 +584,6 @@ export interface PendingTransaction {
     walletName: string;
   } | null;
 }
-
-export type NoticeRejection = "promotion" | "notAMovement" | "noAmount" | "ownTransfer";
-
-export type IngestResult =
-  | { status: "added"; id: number }
-  | { status: "duplicate" }
-  | { status: "rejected"; reason: NoticeRejection };
 
 export interface ConfirmPendingInput {
   walletId: number;

@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  ClipboardPaste,
   CreditCard,
   Inbox,
   Landmark,
@@ -30,7 +29,6 @@ import {
   disconnectGmail,
   dismissPendingTransaction,
   getBankNoticeSettings,
-  importBankNotice,
   listPendingTransactions,
   listTransactionCategories,
   listWallets,
@@ -41,7 +39,7 @@ import { formatDayMonth, formatTime } from "../../lib/date";
 import { useMoney } from "../../lib/hideBalance";
 import { parseToCents } from "../../lib/money";
 import { useClock } from "../../lib/timeFormat";
-import type { IngestResult, PendingTransaction, Wallet } from "../../lib/types";
+import type { PendingTransaction, Wallet } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
 
@@ -59,7 +57,6 @@ export function BankNoticesPage() {
   });
   const [confirming, setConfirming] = useState<PendingTransaction | null>(null);
   const [dismissId, setDismissId] = useState<number | null>(null);
-  const [pasteOpen, setPasteOpen] = useState(false);
 
   const dismiss = useMutation({
     mutationFn: dismissPendingTransaction,
@@ -81,16 +78,7 @@ export function BankNoticesPage() {
 
   return (
     <>
-      <PageHeader
-        title={es.bankNotices.title}
-        actions={
-          <Button onClick={() => setPasteOpen(true)}>
-            <span className="flex items-center gap-2">
-              <ClipboardPaste size={16} /> {es.bankNotices.paste}
-            </span>
-          </Button>
-        }
-      />
+      <PageHeader title={es.bankNotices.title} />
 
       {resultBanner && (
         <div
@@ -143,7 +131,6 @@ export function BankNoticesPage() {
         wallets={wallets.data ?? []}
         onClose={() => setConfirming(null)}
       />
-      <PasteModal open={pasteOpen} onClose={() => setPasteOpen(false)} />
       <ConfirmDialog
         open={dismissId !== null}
         title={es.bankNotices.dismiss}
@@ -200,9 +187,6 @@ function PendingCard({
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
             <span className="rounded-full bg-surface-overlay px-2 py-0.5 text-fg-muted">
               {income ? es.bankNotices.income : es.bankNotices.expense}
-            </span>
-            <span className="rounded-full bg-surface-overlay px-2 py-0.5 text-fg-muted">
-              {p.source === "gmail" ? es.bankNotices.viaGmail : es.bankNotices.viaPaste}
             </span>
             {walletName && (
               <span className="rounded-full bg-accent/10 px-2 py-0.5 text-accent">
@@ -388,78 +372,6 @@ function ConfirmModal({
           </div>
         </div>
       )}
-    </Modal>
-  );
-}
-
-function PasteModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [text, setText] = useState("");
-  const [result, setResult] = useState<IngestResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const close = () => {
-    setText("");
-    setResult(null);
-    setError(null);
-    onClose();
-  };
-
-  const read = useMutation({
-    mutationFn: () => importBankNotice(text),
-    onSuccess: (r) => {
-      setResult(r);
-      setError(null);
-      if (r.status === "added") {
-        qc.invalidateQueries({ queryKey: PENDING_KEY });
-        setText("");
-      }
-    },
-    onError: (e) => setError(e instanceof Error ? e.message : String(e)),
-  });
-
-  const message =
-    result?.status === "added"
-      ? es.bankNotices.resultAdded
-      : result?.status === "duplicate"
-        ? es.bankNotices.resultDuplicate
-        : result?.status === "rejected"
-          ? es.bankNotices.rejected[result.reason]
-          : null;
-
-  return (
-    <Modal open={open} onClose={close} title={es.bankNotices.pasteTitle}>
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-fg-muted">{es.bankNotices.pasteHint}</p>
-        <textarea
-          data-testid="paste-text"
-          className={`${inputClass} min-h-40`}
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setResult(null);
-          }}
-          placeholder={es.bankNotices.pastePlaceholder}
-        />
-        {message && (
-          <p className={`text-sm ${result?.status === "added" ? "text-accent" : "text-gold"}`}>
-            {message}
-          </p>
-        )}
-        {error && <p className="text-sm text-danger">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={close}>
-            {es.common.close}
-          </Button>
-          <Button
-            data-testid="paste-read"
-            onClick={() => read.mutate()}
-            disabled={read.isPending || text.trim() === ""}
-          >
-            {es.bankNotices.read}
-          </Button>
-        </div>
-      </div>
     </Modal>
   );
 }

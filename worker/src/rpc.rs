@@ -238,7 +238,6 @@ async fn dispatch(
         "dismiss_pending_transaction" => {
             out(bank_notices::dismiss_pending_transaction(db, uid, args(body)?).await?)
         }
-        "import_bank_notice" => out(bank_notices::import_bank_notice(db, uid, args(body)?).await?),
 
         _ => Err(AppError::NotFound("comando")),
     }

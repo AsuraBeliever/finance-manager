@@ -213,16 +213,6 @@ object Lucide {
         )
     }
 
-    val ClipboardPaste by lazy {
-        icon(
-            "M11 14h10",
-            "M16 4h2a2 2 0 0 1 2 2v1.344",
-            "m17 18 4-4-4-4",
-            "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113",
-            "M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z",
-        )
-    }
-
     val Gem by lazy {
         icon(
             "M10.5 3 8 9l4 13 4-13-2.5-6",

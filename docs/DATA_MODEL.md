@@ -465,12 +465,11 @@ ALTER TABLE savings_goals ADD COLUMN contribution_cents INTEGER;  -- NULL = plan
 
 ## Avisos del banco (migración 0042, FIN-5)
 
-Movimientos leídos de los avisos del banco (correo vía Gmail push, o texto
-pegado). Nada toca un saldo hasta que el usuario confirma: entonces se inserta
+Movimientos leídos de los avisos del banco (correo vía Gmail push). Nada toca un saldo hasta que el usuario confirma: entonces se inserta
 una transacción normal (`client_id = 'pending-<id>'`, idempotente) y la fila
 pasa a `confirmed` con su `transaction_id`. `UNIQUE (user_id, source,
-source_id)` hace que un aviso recibido dos veces (mismo mensaje de Gmail o mismo
-texto pegado) no se duplique; las filas resueltas se quedan para que un aviso
+source_id)` hace que un aviso recibido dos veces (mismo mensaje de Gmail) no se
+duplique; las filas resueltas se quedan para que un aviso
 descartado no regrese. Cartera y categoría sugeridas y el posible duplicado se
 calculan al listar (`handlers/bank_notices.rs`).
 
@@ -519,15 +518,15 @@ CREATE TABLE card_wallets (
 );
 
 -- A notice read into a movement, waiting for the user. source = 'gmail'
--- (source_id = Gmail message id) or 'paste' (source_id = SHA-256 of the
--- pasted text); UNIQUE makes a re-delivered notice a no-op. Rows stay after
+-- (source_id = Gmail message id); left open (no CHECK) for the phone's
+-- notification channel of FIN-1. UNIQUE makes a re-delivered notice a no-op. Rows stay after
 -- they're resolved so a re-delivery of a dismissed notice doesn't come back.
 -- Suggested wallet/category are computed when listing, so a new card mapping
 -- applies to what is already waiting.
 CREATE TABLE pending_transactions (
   id INTEGER PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  source TEXT NOT NULL CHECK (source IN ('gmail', 'paste')),
+  source TEXT NOT NULL,
   source_id TEXT NOT NULL,
   sender TEXT NOT NULL,
   subject TEXT,

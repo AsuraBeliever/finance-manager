@@ -77,7 +77,7 @@ puente Tauri original), respuesta JSON o `{"error": "..."}` (400/401/404/500).
 | Dashboard | `get_dashboard_summary` (foto del momento: saldos, donas, inversiones) |
 | Analytics | `get_spending_trends`, `get_category_breakdown` — ambos aceptan `period` (`{kind}`: `allTime` \| `currentMonth` \| `lastMonths{months}` \| `month{year,month}` \| `day{date}` \| `range{from,to}`); la ventana se resuelve en `finanzas-core::period` |
 | Inversiones | `list_investments`, `create_investment`, `update_investment`, `close_investment`, `delete_investment`, `get_investment_detail`, `add_snapshot`, `add_investment_movement`, `get_investment_movement` (por id o por su transacción), `update_investment_movement`, `delete_investment_movement`, `list_calculators`, `get_investment_catalog` |
-| Avisos del banco (FIN-5) | `get_bank_notice_settings` (Gmail conectado o no, bancos incluidos, remitentes y tarjetas del usuario), `connect_gmail_code` (Android: server auth code → token), `disconnect_gmail` (para el watch, revoca y borra), `add_bank_sender` / `update_bank_sender` / `delete_bank_sender`, `set_card_wallet` (`walletId` null = quitar), `list_pending_transactions` (con cartera/categoría sugeridas y `duplicateOf`), `confirm_pending_transaction` (registra un ingreso/gasto normal con `client_id = 'pending-<id>'`), `dismiss_pending_transaction`, `import_bank_notice` (pegar texto) |
+| Avisos del banco (FIN-5) | `get_bank_notice_settings` (Gmail conectado o no, bancos incluidos, remitentes y tarjetas del usuario), `connect_gmail_code` (Android: server auth code → token), `disconnect_gmail` (para el watch, revoca y borra), `add_bank_sender` / `update_bank_sender` / `delete_bank_sender`, `set_card_wallet` (`walletId` null = quitar), `list_pending_transactions` (con cartera/categoría sugeridas y `duplicateOf`), `confirm_pending_transaction` (registra un ingreso/gasto normal con `client_id = 'pending-<id>'`), `dismiss_pending_transaction` |
 | Ajustes / mercado | `list_currencies`, `add_currency`, `get_exchange_rates`, `set_exchange_rate`, `fetch_exchange_rates`, `fetch_banxico_rate`, `refresh_market_data_cmd`, `get_setting`, `set_setting` |
 
 Datos de mercado: cron trigger 3× al día (07:00, 15:00 y 20:00 UTC = 01:00,
@@ -196,7 +196,8 @@ falla, las demás siguen. El watch dura 7 días: el cron de cada 5 minutos
 - Tokens en D1 cifrados con AES-GCM (SubtleCrypto) con el secreto `GMAIL_TOKEN_KEY`.
 - Secretos/vars: `GMAIL_TOKEN_KEY` (base64 de 32 bytes), `GMAIL_PUSH_TOKEN`,
   `GMAIL_PUBSUB_TOPIC`; `GMAIL_API_BASE` / `GOOGLE_TOKEN_URL` solo para pruebas
-  locales contra un Google falso. Sin `GMAIL_TOKEN_KEY` la app ofrece solo «Pegar aviso».
+  locales contra un Google falso. Sin `GMAIL_TOKEN_KEY` la pantalla dice que la
+  conexión aún no está disponible.
 - Requiere en Google Cloud: Gmail API y Pub/Sub habilitadas, permiso de publicar
   en el tema para `gmail-api-push@system.gserviceaccount.com`, y el scope
   `gmail.readonly` en la pantalla de consentimiento (restringido: hasta pasar la
@@ -211,5 +212,5 @@ falla, las demás siguen. El watch dura 7 días: el cron de cada 5 minutos
 | `/carteras`, `/carteras/:id` | Lista + detalle con historial de transacciones |
 | `/transacciones` | Lista con filtros; modal con tabs ingreso/gasto/transferencia |
 | `/inversiones`, `/inversiones/:id` | Lista + detalle con gráfica de proyección y vencimiento |
-| `/avisos` | Avisos del banco: bandeja para confirmar/descartar, pegar aviso, Gmail, bancos y tarjetas |
+| `/avisos` | Avisos del banco: bandeja para confirmar/descartar, Gmail, bancos y tarjetas |
 | `/ajustes` | Monedas, categorías, sesión (cerrar sesión en móvil) |

@@ -589,7 +589,7 @@ data class DuplicateRef(
 @Serializable
 data class PendingTransaction(
     val id: Long,
-    /** "gmail" | "paste". */
+    /** "gmail". */
     val source: String,
     val sender: String = "",
     val subject: String? = null,
@@ -605,13 +605,4 @@ data class PendingTransaction(
     val suggestedWalletId: Long? = null,
     val suggestedCategoryId: Long? = null,
     val duplicateOf: DuplicateRef? = null,
-)
-
-/** What reading a pasted notice did: "added" | "duplicate" | "rejected". */
-@Serializable
-data class IngestResult(
-    val status: String,
-    val id: Long? = null,
-    /** "promotion" | "notAMovement" | "noAmount" | "ownTransfer", when rejected. */
-    val reason: String? = null,
 )
