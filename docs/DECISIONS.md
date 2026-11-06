@@ -291,3 +291,24 @@ original (reembolsos parciales, tope = lo gastado).
 Se guarda como `income` + `is_refund = 1` en lugar de un `kind` nuevo: reconstruir
 `transactions` para cambiar el CHECK borraría `investment_movements` por cascada en
 D1. Detalle en DATA_MODEL «Reembolsos».
+
+## 2026-11-06 — Avisos del banco: Gmail push + bandeja para confirmar (FIN-5)
+
+El cliente quiere que los avisos que el banco manda por correo se vuelvan
+movimientos solos, sin pagar dominio y sin revisar el buzón cada minuto. Se usa
+`users.watch` de la Gmail API con Google Pub/Sub: Gmail empuja al worker en
+cuanto llega un correo (la URL `.workers.dev` sirve como endpoint push).
+Descartado: Cloudflare Email Routing (necesita dominio propio) y un filtro de
+reenvío en Gmail (exige una dirección receptora verificada, o sea dominio).
+
+Los movimientos no se registran directo: caen en una bandeja para confirmar
+(decisión del cliente) — evita duplicar lo anotado a mano y errores de lectura.
+
+El lector es uno solo para cualquier banco: un tokenizador + transductor (máquina
+de Mealy) en `finanzas-core::bank_notice`; BBVA y Nu solo aportan remitentes y
+etiquetas. Es la pieza que comparte FIN-1 (canal de notificaciones de Android).
+Para cuentas que no son Gmail queda «Pegar aviso».
+
+Coste/límite: `gmail.readonly` es un scope restringido; mientras la app de Google
+no pase la verificación, solo los usuarios de prueba de la consola pueden
+conectar Gmail.
