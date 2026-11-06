@@ -862,11 +862,10 @@ fn lex(text: &str) -> Vec<Lex> {
             out.push(Lex::Word(raw, norm));
         } else if c == '.'
             && chars.get(i + 1).is_none_or(|n| n.is_whitespace())
-            && !matches!(out.last(), Some(Lex::Word(raw, _)) if raw.chars().count() <= 2)
+            && !is_abbreviation(&out, chars[i + 1..].iter().find(|n| !n.is_whitespace()))
         {
             // a full stop ends a sentence like a line break ends a cell:
-            // "en AMAZON. Recuerda…" must not glue the next sentence on. Not
-            // after a one/two-letter abbreviation: "7:15 p. m.", "No. 1234".
+            // "en AMAZON MX. Recuerda…" must not glue the next sentence on.
             if out.last() != Some(&Lex::Newline) {
                 out.push(Lex::Newline);
             }
@@ -877,6 +876,15 @@ fn lex(text: &str) -> Vec<Lex> {
         }
     }
     out
+}
+
+/// A full stop that only shortens a word: the word is at most three letters
+/// and what follows starts lower-case or with a digit ("7:15 p. m.",
+/// "tarjeta No. 1234"). A capital after it starts a new sentence, even after a
+/// short word ("AMAZON MX. Recuerda…").
+fn is_abbreviation(before: &[Lex], next: Option<&char>) -> bool {
+    let short = matches!(before.last(), Some(Lex::Word(raw, _)) if raw.chars().count() <= 3);
+    short && next.is_some_and(|n| n.is_lowercase() || n.is_ascii_digit())
 }
 
 /// `1,234.56` → 123456 cents. One or two digits after the last separator are
@@ -1596,6 +1604,22 @@ mod tests {
         assert_eq!(n.card_last4.as_deref(), Some("1122"));
         assert_eq!(n.occurred_time.as_deref(), Some("19:15"));
         assert_eq!(n.merchant.as_deref(), Some("AMAZON MX"));
+
+        // review of d049419: a two-letter suffix followed by a new sentence
+        for (text, merchant) in [
+            (
+                "Compra por $300.00 en AMAZON MX. Recuerda domiciliar tus pagos.",
+                "AMAZON MX",
+            ),
+            (
+                "Compra por $300.00 en OXXO GAS SA. Recuerda domiciliar tus pagos.",
+                "OXXO GAS SA",
+            ),
+        ] {
+            let n = read_notice("avisos@bbva.mx", "Notificación de compra", text, None).unwrap();
+            assert_eq!(n.merchant.as_deref(), Some(merchant), "{text}");
+            assert_eq!(n.amount_cents, 30_000);
+        }
     }
 
     #[test]
