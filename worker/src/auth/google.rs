@@ -111,6 +111,66 @@ pub async fn start(req: Request, ctx: RouteContext<()>) -> worker::Result<Respon
     redirect(&url, &state_cookie(&state, 600))
 }
 
+/// State prefix that routes a callback to the Gmail connect flow instead of
+/// sign-in. Both share the one redirect URI already registered with Google.
+const GMAIL_STATE_PREFIX: &str = "gmail.";
+
+/// Browser side of "Conectar Gmail": the user is already signed in (session
+/// cookie), so this only asks Google for read access to the mailbox, offline
+/// (a refresh token, so pushes can be read with nobody online).
+pub async fn gmail_start(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    let result: AppResult<(String, String)> = async {
+        let db = ctx.env.d1("DB").map_err(db_err)?;
+        super::require_user(&req, &db).await?;
+        let cfg = crate::gmail::GmailConfig::require(&ctx.env)?;
+        let state = format!("{GMAIL_STATE_PREFIX}{}", hex::encode(random_bytes(16)));
+        let url = format!(
+            "{AUTH_URL}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&access_type=offline&prompt=consent&include_granted_scopes=true",
+            enc(&cfg.client_id),
+            enc(&redirect_uri(&req)?),
+            enc(&format!("openid email {}", crate::gmail::SCOPE)),
+            enc(&state),
+        );
+        Ok((url, state))
+    }
+    .await;
+    match result {
+        Ok((url, state)) => redirect(&url, &state_cookie(&state, 600)),
+        Err(e) => {
+            worker::console_error!("gmail connect start failed: {e}");
+            redirect("/#/avisos?gmail=error", &state_cookie("", 0))
+        }
+    }
+}
+
+/// Second half of `gmail_start`: Google sent the user back with a code.
+async fn gmail_callback(
+    req: &Request,
+    ctx: &RouteContext<()>,
+    code: Option<String>,
+) -> worker::Result<Response> {
+    let result: AppResult<()> = async {
+        let code = code.ok_or_else(|| AppError::InvalidInput("acceso no concedido".into()))?;
+        let db = ctx.env.d1("DB").map_err(db_err)?;
+        let uid = super::require_user(req, &db).await?;
+        let cfg = crate::gmail::GmailConfig::require(&ctx.env)?;
+        let tokens = cfg.exchange_code(&code, &redirect_uri(req)?).await?;
+        crate::handlers::bank_notices::save_gmail_grant(&db, &cfg, uid, tokens).await
+    }
+    .await;
+    match result {
+        Ok(()) => redirect("/#/avisos?gmail=ok", &state_cookie("", 0)),
+        Err(e) => {
+            worker::console_error!("gmail connect failed: {e}");
+            let reason = match e {
+                AppError::InvalidInput(_) => "denied",
+                _ => "error",
+            };
+            redirect(&format!("/#/avisos?gmail={reason}"), &state_cookie("", 0))
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct TokenResponse {
     id_token: Option<String>,
@@ -263,11 +323,20 @@ pub async fn callback(req: Request, ctx: RouteContext<()>) -> worker::Result<Res
             _ => {}
         }
     }
+    // CSRF: the state must match the cookie we set in /start (or gmail_start)
+    if let Some(st) = &state {
+        if st.starts_with(GMAIL_STATE_PREFIX) {
+            if cookie(&req, STATE_COOKIE).as_deref() != Some(st.as_str()) {
+                worker::console_error!("gmail callback: state no coincide");
+                return redirect("/#/avisos?gmail=error", &state_cookie("", 0));
+            }
+            return gmail_callback(&req, &ctx, code).await;
+        }
+    }
     let (Some(code), Some(state)) = (code, state) else {
         worker::console_error!("google callback: faltan code/state en el query");
         return fail();
     };
-    // CSRF: the state must match the cookie we set in /start
     if cookie(&req, STATE_COOKIE).as_deref() != Some(state.as_str()) {
         worker::console_error!(
             "google callback: state no coincide (cookie {:?})",

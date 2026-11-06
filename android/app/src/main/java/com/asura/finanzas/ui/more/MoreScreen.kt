@@ -43,16 +43,17 @@ enum class MoreDestination(val labelRes: Int, val icon: ImageVector) {
     Goals(R.string.nav_goals, Lucide.PiggyBank),
     Budgets(R.string.nav_budgets, Lucide.Target),
     Subscriptions(R.string.nav_subscriptions, Lucide.CreditCard),
+    BankNotices(R.string.nav_bank_notices, Lucide.Mail),
     Categories(R.string.categories_title, Lucide.Tags),
     ;
 
     companion object {
         /**
-         * What the sheet lists — the web's `planningItems`, which is three.
+         * What the sheet lists — the web's `planningItems`.
          * Categories is reachable, but from Ajustes, the one door the web
          * gives it; listing it here too made the phone's menu a row longer.
          */
-        val Planning = listOf(Goals, Budgets, Subscriptions)
+        val Planning = listOf(Goals, Budgets, Subscriptions, BankNotices)
     }
 }
 

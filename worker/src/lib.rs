@@ -6,6 +6,7 @@
 mod auth;
 mod db;
 mod error;
+mod gmail;
 mod handlers;
 mod market;
 mod rpc;
@@ -36,6 +37,10 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         )
         .post_async("/api/auth/change_password", auth::change_password)
         .post_async("/api/rpc/:name", rpc::handle)
+        // Bank notices from Gmail: the browser connect flow (Android posts a
+        // server auth code over RPC instead) and the Pub/Sub push endpoint.
+        .get_async("/api/gmail/connect", auth::google::gmail_start)
+        .post_async("/api/gmail/push", gmail_push)
         .or_else_any_method_async("/*catchall", |_, _| async {
             Response::error("Not found", 404)
         })
@@ -43,8 +48,46 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .await
 }
 
-/// The frequent cron in wrangler.toml: only books automatic subscription
-/// charges, so a charge lands within minutes of its chosen time.
+/// Pub/Sub push for a Gmail mailbox change. Authenticated by the shared
+/// GMAIL_PUSH_TOKEN in the subscription's URL (`?token=`). Always 204 once
+/// authenticated: a failure leaves the history cursor where it was, so the
+/// next push picks the messages up — answering 5xx would only make Pub/Sub
+/// redeliver the same notification.
+async fn gmail_push(mut req: Request, ctx: worker::RouteContext<()>) -> Result<Response> {
+    let Some(cfg) = gmail::GmailConfig::from_env(&ctx.env) else {
+        return Response::error("Not found", 404);
+    };
+    let token = req.url().ok().and_then(|u| {
+        u.query_pairs()
+            .find(|(k, _)| k == "token")
+            .map(|(_, v)| v.into_owned())
+    });
+    let authorized = match (&cfg.push_token, token) {
+        (Some(expected), Some(got)) => gmail::same_token(expected, &got),
+        _ => false,
+    };
+    if !authorized {
+        return Response::error("Unauthorized", 401);
+    }
+    let body: serde_json::Value = req.json().await.unwrap_or_default();
+    let Some((email, history)) = gmail::parse_push(&body) else {
+        return Ok(Response::empty()?.with_status(204));
+    };
+    match ctx.env.d1("DB") {
+        Ok(db) => {
+            if let Err(e) = handlers::bank_notices::process_push(&db, &cfg, &email, &history).await
+            {
+                console_error!("gmail push failed: {e}");
+            }
+        }
+        Err(e) => console_error!("gmail push: no DB binding: {e}"),
+    }
+    Ok(Response::empty()?.with_status(204))
+}
+
+/// The frequent cron in wrangler.toml: books automatic subscription charges, so
+/// a charge lands within minutes of its chosen time, and renews the Gmail
+/// watches about to lapse.
 const SUBSCRIPTION_CRON: &str = "*/5 * * * *";
 
 /// Daily market-data refresh (cron, UTC) — replaces the desktop's
@@ -64,6 +107,13 @@ pub async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
     if event.cron() == SUBSCRIPTION_CRON {
         if let Err(e) = handlers::subscriptions::post_due_subscriptions(&db).await {
             console_error!("subscription auto-charge failed: {e}");
+        }
+        // Gmail watches last 7 days. Renewed a few at a time here rather than
+        // in the daily run, which already spends its subrequests on market data.
+        if let Some(cfg) = gmail::GmailConfig::from_env(&env) {
+            if let Err(e) = handlers::bank_notices::renew_gmail_watches(&db, &cfg).await {
+                console_error!("gmail watch renewal failed: {e}");
+            }
         }
         return;
     }

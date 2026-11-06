@@ -36,8 +36,9 @@ migrations_dir = "migrations"
 #                            behind the cetesdirecto app. Two later passes catch
 #                            the page once it flips (a second one in case it
 #                            publishes late); the refresh is idempotent.
-# Every 5 minutes: automatic subscription charges only (each fires at its own
-#   charge_time, CDMX) — dispatched by cron string in lib.rs (SUBSCRIPTION_CRON).
+# Every 5 minutes: automatic subscription charges (each fires at its own
+#   charge_time, CDMX) and renewal of the Gmail watches about to lapse —
+#   dispatched by cron string in lib.rs (SUBSCRIPTION_CRON).
 crons = ["0 7 * * *", "0 15 * * *", "0 20 * * *", "*/5 * * * *"]
 
 [vars]

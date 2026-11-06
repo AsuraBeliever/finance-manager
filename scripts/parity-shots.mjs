@@ -143,6 +143,8 @@ const SCREENS = [
   { name: "budget-form", route: "/#/presupuestos", open: [/new limit|nuevo límite/i], steps: 2 },
   { name: "subs", route: "/#/suscripciones", steps: 3 },
   { name: "sub-form", route: "/#/suscripciones", open: [/new subscription|nueva suscripción/i], steps: 3 },
+  { name: "bank-notices", route: "/#/avisos", steps: 4 },
+  { name: "bank-notice-confirm", route: "/#/avisos", open: [/^(confirm|confirmar)$/i], steps: 2 },
   { name: "cats", route: "/#/categorias", steps: 3 },
   { name: "settings", route: "/#/ajustes", steps: 4 },
   { name: "appearance", route: "/#/apariencia", steps: 4 },

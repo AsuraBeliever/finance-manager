@@ -77,6 +77,7 @@ fun SettingsScreen(
     onSignedOut: () -> Unit,
     /** Categories live under the planning sheet, which this screen cannot open. */
     onOpenCategories: () -> Unit,
+    onOpenBankNotices: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = Broke.colors
@@ -230,6 +231,14 @@ fun SettingsScreen(
             hint = stringResource(R.string.appearance_settings_hint),
             link = stringResource(R.string.appearance_manage),
             onClick = { showAppearance = true },
+        )
+
+        LinkCard(
+            icon = Lucide.Mail,
+            title = stringResource(R.string.bank_notices_title),
+            hint = stringResource(R.string.bank_notices_settings_hint),
+            link = stringResource(R.string.bank_notices_manage),
+            onClick = onOpenBankNotices,
         )
 
         LinkCard(

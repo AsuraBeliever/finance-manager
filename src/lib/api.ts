@@ -1,5 +1,8 @@
 import { es } from "../i18n/es";
 import type {
+  BankNoticeSettings,
+  ConfirmPendingInput,
+  PendingTransaction,
   Budget,
   CalculatorId,
   CategoryBreakdown,
@@ -495,3 +498,32 @@ export interface BanxicoRate {
 
 export const fetchBanxicoRate = (kind: BanxicoSeriesKind) =>
   rpc<BanxicoRate>("fetch_banxico_rate", { kind });
+
+// ---- bank notices (FIN-5) ----
+export const getBankNoticeSettings = () =>
+  rpc<BankNoticeSettings>("get_bank_notice_settings");
+
+/** Browser flow: a full-page redirect to Google and back to /#/avisos. */
+export const GMAIL_CONNECT_URL = "/api/gmail/connect";
+
+export const disconnectGmail = () => rpc<void>("disconnect_gmail");
+
+export const addBankSender = (pattern: string, walletId: number | null) =>
+  rpc<number>("add_bank_sender", { pattern, walletId });
+
+export const updateBankSender = (id: number, walletId: number | null) =>
+  rpc<void>("update_bank_sender", { id, walletId });
+
+export const deleteBankSender = (id: number) => rpc<void>("delete_bank_sender", { id });
+
+export const setCardWallet = (cardLast4: string, walletId: number | null) =>
+  rpc<void>("set_card_wallet", { cardLast4, walletId });
+
+export const listPendingTransactions = () =>
+  rpc<PendingTransaction[]>("list_pending_transactions");
+
+export const confirmPendingTransaction = (id: number, input: ConfirmPendingInput) =>
+  rpc<number>("confirm_pending_transaction", { id, ...input });
+
+export const dismissPendingTransaction = (id: number) =>
+  rpc<void>("dismiss_pending_transaction", { id });

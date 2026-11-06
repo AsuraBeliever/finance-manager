@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es as dateLocaleEs, enUS as dateLocaleEn } from "date-fns/locale";
-import { ChevronRight, Download, Info, KeyRound, LogOut, Monitor, Palette, Smartphone, Sparkles, Tags } from "lucide-react";
+import { ChevronRight, Download, Info, KeyRound, LogOut, Mail, Monitor, Palette, Smartphone, Sparkles, Tags } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { InstallOfferView, useInstallOffer } from "../../components/InstallButton";
@@ -221,6 +221,21 @@ export function SettingsPage() {
             <InstallOfferView install={install} detailed />
           </section>
         )}
+
+        <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
+          <h3 className="mb-1 flex items-center gap-2 font-medium">
+            <Mail size={16} className="text-fg-subtle" />
+            {es.bankNotices.title}
+          </h3>
+          <p className="mb-3 text-xs text-fg-subtle">{es.bankNotices.settingsHint}</p>
+          <Link
+            to="/avisos"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
+          >
+            {es.bankNotices.manage}
+            <ChevronRight size={15} />
+          </Link>
+        </section>
 
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
           <h3 className="mb-1 flex items-center gap-2 font-medium">

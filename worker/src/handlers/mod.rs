@@ -1,4 +1,5 @@
 pub mod analytics;
+pub mod bank_notices;
 pub mod budgets;
 pub mod credit;
 pub mod dashboard;

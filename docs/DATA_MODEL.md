@@ -462,3 +462,87 @@ ALTER TABLE savings_goals ADD COLUMN contribution_cents INTEGER;  -- NULL = plan
 
   **Historial de tasas + reconciliación** (migración 0036): `wallet_yield_rates(wallet_id, effective_from, rate_bps)` guarda desde qué día corre cada tasa (se escribe al crear/editar la cartera; re-editarla el mismo día sobrescribe). Tras el paso hacia adelante, `reconcile_one` recalcula los últimos 30 días con `reconciliation_delta` y postea la diferencia como UN ajuste fechado hoy (`client_id = yield-fix:<wallet>:<hoy>`, se reescribe entero en cada corrida para ser idempotente entre las 3 del día; `income` si se debe, `expense` si se pagó de más). Eso es lo que rescata un movimiento capturado DESPUÉS de que el cron cerró su día: el cursor nunca retrocede. La ventana se recorta al primer `effective_from` conocido — sin tasa histórica no se toca el día, porque repintarlo con la tasa vigente inflaría el saldo. El saldo sigue siendo calculado (initial + Σ transacciones); los abonos son transacciones reales, editables/borrables.
 - **tarjetas de crédito** (migración 0027): `credit_cut_day` (1-31) marca la cartera como tarjeta — los gastos vuelven el saldo negativo (deuda = −saldo) y pagarla es una transferencia normal desde una cartera de débito. Todo lo derivado es puro en `finanzas_core::credit` (fechas de corte con clamp a fin de mes, fecha límite = corte + `credit_due_days`, calendario MSI) y se arma en `get_credit_card_summary`: **saldo al corte** = deuda al día del último corte; **por pagar del corte** = saldo al corte − abonos (income/transfer_in) posteriores al corte; **utilización** = deuda ÷ límite; **crédito disponible** = límite − deuda − MSI aún no facturado. Convención: el corte cierra al final de su día (una transacción fechada el día del corte pertenece al estado que cierra ese día). **MSI** (`msi_plans`): el plan NO es una transacción; el cron diario postea un gasto por mensualidad en cada fecha de corte (`client_id = msi:<plan>:<n>`, idempotente), con el remanente de centavos en la primera. Las mensualidades toman la categoría del plan (`msi_plans.category_id`, elegible como en cualquier gasto; NULL = la reservada *Meses sin intereses*), así cuentan en presupuestos/analytics. Así la deuda refleja lo facturado (como el estado de cuenta) y lo no facturado igual resta crédito disponible. Borrar un plan borra sus gastos posteados (batch).
+
+## Avisos del banco (migración 0042, FIN-5)
+
+Movimientos leídos de los avisos del banco (correo vía Gmail push). Nada toca un saldo hasta que el usuario confirma: entonces se inserta
+una transacción normal (`client_id = 'pending-<id>'`, idempotente) y la fila
+pasa a `confirmed` con su `transaction_id`. `UNIQUE (user_id, source,
+source_id)` hace que un aviso recibido dos veces (mismo mensaje de Gmail) no se
+duplique; las filas resueltas se quedan para que un aviso
+descartado no regrese. Cartera y categoría sugeridas y el posible duplicado se
+calculan al listar (`handlers/bank_notices.rs`).
+
+```sql
+-- Movements read from bank notices (FIN-5): a Gmail connection per user, the
+-- senders they treat as banks, card ending → wallet, and the inbox of notices
+-- waiting to be confirmed or dismissed.
+
+-- One Gmail mailbox per user. Tokens are AES-GCM encrypted with the worker
+-- secret GMAIL_TOKEN_KEY (base64 of iv || ciphertext); D1 never holds them in
+-- clear. history_id = Gmail's cursor: each push reads what came after it.
+-- Times are unix seconds. needs_reconnect = 1 once Google refuses the refresh
+-- token (the user revoked access): pushes are ignored until they reconnect.
+CREATE TABLE gmail_connections (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  refresh_token_enc TEXT NOT NULL,
+  access_token_enc TEXT,
+  access_expires_at INTEGER,
+  history_id TEXT,
+  watch_expires_at INTEGER,
+  last_push_at TEXT,
+  needs_reconnect INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_gmail_connections_email ON gmail_connections(email);
+
+-- Senders the user adds as banks, beyond the built-in ones (BBVA, Nu).
+-- pattern = full address (alertas@banco.com) or domain (banco.com, subdomains
+-- included). wallet_id = default wallet for that sender's notices.
+CREATE TABLE bank_senders (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pattern TEXT NOT NULL,
+  wallet_id INTEGER REFERENCES wallets(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (user_id, pattern)
+);
+
+-- Card/account ending (4 digits) → the wallet its notices land in.
+CREATE TABLE card_wallets (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  card_last4 TEXT NOT NULL,
+  wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, card_last4)
+);
+
+-- A notice read into a movement, waiting for the user. source = 'gmail'
+-- (source_id = Gmail message id); left open (no CHECK) for the phone's
+-- notification channel of FIN-1. UNIQUE makes a re-delivered notice a no-op. Rows stay after
+-- they're resolved so a re-delivery of a dismissed notice doesn't come back.
+-- Suggested wallet/category are computed when listing, so a new card mapping
+-- applies to what is already waiting.
+CREATE TABLE pending_transactions (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  sender TEXT NOT NULL,
+  subject TEXT,
+  bank TEXT,
+  kind TEXT NOT NULL CHECK (kind IN ('expense', 'income')),
+  amount_cents INTEGER NOT NULL,
+  currency_code TEXT NOT NULL,
+  merchant TEXT,
+  card_last4 TEXT,
+  occurred_at TEXT NOT NULL,
+  occurred_time TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'dismissed')),
+  transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  resolved_at TEXT,
+  UNIQUE (user_id, source, source_id)
+);
+CREATE INDEX idx_pending_transactions_user ON pending_transactions(user_id, status);
+```
