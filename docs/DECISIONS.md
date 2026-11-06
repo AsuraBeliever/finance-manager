@@ -312,3 +312,14 @@ Para cuentas que no son Gmail queda «Pegar aviso».
 Coste/límite: `gmail.readonly` es un scope restringido; mientras la app de Google
 no pase la verificación, solo los usuarios de prueba de la consola pueden
 conectar Gmail.
+
+**Actualización (mismo día, con los correos reales del cliente):** ni BBVA ni Nu
+mandan correo por compra con tarjeta — eso llega solo como notificación de la
+app (canal de FIN-1). Por correo llegan transferencias recibidas (Nu), recargas
+(Nu), SPEI enviados (BBVA), pagos a la propia tarjeta (Nu) y retiros de apartados
+(BBVA). Los dos últimos son movimientos entre cuentas del usuario: el lector los
+aparta con el rechazo `ownTransfer` en lugar de registrarlos como gasto o
+ingreso (la bandeja solo maneja ingresos y gastos; llevarlos como
+transferencias queda para otra tarea). Las promociones de BBVA salen del mismo
+dominio que sus avisos y con asuntos que parecen movimientos, así que el push
+ignora lo que Gmail ya clasificó como Promociones o spam.

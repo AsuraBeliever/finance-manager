@@ -174,8 +174,9 @@ Sin dominio propio ni sondeo: al conectar, el worker llama `users.watch` de la
 Gmail API con el tema de Pub/Sub `GMAIL_PUBSUB_TOPIC`; la suscripción push de ese
 tema hace `POST /api/gmail/push?token=<GMAIL_PUSH_TOKEN>` en cuanto cambia el
 buzón. El worker lee `history.list` desde el `history_id` guardado, mira solo
-los encabezados de cada correo nuevo y abre completo únicamente el de un
-remitente que es banco (BBVA/Nu incluidos + `bank_senders`); el lector de
+los encabezados y etiquetas de cada correo nuevo (salta lo que Gmail clasificó
+como Promociones o spam) y abre completo únicamente el de un remitente que es
+banco (BBVA/Nu incluidos + `bank_senders`); el lector de
 `finanzas-core::bank_notice` lo convierte en una fila de
 `pending_transactions`. Siempre responde 204 tras autenticar: si algo falla, el
 cursor no avanza y el siguiente push lo recoge.
