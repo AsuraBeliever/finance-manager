@@ -355,6 +355,23 @@ fn parse_history(v: &Value) -> HistoryPage {
     }
 }
 
+/// A message's sender and Gmail labels.
+pub struct MailMeta {
+    pub from: String,
+    pub labels: Vec<String>,
+}
+
+impl MailMeta {
+    /// Gmail already filed it as marketing or spam. Banks send promotions
+    /// from the same domains as their notices (BBVA: email.bbva.mx), often
+    /// with subjects that read like a movement ("$600 de regalo…").
+    pub fn is_marketing(&self) -> bool {
+        self.labels
+            .iter()
+            .any(|l| l == "CATEGORY_PROMOTIONS" || l == "SPAM")
+    }
+}
+
 /// One message, reduced to what the notice reader needs.
 pub struct Mail {
     pub from: String,
@@ -435,8 +452,9 @@ impl GmailConfig {
         Ok(Ok(parse_history(&v)))
     }
 
-    /// From + Subject only — cheap check before reading a whole message.
-    pub async fn headers(&self, access: &str, id: &str) -> AppResult<Option<(String, String)>> {
+    /// From and Gmail's own labels — cheap check before reading a whole
+    /// message. None = the message is gone.
+    pub async fn headers(&self, access: &str, id: &str) -> AppResult<Option<MailMeta>> {
         let url = self.api(&format!(
             "messages/{}?format=metadata&metadataHeaders=From&metadataHeaders=Subject",
             enc(id)
@@ -450,7 +468,18 @@ impl GmailConfig {
             .pointer("/payload/headers")
             .cloned()
             .unwrap_or(Value::Null);
-        Ok(Some((header(&hs, "From"), header(&hs, "Subject"))))
+        let labels = v
+            .get("labelIds")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect();
+        Ok(Some(MailMeta {
+            from: header(&hs, "From"),
+            labels,
+        }))
     }
 
     pub async fn message(&self, access: &str, id: &str) -> AppResult<Option<Mail>> {
@@ -620,6 +649,17 @@ mod tests {
         );
         let empty = parse_history(&serde_json::json!({"historyId": "7"}));
         assert!(empty.records.is_empty() && !empty.more);
+    }
+
+    #[test]
+    fn marketing_labels() {
+        let meta = |labels: &[&str]| MailMeta {
+            from: "clientes@email.bbva.mx".into(),
+            labels: labels.iter().map(|l| l.to_string()).collect(),
+        };
+        assert!(meta(&["CATEGORY_PROMOTIONS", "UNREAD", "INBOX"]).is_marketing());
+        assert!(meta(&["SPAM"]).is_marketing());
+        assert!(!meta(&["CATEGORY_UPDATES", "INBOX"]).is_marketing());
     }
 
     #[test]

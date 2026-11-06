@@ -71,6 +71,10 @@ pub enum Rejection {
     NotAMovement,
     /// Looks like a movement but carries no amount (e.g. truncated text).
     NoAmount,
+    /// Money between the user's own accounts — a payment to their credit
+    /// card, money taken out of a savings pocket. Neither income nor expense:
+    /// it belongs in the app as a transfer.
+    OwnTransfer,
 }
 
 /// A bank the reader knows by name: its sender domains and its own field labels.
@@ -94,7 +98,14 @@ pub const KNOWN_BANKS: &[BankProfile] = &[
         key: "nu",
         name: "Nu",
         domains: &["nu.com.mx", "nubank.com.mx", "nu.com"],
-        merchant_labels: &["comercio", "establecimiento", "destinatario", "remitente"],
+        // "Empresa a la cual se realizará el pago: Telcel" on top-ups
+        merchant_labels: &[
+            "comercio",
+            "establecimiento",
+            "destinatario",
+            "remitente",
+            "pago",
+        ],
     },
 ];
 
@@ -146,6 +157,9 @@ pub fn read_notice(
     if has_phrase(&subj, PROMO_PHRASES) {
         return Err(Rejection::Promotion);
     }
+    if has_phrase(&subj, OWN_TRANSFER_SUBJECT) || has_phrase(&body_toks, OWN_TRANSFER_PHRASES) {
+        return Err(Rejection::OwnTransfer);
+    }
     if has_phrase(&subj, NOT_MOVEMENT_PHRASES)
         || has_phrase(&subj, DECLINED_PHRASES)
         || has_phrase(&subj, CANCELLED_PHRASES)
@@ -191,7 +205,10 @@ pub fn read_notice(
         kind,
         amount_cents,
         currency,
-        merchant: from_body.merchant.or(from_subj.merchant),
+        merchant: from_body
+            .merchant
+            .or_else(|| counterpart(&body_toks))
+            .or(from_subj.merchant),
         card_last4: from_body.card.or(from_subj.card),
         occurred_at,
         occurred_time,
@@ -262,6 +279,10 @@ const KIND_PHRASES: &[(&[&str], NoticeKind)] = &[
     (&["transferencia", "enviada"], NoticeKind::Expense),
     (&["spei", "enviado"], NoticeKind::Expense),
     (&["transferencia", "spei", "enviada"], NoticeKind::Expense),
+    // BBVA: "La transferencia a cuenta de débito fue exitosa"
+    (&["transferencia", "a", "cuenta"], NoticeKind::Expense),
+    (&["transferencia", "exitosa"], NoticeKind::Expense),
+    (&["transferencia", "enviada"], NoticeKind::Expense),
     (&["has", "enviado"], NoticeKind::Expense),
     (&["envio", "de"], NoticeKind::Expense),
     (&["domiciliacion"], NoticeKind::Expense),
@@ -285,7 +306,66 @@ const PROMO_PHRASES: &[&[&str]] = &[
     &["preautorizado"],
     &["cashback", "extra"],
     &["webinar"],
+    &["regalo"],
+    &["llevate"],
+    &["beneficios"],
+    &["novedades"],
+    &["noticias"],
+    &["sabias"],
+    &["descubre"],
 ];
+
+/// In a subject: money between the user's own accounts (seen in real BBVA and
+/// Nu notices: "¡Recibimos tu pago!", "Retiraste dinero de tus apartados").
+const OWN_TRANSFER_SUBJECT: &[&[&str]] = &[
+    &["recibimos", "tu", "pago"],
+    &["apartado"],
+    &["apartados"],
+    &["pago", "a", "tu", "tarjeta"],
+];
+
+/// Anywhere: the same, worded in the body.
+const OWN_TRANSFER_PHRASES: &[&[&str]] = &[
+    &["pago", "que", "hiciste", "a", "tu", "tarjeta"],
+    &["pago", "a", "tu", "tarjeta", "de", "credito"],
+];
+
+/// "<who> hizo una transferencia…", "<who> te envió…": the counterpart is the
+/// run of words right before the phrase (Nu names the payer this way).
+const COUNTERPART_PHRASES: &[&[&str]] = &[
+    &["hizo", "una", "transferencia"],
+    &["te", "envio"],
+    &["te", "transfirio"],
+    &["te", "deposito"],
+];
+
+/// The counterpart named before a `COUNTERPART_PHRASES` phrase, if any.
+fn counterpart(toks: &[Tok]) -> Option<String> {
+    for (i, _) in toks.iter().enumerate() {
+        let hit = COUNTERPART_PHRASES.iter().any(|p| {
+            p.iter()
+                .enumerate()
+                .all(|(k, w)| matches!(toks.get(i + k), Some(Tok::Word { norm, .. }) if norm == w))
+        });
+        if !hit {
+            continue;
+        }
+        let mut words: Vec<&str> = toks[..i]
+            .iter()
+            .rev()
+            .map_while(|t| match t {
+                Tok::Word { raw, .. } => Some(raw.as_str()),
+                _ => None,
+            })
+            .take(8)
+            .collect();
+        words.reverse();
+        if !words.is_empty() {
+            return Some(words.join(" "));
+        }
+    }
+    None
+}
 
 /// In a subject, not a movement.
 const NOT_MOVEMENT_PHRASES: &[&[&str]] = &[
@@ -421,6 +501,9 @@ struct Fields {
     early_amount: Option<(i64, String)>,
     card: Option<String>,
     merchant: Option<String>,
+    /// The merchant came from a label ("Destinatario:"), not a guess after
+    /// "en"/"a"/"de"; a label overrides a guess, never the other way round.
+    merchant_labelled: bool,
     date: Option<NaiveDate>,
     time: Option<String>,
 }
@@ -494,13 +577,16 @@ impl<'a> Transducer<'a> {
     }
 
     fn flush_merchant(&mut self) {
-        if self.out.merchant.is_none() && !self.merchant_buf.is_empty() {
+        let labelled = matches!(self.state, State::Merchant { labelled: true });
+        let replace = self.out.merchant.is_none() || (labelled && !self.out.merchant_labelled);
+        if replace && !self.merchant_buf.is_empty() {
             let name = self
                 .merchant_buf
                 .trim_matches(|c: char| !c.is_alphanumeric())
                 .to_string();
             if name.chars().any(|c| c.is_alphabetic()) {
                 self.out.merchant = Some(name);
+                self.out.merchant_labelled = labelled;
             }
         }
         self.merchant_buf.clear();
@@ -533,7 +619,10 @@ impl<'a> Transducer<'a> {
             // ---- merchant collection ----
             (State::Merchant { labelled }, Tok::Word { raw, norm }) => {
                 let stop = !labelled && MERCHANT_STOP.contains(&norm.as_str());
-                if stop || self.merchant_buf.len() >= 60 {
+                // "Destinatario: JUAN PÉREZ Monto: $700": the next label ends it
+                let next_label =
+                    matches!(next, Some(Tok::Punct(':'))) && !self.merchant_buf.is_empty();
+                if stop || next_label || self.merchant_buf.len() >= 60 {
                     self.flush_merchant();
                     self.scan_word(norm, next, after_kind)
                 } else {
@@ -616,7 +705,7 @@ impl<'a> Transducer<'a> {
         if CARD_WORDS.contains(&norm) {
             return State::Card(4);
         }
-        if self.out.merchant.is_none() && self.is_label(norm) && next_is_colon {
+        if !self.out.merchant_labelled && self.is_label(norm) && next_is_colon {
             return State::Merchant { labelled: true };
         }
         if self.out.merchant.is_none()
@@ -1284,8 +1373,8 @@ mod tests {
 
         let n = read_notice(
             "avisos@bbva.mx",
-            "Pago a tu tarjeta",
-            "Recibimos tu pago a tu tarjeta de crédito por $2,000.00",
+            "Cargo a tu tarjeta",
+            "Se realizó un cargo a tu tarjeta de crédito por $2,000.00",
             None,
         )
         .unwrap();
@@ -1332,6 +1421,166 @@ mod tests {
                 None
             ),
             Err(Rejection::NotAMovement)
+        );
+    }
+
+    // ---- real notices (FIN-5) ----
+    //
+    // Text of real BBVA and Nu emails as the worker sees them once the HTML
+    // is reduced to text (table cells flattened between `|`), with every
+    // name, amount, account and reference replaced. Neither bank emails card
+    // purchases (those are app pushes, FIN-1); these are what does arrive.
+
+    const NU_TRANSFER_IN: &str = "Esta cantidad ya está disponible en tu cuenta\n\
+        | Transferencia recibida |\n\
+        | Hola, Ana: |\n\
+        | JUAN PEREZ LOPEZ hizo una transferencia a tu Cuenta Nu por:* Monto: $1,150.00 * Fecha: 01 NOV 2026 * Hora: 21:55 Esta cantidad ya está disponible en tu cuenta. |\n\
+        | Comparte Nu y aumenta las posibilidades de que alguien crezca su dinero 6.50% anual y disfrute los beneficios de la moradita. |\n\
+        | Invitar ahora |\n\
+        | Abrazos, Equipo Nu |\n\
+        | Para emergencias, llama al 55 0000 0000. |";
+
+    #[test]
+    fn real_nu_transfer_received() {
+        let n = read_notice(
+            "Nu <nu@nu.com.mx>",
+            "¡Recibiste una transferencia!",
+            NU_TRANSFER_IN,
+            None,
+        )
+        .unwrap();
+        assert_eq!(n.bank, Some("nu"));
+        assert_eq!(n.kind, NoticeKind::Income);
+        // $1,150.00 = 1150×100 = 115000
+        assert_eq!(n.amount_cents, 115_000);
+        assert_eq!(n.merchant.as_deref(), Some("JUAN PEREZ LOPEZ"));
+        assert_eq!(n.card_last4, None);
+        assert_eq!(n.occurred_at.as_deref(), Some("2026-11-01"));
+        assert_eq!(n.occurred_time.as_deref(), Some("21:55"));
+    }
+
+    #[test]
+    fn real_nu_phone_top_up() {
+        let body = "Tu comprobante de pago de recarga de celular\n\
+            | Aquí está tu comprobante de tu pago de recarga de celular |\n\
+            | 4 nov 2026 - 08:02:17 |\n\
+            | Detalle Monto: $25.00 Costo extra: $0 Tipo de transacción: Recarga telefónica Número de celular: 5500000000 |\n\
+            | Recibe Empresa a la cual se realizará el pago: Telcel Internet |\n\
+            | Envía Nombre: Ana Ruiz Método de pago: Tarjeta de crédito Nu |\n\
+            | Información adicional Código de operación: 00000aaa-1b11-2c22-3d33-444444444444 |\n\
+            | Abrazos, Equipo Nu |";
+        let n = read_notice(
+            "nu@nu.com.mx",
+            "Tu comprobante de pago de recarga de celular",
+            body,
+            None,
+        )
+        .unwrap();
+        assert_eq!(n.kind, NoticeKind::Expense);
+        // $25.00 = 2500; the "$0" extra fee after it is not the amount
+        assert_eq!(n.amount_cents, 2_500);
+        assert_eq!(n.merchant.as_deref(), Some("Telcel Internet"));
+        assert_eq!(n.occurred_at.as_deref(), Some("2026-11-04"));
+        assert_eq!(n.occurred_time.as_deref(), Some("08:02"));
+    }
+
+    #[test]
+    fn real_bbva_spei_sent() {
+        let body = " BBVA México\n\
+            | Notificación BBVA |\n\
+            | # Transferencia exitosa a cuenta de débito BBVA |\n\
+            | Ruiz Pérez Ana, te compartimos los detalles de tu transferencia. |\n\
+            | | Nombre del destinatario: JUAN PEREZ LOPEZ Monto: $ 700.00 Cuenta destino: 1234 |\n\
+            | ## Detalles de operación |\n\
+            | Concepto: | consulta |\n\
+            | Fecha: | 23 de octubre de 2026 |\n\
+            | Hora: | 21:10:34 h |\n\
+            | Folio de internet: | 1000000000 |\n\
+            | Saludos, Equipo BBVA. |\n\
+            | ## ¿No reconoces esta operación? |\n\
+            | Este correo electrónico constituye una notificación de los términos en que se realizó la operación, el único comprobante oficial es el estado de cuenta que emite BBVA. |";
+        let n = read_notice(
+            "Clientes BBVA <clientes@bbva.mx>",
+            "La transferencia a cuenta de débito fue exitosa",
+            body,
+            None,
+        )
+        .unwrap();
+        assert_eq!(n.bank, Some("bbva"));
+        assert_eq!(n.kind, NoticeKind::Expense);
+        // $ 700.00 = 70000
+        assert_eq!(n.amount_cents, 70_000);
+        assert_eq!(n.merchant.as_deref(), Some("JUAN PEREZ LOPEZ"));
+        // "Cuenta destino" is the recipient's account, not the user's card
+        assert_eq!(n.card_last4, None);
+        assert_eq!(n.occurred_at.as_deref(), Some("2026-10-23"));
+        assert_eq!(n.occurred_time.as_deref(), Some("21:10"));
+    }
+
+    #[test]
+    fn real_own_transfers_are_set_apart() {
+        // Nu: a payment to the user's own credit card
+        assert_eq!(
+            read_notice(
+                "nu@nu.com.mx",
+                "¡Recibimos tu pago!",
+                "Ya lo puedes ver en tu app;\n| ¡Gracias por tu pago! |\n| Hola, Ana: |\n\
+                 | Recibimos el pago que hiciste a tu tarjeta de crédito Nu por: |\n| $400.00 |\n\
+                 | Esta cantidad ya está disponible en tu línea de crédito. |",
+                None,
+            ),
+            Err(Rejection::OwnTransfer)
+        );
+        // BBVA: money taken out of a savings pocket into the account
+        assert_eq!(
+            read_notice(
+                "clientes@bbva.mx",
+                "Retiraste dinero de tus apartados",
+                "| Notificación BBVA |\n| # Hola, ANA: |\n\
+                 | El retiro de dinero de tu apartado en la cuenta terminación ******1234 fue exitoso, te compartimos el comprobante |\n\
+                 | El dinero ya se encuentra en el saldo disponible de tu cuenta |\n\
+                 | | Importe retirado: $4,000.00 |\n| Nombre del apartado: Viaje |\n| Fecha: 2026-10-19 |",
+                None,
+            ),
+            Err(Rejection::OwnTransfer)
+        );
+    }
+
+    #[test]
+    fn real_non_movements_are_ignored() {
+        // Nu: virtual card deleted (names a card ending and "pagos", no money)
+        assert_eq!(
+            read_notice(
+                "nu@nu.com.mx",
+                "Tarjeta virtual borrada",
+                "Eliminaste tu tarjeta virtual\n| Hola, Ana, |\n\
+                 | Te compartimos los sitios y apps en donde tenías registrada tu tarjeta virtual con terminación 1234 para que no tengas problemas con tus próximos pagos. |\n\
+                 | Str*Telcel |\n\
+                 | Para que los cobros recurrentes se sigan haciendo con normalidad, puedes crear una nueva tarjeta virtual y registrarla en los comercios. |",
+                None,
+            ),
+            Err(Rejection::NotAMovement)
+        );
+        // BBVA marketing from email.bbva.mx with no promo word but "regalo"
+        assert_eq!(
+            read_notice(
+                "BBVA <clientes@email.bbva.mx>",
+                "$600 de regalo listos para El Buen Fin",
+                "Ana, se acerca El Buen Fin y tu carrito de compras lo sabe. ¿Qué tal si nosotros ponemos los primeros $600 de la cuenta?\n\
+                 Si traes tu nómina a BBVA, te regalamos un combo de bienvenida.\n$300 en tarjeta digital para Uber",
+                None,
+            ),
+            Err(Rejection::Promotion)
+        );
+        // Nu: credit-limit offer
+        assert_eq!(
+            read_notice(
+                "nu@nu.com.mx",
+                "¡Tienes un aumento de límite de crédito preaprobado!",
+                "Acepta tu nuevo límite en la app. Ahora puedes tener $20,000.00",
+                None,
+            ),
+            Err(Rejection::Promotion)
         );
     }
 

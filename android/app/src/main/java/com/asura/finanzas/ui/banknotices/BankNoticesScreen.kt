@@ -576,6 +576,7 @@ private fun PasteSheet(
                     when (r.reason) {
                         "promotion" -> R.string.bank_notices_rejected_promotion
                         "noAmount" -> R.string.bank_notices_rejected_no_amount
+                        "ownTransfer" -> R.string.bank_notices_rejected_own_transfer
                         else -> R.string.bank_notices_rejected_not_amovement
                     },
                 )

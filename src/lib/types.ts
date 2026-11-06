@@ -585,7 +585,7 @@ export interface PendingTransaction {
   } | null;
 }
 
-export type NoticeRejection = "promotion" | "notAMovement" | "noAmount";
+export type NoticeRejection = "promotion" | "notAMovement" | "noAmount" | "ownTransfer";
 
 export type IngestResult =
   | { status: "added"; id: number }

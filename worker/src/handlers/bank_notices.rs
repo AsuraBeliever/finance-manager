@@ -913,10 +913,10 @@ async fn read_mailbox(
     'records: for (record_id, ids) in &page.records {
         for id in ids {
             let step: AppResult<bool> = async {
-                let Some((from, _)) = cfg.headers(&access, id).await? else {
+                let Some(meta) = cfg.headers(&access, id).await? else {
                     return Ok(false);
                 };
-                if !is_bank_sender(&senders, &from) {
+                if meta.is_marketing() || !is_bank_sender(&senders, &meta.from) {
                     return Ok(false);
                 }
                 let Some(mail) = cfg.message(&access, id).await? else {

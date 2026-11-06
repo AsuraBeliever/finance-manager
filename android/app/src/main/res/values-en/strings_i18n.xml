@@ -165,6 +165,7 @@
     <string name="bank_notices_rejected_promotion">That looks like a promotion, not a movement.</string>
     <string name="bank_notices_rejected_not_amovement">No movement found in that text (statement, declined charge…).</string>
     <string name="bank_notices_rejected_no_amount">No amount found: paste the whole notice.</string>
+    <string name="bank_notices_rejected_own_transfer">That\'s money between your own accounts (card payment, savings pocket): log it as a transfer.</string>
     <string name="bank_notices_empty_title">No notices to confirm</string>
     <string name="bank_notices_empty_description">When your bank notifies you of a purchase, transfer or deposit, it shows up here.</string>
     <string name="bank_notices_expense">Expense</string>

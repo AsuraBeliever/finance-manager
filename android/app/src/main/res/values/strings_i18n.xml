@@ -165,6 +165,7 @@
     <string name="bank_notices_rejected_promotion">Parece una promoción, no un movimiento.</string>
     <string name="bank_notices_rejected_not_amovement">No encontré un movimiento en ese texto (estado de cuenta, cargo rechazado…).</string>
     <string name="bank_notices_rejected_no_amount">No encontré el monto: pega el aviso completo.</string>
+    <string name="bank_notices_rejected_own_transfer">Es un movimiento entre tus cuentas (pago de tarjeta, apartado): regístralo como transferencia.</string>
     <string name="bank_notices_empty_title">Sin avisos por confirmar</string>
     <string name="bank_notices_empty_description">Cuando tu banco te avise de una compra, transferencia o depósito, aparecerá aquí.</string>
     <string name="bank_notices_expense">Gasto</string>

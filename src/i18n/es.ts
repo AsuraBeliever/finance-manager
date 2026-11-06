@@ -189,6 +189,7 @@ export const esDict = {
       promotion: "Parece una promoción, no un movimiento.",
       notAMovement: "No encontré un movimiento en ese texto (estado de cuenta, cargo rechazado…).",
       noAmount: "No encontré el monto: pega el aviso completo.",
+      ownTransfer: "Es un movimiento entre tus cuentas (pago de tarjeta, apartado): regístralo como transferencia.",
     } as Record<string, string>,
     emptyTitle: "Sin avisos por confirmar",
     emptyDescription: "Cuando tu banco te avise de una compra, transferencia o depósito, aparecerá aquí.",

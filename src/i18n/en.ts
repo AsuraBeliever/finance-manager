@@ -180,6 +180,7 @@ export const en: Dict = {
       promotion: "That looks like a promotion, not a movement.",
       notAMovement: "No movement found in that text (statement, declined charge…).",
       noAmount: "No amount found: paste the whole notice.",
+      ownTransfer: "That's money between your own accounts (card payment, savings pocket): log it as a transfer.",
     } as Record<string, string>,
     emptyTitle: "No notices to confirm",
     emptyDescription: "When your bank notifies you of a purchase, transfer or deposit, it shows up here.",

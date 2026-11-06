@@ -612,6 +612,6 @@ data class PendingTransaction(
 data class IngestResult(
     val status: String,
     val id: Long? = null,
-    /** "promotion" | "notAMovement" | "noAmount", when rejected. */
+    /** "promotion" | "notAMovement" | "noAmount" | "ownTransfer", when rejected. */
     val reason: String? = null,
 )
