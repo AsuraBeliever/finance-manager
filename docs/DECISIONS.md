@@ -322,5 +322,6 @@ app (canal de FIN-1). Por correo llegan transferencias recibidas (Nu), recargas
 aparta con el rechazo `ownTransfer` en lugar de registrarlos como gasto o
 ingreso (la bandeja solo maneja ingresos y gastos; llevarlos como
 transferencias queda para otra tarea). Las promociones de BBVA salen del mismo
-dominio que sus avisos y con asuntos que parecen movimientos, así que el push
-ignora lo que Gmail ya clasificó como Promociones o spam.
+dominio que sus avisos y con asuntos que parecen movimientos («$600 de regalo»):
+las rechaza el lector por el asunto. No se usa la pestaña Promociones de Gmail
+como filtro: en el buzón del cliente hay una transferencia real de Nu ahí.

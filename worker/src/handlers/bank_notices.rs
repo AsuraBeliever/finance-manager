@@ -883,7 +883,7 @@ async fn read_mailbox(
                 let Some(meta) = cfg.headers(&access, id).await? else {
                     return Ok(false);
                 };
-                if meta.is_marketing() || !is_bank_sender(&senders, &meta.from) {
+                if meta.is_spam() || !is_bank_sender(&senders, &meta.from) {
                     return Ok(false);
                 }
                 let Some(mail) = cfg.message(&access, id).await? else {
@@ -967,10 +967,11 @@ const RENEW_PER_RUN: i64 = 3;
 /// A watch is renewed once it has less than this left (it lasts 7 days).
 const RENEW_WITHIN_SECS: i64 = 2 * 24 * 3600;
 
-/// Runs on the frequent cron: renews the few watches closest to expiring. A
-/// handful per run keeps every invocation small (two fetches each), and with a
-/// run every 5 minutes there are hundreds of slots a day — a watch with two
-/// days left is always renewed long before it lapses.
+/// Runs on the frequent cron: renews a few of the watches with less than two
+/// days left. A handful per run keeps every invocation small (two fetches
+/// each), and with a run every 5 minutes there are hundreds of slots a day.
+/// Picked at random rather than soonest-first: a connection that keeps failing
+/// (its expiry never moves) would otherwise take the same slots every run.
 pub async fn renew_gmail_watches(db: &D1Database, cfg: &GmailConfig) -> AppResult<()> {
     let conns: Vec<TokenRow> = all(
         db,
@@ -978,7 +979,7 @@ pub async fn renew_gmail_watches(db: &D1Database, cfg: &GmailConfig) -> AppResul
          FROM gmail_connections
          WHERE needs_reconnect = 0
            AND (watch_expires_at IS NULL OR watch_expires_at < ?1)
-         ORDER BY watch_expires_at
+         ORDER BY RANDOM()
          LIMIT ?2",
         jsv![now_secs() + RENEW_WITHIN_SECS, RENEW_PER_RUN],
     )

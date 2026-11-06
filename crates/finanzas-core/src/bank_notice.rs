@@ -324,11 +324,10 @@ const OWN_TRANSFER_SUBJECT: &[&[&str]] = &[
     &["pago", "a", "tu", "tarjeta"],
 ];
 
-/// Anywhere: the same, worded in the body.
-const OWN_TRANSFER_PHRASES: &[&[&str]] = &[
-    &["pago", "que", "hiciste", "a", "tu", "tarjeta"],
-    &["pago", "a", "tu", "tarjeta", "de", "credito"],
-];
+/// In the body: Nu's own wording only. A looser "pago a tu tarjeta" also turns
+/// up in footers of real charges ("recuerda domiciliar el pago a tu tarjeta de
+/// crédito") and would drop them; the real notices are caught by the subject.
+const OWN_TRANSFER_PHRASES: &[&[&str]] = &[&["pago", "que", "hiciste", "a", "tu", "tarjeta"]];
 
 /// "<who> hizo una transferencia…", "<who> te envió…": the counterpart is the
 /// run of words right before the phrase (Nu names the payer this way).
@@ -520,6 +519,9 @@ struct Transducer<'a> {
     /// "$350.00 de María"), never in "fecha de operación".
     since_anchor: usize,
     labels: &'a [&'a str],
+    /// The word before the current one: "Método de pago:" is how it was
+    /// paid, not who was paid.
+    prev_word: Option<&'a str>,
 }
 
 impl<'a> Transducer<'a> {
@@ -531,6 +533,7 @@ impl<'a> Transducer<'a> {
             merchant_buf: String::new(),
             glued: false,
             since_anchor: usize::MAX,
+            prev_word: None,
             labels,
         };
         for (i, tok) in toks.iter().enumerate() {
@@ -540,6 +543,11 @@ impl<'a> Transducer<'a> {
             let after_kind = kind_at.is_some_and(|k| i >= k);
             let next = toks.get(i + 1);
             t.step(tok, next, after_kind);
+            match tok {
+                Tok::Word { norm, .. } => t.prev_word = Some(norm.as_str()),
+                Tok::Punct(':') => {}
+                _ => t.prev_word = None,
+            }
             t.since_anchor = if matches!(tok, Tok::Money(..)) {
                 0
             } else {
@@ -705,7 +713,10 @@ impl<'a> Transducer<'a> {
         if CARD_WORDS.contains(&norm) {
             return State::Card(4);
         }
-        if !self.out.merchant_labelled && self.is_label(norm) && next_is_colon {
+        let means_of_payment = matches!(self.prev_word, Some("de")) && matches!(norm, "pago")
+            || matches!(self.prev_word, Some("metodo" | "forma" | "medio"));
+        if !self.out.merchant_labelled && self.is_label(norm) && next_is_colon && !means_of_payment
+        {
             return State::Merchant { labelled: true };
         }
         if self.out.merchant.is_none()
@@ -849,6 +860,13 @@ fn lex(text: &str) -> Vec<Lex> {
             let raw: String = chars[start..i].iter().collect();
             let norm: String = raw.chars().map(fold).collect();
             out.push(Lex::Word(raw, norm));
+        } else if c == '.' && chars.get(i + 1).is_none_or(|n| n.is_whitespace()) {
+            // a full stop ends a sentence like a line break ends a cell:
+            // "en AMAZON. Recuerda…" must not glue the next sentence on
+            if out.last() != Some(&Lex::Newline) {
+                out.push(Lex::Newline);
+            }
+            i += 1;
         } else {
             out.push(Lex::Punct(c));
             i += 1;
@@ -1544,6 +1562,34 @@ mod tests {
             ),
             Err(Rejection::OwnTransfer)
         );
+    }
+
+    #[test]
+    fn footer_about_card_payments_keeps_the_charge() {
+        // review 2 of PR #2: a footer reminder is not a payment to the card
+        let n = read_notice(
+            "avisos@bbva.mx",
+            "Notificación de compra",
+            "Compra por $300.00 en AMAZON. Recuerda domiciliar el pago a tu tarjeta de crédito.",
+            None,
+        )
+        .unwrap();
+        assert_eq!(n.amount_cents, 30_000);
+        assert_eq!(n.merchant.as_deref(), Some("AMAZON"));
+    }
+
+    #[test]
+    fn nu_means_of_payment_is_not_the_merchant() {
+        // "Método de pago:" before the real label must not win
+        let n = read_notice(
+            "nu@nu.com.mx",
+            "Tu comprobante de pago de recarga de celular",
+            "| Detalle Monto: $25.00 |\n| Envía Nombre: Ana Método de pago: Tarjeta de crédito Nu |\n\
+             | Recibe Empresa a la cual se realizará el pago: Telcel Internet |",
+            None,
+        )
+        .unwrap();
+        assert_eq!(n.merchant.as_deref(), Some("Telcel Internet"));
     }
 
     #[test]

@@ -362,13 +362,11 @@ pub struct MailMeta {
 }
 
 impl MailMeta {
-    /// Gmail already filed it as marketing or spam. Banks send promotions
-    /// from the same domains as their notices (BBVA: email.bbva.mx), often
-    /// with subjects that read like a movement ("$600 de regalo…").
-    pub fn is_marketing(&self) -> bool {
-        self.labels
-            .iter()
-            .any(|l| l == "CATEGORY_PROMOTIONS" || l == "SPAM")
+    /// Gmail filed it as spam. Only spam: Gmail's Promotions tab is not
+    /// reliable enough — real Nu "¡Recibiste una transferencia!" notices have
+    /// landed there — and the reader already turns marketing down itself.
+    pub fn is_spam(&self) -> bool {
+        self.labels.iter().any(|l| l == "SPAM")
     }
 }
 
@@ -652,14 +650,15 @@ mod tests {
     }
 
     #[test]
-    fn marketing_labels() {
+    fn only_spam_is_skipped() {
         let meta = |labels: &[&str]| MailMeta {
-            from: "clientes@email.bbva.mx".into(),
+            from: "nu@nu.com.mx".into(),
             labels: labels.iter().map(|l| l.to_string()).collect(),
         };
-        assert!(meta(&["CATEGORY_PROMOTIONS", "UNREAD", "INBOX"]).is_marketing());
-        assert!(meta(&["SPAM"]).is_marketing());
-        assert!(!meta(&["CATEGORY_UPDATES", "INBOX"]).is_marketing());
+        assert!(meta(&["SPAM"]).is_spam());
+        // a real transfer notice Gmail filed under Promotions is still read
+        assert!(!meta(&["CATEGORY_PROMOTIONS", "UNREAD", "INBOX"]).is_spam());
+        assert!(!meta(&["CATEGORY_UPDATES", "INBOX"]).is_spam());
     }
 
     #[test]
