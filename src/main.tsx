@@ -16,6 +16,7 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { ChangePasswordPage } from "./features/settings/ChangePasswordPage";
 import { SavingsGoalsPage } from "./features/goals/SavingsGoalsPage";
 import { BudgetsPage } from "./features/budgets/BudgetsPage";
+import { BankNoticesPage } from "./features/bankNotices/BankNoticesPage";
 import { SubscriptionsPage } from "./features/subscriptions/SubscriptionsPage";
 import { CategoriesPage } from "./features/categories/CategoriesPage";
 import { AppearancePage } from "./features/appearance/AppearancePage";
@@ -67,6 +68,7 @@ const router = createHashRouter([
       { path: "metas", element: <SavingsGoalsPage /> },
       { path: "presupuestos", element: <BudgetsPage /> },
       { path: "suscripciones", element: <SubscriptionsPage /> },
+      { path: "avisos", element: <BankNoticesPage /> },
       { path: "categorias", element: <CategoriesPage /> },
       { path: "apariencia", element: <AppearancePage /> },
       { path: "ajustes", element: <SettingsPage /> },

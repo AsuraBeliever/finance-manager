@@ -526,3 +526,78 @@ export interface SubInput {
   autoCharge: boolean;
   chargeTime: string | null;
 }
+
+// ---- bank notices (FIN-5) ----
+
+export interface GmailStatus {
+  email: string;
+  connectedAt: string;
+  lastPushAt: string | null;
+  /** Google refused the stored grant (access revoked): connect again. */
+  needsReconnect: boolean;
+}
+
+export interface KnownBank {
+  key: string;
+  name: string;
+  domains: string[];
+}
+
+export interface BankSender {
+  id: number;
+  pattern: string;
+  walletId: number | null;
+}
+
+export interface CardWallet {
+  cardLast4: string;
+  walletId: number;
+}
+
+export interface BankNoticeSettings {
+  gmailAvailable: boolean;
+  gmail: GmailStatus | null;
+  knownBanks: KnownBank[];
+  senders: BankSender[];
+  cards: CardWallet[];
+}
+
+export interface PendingTransaction {
+  id: number;
+  source: "gmail" | "paste";
+  sender: string;
+  subject: string | null;
+  bankName: string | null;
+  kind: "income" | "expense";
+  amountCents: number;
+  currencyCode: string;
+  merchant: string | null;
+  cardLast4: string | null;
+  occurredAt: string;
+  occurredTime: string | null;
+  suggestedWalletId: number | null;
+  suggestedCategoryId: number | null;
+  duplicateOf: {
+    id: number;
+    description: string | null;
+    occurredAt: string;
+    walletName: string;
+  } | null;
+}
+
+export type NoticeRejection = "promotion" | "notAMovement" | "noAmount";
+
+export type IngestResult =
+  | { status: "added"; id: number }
+  | { status: "duplicate" }
+  | { status: "rejected"; reason: NoticeRejection };
+
+export interface ConfirmPendingInput {
+  walletId: number;
+  amountCents: number;
+  categoryId: number | null;
+  description: string | null;
+  occurredAt: string;
+  occurredTime: string | null;
+  rememberCard: boolean;
+}

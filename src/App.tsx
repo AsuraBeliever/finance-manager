@@ -14,6 +14,7 @@ import {
   CreditCard,
   MoreHorizontal,
   ChevronRight,
+  Mail,
 } from "lucide-react";
 import { es } from "./i18n/es";
 import { UNAUTHORIZED_EVENT } from "./lib/api";
@@ -52,6 +53,7 @@ export default function App() {
     { to: "/metas", label: es.nav.goals, icon: PiggyBank },
     { to: "/presupuestos", label: es.nav.budgets, icon: Target },
     { to: "/suscripciones", label: es.nav.subscriptions, icon: CreditCard },
+    { to: "/avisos", label: es.nav.bankNotices, icon: Mail },
   ];
   // Always revalidate the session against the server on load: after a Google
   // OAuth redirect there is no JS continuity to setQueryData, so the app must

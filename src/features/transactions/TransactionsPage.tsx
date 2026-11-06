@@ -1,11 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeftRight, Plus } from "lucide-react";
+import { ArrowLeftRight, Mail, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { PrivacyToggle } from "../../components/PrivacyToggle";
-import { listTransactions, listWallets, TX_LIST_LIMIT, type TxFilter } from "../../lib/api";
+import {
+  listPendingTransactions,
+  listTransactions,
+  listWallets,
+  TX_LIST_LIMIT,
+  type TxFilter,
+} from "../../lib/api";
 import type { Period, Transaction } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { TransactionFilters, type FilterKind } from "./TransactionFilters";
@@ -83,6 +90,7 @@ export function TransactionsPage() {
       />
 
       <OutboxPanel />
+      <PendingNoticesBanner />
 
       <TransactionFilters
         kind={kind}
@@ -137,5 +145,27 @@ export function TransactionsPage() {
         }}
       />
     </>
+  );
+}
+
+/** Bank notices waiting in /avisos — the inbox is one tap away from here. */
+function PendingNoticesBanner() {
+  const pending = useQuery({
+    queryKey: ["pendingTransactions"],
+    queryFn: listPendingTransactions,
+  });
+  const n = pending.data?.length ?? 0;
+  if (n === 0) return null;
+  return (
+    <Link
+      to="/avisos"
+      className="mb-4 flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm text-fg transition-colors hover:bg-accent/15"
+    >
+      <Mail size={16} className="shrink-0 text-accent" />
+      <span className="flex-1">
+        {es.bankNotices.pendingBanner} ({n})
+      </span>
+      <span className="font-medium text-accent">{es.bankNotices.review}</span>
+    </Link>
   );
 }
