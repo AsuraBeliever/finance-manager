@@ -262,9 +262,17 @@ impl GmailConfig {
             enc(&self.client_secret),
             enc(redirect_uri),
         );
+        // Any refusal here is ours (a wrong client secret answers 401
+        // invalid_client, an expired code 400 invalid_grant), never "the user
+        // didn't allow reading mail": Internal, so the app says "try again".
         let v = send(Method::Post, &self.token_url, None, Some(form), None)
             .await?
-            .map_err(|s| google_failed("la autorización", s))?;
+            .map_err(|s| {
+                AppError::Internal(format!(
+                    "Google rechazó el intercambio del código ({})",
+                    s.0
+                ))
+            })?;
         serde_json::from_value(v).map_err(|e| AppError::Internal(format!("tokens inválidos: {e}")))
     }
 
