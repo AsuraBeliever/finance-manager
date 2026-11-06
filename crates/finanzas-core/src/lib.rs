@@ -3,6 +3,7 @@
 //! Cloudflare Worker (D1) load data into `investments::CalcContext` and call
 //! the calculators from here.
 
+pub mod bank_notice;
 pub mod budget;
 pub mod credit;
 pub mod error;
