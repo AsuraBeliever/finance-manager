@@ -85,8 +85,9 @@ async fn gmail_push(mut req: Request, ctx: worker::RouteContext<()>) -> Result<R
     Ok(Response::empty()?.with_status(204))
 }
 
-/// The frequent cron in wrangler.toml: only books automatic subscription
-/// charges, so a charge lands within minutes of its chosen time.
+/// The frequent cron in wrangler.toml: books automatic subscription charges, so
+/// a charge lands within minutes of its chosen time, and renews the Gmail
+/// watches about to lapse.
 const SUBSCRIPTION_CRON: &str = "*/5 * * * *";
 
 /// Daily market-data refresh (cron, UTC) — replaces the desktop's
@@ -107,6 +108,13 @@ pub async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
         if let Err(e) = handlers::subscriptions::post_due_subscriptions(&db).await {
             console_error!("subscription auto-charge failed: {e}");
         }
+        // Gmail watches last 7 days. Renewed a few at a time here rather than
+        // in the daily run, which already spends its subrequests on market data.
+        if let Some(cfg) = gmail::GmailConfig::from_env(&env) {
+            if let Err(e) = handlers::bank_notices::renew_gmail_watches(&db, &cfg).await {
+                console_error!("gmail watch renewal failed: {e}");
+            }
+        }
         return;
     }
     if let Err(e) = market::fetch_and_store_rates(&db, false).await {
@@ -123,14 +131,6 @@ pub async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
     }
     if let Err(e) = handlers::goals::snapshot_all_goals(&db).await {
         console_error!("goal snapshot failed: {e}");
-    }
-    // A Gmail watch lasts 7 days; renewing on the 01:00 run is plenty.
-    if event.cron() == "0 7 * * *" {
-        if let Some(cfg) = gmail::GmailConfig::from_env(&env) {
-            if let Err(e) = handlers::bank_notices::renew_gmail_watches(&db, &cfg).await {
-                console_error!("gmail watch renewal failed: {e}");
-            }
-        }
     }
     if let Err(e) = db::exec(
         &db,

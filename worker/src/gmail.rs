@@ -312,6 +312,49 @@ pub struct Watch {
     pub expiration: String,
 }
 
+/// A page of `history.list`: each record's id with the message ids it added.
+#[derive(Debug, PartialEq)]
+pub struct HistoryPage {
+    pub records: Vec<(String, Vec<String>)>,
+    /// The mailbox's current history id — the cursor once everything is read.
+    pub history_id: Option<String>,
+    /// More records remain after this page.
+    pub more: bool,
+}
+
+fn parse_history(v: &Value) -> HistoryPage {
+    let records = v
+        .get("history")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|h| {
+            let id = match h.get("id")? {
+                Value::String(s) => s.clone(),
+                Value::Number(n) => n.to_string(),
+                _ => return None,
+            };
+            let ids = h
+                .get("messagesAdded")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|m| m.pointer("/message/id").and_then(Value::as_str))
+                .map(str::to_string)
+                .collect();
+            Some((id, ids))
+        })
+        .collect();
+    HistoryPage {
+        records,
+        history_id: v
+            .get("historyId")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        more: v.get("nextPageToken").and_then(Value::as_str).is_some(),
+    }
+}
+
 /// One message, reduced to what the notice reader needs.
 pub struct Mail {
     pub from: String,
@@ -368,60 +411,28 @@ impl GmailConfig {
         .await;
     }
 
-    /// Ids of messages added since `start`, and the new cursor. Err(404) =
-    /// the cursor is too old to replay.
+    /// One page of what was added to INBOX after `start`: at most
+    /// `max_records` history records, oldest first. Err(404) = the cursor is
+    /// too old to replay.
+    ///
+    /// One page only, on purpose: a free-plan invocation gets 50 subrequests,
+    /// and each message costs one or two more. What doesn't fit is read by the
+    /// next push, from the last record this one finished.
     pub async fn history(
         &self,
         access: &str,
         start: &str,
-    ) -> AppResult<Result<(Vec<String>, Option<String>), HttpStatus>> {
-        let mut ids = Vec::new();
-        let mut cursor = None;
-        let mut page: Option<String> = None;
-        // a few pages at most: one push rarely carries more than a handful
-        for _ in 0..5 {
-            let mut url = self.api(&format!(
-                "history?startHistoryId={}&historyTypes=messageAdded&labelId=INBOX&maxResults=100",
-                enc(start)
-            ));
-            if let Some(p) = &page {
-                url.push_str(&format!("&pageToken={}", enc(p)));
-            }
-            let v = match send(Method::Get, &url, Some(access), None, None).await? {
-                Ok(v) => v,
-                Err(s) => return Ok(Err(s)),
-            };
-            if let Some(h) = v.get("historyId").and_then(Value::as_str) {
-                cursor = Some(h.to_string());
-            }
-            for h in v
-                .get("history")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-            {
-                for m in h
-                    .get("messagesAdded")
-                    .and_then(Value::as_array)
-                    .into_iter()
-                    .flatten()
-                {
-                    if let Some(id) = m.pointer("/message/id").and_then(Value::as_str) {
-                        if !ids.iter().any(|x| x == id) {
-                            ids.push(id.to_string());
-                        }
-                    }
-                }
-            }
-            page = v
-                .get("nextPageToken")
-                .and_then(Value::as_str)
-                .map(str::to_string);
-            if page.is_none() {
-                break;
-            }
-        }
-        Ok(Ok((ids, cursor)))
+        max_records: u32,
+    ) -> AppResult<Result<HistoryPage, HttpStatus>> {
+        let url = self.api(&format!(
+            "history?startHistoryId={}&historyTypes=messageAdded&labelId=INBOX&maxResults={max_records}",
+            enc(start)
+        ));
+        let v = match send(Method::Get, &url, Some(access), None, None).await? {
+            Ok(v) => v,
+            Err(s) => return Ok(Err(s)),
+        };
+        Ok(Ok(parse_history(&v)))
     }
 
     /// From + Subject only — cheap check before reading a whole message.
@@ -582,6 +593,33 @@ mod tests {
         let html = URL_SAFE_NO_PAD.encode("<div>Compra</div><div>$10.00</div>");
         let payload = serde_json::json!({"mimeType": "text/html", "body": {"data": html}});
         assert_eq!(body_text(&payload), "Compra\n$10.00");
+    }
+
+    #[test]
+    fn history_page() {
+        let v = serde_json::json!({
+            "history": [
+                {"id": "101", "messagesAdded": [{"message": {"id": "a"}}]},
+                {"id": "102", "messages": [{"id": "x"}]},
+                {"id": "103", "messagesAdded": [{"message": {"id": "b"}}, {"message": {"id": "c"}}]},
+            ],
+            "historyId": "110",
+            "nextPageToken": "t",
+        });
+        assert_eq!(
+            parse_history(&v),
+            HistoryPage {
+                records: vec![
+                    ("101".into(), vec!["a".into()]),
+                    ("102".into(), vec![]),
+                    ("103".into(), vec!["b".into(), "c".into()]),
+                ],
+                history_id: Some("110".into()),
+                more: true,
+            }
+        );
+        let empty = parse_history(&serde_json::json!({"historyId": "7"}));
+        assert!(empty.records.is_empty() && !empty.more);
     }
 
     #[test]

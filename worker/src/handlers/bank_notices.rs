@@ -94,12 +94,8 @@ fn truncate(s: &str, max: usize) -> String {
 }
 
 /// Is this sender one of the user's banks (built-in or added)?
-async fn is_bank_sender(db: &D1Database, uid: i64, from: &str) -> AppResult<bool> {
-    if known_bank(from).is_some() {
-        return Ok(true);
-    }
-    let senders = list_senders(db, uid).await?;
-    Ok(senders.iter().any(|s| sender_matches(from, &s.pattern)))
+fn is_bank_sender(senders: &[BankSender], from: &str) -> bool {
+    known_bank(from).is_some() || senders.iter().any(|s| sender_matches(from, &s.pattern))
 }
 
 #[derive(Deserialize)]
@@ -864,9 +860,108 @@ pub async fn disconnect_gmail(
     Ok(())
 }
 
-/// One Pub/Sub push: read every message added since the stored cursor, keep
-/// the ones from the user's banks. The cursor only moves forward once the
-/// batch is read, so a failure is retried by the next push.
+/// History records one push reads. Each message costs one or two fetches
+/// (headers, then the body if it's a bank's), on top of the token refresh and
+/// the history call — 10 records keep the worst case well under the free
+/// plan's 50 subrequests and 50 D1 queries per invocation.
+const PUSH_RECORDS: u32 = 10;
+
+/// What a push did for one mailbox: notices added, and the cursor to store.
+struct PushRead {
+    added: usize,
+    cursor: Option<String>,
+}
+
+/// Read one page of the mailbox's history from its stored cursor. The cursor
+/// moves record by record: a record counts as read only once all its messages
+/// were, so a failure half way is retried from that record by the next push,
+/// and nothing before it is read twice (a re-read would be harmless anyway —
+/// pending rows are UNIQUE per message).
+async fn read_mailbox(
+    db: &D1Database,
+    cfg: &GmailConfig,
+    c: &TokenRow,
+    pushed_history: &str,
+) -> AppResult<PushRead> {
+    let Some(access) = access_token(db, cfg, c).await? else {
+        return Ok(PushRead {
+            added: 0,
+            cursor: None,
+        });
+    };
+    let start = c
+        .history_id
+        .clone()
+        .unwrap_or_else(|| pushed_history.into());
+    let page = match cfg.history(&access, &start, PUSH_RECORDS).await? {
+        Ok(p) => p,
+        // cursor too old to replay: restart from this push
+        Err(HttpStatus(404)) => {
+            return Ok(PushRead {
+                added: 0,
+                cursor: Some(pushed_history.to_string()),
+            })
+        }
+        Err(HttpStatus(s)) => {
+            return Err(AppError::Internal(format!("history de Gmail falló ({s})")))
+        }
+    };
+    let senders = list_senders(db, c.user_id).await?;
+    let mut added = 0;
+    let mut cursor = None;
+    let mut complete = true;
+    'records: for (record_id, ids) in &page.records {
+        for id in ids {
+            let step: AppResult<bool> = async {
+                let Some((from, _)) = cfg.headers(&access, id).await? else {
+                    return Ok(false);
+                };
+                if !is_bank_sender(&senders, &from) {
+                    return Ok(false);
+                }
+                let Some(mail) = cfg.message(&access, id).await? else {
+                    return Ok(false);
+                };
+                let received = chrono::DateTime::from_timestamp_millis(
+                    mail.internal_date_ms - 6 * 3600 * 1000,
+                )
+                .map(|d| d.naive_utc());
+                let r = ingest(
+                    db,
+                    c.user_id,
+                    "gmail",
+                    id,
+                    &mail.from,
+                    &mail.subject,
+                    &mail.body,
+                    received,
+                )
+                .await?;
+                Ok(matches!(r, Ingest::Added { .. }))
+            }
+            .await;
+            match step {
+                Ok(true) => added += 1,
+                Ok(false) => {}
+                Err(e) => {
+                    worker::console_error!("gmail message {id} (user {}): {e}", c.user_id);
+                    complete = false;
+                    break 'records;
+                }
+            }
+        }
+        cursor = Some(record_id.clone());
+    }
+    // Everything on the page read and nothing after it: jump to the mailbox's
+    // own cursor, past records that added nothing to INBOX.
+    if complete && !page.more {
+        cursor = page.history_id.or(cursor);
+    }
+    Ok(PushRead { added, cursor })
+}
+
+/// One Pub/Sub push for a mailbox. Each connection is read on its own: one
+/// failing (a revoked grant, a Gmail hiccup) doesn't stop the others.
 pub async fn process_push(
     db: &D1Database,
     cfg: &GmailConfig,
@@ -882,71 +977,43 @@ pub async fn process_push(
     .await?;
     let mut added = 0;
     for c in conns {
-        let Some(access) = access_token(db, cfg, &c).await? else {
-            continue;
-        };
-        let start = c
-            .history_id
-            .clone()
-            .unwrap_or_else(|| pushed_history.into());
-        let (ids, cursor) = match cfg.history(&access, &start).await? {
-            Ok(v) => v,
-            Err(HttpStatus(404)) => {
-                // cursor too old to replay: restart from this push
-                (vec![], Some(pushed_history.to_string()))
+        match read_mailbox(db, cfg, &c, pushed_history).await {
+            Ok(r) => {
+                added += r.added;
+                exec(
+                    db,
+                    "UPDATE gmail_connections
+                     SET history_id = COALESCE(?2, history_id), last_push_at = datetime('now')
+                     WHERE user_id = ?1",
+                    jsv![c.user_id, r.cursor],
+                )
+                .await?;
             }
-            Err(HttpStatus(s)) => {
-                return Err(AppError::Internal(format!("history de Gmail falló ({s})")))
-            }
-        };
-        for id in ids {
-            let Some((from, _subject)) = cfg.headers(&access, &id).await? else {
-                continue;
-            };
-            if !is_bank_sender(db, c.user_id, &from).await? {
-                continue;
-            }
-            let Some(mail) = cfg.message(&access, &id).await? else {
-                continue;
-            };
-            let received =
-                chrono::DateTime::from_timestamp_millis(mail.internal_date_ms - 6 * 3600 * 1000)
-                    .map(|d| d.naive_utc());
-            if let Ingest::Added { .. } = ingest(
-                db,
-                c.user_id,
-                "gmail",
-                &id,
-                &mail.from,
-                &mail.subject,
-                &mail.body,
-                received,
-            )
-            .await?
-            {
-                added += 1;
-            }
+            Err(e) => worker::console_error!("gmail push for user {} failed: {e}", c.user_id),
         }
-        exec(
-            db,
-            "UPDATE gmail_connections
-             SET history_id = COALESCE(?2, history_id), last_push_at = datetime('now')
-             WHERE user_id = ?1",
-            jsv![c.user_id, cursor],
-        )
-        .await?;
     }
     Ok(added)
 }
 
-/// Daily cron: a watch lasts 7 days; renewing every day keeps a margin even
-/// if a few runs fail.
+/// Watches renewed per cron run, the soonest to expire first.
+const RENEW_PER_RUN: i64 = 3;
+/// A watch is renewed once it has less than this left (it lasts 7 days).
+const RENEW_WITHIN_SECS: i64 = 2 * 24 * 3600;
+
+/// Runs on the frequent cron: renews the few watches closest to expiring. A
+/// handful per run keeps every invocation small (two fetches each), and with a
+/// run every 5 minutes there are hundreds of slots a day — a watch with two
+/// days left is always renewed long before it lapses.
 pub async fn renew_gmail_watches(db: &D1Database, cfg: &GmailConfig) -> AppResult<()> {
     let conns: Vec<TokenRow> = all(
         db,
         "SELECT user_id, refresh_token_enc, access_token_enc, access_expires_at, history_id
-         FROM gmail_connections WHERE needs_reconnect = 0",
-        jsv![],
+         FROM gmail_connections
+         WHERE needs_reconnect = 0
+           AND (watch_expires_at IS NULL OR watch_expires_at < ?1)
+         ORDER BY watch_expires_at
+         LIMIT ?2",
+        jsv![now_secs() + RENEW_WITHIN_SECS, RENEW_PER_RUN],
     )
     .await?;
     for c in conns {

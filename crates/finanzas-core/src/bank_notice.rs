@@ -148,6 +148,7 @@ pub fn read_notice(
     }
     if has_phrase(&subj, NOT_MOVEMENT_PHRASES)
         || has_phrase(&subj, DECLINED_PHRASES)
+        || has_phrase(&subj, CANCELLED_PHRASES)
         || has_phrase(&body_toks, DECLINED_PHRASES)
     {
         return Err(Rejection::NotAMovement);
@@ -306,8 +307,11 @@ const DECLINED_PHRASES: &[&[&str]] = &[
     &["no", "fue", "aprobada"],
     &["no", "aprobada"],
     &["no", "se", "pudo"],
-    &["cancelada"],
 ];
+
+/// In a subject only: banks' footers say things like "si tu tarjeta fue
+/// cancelada, llámanos", which must not drop a real charge.
+const CANCELLED_PHRASES: &[&[&str]] = &[&["cancelada"], &["cancelado"]];
 
 /// Generic merchant/counterpart labels (followed by `:`).
 const MERCHANT_LABELS: &[&str] = &[
@@ -321,7 +325,9 @@ const MERCHANT_LABELS: &[&str] = &[
     "remitente",
 ];
 
-/// Words before an amount that make it a balance, not the movement.
+/// Words before an amount that make it a balance, not the movement. "crédito"
+/// only counts on its own ("crédito disponible"): right after "tarjeta (de)" it
+/// names the card, and the card context swallows it first.
 const BALANCE_WORDS: &[&str] = &["saldo", "disponible", "limite", "credito"];
 
 /// Words that end a merchant run after `en` / `a` / `de`.
@@ -568,10 +574,11 @@ impl<'a> Transducer<'a> {
             }
             (State::Card(_), Tok::Masked(_)) => State::Scan,
             (State::Card(n), Tok::Word { norm, .. }) if n > 0 => {
-                if CARD_CONT.contains(&norm.as_str())
-                    || CARD_WORDS.contains(&norm.as_str())
-                    || norm.len() <= 3
-                {
+                if CARD_WORDS.contains(&norm.as_str()) {
+                    // "tarjeta de crédito terminación …": a new card word
+                    // restarts the wait for the digits
+                    State::Card(4)
+                } else if CARD_CONT.contains(&norm.as_str()) || norm.len() <= 3 {
                     State::Card(n - 1)
                 } else {
                     self.scan_word(norm, next, after_kind)
@@ -630,7 +637,11 @@ impl<'a> Transducer<'a> {
 const CARD_WORDS: &[&str] = &["terminacion", "termina", "terminada", "tarjeta", "cuenta"];
 
 /// Words a card context may skip on its way to the digits.
-const CARD_CONT: &[&str] = &["no", "numero", "en", "con", "de", "debito", "nomina"];
+/// "crédito"/"débito" here describe the card ("tarjeta de crédito"), so they
+/// never reach the balance check.
+const CARD_CONT: &[&str] = &[
+    "no", "numero", "en", "con", "de", "credito", "debito", "nomina", "digital", "virtual",
+];
 
 // --------------------------------------------------------------- tokenizer --
 
@@ -757,10 +768,12 @@ fn lex(text: &str) -> Vec<Lex> {
     out
 }
 
-/// `1,234.56` → 123456 cents. A lone `,dd` is read as a decimal comma.
+/// `1,234.56` → 123456 cents. One or two digits after the last separator are
+/// decimals (`12.5` = 1250, a decimal comma `1.234,56` too); three are a
+/// thousands group (`12,000`).
 fn parse_cents(num: &str) -> Option<i64> {
     let (int_part, frac) = match num.rfind(['.', ',']) {
-        Some(p) if num.len() - p - 1 == 2 => (&num[..p], &num[p + 1..]),
+        Some(p) if matches!(num.len() - p - 1, 1 | 2) => (&num[..p], &num[p + 1..]),
         _ => (num, ""),
     };
     let int_digits: String = int_part.chars().filter(|c| c.is_ascii_digit()).collect();
@@ -768,10 +781,10 @@ fn parse_cents(num: &str) -> Option<i64> {
         return None;
     }
     let units: i64 = int_digits.parse().ok()?;
-    let cents: i64 = if frac.is_empty() {
-        0
-    } else {
-        frac.parse().ok()?
+    let cents: i64 = match frac.len() {
+        0 => 0,
+        1 => frac.parse::<i64>().ok()? * 10,
+        _ => frac.parse().ok()?,
     };
     Some(units * 100 + cents)
 }
@@ -1255,6 +1268,74 @@ mod tests {
     }
 
     #[test]
+    fn credit_card_wording_is_not_a_balance() {
+        // review of PR #2: "crédito" right after "tarjeta de" named the card
+        // but was read as "saldo/crédito disponible", so the amount was lost.
+        let n = read_notice(
+            "hola@nu.com.mx",
+            "Compra",
+            "Compraste con tu tarjeta de crédito por $450.00 en OXXO",
+            None,
+        )
+        .unwrap();
+        // $450.00 = 45000
+        assert_eq!(n.amount_cents, 45_000);
+        assert_eq!(n.merchant.as_deref(), Some("OXXO"));
+
+        let n = read_notice(
+            "avisos@bbva.mx",
+            "Pago a tu tarjeta",
+            "Recibimos tu pago a tu tarjeta de crédito por $2,000.00",
+            None,
+        )
+        .unwrap();
+        // $2,000.00 = 200000
+        assert_eq!(n.amount_cents, 200_000);
+
+        let n = read_notice(
+            "avisos@bbva.mx",
+            "Notificación de compra",
+            "Compra con tu tarjeta de crédito terminación 1234 por $450.00 en OXXO",
+            None,
+        )
+        .unwrap();
+        assert_eq!(n.amount_cents, 45_000);
+        assert_eq!(n.card_last4.as_deref(), Some("1234"));
+
+        // a real balance line still doesn't win over the movement
+        let n = read_notice(
+            "avisos@bbva.mx",
+            "Compra",
+            "Crédito disponible: $9,000.00. Compra por $100.00 en OXXO",
+            None,
+        )
+        .unwrap();
+        assert_eq!(n.amount_cents, 10_000);
+    }
+
+    #[test]
+    fn footer_mentioning_cancelled_card_keeps_the_charge() {
+        let n = read_notice(
+            "avisos@bbva.mx",
+            "Notificación de compra",
+            "Compra por $300.00 en AMAZON.\nSi tu tarjeta fue robada o cancelada, llámanos.",
+            None,
+        )
+        .unwrap();
+        assert_eq!(n.amount_cents, 30_000);
+        // …but a cancellation in the subject is not a movement
+        assert_eq!(
+            read_notice(
+                "avisos@bbva.mx",
+                "Compra cancelada",
+                "Compra por $300.00",
+                None
+            ),
+            Err(Rejection::NotAMovement)
+        );
+    }
+
+    #[test]
     fn promotion_rejected() {
         assert_eq!(
             read_notice(
@@ -1394,6 +1475,8 @@ mod tests {
         assert_eq!(parse_cents("1.234,56"), Some(123_456));
         assert_eq!(parse_cents("0.99"), Some(99));
         assert_eq!(parse_cents("12,000"), Some(1_200_000));
+        // one decimal digit: $12.5 = 12×100 + 50 = 1250, not $125.00
+        assert_eq!(parse_cents("12.5"), Some(1_250));
     }
 
     #[test]

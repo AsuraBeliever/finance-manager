@@ -89,7 +89,8 @@ día previo, así que con una sola corrida la posición en títulos iba siempre 
 día de rendimiento atrás del app de cetesdirecto.
 
 Un cuarto trigger, `*/5 * * * *` (despachado por cadena en `lib.rs`,
-`SUBSCRIPTION_CRON`), sólo cobra las suscripciones con `auto_charge = 1`
+`SUBSCRIPTION_CRON`), renueva los watches de Gmail por caducar (ver «Avisos del
+banco por Gmail») y cobra las suscripciones con `auto_charge = 1`
 (`subscriptions::post_due_subscriptions`): un gasto por cada fecha de cargo
 vencida (fechada en esa fecha, no en la del cron; hasta 12 de rezago). El cargo
 de hoy espera a su `charge_time` (CDMX), así que sale a lo más 5 min después de
@@ -177,8 +178,16 @@ los encabezados de cada correo nuevo y abre completo únicamente el de un
 remitente que es banco (BBVA/Nu incluidos + `bank_senders`); el lector de
 `finanzas-core::bank_notice` lo convierte en una fila de
 `pending_transactions`. Siempre responde 204 tras autenticar: si algo falla, el
-cursor no avanza y el siguiente push lo recoge. El watch dura 7 días; el cron de
-las 07:00 UTC lo renueva.
+cursor no avanza y el siguiente push lo recoge.
+
+Límites del plan gratuito (50 subrequests y 50 consultas D1 por invocación):
+cada push lee **una página de 10 registros** de history como máximo y el cursor
+avanza registro por registro (un registro cuenta como leído cuando todos sus
+correos lo están); lo que no cabe lo lee el siguiente push. Los remitentes del
+usuario se leen una vez por push. Cada conexión se procesa aparte: si una
+falla, las demás siguen. El watch dura 7 días: el cron de cada 5 minutos
+(`SUBSCRIPTION_CRON`) renueva como mucho 3 por corrida, los que tienen menos de
+2 días de vida, el más próximo a caducar primero.
 
 - Conexión web: `GET /api/gmail/connect` (requiere sesión) → Google → el mismo
   `/api/auth/google/callback` del login, distinguido por el `state` `gmail.…`.
