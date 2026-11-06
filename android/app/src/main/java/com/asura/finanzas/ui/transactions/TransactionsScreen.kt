@@ -154,6 +154,8 @@ fun TransactionsScreen(
     repository: BrokeRepository,
     outbox: Outbox,
     modifier: Modifier = Modifier,
+    /** The bank-notice inbox lives under the planning sheet. */
+    onOpenBankNotices: () -> Unit = {},
 ) {
     val (key, reload) = rememberReloadKey()
     var filter by remember { mutableStateOf(KindFilter.All) }
@@ -219,6 +221,7 @@ fun TransactionsScreen(
                 outbox = outbox,
                 repository = repository,
                 onSynced = reload,
+                onOpenBankNotices = onOpenBankNotices,
                 transactions = (current as? Load.Ready)?.data,
                 error = (current as? Load.Failed)?.message,
                 filter = filter,
@@ -310,6 +313,7 @@ private fun TransactionList(
     outbox: Outbox,
     repository: BrokeRepository,
     onSynced: () -> Unit,
+    onOpenBankNotices: () -> Unit,
     /** Null while the current filters load — the web draws no list then. */
     transactions: List<Transaction>?,
     /** `text-sm text-danger` above where the list would be. */
@@ -368,6 +372,8 @@ private fun TransactionList(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             )
         }
+
+        item { PendingNoticesBanner(repository, onOpenBankNotices) }
 
         item {
             PickerField(
@@ -925,5 +931,41 @@ fun TransactionTotal(totals: TxTotals, hide: Boolean, kind: String?) {
                 }
             }
         }
+    }
+}
+
+/** The web's `PendingNoticesBanner`: bank notices waiting in the inbox, one tap away. */
+@Composable
+private fun PendingNoticesBanner(repository: BrokeRepository, onOpen: () -> Unit) {
+    val pending = com.asura.finanzas.ui.components.loadCached(
+        "pendingTransactions:count",
+        fallback = emptyList<com.asura.finanzas.data.PendingTransaction>(),
+    ) { repository.pendingTransactions().value }
+    if (pending.isEmpty()) return
+    val colors = Broke.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.accent.copy(alpha = 0.1f))
+            .border(1.dp, colors.accent.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .clickable(onClick = onOpen)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(Lucide.Mail, contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
+        Text(
+            stringResource(R.string.bank_notices_pending_banner) + " (${pending.size})",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.fg,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            stringResource(R.string.bank_notices_review),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+            color = colors.accent,
+        )
     }
 }

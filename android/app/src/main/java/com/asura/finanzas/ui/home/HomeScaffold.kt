@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asura.finanzas.ui.subscriptions.SubscriptionsScreen
+import com.asura.finanzas.ui.banknotices.BankNoticesScreen
 import com.asura.finanzas.ui.goals.GoalsScreen
 import com.asura.finanzas.ui.categories.CategoriesScreen
 import com.asura.finanzas.ui.budgets.BudgetsScreen
@@ -148,11 +149,15 @@ fun HomeScaffold(
                         },
                     )
                     Tab.Wallets -> WalletsScreen(repository)
-                    Tab.Transactions -> TransactionsScreen(repository, outbox)
+                    Tab.Transactions -> TransactionsScreen(
+                        repository, outbox,
+                        onOpenBankNotices = { moreTarget = MoreDestination.BankNotices },
+                    )
                     Tab.Investments -> InvestmentsScreen(repository)
                     Tab.Settings -> SettingsScreen(
                         repository, preferences, appearanceSync, onSignedOut,
                         onOpenCategories = { moreTarget = MoreDestination.Categories },
+                        onOpenBankNotices = { moreTarget = MoreDestination.BankNotices },
                     )
                     Tab.More -> Unit
                 }
@@ -168,6 +173,8 @@ fun HomeScaffold(
                         BudgetsScreen(repository, onBack = { moreTarget = null })
                     MoreDestination.Subscriptions ->
                         SubscriptionsScreen(repository, onBack = { moreTarget = null })
+                    MoreDestination.BankNotices ->
+                        BankNoticesScreen(repository, onBack = { moreTarget = null })
                     MoreDestination.Categories ->
                         CategoriesScreen(repository, onBack = { moreTarget = null })
                 }

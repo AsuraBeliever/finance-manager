@@ -1141,6 +1141,88 @@ class BrokeRepository(
         cache.invalidateReads()
     }
 
+    // ---- bank notices (FIN-5) ----
+
+    suspend fun bankNoticeSettings(): BankNoticeSettings =
+        rpc.json.decodeFromJsonElement(
+            BankNoticeSettings.serializer(),
+            rpc.call("get_bank_notice_settings"),
+        )
+
+    suspend fun pendingTransactions(): Synced<List<PendingTransaction>> =
+        cached("pendingTransactions", ListSerializer(PendingTransaction.serializer())) {
+            rpc.call("list_pending_transactions")
+        }
+
+    /** The server auth code Google's AuthorizationClient hands the app. */
+    suspend fun connectGmail(code: String) {
+        rpc.call("connect_gmail_code", buildJsonObject { put("code", code) })
+    }
+
+    suspend fun disconnectGmail() {
+        rpc.call("disconnect_gmail")
+    }
+
+    suspend fun addBankSender(pattern: String) {
+        rpc.call("add_bank_sender", buildJsonObject { put("pattern", pattern.trim()) })
+    }
+
+    suspend fun updateBankSender(id: Long, walletId: Long?) {
+        rpc.call(
+            "update_bank_sender",
+            buildJsonObject { put("id", id); put("walletId", walletId) },
+        )
+    }
+
+    suspend fun deleteBankSender(id: Long) {
+        rpc.call("delete_bank_sender", buildJsonObject { put("id", id) })
+    }
+
+    /** null wallet removes the mapping. */
+    suspend fun setCardWallet(cardLast4: String, walletId: Long?) {
+        rpc.call(
+            "set_card_wallet",
+            buildJsonObject { put("cardLast4", cardLast4); put("walletId", walletId) },
+        )
+    }
+
+    suspend fun confirmPendingTransaction(
+        id: Long,
+        walletId: Long,
+        amountCents: Long,
+        categoryId: Long?,
+        description: String?,
+        occurredAt: String,
+        occurredTime: String?,
+        rememberCard: Boolean,
+    ) {
+        rpc.call(
+            "confirm_pending_transaction",
+            buildJsonObject {
+                put("id", id)
+                put("walletId", walletId)
+                put("amountCents", amountCents)
+                categoryId?.let { put("categoryId", it) }
+                description?.takeIf { it.isNotBlank() }?.let { put("description", it.trim()) }
+                put("occurredAt", occurredAt)
+                occurredTime?.let { put("occurredTime", it) }
+                put("rememberCard", rememberCard)
+            },
+        )
+        cache.invalidateReads()
+    }
+
+    suspend fun dismissPendingTransaction(id: Long) {
+        rpc.call("dismiss_pending_transaction", buildJsonObject { put("id", id) })
+        cache.invalidateReads()
+    }
+
+    suspend fun importBankNotice(text: String): IngestResult =
+        rpc.json.decodeFromJsonElement(
+            IngestResult.serializer(),
+            rpc.call("import_bank_notice", buildJsonObject { put("text", text) }),
+        ).also { cache.invalidateReads() }
+
     private suspend fun <T> cached(
         key: String?,
         serializer: kotlinx.serialization.KSerializer<T>,

@@ -547,3 +547,71 @@ data class InvestmentProjection(
     val contributedCents: Long = 0,
     val interestCents: Long = 0,
 )
+
+// ---- bank notices (FIN-5) — mirrors `src/lib/types.ts` ----
+
+@Serializable
+data class GmailStatus(
+    val email: String,
+    val connectedAt: String,
+    val lastPushAt: String? = null,
+    /** Google refused the stored grant (access revoked): connect again. */
+    val needsReconnect: Boolean = false,
+)
+
+@Serializable
+data class KnownBank(val key: String, val name: String, val domains: List<String> = emptyList())
+
+@Serializable
+data class BankSender(val id: Long, val pattern: String, val walletId: Long? = null)
+
+@Serializable
+data class CardWallet(val cardLast4: String, val walletId: Long)
+
+@Serializable
+data class BankNoticeSettings(
+    val gmailAvailable: Boolean = false,
+    val gmail: GmailStatus? = null,
+    val knownBanks: List<KnownBank> = emptyList(),
+    val senders: List<BankSender> = emptyList(),
+    val cards: List<CardWallet> = emptyList(),
+)
+
+@Serializable
+data class DuplicateRef(
+    val id: Long,
+    val description: String? = null,
+    val occurredAt: String,
+    val walletName: String,
+)
+
+/** A movement read from a bank notice, waiting to be confirmed or dismissed. */
+@Serializable
+data class PendingTransaction(
+    val id: Long,
+    /** "gmail" | "paste". */
+    val source: String,
+    val sender: String = "",
+    val subject: String? = null,
+    val bankName: String? = null,
+    /** "income" | "expense". */
+    val kind: String,
+    val amountCents: Long,
+    val currencyCode: String = "MXN",
+    val merchant: String? = null,
+    val cardLast4: String? = null,
+    val occurredAt: String,
+    val occurredTime: String? = null,
+    val suggestedWalletId: Long? = null,
+    val suggestedCategoryId: Long? = null,
+    val duplicateOf: DuplicateRef? = null,
+)
+
+/** What reading a pasted notice did: "added" | "duplicate" | "rejected". */
+@Serializable
+data class IngestResult(
+    val status: String,
+    val id: Long? = null,
+    /** "promotion" | "notAMovement" | "noAmount", when rejected. */
+    val reason: String? = null,
+)
