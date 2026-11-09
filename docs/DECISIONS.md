@@ -310,3 +310,12 @@ primer día inflaría un mes con un «ingreso» que no ocurrió.
 No se crean filas en `transactions`: el rendimiento no entra a ninguna cartera
 (el valor de la inversión ya lo incluye) y crearlas movería saldos. Se archiva
 bajo la categoría semilla *Intereses*, la misma de las carteras con rendimiento.
+
+Mantenerlo vigente (revisión del PR #5): el cron extiende cada historial como
+mucho 370 días por corrida y deja un punto de control en cero al final de una
+ventana recortada, para que el primer relleno tras el deploy se reparta en
+varias corridas sin atorarse; reconstruye cualquier historial cuyo último
+total ya no cuadra con la ganancia (lo que repara escrituras que no lo
+recalcularon), y borrar una cartera recalcula las inversiones cuyos
+movimientos se van con ella. BONDDIA estimado valúa el historial en una sola
+pasada (`values_over`): día por día desde cero era cuadrático.

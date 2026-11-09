@@ -734,10 +734,9 @@ fn yield_applies(f: &TxFilter) -> bool {
 /// `push_tx_filter` for the yield rows. The caller has scoped `i.user_id`.
 fn push_yield_filter(sql: &mut String, params: &mut Vec<JsValue>, f: &TxFilter) {
     sql.push_str(" AND y.gain_cents <> 0");
-    if let Some(wid) = f.wallet_id {
-        sql.push_str(" AND i.linked_wallet_id = ?");
-        params.push(wid.to_js());
-    }
+    // Tied to the investment's linked wallet, so a wallet filter keeps the
+    // yield of the investments fed from those wallets (like apartados).
+    f.push_wallets(sql, params, "i.linked_wallet_id");
     if let Some(cid) = f.category_id {
         sql.push_str(&format!(" AND ? = {INTERESES_CATEGORY}"));
         params.push(cid.to_js());
