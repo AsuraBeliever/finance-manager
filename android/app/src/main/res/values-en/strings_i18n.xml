@@ -409,6 +409,8 @@
     <string name="transactions_date">Date</string>
     <string name="transactions_time">Time</string>
     <string name="transactions_all_wallets">All wallets</string>
+    <string name="transactions_n_wallets">{n} wallets</string>
+    <string name="transactions_wallets_filter">Wallets</string>
     <string name="transactions_all_kinds">All types</string>
     <string name="transactions_type_all">All</string>
     <string name="transactions_all_categories">All categories</string>

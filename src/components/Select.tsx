@@ -16,20 +16,11 @@ interface SelectProps<T extends string | number> {
   "aria-label"?: string;
 }
 
-/** A themed dropdown that replaces the native <select>. The native popup can
- *  render off-screen on the phone (and inside a transformed/clipped ancestor),
- *  so the list is rendered in a portal at <body> with fixed positioning,
- *  anchored to the trigger, flipped up when there's no room below and always
- *  clamped to the viewport — it can never escape the screen. The portal is
- *  marked `data-select-portal` so an outer dropdown (e.g. the period picker)
- *  doesn't treat a click inside it as "outside" and close itself. */
-export function Select<T extends string | number>({
-  value,
-  onChange,
-  options,
-  className = "",
-  "aria-label": ariaLabel,
-}: SelectProps<T>) {
+/** Open state plus fixed positioning for a dropdown rendered in a portal:
+ *  anchored to the trigger, flipped up when there's no room below, clamped to
+ *  the viewport, and closed by an outside click or Escape. Shared by `Select`
+ *  and `MultiSelect`. */
+export function useAnchoredPopover() {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
@@ -38,8 +29,6 @@ export function Select<T extends string | number>({
     left: 0,
     width: 0,
   });
-
-  const selected = options.find((o) => o.value === value);
 
   function reposition() {
     const b = btnRef.current;
@@ -78,6 +67,26 @@ export function Select<T extends string | number>({
       window.removeEventListener("scroll", onMove, true);
     };
   }, [open]);
+
+  return { open, setOpen, btnRef, popRef, pos };
+}
+
+/** A themed dropdown that replaces the native <select>. The native popup can
+ *  render off-screen on the phone (and inside a transformed/clipped ancestor),
+ *  so the list is rendered in a portal at <body> with fixed positioning,
+ *  anchored to the trigger, flipped up when there's no room below and always
+ *  clamped to the viewport — it can never escape the screen. The portal is
+ *  marked `data-select-portal` so an outer dropdown (e.g. the period picker)
+ *  doesn't treat a click inside it as "outside" and close itself. */
+export function Select<T extends string | number>({
+  value,
+  onChange,
+  options,
+  className = "",
+  "aria-label": ariaLabel,
+}: SelectProps<T>) {
+  const { open, setOpen, btnRef, popRef, pos } = useAnchoredPopover();
+  const selected = options.find((o) => o.value === value);
 
   return (
     <>

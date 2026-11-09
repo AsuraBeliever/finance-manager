@@ -474,6 +474,8 @@ export const esDict = {
     date: "Fecha",
     time: "Hora",
     allWallets: "Todas las carteras",
+    nWallets: "{n} carteras",
+    walletsFilter: "Carteras",
     allKinds: "Todos los tipos",
     typeAll: "Todos",
     allCategories: "Todas las categorías",

@@ -462,6 +462,8 @@ export const en: Dict = {
     date: "Date",
     time: "Time",
     allWallets: "All wallets",
+    nWallets: "{n} wallets",
+    walletsFilter: "Wallets",
     allKinds: "All types",
     typeAll: "All",
     allCategories: "All categories",
