@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -110,6 +111,8 @@ fun HomeScaffold(
     LaunchedEffect(Unit) {
         dashboardPeriod = Period.fromJson(preferences.dashboardPeriod.first())
     }
+    // The transactions list's «Rendimientos» toggle, kept on the device.
+    val txShowYield by preferences.txShowYield.collectAsState(initial = true)
 
     val online by rememberOnline()
 
@@ -148,7 +151,12 @@ fun HomeScaffold(
                         },
                     )
                     Tab.Wallets -> WalletsScreen(repository)
-                    Tab.Transactions -> TransactionsScreen(repository, outbox)
+                    Tab.Transactions -> TransactionsScreen(
+                        repository,
+                        outbox,
+                        showYield = txShowYield,
+                        onShowYieldChange = { scope.launch { preferences.setTxShowYield(it) } },
+                    )
                     Tab.Investments -> InvestmentsScreen(repository)
                     Tab.Settings -> SettingsScreen(
                         repository, preferences, appearanceSync, onSignedOut,

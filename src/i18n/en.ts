@@ -459,6 +459,7 @@ export const en: Dict = {
     category: "Category",
     noCategory: "Uncategorized",
     yieldRow: "Yield",
+    yieldToggle: "Yield",
     description: "Description",
     date: "Date",
     time: "Time",

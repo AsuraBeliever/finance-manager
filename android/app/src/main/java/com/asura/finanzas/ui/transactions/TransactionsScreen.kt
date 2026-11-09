@@ -67,6 +67,7 @@ import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.PeriodPicker
 import com.asura.finanzas.ui.components.MultiPickerField
+import com.asura.finanzas.ui.components.OutlineButton
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.PrivacyToggle
@@ -162,6 +163,9 @@ enum class KindFilter(val labelRes: Int, val wire: String?) {
 fun TransactionsScreen(
     repository: BrokeRepository,
     outbox: Outbox,
+    /** The «Rendimientos» toggle, kept on the device by the caller (FIN-10). */
+    showYield: Boolean = true,
+    onShowYieldChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val (key, reload) = rememberReloadKey()
@@ -194,7 +198,7 @@ fun TransactionsScreen(
     // back at the first page.
     // Keyed on the filter, so any change — returning to one paged before
     // included — drops back to the first page.
-    val filterKey = listOf(filter, walletIds.sorted(), category?.id, period)
+    val filterKey = listOf(filter, walletIds.sorted(), category?.id, period, showYield)
     var pages by remember(filterKey) { mutableStateOf(1) }
     val limit = pages * TX_LIST_LIMIT
     // The page that has actually arrived, so the button can say it is loading.
@@ -214,6 +218,7 @@ fun TransactionsScreen(
                 kind = filter.wire,
                 categoryId = category?.id,
                 period = periodFilter,
+                includeYield = showYield,
             )
         } finally {
             loadedLimit = limit
@@ -231,7 +236,7 @@ fun TransactionsScreen(
 
     // Totals only exist for a single-sided kind; the API rejects them otherwise.
     val totals = loadCached<TxTotals?>(
-        listOf("txTotals", filter, walletIds.sorted(), category?.id, period),
+        listOf("txTotals", filter, walletIds.sorted(), category?.id, period, showYield),
         refetch = key,
         fallback = null,
     ) {
@@ -243,6 +248,7 @@ fun TransactionsScreen(
                     categoryId = category?.id,
                     period = periodFilter,
                     walletIds = walletIds.sorted(),
+                    includeYield = showYield,
                 )
             }
     }
@@ -269,6 +275,8 @@ fun TransactionsScreen(
                 onCategory = { category = it },
                 period = period,
                 onPeriodChange = { period = it },
+                showYield = showYield,
+                onShowYieldChange = onShowYieldChange,
                 fromCache = (current as? Load.Ready)?.fromCache == true,
                 onNew = { showForm = true },
                 totals = totals,
@@ -367,6 +375,8 @@ private fun TransactionList(
     onCategory: (TransactionCategory?) -> Unit,
     period: Period,
     onPeriodChange: (Period) -> Unit,
+    showYield: Boolean,
+    onShowYieldChange: (Boolean) -> Unit,
     fromCache: Boolean,
     onNew: () -> Unit,
     totals: TxTotals?,
@@ -469,8 +479,21 @@ private fun TransactionList(
                 value = period,
                 onChange = onPeriodChange,
                 allowAll = true,
-                modifier = Modifier.padding(bottom = 16.dp),
+                modifier = Modifier.padding(bottom = 12.dp),
             )
+        }
+
+        // The web's «Rendimientos» toggle: on, the investments' daily yield and
+        // the wallets' automatic interest are listed; off, hidden.
+        item {
+            Row(Modifier.padding(bottom = 16.dp)) {
+                OutlineButton(
+                    text = stringResource(R.string.transactions_yield_toggle),
+                    onClick = { onShowYieldChange(!showYield) },
+                    leadingIcon = if (showYield) Lucide.Check else Lucide.TrendingUp,
+                    active = showYield,
+                )
+            }
         }
 
         totals?.let { summary ->
@@ -493,7 +516,7 @@ private fun TransactionList(
             // and telling them apart is the whole point: with a filter on, an
             // empty list is about the filter, not the account.
             val filtered = walletIds.isNotEmpty() || filter.wire != null ||
-                category != null || period != Period.AllTime
+                category != null || period != Period.AllTime || !showYield
             item {
                 EmptyState(
                     Lucide.ArrowLeftRight,

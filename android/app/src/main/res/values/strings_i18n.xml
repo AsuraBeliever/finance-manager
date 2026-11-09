@@ -406,6 +406,7 @@
     <string name="transactions_category">Categoría</string>
     <string name="transactions_no_category">Sin categoría</string>
     <string name="transactions_yield_row">Rendimiento</string>
+    <string name="transactions_yield_toggle">Rendimientos</string>
     <string name="transactions_description">Descripción</string>
     <string name="transactions_date">Fecha</string>
     <string name="transactions_time">Hora</string>

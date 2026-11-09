@@ -634,9 +634,17 @@ pub struct TxFilter {
     pub period: Option<Period>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    /// `false` hides what the user's money earned on its own (FIN-10): the
+    /// investments' daily yield and the automatic interest of yield-bearing
+    /// wallets. Absent = shown. Only the view: nothing is deleted.
+    pub include_yield: Option<bool>,
 }
 
 impl TxFilter {
+    fn shows_yield(&self) -> bool {
+        self.include_yield.unwrap_or(true)
+    }
+
     /// The wallets the filter is limited to, or `None` for every wallet.
     fn wallets(&self) -> Option<Vec<i64>> {
         let mut ids: Vec<i64> = self.wallet_ids.clone().unwrap_or_default();
@@ -658,8 +666,9 @@ impl TxFilter {
     /// `AND <column> IN (…)` for the selected wallets; nothing when the
     /// filter covers every wallet. The ids travel as ONE bound JSON array
     /// unpacked by `json_each`, not one `?` each: D1 caps a query at 100
-    /// bound parameters and the list query applies this twice. The caller's
-    /// `user_id` scope still applies, so another user's id matches nothing.
+    /// bound parameters and the list query applies this three times
+    /// (movements, apartados, investment yield). The caller's `user_id`
+    /// scope still applies, so another user's id matches nothing.
     fn push_wallets(&self, sql: &mut String, params: &mut Vec<JsValue>, column: &str) {
         if let Some(json) = self.wallets_json() {
             sql.push_str(&format!(
@@ -684,6 +693,14 @@ impl TxFilter {
 /// The caller has already opened the query with the `wallets w` join and the
 /// `w.user_id = ?` scope.
 fn push_tx_filter(sql: &mut String, params: &mut Vec<JsValue>, f: &TxFilter) {
+    if !f.shows_yield() {
+        // The interest the cron posts on yield-bearing wallets, recognised by
+        // its client_id (handlers::wallet_yield). COALESCE: most rows have none.
+        sql.push_str(
+            " AND COALESCE(t.client_id, '') NOT LIKE 'yield:%'
+              AND COALESCE(t.client_id, '') NOT LIKE 'yield-fix:%'",
+        );
+    }
     f.push_wallets(sql, params, "t.wallet_id");
     if let Some(kind) = &f.kind {
         if kind == "transfer" {
@@ -727,7 +744,7 @@ pub(crate) const INTERESES_CATEGORY: &str = "(SELECT id FROM transaction_categor
 /// filed under «Intereses», tied to the investment's linked wallet. A kind
 /// other than income, or another category, leaves them out.
 fn yield_applies(f: &TxFilter) -> bool {
-    matches!(f.kind.as_deref(), None | Some("income"))
+    f.shows_yield() && matches!(f.kind.as_deref(), None | Some("income"))
 }
 
 /// The WHERE tail for `investment_yield_days y JOIN investments i`, mirroring

@@ -406,6 +406,7 @@
     <string name="transactions_category">Category</string>
     <string name="transactions_no_category">Uncategorized</string>
     <string name="transactions_yield_row">Yield</string>
+    <string name="transactions_yield_toggle">Yield</string>
     <string name="transactions_description">Description</string>
     <string name="transactions_date">Date</string>
     <string name="transactions_time">Time</string>
