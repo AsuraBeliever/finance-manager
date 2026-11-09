@@ -812,6 +812,7 @@ pub async fn add_investment_movement(
             )?);
         }
         batch(db, stmts).await?;
+        refresh_yield(db, uid, a.investment_id).await;
         return Ok(());
     };
 
