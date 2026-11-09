@@ -47,6 +47,7 @@ import { POSITIVE, useChartTokens } from "../../lib/palette";
 import type { SimCadence } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
+import { YieldHistory } from "./YieldHistory";
 import { MovementEditModal } from "./MovementEditModal";
 
 const SIM_GOLD = "#c9a14a";
@@ -93,6 +94,9 @@ export function InvestmentDetailPage() {
     // Movements can move money in/out of a wallet, so refresh balances + ledger.
     queryClient.invalidateQueries({ queryKey: ["wallets"] });
     queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    // Its daily yield counts as income (FIN-9): the month's figures move too.
+    queryClient.invalidateQueries({ queryKey: ["spendingTrends"] });
+    queryClient.invalidateQueries({ queryKey: ["breakdown"] });
   };
 
   const close = useMutation({
@@ -450,6 +454,8 @@ export function InvestmentDetailPage() {
         </ResponsiveContainer>
       </section>
       )}
+
+      <YieldHistory investmentId={invId} />
 
       {d.calculator !== "manual" && (
         <section className="mb-4 rounded-xl border border-border-muted bg-surface-raised p-5">

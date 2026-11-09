@@ -119,8 +119,9 @@ export type TransactionKind = "income" | "expense" | "refund" | "transfer_in" | 
 
 /** A transaction row's kind as shown in the history. Beyond the real kinds, the
  *  list also surfaces read-only apartado moves to/from goals ("reserve" /
- *  "release") for tracking — these never affect balances. */
-export type TxRowKind = TransactionKind | "reserve" | "release";
+ *  "release") for tracking — these never affect balances — and "yield": what an
+ *  investment earned that day (income, can be negative; FIN-9). */
+export type TxRowKind = TransactionKind | "reserve" | "release" | "yield";
 
 export interface TransactionCategory {
   id: number;
@@ -153,6 +154,18 @@ export interface Transaction {
   refundedCents: number;
   /** On an expense: what can still be refunded (computed in Rust; 0 otherwise). */
   refundableCents: number;
+  /** Only on "yield" rows: the investment's currency (no wallet says it). */
+  currencyCode?: string;
+}
+
+/** One investment's yield history (`get_investment_yield`), newest first. */
+export interface InvestmentYield {
+  currencyCode: string;
+  months: { month: string; gainCents: number }[];
+  days: { day: string; gainCents: number }[];
+  hasMore: boolean;
+  /** Recorded as the days go by (no price history): nothing before the first day. */
+  observed: boolean;
 }
 
 export interface ExchangeRate {

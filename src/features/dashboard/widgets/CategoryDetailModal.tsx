@@ -96,7 +96,10 @@ export function CategoryDetailModal({
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm text-fg">
-                        {t.description || seedName(target.name)}
+                        {/* An investment's daily yield, filed under «Intereses». */}
+                        {t.kind === "yield"
+                          ? es.transactions.yieldRow
+                          : t.description || seedName(target.name)}
                       </p>
                       <p className="text-xs text-fg-subtle">
                         {t.occurredAt}
@@ -105,8 +108,11 @@ export function CategoryDetailModal({
                       </p>
                     </div>
                     <span className={`text-sm font-medium tabular-nums ${color}`}>
-                      {sign}
-                      {money(t.amountCents, currencyByWallet.get(t.walletId) ?? "MXN")}
+                      {t.amountCents < 0 ? "−" : sign}
+                      {money(
+                        Math.abs(t.amountCents),
+                        t.currencyCode ?? currencyByWallet.get(t.walletId) ?? "MXN",
+                      )}
                     </span>
                   </li>
                 );

@@ -470,6 +470,8 @@ export const esDict = {
     amountReceived: "Monto recibido",
     category: "Categoría",
     noCategory: "Sin categoría",
+    /** Una fila de rendimiento diario de una inversión (solo lectura). */
+    yieldRow: "Rendimiento",
     description: "Descripción",
     date: "Fecha",
     time: "Hora",
@@ -509,6 +511,13 @@ export const esDict = {
     transferHint: "Si las carteras usan monedas distintas, captura ambos montos.",
   },
   investments: {
+    yieldHistory: "Rendimiento diario",
+    yieldHistoryHint: "Lo que genera cada día aunque no lo retires; cuenta como ingreso de su mes.",
+    yieldObservedHint: "El precio de esta inversión sólo se conoce día a día: su rendimiento se registra desde que la app empezó a seguirla.",
+    yieldByMonth: "Por mes",
+    yieldByDay: "Por día",
+    yieldEmpty: "Todavía no hay rendimiento registrado.",
+    yieldShowMore: "Ver más días",
     title: "Inversiones",
     detailTitle: "Detalle de inversión",
     newInvestment: "Nueva inversión",
