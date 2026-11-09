@@ -496,6 +496,7 @@ export const esDict = {
     registerRefund: "Registrar reembolso",
     totalConverted: "Convertido a MXN",
     listCapped: "Se muestran los {n} movimientos más recientes; el total los considera todos.",
+    showMore: "Mostrar más",
     deleteConfirmTitle: "Eliminar transacción",
     deleteConfirm:
       "¿Eliminar esta transacción? Si es una transferencia se eliminan ambas partes.",
