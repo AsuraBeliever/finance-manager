@@ -106,7 +106,12 @@ ganancia. Una calculadora nueva solo tiene que decidir `values_past_days`:
 `true` (por defecto) si `value_at` puede valuar un día pasado tal como fue;
 `false` si depende de un precio del que solo se guarda el último (cripto,
 BONDDIA en títulos) — entonces el historial se graba día a día desde una base
-en cero. Detalle de almacenamiento en DATA_MODEL «Rendimiento diario».
+en cero. Si `value_at` no es una fórmula directa sino que recorre los días
+pasados (BONDDIA estimado sobre la serie diaria de tasas), la calculadora debe
+implementar también `values_over`: el historial pide un valor por día y, día
+por día desde cero, se vuelve cuadrático (408 ms frente a 0.86 ms en una
+BONDDIA de 3 años con 40 aportaciones; el tope de CPU es 10 ms). Detalle de
+almacenamiento en DATA_MODEL «Rendimiento diario».
 
 ## Proyecciones
 

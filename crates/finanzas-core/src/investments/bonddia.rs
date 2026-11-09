@@ -128,9 +128,6 @@ impl InvestmentCalculator for Bonddia {
         None // daily liquidity fund
     }
 
-    /// The estimated mode is a rate model over the Banxico history and can
-    /// value any day; the títulos ("exact") mode rides the official NAV, of
-    /// which only the latest is cached.
     /// Estimated mode over a rate history, in ONE pass: yesterday's value
     /// grown by one day, plus whatever enters today. Valuing each day from
     /// scratch walks every past day per movement — days² × movements, ~0.4 s
@@ -212,6 +209,9 @@ impl InvestmentCalculator for Bonddia {
         Ok(out)
     }
 
+    /// The estimated mode is a rate model over the Banxico history and can
+    /// value any day; the títulos ("exact") mode rides the official NAV, of
+    /// which only the latest is cached.
     fn values_past_days(&self, inv: &Investment) -> bool {
         let titulos = parse_params(inv)
             .ok()

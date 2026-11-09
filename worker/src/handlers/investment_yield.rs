@@ -164,11 +164,24 @@ async fn extend_modeled(
         }
         None => parse_start_date(inv)? - Duration::days(1),
     };
-    let through = history_end(calc, inv, today).min(after + Duration::days(MAX_DAYS_PER_RUN));
+    let end = history_end(calc, inv, today);
+    let through = end.min(after + Duration::days(MAX_DAYS_PER_RUN));
     if after >= through {
         return Ok(());
     }
-    let days = daily_gains(calc, inv, ctx, after, through)?;
+    let mut days = daily_gains(calc, inv, ctx, after, through)?;
+    // Days that earned nothing aren't stored, so a cut-short window can end on
+    // no row at all — and the next run would start from the same day and walk
+    // the same empty window forever (a manual position with one far snapshot).
+    // A zero-gain checkpoint on the window's last day carries the walk forward;
+    // every reader skips or just adds zero rows.
+    if through < end && days.last().map(|y| y.day) != Some(through) {
+        days.push(YieldDay {
+            day: through,
+            gain_cents: 0,
+            total_gain_cents: gain_at(calc, inv, ctx, through)?,
+        });
+    }
     if !days.is_empty() {
         batch(db, upserts(db, inv.id, &days)?).await?;
     }

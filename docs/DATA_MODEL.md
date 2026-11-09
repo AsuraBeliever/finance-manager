@@ -223,9 +223,14 @@ nunca cuentan; la suma del historial = la ganancia de la inversión, al centavo.
 
 - **Modelado** (CETES, tasa fija, cajita, BONDDIA estimado, manual): se rehace
   completo tras cada escritura a la inversión (alta, edición, cerrar/reabrir,
-  movimientos, snapshots, borrar la pata de un movimiento desde Transacciones) y
-  el cron diario lo extiende hasta hoy (o el vencimiento). Los días en cero no
-  se guardan.
+  movimientos, snapshots, borrar la pata de un movimiento desde Transacciones,
+  borrar una cartera con movimientos ligados) y el cron diario lo extiende
+  hasta hoy (o el vencimiento), como mucho 370 días por inversión y corrida
+  (el primer relleno tras el deploy se reparte en varias corridas). Los días en
+  cero no se guardan, salvo un punto de control con `gain_cents = 0` al final
+  de una ventana recortada, para que la siguiente corrida siga desde ahí. Si el
+  último `total_gain_cents` guardado ya no cuadra con la ganancia, el cron lo
+  reconstruye entero.
 - **Observado** (cripto, BONDDIA en títulos): sin precio histórico; el cron
   graba un renglón por día, y el primero es una base de 0 (la ganancia previa
   no tiene fecha a la que asignarse).
