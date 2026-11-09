@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.coroutines.cancellation.CancellationException
 import com.asura.finanzas.R
 import com.asura.finanzas.data.ActivityRow
 import com.asura.finanzas.data.BrokeRepository
@@ -88,6 +89,7 @@ fun InvestmentActivitySection(
     val genericError = stringResource(R.string.common_error)
 
     LaunchedEffect(investmentId, requestKey) {
+        failed = null
         try {
             runCatching {
                 repository.investmentActivity(
@@ -98,7 +100,11 @@ fun InvestmentActivitySection(
                 )
             }.fold(
                 onSuccess = { activity = filterKey to it; failed = null },
-                onFailure = { failed = it.message ?: genericError },
+                onFailure = {
+                    // A newer filter cancelled this read: not a failure.
+                    if (it is CancellationException) throw it
+                    failed = it.message ?: genericError
+                },
             )
         } finally {
             loadedFor = requestKey
