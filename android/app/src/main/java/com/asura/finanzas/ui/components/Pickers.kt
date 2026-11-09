@@ -44,6 +44,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.theme.Broke
 import com.asura.finanzas.R
@@ -189,6 +191,8 @@ fun <T> MultiPickerField(
     /** Closed-box text for two or more picks, already holding the count. */
     manyLabel: String,
     modifier: Modifier = Modifier,
+    /** What a screen reader calls the box — the web's `aria-label`. */
+    contentDescription: String? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val colors = Broke.colors
@@ -238,6 +242,13 @@ fun <T> MultiPickerField(
             modifier = Modifier
                 .menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable)
                 .fillMaxWidth()
+                .then(
+                    if (contentDescription != null) {
+                        Modifier.semantics { this.contentDescription = contentDescription }
+                    } else {
+                        Modifier
+                    },
+                )
                 .clip(RoundedCornerShape(8.dp))
                 .background(colors.surface)
                 .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))

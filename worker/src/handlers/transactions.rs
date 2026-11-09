@@ -630,15 +630,26 @@ impl TxFilter {
         (!ids.is_empty()).then_some(ids)
     }
 
-    /// `AND <column> IN (?, …)` for the selected wallets; nothing when the
-    /// filter covers every wallet. Ids are bound, never interpolated, and the
-    /// caller's `user_id` scope still applies, so another user's id matches
-    /// nothing.
+    /// The selected wallets as one JSON array literal (`[1,2]`), or `None`
+    /// for every wallet.
+    fn wallets_json(&self) -> Option<String> {
+        self.wallets().map(|ids| {
+            let list: Vec<String> = ids.iter().map(i64::to_string).collect();
+            format!("[{}]", list.join(","))
+        })
+    }
+
+    /// `AND <column> IN (…)` for the selected wallets; nothing when the
+    /// filter covers every wallet. The ids travel as ONE bound JSON array
+    /// unpacked by `json_each`, not one `?` each: D1 caps a query at 100
+    /// bound parameters and the list query applies this twice. The caller's
+    /// `user_id` scope still applies, so another user's id matches nothing.
     fn push_wallets(&self, sql: &mut String, params: &mut Vec<JsValue>, column: &str) {
-        if let Some(ids) = self.wallets() {
-            let marks = vec!["?"; ids.len()].join(", ");
-            sql.push_str(&format!(" AND {column} IN ({marks})"));
-            params.extend(ids.iter().map(|id| id.to_js()));
+        if let Some(json) = self.wallets_json() {
+            sql.push_str(&format!(
+                " AND {column} IN (SELECT value FROM json_each(?))"
+            ));
+            params.push(json.to_js());
         }
     }
 
@@ -1185,4 +1196,34 @@ pub async fn reorder_transaction_categories(
         .collect::<AppResult<Vec<_>>>()?;
     batch(db, stmts).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn filter(wallet_id: Option<i64>, wallet_ids: Option<Vec<i64>>) -> TxFilter {
+        TxFilter {
+            wallet_id,
+            wallet_ids,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn no_wallets_means_every_wallet() {
+        assert_eq!(filter(None, None).wallets_json(), None);
+        assert_eq!(filter(None, Some(vec![])).wallets_json(), None);
+    }
+
+    #[test]
+    fn old_single_wallet_still_filters() {
+        assert_eq!(filter(Some(7), None).wallets_json().as_deref(), Some("[7]"));
+    }
+
+    #[test]
+    fn single_and_list_add_up_sorted_without_repeats() {
+        let f = filter(Some(2), Some(vec![9, 2, 5, 9]));
+        assert_eq!(f.wallets_json().as_deref(), Some("[2,5,9]"));
+    }
 }

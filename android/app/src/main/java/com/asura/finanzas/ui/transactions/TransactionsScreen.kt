@@ -389,6 +389,7 @@ private fun TransactionList(
                 onChange = { picked -> onWallets(picked.map { it.id }) },
                 allLabel = allWalletsLabel(),
                 manyLabel = text(R.string.transactions_n_wallets, "n" to picked.size),
+                contentDescription = stringResource(R.string.transactions_wallets_filter),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             )
         }
