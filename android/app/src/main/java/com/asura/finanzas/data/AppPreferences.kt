@@ -55,6 +55,16 @@ class AppPreferences(private val context: Context) {
 
     val dashboardPeriod: Flow<String?> = context.prefsDataStore.data.map { it[dashboardPeriodKey] }
 
+    /** The transactions list's «Rendimientos» toggle (FIN-10); the web keeps it
+     *  in its saved filter. Absent = shown. */
+    private val txShowYieldKey = booleanPreferencesKey("tx_show_yield")
+
+    val txShowYield: Flow<Boolean> = context.prefsDataStore.data.map { it[txShowYieldKey] ?: true }
+
+    suspend fun setTxShowYield(show: Boolean) {
+        context.prefsDataStore.edit { it[txShowYieldKey] = show }
+    }
+
     suspend fun setDashboardPeriod(json: String) {
         context.prefsDataStore.edit { it[dashboardPeriodKey] = json }
     }

@@ -461,10 +461,14 @@ class BrokeRepository(
         kind: String? = null,
         categoryId: Long? = null,
         period: JsonObject? = null,
+        /** false hides the investments' daily yield and the wallets' automatic interest. */
+        includeYield: Boolean = true,
     ): Synced<List<Transaction>> {
         // Only the unfiltered list is worth keeping for offline: a cache keyed
         // by every filter combination would mostly be misses.
-        val key = if (walletId == null && kind == null && categoryId == null && period == null) {
+        val key = if (walletId == null && kind == null && categoryId == null && period == null &&
+            includeYield
+        ) {
             "transactions"
         } else {
             null
@@ -481,6 +485,7 @@ class BrokeRepository(
                         kind?.let { put("kind", it) }
                         categoryId?.let { put("categoryId", it) }
                         period?.let { put("period", it) }
+                        if (!includeYield) put("includeYield", false)
                     }
                 },
             )
@@ -628,6 +633,7 @@ class BrokeRepository(
         walletId: Long?,
         categoryId: Long?,
         period: JsonObject?,
+        includeYield: Boolean = true,
     ): TxTotals = rpc.json.decodeFromJsonElement(
         TxTotals.serializer(),
         rpc.call(
@@ -638,6 +644,7 @@ class BrokeRepository(
                     walletId?.let { put("walletId", it) }
                     categoryId?.let { put("categoryId", it) }
                     period?.let { put("period", it) }
+                    if (!includeYield) put("includeYield", false)
                 }
             },
         ),

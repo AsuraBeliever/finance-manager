@@ -472,6 +472,7 @@ export const esDict = {
     noCategory: "Sin categoría",
     /** Una fila de rendimiento diario de una inversión (solo lectura). */
     yieldRow: "Rendimiento",
+    yieldToggle: "Rendimientos",
     description: "Descripción",
     date: "Fecha",
     time: "Hora",

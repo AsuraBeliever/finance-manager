@@ -23,6 +23,8 @@ interface PersistedFilter {
   categoryId: number | "";
   /** null = every date. Absent in filters saved before periods existed. */
   period?: Period | null;
+  /** «Rendimientos» toggle; absent (saved before it existed) = shown. */
+  showYield?: boolean;
 }
 
 function loadFilter(): PersistedFilter {
@@ -42,10 +44,11 @@ export function TransactionsPage() {
   const [kind, setKind] = useState<FilterKind>(() => loadFilter().kind);
   const [categoryId, setCategoryId] = useState<number | "">(() => loadFilter().categoryId);
   const [period, setPeriod] = useState<Period | null>(() => loadFilter().period ?? null);
+  const [showYield, setShowYield] = useState<boolean>(() => loadFilter().showYield ?? true);
 
   useEffect(() => {
-    localStorage.setItem(FILTER_KEY, JSON.stringify({ walletId, kind, categoryId, period }));
-  }, [walletId, kind, categoryId, period]);
+    localStorage.setItem(FILTER_KEY, JSON.stringify({ walletId, kind, categoryId, period, showYield }));
+  }, [walletId, kind, categoryId, period, showYield]);
 
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
 
@@ -54,12 +57,14 @@ export function TransactionsPage() {
     ...(kind !== "" && { kind }),
     ...(categoryId !== "" && { categoryId }),
     ...(period !== null && { period }),
+    ...(!showYield && { includeYield: false }),
   };
   const transactions = useQuery({
     queryKey: ["transactions", filter],
     queryFn: () => listTransactions(filter),
   });
-  const filtered = walletId !== "" || kind !== "" || categoryId !== "" || period !== null;
+  const filtered =
+    walletId !== "" || kind !== "" || categoryId !== "" || period !== null || !showYield;
 
   const currencyByWallet = useMemo(
     () => new Map((wallets.data ?? []).map((w) => [w.id, w.currencyCode])),
@@ -95,6 +100,8 @@ export function TransactionsPage() {
         onPeriodChange={setPeriod}
         walletId={walletId}
         onWalletChange={setWalletId}
+        showYield={showYield}
+        onShowYieldChange={setShowYield}
       />
 
       <TransactionTotal filter={filter} />

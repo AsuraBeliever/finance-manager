@@ -428,6 +428,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 |---|---|---|
 | Lista (con las dos patas de una transferencia plegadas en un renglón) | `ui/transactions` | ✅ |
 | Filtros (cartera, tipo, categoría, periodo) | `ui/transactions` | ✅ |
+| Interruptor «Rendimientos» (oculta rendimiento de inversiones e intereses automáticos; se recuerda en el dispositivo: `localStorage` ↔ DataStore `tx_show_yield`) | `ui/transactions` + `data/AppPreferences` | ✅ (FIN-10) |
 | Total de lo filtrado (`sumTransactions`) | `ui/transactions` | ✅ con conteo y desglose por moneda |
 | Aviso de lista truncada a 100 | `ui/transactions` + `WalletDetailScreen` | ✅ |
 | «Sin resultados» distinto de «sin movimientos» | `ui/transactions` | ✅ |

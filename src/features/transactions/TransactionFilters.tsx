@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Check, TrendingUp } from "lucide-react";
 import { inputClass } from "../../components/Field";
 import { PeriodPicker } from "../../components/PeriodPicker";
 import { listFilterCategories, listWallets } from "../../lib/api";
@@ -18,6 +19,10 @@ interface TransactionFiltersProps {
   /** Wallet picker — pass both to show it; omit when the wallet is fixed. */
   walletId?: number | "";
   onWalletChange?: (walletId: number | "") => void;
+  /** «Rendimientos» toggle — pass both to show it. Off hides the investments'
+   *  daily yield and the wallets' automatic interest from the list. */
+  showYield?: boolean;
+  onShowYieldChange?: (show: boolean) => void;
 }
 
 /** Filter bar shared by the transactions tab and the wallet detail: type,
@@ -30,6 +35,8 @@ export function TransactionFilters({
   onPeriodChange,
   walletId,
   onWalletChange,
+  showYield,
+  onShowYieldChange,
 }: TransactionFiltersProps) {
   const wallets = useQuery({
     queryKey: ["wallets", {}],
@@ -120,6 +127,21 @@ export function TransactionFilters({
         onChange={(p) => onPeriodChange(p.kind === "allTime" ? null : p)}
         allowAll
       />
+      {onShowYieldChange && (
+        <button
+          type="button"
+          aria-pressed={showYield}
+          onClick={() => onShowYieldChange(!showYield)}
+          className={`flex items-center gap-2 self-start rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+            showYield
+              ? "border-accent/40 bg-accent/15 text-fg"
+              : "border-border-muted bg-surface text-fg-subtle hover:border-accent"
+          }`}
+        >
+          {showYield ? <Check size={15} className="text-accent" /> : <TrendingUp size={15} />}
+          {es.transactions.yieldToggle}
+        </button>
+      )}
     </div>
   );
 }

@@ -210,6 +210,8 @@ export interface TxFilter {
   period?: Period;
   limit?: number;
   offset?: number;
+  /** false hides the investments' daily yield and the wallets' automatic interest. */
+  includeYield?: boolean;
 }
 
 export const addIncome = (input: SimpleTxInput) =>
