@@ -72,6 +72,10 @@ export function InvestmentActivity({ investmentId, canMove, onAdd, onEdit, onDel
         )}
       </div>
 
+      {a?.observed && (
+        <p className="mb-3 text-xs text-fg-subtle">{es.investments.yieldObservedHint}</p>
+      )}
+
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <PeriodPicker
           value={period ?? { kind: "allTime" }}
@@ -113,7 +117,11 @@ export function InvestmentActivity({ investmentId, canMove, onAdd, onEdit, onDel
 
       {a && a.rows.length === 0 ? (
         <p className="py-2 text-sm text-fg-subtle">
-          {period === null && showYield ? es.investments.movementsEmpty : es.investments.activityEmpty}
+          {period !== null || !showYield
+            ? es.investments.activityEmpty
+            : canMove
+              ? es.investments.movementsEmpty
+              : es.investments.yieldEmpty}
         </p>
       ) : (
         a && (

@@ -516,6 +516,8 @@ export const esDict = {
   },
   investments: {
     activityTitle: "Movimientos y rendimientos",
+    yieldObservedHint: "El precio de esta inversión sólo se conoce día a día: su rendimiento se registra desde que la app empezó a seguirla.",
+    yieldEmpty: "Todavía no hay rendimiento registrado.",
     activityEmpty: "Nada en este periodo con estos filtros.",
     totalYield: "Rendimiento generado",
     totalDeposited: "Aportado",

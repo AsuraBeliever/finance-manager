@@ -175,6 +175,8 @@ export interface InvestmentActivity {
     occurredAt: string;
   }[];
   hasMore: boolean;
+  /** Yield recorded day by day (no price history): nothing before the first day. */
+  observed: boolean;
 }
 
 export interface ExchangeRate {

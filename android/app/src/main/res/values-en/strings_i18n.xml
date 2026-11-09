@@ -443,6 +443,8 @@
     <string name="transactions_invalid_amount">Invalid amount</string>
     <string name="transactions_transfer_hint">If the wallets use different currencies, enter both amounts.</string>
     <string name="investments_activity_title">Movements and yield</string>
+    <string name="investments_yield_observed_hint">This investment\'s price is only known day by day: its yield is recorded from when the app started tracking it.</string>
+    <string name="investments_yield_empty">No yield recorded yet.</string>
     <string name="investments_activity_empty">Nothing in this period with these filters.</string>
     <string name="investments_total_yield">Yield earned</string>
     <string name="investments_total_deposited">Contributed</string>

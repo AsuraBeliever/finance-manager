@@ -367,6 +367,8 @@ data class InvestmentActivity(
     val count: Long = 0,
     val rows: List<ActivityRow> = emptyList(),
     val hasMore: Boolean = false,
+    /** Yield recorded day by day (no price history): nothing before the first day. */
+    val observed: Boolean = false,
 )
 
 @Serializable

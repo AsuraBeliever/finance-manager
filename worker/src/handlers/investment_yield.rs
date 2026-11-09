@@ -340,6 +340,9 @@ pub struct InvestmentActivity {
     pub rows: Vec<ActivityRow>,
     /// More rows exist beyond `limit`.
     pub has_more: bool,
+    /// Recorded day by day as it happens (crypto, BONDDIA títulos): there is
+    /// no yield from before the first record, and the page says so.
+    pub observed: bool,
 }
 
 #[derive(Deserialize)]
@@ -359,6 +362,7 @@ pub async fn list_investment_activity(
     a: InvestmentActivityArgs,
 ) -> AppResult<InvestmentActivity> {
     let inv = fetch_investment(db, uid, a.investment_id).await?;
+    let observed = !find(&inv.calculator)?.values_past_days(&inv);
     let (start, end) = match &a.period {
         Some(p) => {
             let r = resolve_period(p, today_mx());
@@ -415,5 +419,6 @@ pub async fn list_investment_activity(
         count: totals.iter().map(|t| t.n).sum(),
         rows,
         has_more,
+        observed,
     })
 }

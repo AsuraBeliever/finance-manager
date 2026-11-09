@@ -443,6 +443,8 @@
     <string name="transactions_invalid_amount">Monto inválido</string>
     <string name="transactions_transfer_hint">Si las carteras usan monedas distintas, captura ambos montos.</string>
     <string name="investments_activity_title">Movimientos y rendimientos</string>
+    <string name="investments_yield_observed_hint">El precio de esta inversión sólo se conoce día a día: su rendimiento se registra desde que la app empezó a seguirla.</string>
+    <string name="investments_yield_empty">Todavía no hay rendimiento registrado.</string>
     <string name="investments_activity_empty">Nada en este periodo con estos filtros.</string>
     <string name="investments_total_yield">Rendimiento generado</string>
     <string name="investments_total_deposited">Aportado</string>

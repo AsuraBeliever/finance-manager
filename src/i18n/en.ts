@@ -501,6 +501,8 @@ export const en: Dict = {
   },
   investments: {
     activityTitle: "Movements and yield",
+    yieldObservedHint: "This investment's price is only known day by day: its yield is recorded from when the app started tracking it.",
+    yieldEmpty: "No yield recorded yet.",
     activityEmpty: "Nothing in this period with these filters.",
     totalYield: "Yield earned",
     totalDeposited: "Contributed",

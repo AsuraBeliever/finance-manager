@@ -76,10 +76,16 @@ fun InvestmentActivitySection(
     // Pages belong to the filter they were raised under (as in Transacciones).
     var pages by remember(investmentId, period, showYield) { mutableStateOf(1) }
     val limit = pages * PAGE
-    // The last answer stays up while a longer one loads (web: keepPreviousData).
-    var activity by remember(investmentId) { mutableStateOf<InvestmentActivity?>(null) }
+    // Each answer remembers the filter it is for. A longer page of the same
+    // filter keeps the rows up while it loads (web: keepPreviousData); another
+    // filter shows nothing until its own rows arrive, never the old figures
+    // under the new label.
+    val filterKey = listOf(period, showYield)
+    var activity by remember(investmentId) { mutableStateOf<Pair<Any, InvestmentActivity>?>(null) }
     var loadedFor by remember(investmentId) { mutableStateOf<Any?>(null) }
+    var failed by remember(investmentId) { mutableStateOf<String?>(null) }
     val requestKey = listOf(period, showYield, limit, reloadKey)
+    val genericError = stringResource(R.string.common_error)
 
     LaunchedEffect(investmentId, requestKey) {
         try {
@@ -90,7 +96,10 @@ fun InvestmentActivitySection(
                     showYield,
                     limit,
                 )
-            }.onSuccess { activity = it }
+            }.fold(
+                onSuccess = { activity = filterKey to it; failed = null },
+                onFailure = { failed = it.message ?: genericError },
+            )
         } finally {
             loadedFor = requestKey
         }
@@ -125,6 +134,14 @@ fun InvestmentActivitySection(
                 }
             }
         }
+        if (activity?.second?.observed == true) {
+            Text(
+                stringResource(R.string.investments_yield_observed_hint),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                color = colors.fgSubtle,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+        }
         FlexShrinkRow(gap = 8.dp, modifier = Modifier.padding(bottom = 12.dp)) {
             PeriodPicker(value = period, onChange = { period = it }, allowAll = true)
             OutlineButton(
@@ -135,7 +152,12 @@ fun InvestmentActivitySection(
             )
         }
 
-        val a = activity ?: return@PanelCard
+        // The web's `text-sm text-danger` line when the read failed.
+        failed?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.danger)
+            return@PanelCard
+        }
+        val a = activity?.takeIf { it.first == filterKey }?.second ?: return@PanelCard
         val currency = a.currencyCode
         fun signed(cents: Long, negative: Boolean) =
             (if (negative) "−" else "+") + maskIfHidden(formatMoney(kotlin.math.abs(cents), currency), hide)
@@ -181,8 +203,11 @@ fun InvestmentActivitySection(
         if (a.rows.isEmpty()) {
             Text(
                 stringResource(
-                    if (period == Period.AllTime && showYield) R.string.investments_movements_empty
-                    else R.string.investments_activity_empty,
+                    when {
+                        period != Period.AllTime || !showYield -> R.string.investments_activity_empty
+                        canMove -> R.string.investments_movements_empty
+                        else -> R.string.investments_yield_empty
+                    },
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.fgSubtle,
