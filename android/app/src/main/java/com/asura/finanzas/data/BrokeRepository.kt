@@ -461,10 +461,14 @@ class BrokeRepository(
         kind: String? = null,
         categoryId: Long? = null,
         period: JsonObject? = null,
+        /** Any of these wallets; empty = every wallet. */
+        walletIds: List<Long> = emptyList(),
     ): Synced<List<Transaction>> {
         // Only the unfiltered list is worth keeping for offline: a cache keyed
         // by every filter combination would mostly be misses.
-        val key = if (walletId == null && kind == null && categoryId == null && period == null) {
+        val key = if (walletId == null && walletIds.isEmpty() && kind == null &&
+            categoryId == null && period == null
+        ) {
             "transactions"
         } else {
             null
@@ -478,12 +482,20 @@ class BrokeRepository(
                         put("limit", limit)
                         put("offset", 0)
                         walletId?.let { put("walletId", it) }
+                        putWalletIds(walletIds)
                         kind?.let { put("kind", it) }
                         categoryId?.let { put("categoryId", it) }
                         period?.let { put("period", it) }
                     }
                 },
             )
+        }
+    }
+
+    /** `walletIds` in a filter, left out when it would be empty (= all). */
+    private fun kotlinx.serialization.json.JsonObjectBuilder.putWalletIds(ids: List<Long>) {
+        if (ids.isNotEmpty()) {
+            put("walletIds", kotlinx.serialization.json.JsonArray(ids.map { kotlinx.serialization.json.JsonPrimitive(it) }))
         }
     }
 
@@ -628,6 +640,7 @@ class BrokeRepository(
         walletId: Long?,
         categoryId: Long?,
         period: JsonObject?,
+        walletIds: List<Long> = emptyList(),
     ): TxTotals = rpc.json.decodeFromJsonElement(
         TxTotals.serializer(),
         rpc.call(
@@ -636,6 +649,7 @@ class BrokeRepository(
                 putJsonObject("filter") {
                     put("kind", kind)
                     walletId?.let { put("walletId", it) }
+                    putWalletIds(walletIds)
                     categoryId?.let { put("categoryId", it) }
                     period?.let { put("period", it) }
                 }

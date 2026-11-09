@@ -44,6 +44,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.asura.finanzas.data.Wallet
 import com.asura.finanzas.ui.theme.Broke
 import com.asura.finanzas.R
@@ -167,6 +169,119 @@ fun <T> PickerField(
                             expanded = false
                         },
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * [PickerField] with check marks, the web's `MultiSelect`: the menu stays open
+ * while you tick several options, and its first row ([allLabel]) clears the
+ * selection. Nothing picked means "all".
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun <T> MultiPickerField(
+    options: List<T>,
+    selected: List<T>,
+    optionLabel: @Composable (T) -> String,
+    onChange: (List<T>) -> Unit,
+    allLabel: String,
+    /** Closed-box text for two or more picks, already holding the count. */
+    manyLabel: String,
+    modifier: Modifier = Modifier,
+    /** What a screen reader calls the box — the web's `aria-label`. */
+    contentDescription: String? = null,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val colors = Broke.colors
+    val shown = when (selected.size) {
+        0 -> allLabel
+        1 -> optionLabel(selected.first())
+        else -> manyLabel
+    }
+
+    @Composable
+    fun OptionRow(label: String, checked: Boolean, onClick: () -> Unit) {
+        DropdownMenuItem(
+            leadingIcon = {
+                Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                    if (checked) {
+                        Icon(
+                            Lucide.Check,
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+            },
+            text = {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    color = if (checked) colors.fg else colors.fgMuted,
+                )
+            },
+            onClick = onClick,
+            // The web's ticked row: `bg-surface-raised` behind it.
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .then(if (checked) Modifier.background(colors.surfaceRaised) else Modifier),
+        )
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier
+                .menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+                .then(
+                    if (contentDescription != null) {
+                        Modifier.semantics { this.contentDescription = contentDescription }
+                    } else {
+                        Modifier
+                    },
+                )
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.surface)
+                .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+                .padding(horizontal = 13.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = shown,
+                style = MaterialTheme.typography.bodyMedium
+                    .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
+                color = colors.fg,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                Lucide.ChevronDown,
+                contentDescription = null,
+                tint = colors.fgSubtle,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = colors.surfaceOverlay,
+        ) {
+            OptionRow(allLabel, selected.isEmpty()) { onChange(emptyList()) }
+            options.forEach { option ->
+                val checked = option in selected
+                OptionRow(optionLabel(option), checked) {
+                    onChange(if (checked) selected - option else selected + option)
                 }
             }
         }

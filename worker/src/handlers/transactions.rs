@@ -619,7 +619,11 @@ pub async fn update_transfer(db: &D1Database, uid: i64, a: UpdateTransferArgs) -
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TxFilter {
+    /// One wallet. Kept for the APKs released before `wallet_ids` existed;
+    /// both may come together and then add up.
     pub wallet_id: Option<i64>,
+    /// Any of these wallets. Empty or absent = every wallet.
+    pub wallet_ids: Option<Vec<i64>>,
     pub kind: Option<String>,
     pub category_id: Option<i64>,
     pub from: Option<String>,
@@ -633,6 +637,38 @@ pub struct TxFilter {
 }
 
 impl TxFilter {
+    /// The wallets the filter is limited to, or `None` for every wallet.
+    fn wallets(&self) -> Option<Vec<i64>> {
+        let mut ids: Vec<i64> = self.wallet_ids.clone().unwrap_or_default();
+        ids.extend(self.wallet_id);
+        ids.sort_unstable();
+        ids.dedup();
+        (!ids.is_empty()).then_some(ids)
+    }
+
+    /// The selected wallets as one JSON array literal (`[1,2]`), or `None`
+    /// for every wallet.
+    fn wallets_json(&self) -> Option<String> {
+        self.wallets().map(|ids| {
+            let list: Vec<String> = ids.iter().map(i64::to_string).collect();
+            format!("[{}]", list.join(","))
+        })
+    }
+
+    /// `AND <column> IN (…)` for the selected wallets; nothing when the
+    /// filter covers every wallet. The ids travel as ONE bound JSON array
+    /// unpacked by `json_each`, not one `?` each: D1 caps a query at 100
+    /// bound parameters and the list query applies this twice. The caller's
+    /// `user_id` scope still applies, so another user's id matches nothing.
+    fn push_wallets(&self, sql: &mut String, params: &mut Vec<JsValue>, column: &str) {
+        if let Some(json) = self.wallets_json() {
+            sql.push_str(&format!(
+                " AND {column} IN (SELECT value FROM json_each(?))"
+            ));
+            params.push(json.to_js());
+        }
+    }
+
     /// Inclusive start / exclusive end of the selected period, as SQL date
     /// literals. Bound as parameters, never interpolated.
     fn period_bounds(&self) -> Option<(String, String)> {
@@ -648,10 +684,7 @@ impl TxFilter {
 /// The caller has already opened the query with the `wallets w` join and the
 /// `w.user_id = ?` scope.
 fn push_tx_filter(sql: &mut String, params: &mut Vec<JsValue>, f: &TxFilter) {
-    if let Some(wid) = f.wallet_id {
-        sql.push_str(" AND t.wallet_id = ?");
-        params.push(wid.to_js());
-    }
+    f.push_wallets(sql, params, "t.wallet_id");
     if let Some(kind) = &f.kind {
         if kind == "transfer" {
             // A single "transfer" filter covers both directions.
@@ -854,10 +887,7 @@ pub async fn list_transactions(
              WHERE g.user_id = ? AND g.linked_wallet_id IS NOT NULL",
         );
         params.push(uid.to_js());
-        if let Some(wid) = f.wallet_id {
-            sql.push_str(" AND g.linked_wallet_id = ?");
-            params.push(wid.to_js());
-        }
+        f.push_wallets(&mut sql, &mut params, "g.linked_wallet_id");
         if let Some(from) = &f.from {
             sql.push_str(" AND gc.occurred_at >= ?");
             params.push(from.to_js());
@@ -1278,4 +1308,34 @@ pub async fn reorder_transaction_categories(
         .collect::<AppResult<Vec<_>>>()?;
     batch(db, stmts).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn filter(wallet_id: Option<i64>, wallet_ids: Option<Vec<i64>>) -> TxFilter {
+        TxFilter {
+            wallet_id,
+            wallet_ids,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn no_wallets_means_every_wallet() {
+        assert_eq!(filter(None, None).wallets_json(), None);
+        assert_eq!(filter(None, Some(vec![])).wallets_json(), None);
+    }
+
+    #[test]
+    fn old_single_wallet_still_filters() {
+        assert_eq!(filter(Some(7), None).wallets_json().as_deref(), Some("[7]"));
+    }
+
+    #[test]
+    fn single_and_list_add_up_sorted_without_repeats() {
+        let f = filter(Some(2), Some(vec![9, 2, 5, 9]));
+        assert_eq!(f.wallets_json().as_deref(), Some("[2,5,9]"));
+    }
 }

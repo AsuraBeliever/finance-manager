@@ -201,6 +201,8 @@ export interface TransferDetail {
 
 export interface TxFilter {
   walletId?: number;
+  /** Any of these wallets; combines with `walletId`. */
+  walletIds?: number[];
   /** A real kind, or "transfer" to match both transfer directions. */
   kind?: TransactionKind | "transfer";
   categoryId?: number;

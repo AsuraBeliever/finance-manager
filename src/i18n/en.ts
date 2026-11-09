@@ -463,6 +463,8 @@ export const en: Dict = {
     date: "Date",
     time: "Time",
     allWallets: "All wallets",
+    nWallets: "{n} wallets",
+    walletsFilter: "Wallets",
     allKinds: "All types",
     typeAll: "All",
     allCategories: "All categories",
@@ -484,6 +486,7 @@ export const en: Dict = {
     registerRefund: "Register refund",
     totalConverted: "Converted to MXN",
     listCapped: "Showing the {n} most recent transactions; the total counts them all.",
+    showMore: "Show more",
     deleteConfirmTitle: "Delete transaction",
     deleteConfirm: "Delete this transaction? If it's a transfer, both legs are removed.",
     deleteInvestmentLegConfirm:

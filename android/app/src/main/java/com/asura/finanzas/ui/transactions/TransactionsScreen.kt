@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -65,6 +66,7 @@ import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.PeriodPicker
+import com.asura.finanzas.ui.components.MultiPickerField
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.PrivacyToggle
@@ -164,7 +166,8 @@ fun TransactionsScreen(
 ) {
     val (key, reload) = rememberReloadKey()
     var filter by remember { mutableStateOf(KindFilter.All) }
-    var wallet by remember { mutableStateOf<Wallet?>(null) }
+    // Several wallets can be picked; empty = every wallet (web: MultiSelect).
+    var walletIds by remember { mutableStateOf<List<Long>>(emptyList()) }
     // Category only applies to income/expense and is scoped to the chosen kind,
     // so switching kind clears it (web: TransactionFilters).
     var category by remember { mutableStateOf<TransactionCategory?>(null) }
@@ -184,16 +187,37 @@ fun TransactionsScreen(
     // unfiltered list hit the offline cache, which keys on period == null.
     val periodFilter = period.takeIf { it != Period.AllTime }?.toJson()
 
+    // "Mostrar más" grows the request by one page and refetches from the top
+    // (web: TransactionsPage), so a capture made while browsing can't open a
+    // gap or a duplicate and both legs of a transfer arrive together. The page
+    // count belongs to the filter it was raised under: a new filter starts
+    // back at the first page.
+    // Keyed on the filter, so any change — returning to one paged before
+    // included — drops back to the first page.
+    val filterKey = listOf(filter, walletIds.sorted(), category?.id, period)
+    var pages by remember(filterKey) { mutableStateOf(1) }
+    val limit = pages * TX_LIST_LIMIT
+    // The page that has actually arrived, so the button can say it is loading.
+    var loadedLimit by remember { mutableStateOf(0) }
+
+    // The limit stays out of the key: the rows already shown stay up while
+    // the longer list loads, instead of the list blanking.
     val state by loadSynced(
-        listOf("transactions", filter, wallet?.id, category?.id, period),
-        refetch = key,
+        listOf("transactions") + filterKey,
+        refetch = key to limit,
     ) {
-        repository.transactions(
-            walletId = wallet?.id,
-            kind = filter.wire,
-            categoryId = category?.id,
-            period = periodFilter,
-        )
+        // Settled even when the read fails, or the button would stay stuck.
+        try {
+            repository.transactions(
+                limit = limit,
+                walletIds = walletIds.sorted(),
+                kind = filter.wire,
+                categoryId = category?.id,
+                period = periodFilter,
+            )
+        } finally {
+            loadedLimit = limit
+        }
     }
     // Shares the wallets tab's entry, so the picker is filled the moment the
     // screen appears.
@@ -207,13 +231,20 @@ fun TransactionsScreen(
 
     // Totals only exist for a single-sided kind; the API rejects them otherwise.
     val totals = loadCached<TxTotals?>(
-        listOf("txTotals", filter, wallet?.id, category?.id, period),
+        listOf("txTotals", filter, walletIds.sorted(), category?.id, period),
         refetch = key,
         fallback = null,
     ) {
         filter.wire
             ?.takeIf { filter.hasTotal }
-            ?.let { repository.transactionTotals(it, wallet?.id, category?.id, periodFilter) }
+            ?.let { repository.transactionTotals(
+                    it,
+                    walletId = null,
+                    categoryId = category?.id,
+                    period = periodFilter,
+                    walletIds = walletIds.sorted(),
+                )
+            }
     }
     val scope = rememberCoroutineScope()
 
@@ -231,8 +262,8 @@ fun TransactionsScreen(
                 filter = filter,
                 onFilter = { filter = it; category = null },
                 wallets = wallets,
-                wallet = wallet,
-                onWallet = { wallet = it },
+                walletIds = walletIds,
+                onWallets = { walletIds = it },
                 categories = filterCategories,
                 category = category,
                 onCategory = { category = it },
@@ -243,6 +274,11 @@ fun TransactionsScreen(
                 totals = totals,
                 onEdit = { if (it.isApartado) editingApartado = it else editing = it },
                 onDelete = { pendingDelete = it },
+                limit = limit,
+                // Only a page past the first counts: the first load has no
+                // footer to keep up.
+                loadingMore = pages > 1 && loadedLimit != limit,
+                onShowMore = { pages += 1 },
             )
     }
 
@@ -324,8 +360,8 @@ private fun TransactionList(
     filter: KindFilter,
     onFilter: (KindFilter) -> Unit,
     wallets: List<Wallet>,
-    wallet: Wallet?,
-    onWallet: (Wallet?) -> Unit,
+    walletIds: List<Long>,
+    onWallets: (List<Long>) -> Unit,
     categories: List<TransactionCategory>,
     category: TransactionCategory?,
     onCategory: (TransactionCategory?) -> Unit,
@@ -336,6 +372,10 @@ private fun TransactionList(
     totals: TxTotals?,
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
+    /** How many rows were asked for; a list this long probably has more. */
+    limit: Int,
+    loadingMore: Boolean,
+    onShowMore: () -> Unit,
 ) {
     val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
@@ -377,14 +417,17 @@ private fun TransactionList(
         }
 
         item {
-            PickerField(
-                // The web's filter bar shows the select bare, with no label.
-                label = "",
-                options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
-                selected = wallet,
-                optionLabel = { it?.name ?: allWalletsLabel() },
-                onSelect = onWallet,
-                emptyLabel = stringResource(R.string.transactions_all_wallets),
+            val options = wallets.filter { !it.isArchived }
+            // In the order the menu lists them, whatever order they were ticked in.
+            val picked = options.filter { it.id in walletIds }
+            MultiPickerField(
+                options = options,
+                selected = picked,
+                optionLabel = { it.name },
+                onChange = { picked -> onWallets(picked.map { it.id }) },
+                allLabel = allWalletsLabel(),
+                manyLabel = text(R.string.transactions_n_wallets, "n" to picked.size),
+                contentDescription = stringResource(R.string.transactions_wallets_filter),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             )
         }
@@ -449,7 +492,7 @@ private fun TransactionList(
             // "Nothing matches" is a different message from "nothing here yet",
             // and telling them apart is the whole point: with a filter on, an
             // empty list is about the filter, not the account.
-            val filtered = wallet != null || filter.wire != null ||
+            val filtered = walletIds.isNotEmpty() || filter.wire != null ||
                 category != null || period != Period.AllTime
             item {
                 EmptyState(
@@ -475,15 +518,36 @@ private fun TransactionList(
             }
             // Counted on the raw list, not the folded one: the server capped
             // rows, and a transfer costs two of them.
-            if (transactions.size >= TX_LIST_LIMIT) {
+            // While the next page loads the shorter list is still up, so the
+            // footer stays and says it is loading.
+            if (loadingMore || transactions.size >= limit) {
                 item {
-                    Text(
-                        text(R.string.transactions_list_capped, "n" to TX_LIST_LIMIT),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                        color = colors.fgSubtle,
-                        textAlign = TextAlign.Center,
+                    Column(
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    )
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            // The rows actually shown: a cached copy can hold
+                            // more than this visit has asked for so far.
+                            text(R.string.transactions_list_capped, "n" to transactions.size),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                            color = colors.fgSubtle,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        // The web's ghost button: plain text, no fill.
+                        TextButton(onClick = onShowMore, enabled = !loadingMore) {
+                            Text(
+                                stringResource(
+                                    if (loadingMore) R.string.common_loading
+                                    else R.string.transactions_show_more,
+                                ),
+                                style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                                color = colors.fg,
+                            )
+                        }
+                    }
                 }
             }
         }
