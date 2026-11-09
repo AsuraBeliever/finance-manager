@@ -18,7 +18,10 @@ import { OutboxPanel } from "./OutboxPanel";
 const FILTER_KEY = "finanzas.txFilter";
 
 interface PersistedFilter {
-  walletId: number | "";
+  /** Empty = every wallet. */
+  walletIds?: number[];
+  /** The single wallet saved before several could be picked. */
+  walletId?: number | "";
   kind: FilterKind;
   categoryId: number | "";
   /** null = every date. Absent in filters saved before periods existed. */
@@ -32,25 +35,33 @@ function loadFilter(): PersistedFilter {
   } catch {
     // ignore corrupt/unavailable storage
   }
-  return { walletId: "", kind: "", categoryId: "", period: null };
+  return { walletIds: [], kind: "", categoryId: "", period: null };
+}
+
+/** The saved wallets, reading a filter saved with the old single wallet too. */
+function loadWalletIds(): number[] {
+  const f = loadFilter();
+  if (f.walletIds) return f.walletIds;
+  return typeof f.walletId === "number" ? [f.walletId] : [];
 }
 
 export function TransactionsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
-  const [walletId, setWalletId] = useState<number | "">(() => loadFilter().walletId);
+  const [walletIds, setWalletIds] = useState<number[]>(loadWalletIds);
   const [kind, setKind] = useState<FilterKind>(() => loadFilter().kind);
   const [categoryId, setCategoryId] = useState<number | "">(() => loadFilter().categoryId);
   const [period, setPeriod] = useState<Period | null>(() => loadFilter().period ?? null);
 
   useEffect(() => {
-    localStorage.setItem(FILTER_KEY, JSON.stringify({ walletId, kind, categoryId, period }));
-  }, [walletId, kind, categoryId, period]);
+    localStorage.setItem(FILTER_KEY, JSON.stringify({ walletIds, kind, categoryId, period }));
+  }, [walletIds, kind, categoryId, period]);
 
   const wallets = useQuery({ queryKey: ["wallets", {}], queryFn: () => listWallets() });
 
   const filter: TxFilter = {
-    ...(walletId !== "" && { walletId }),
+    // Sorted so the same picks in another order share a cache entry.
+    ...(walletIds.length > 0 && { walletIds: [...walletIds].sort((a, b) => a - b) }),
     ...(kind !== "" && { kind }),
     ...(categoryId !== "" && { categoryId }),
     ...(period !== null && { period }),
@@ -59,7 +70,7 @@ export function TransactionsPage() {
     queryKey: ["transactions", filter],
     queryFn: () => listTransactions(filter),
   });
-  const filtered = walletId !== "" || kind !== "" || categoryId !== "" || period !== null;
+  const filtered = walletIds.length > 0 || kind !== "" || categoryId !== "" || period !== null;
 
   const currencyByWallet = useMemo(
     () => new Map((wallets.data ?? []).map((w) => [w.id, w.currencyCode])),
@@ -93,8 +104,8 @@ export function TransactionsPage() {
         }}
         period={period}
         onPeriodChange={setPeriod}
-        walletId={walletId}
-        onWalletChange={setWalletId}
+        walletIds={walletIds}
+        onWalletsChange={setWalletIds}
       />
 
       <TransactionTotal filter={filter} />

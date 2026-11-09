@@ -428,6 +428,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 |---|---|---|
 | Lista (con las dos patas de una transferencia plegadas en un renglón) | `ui/transactions` | ✅ |
 | Filtros (cartera, tipo, categoría, periodo) | `ui/transactions` | ✅ |
+| Varias carteras a la vez (`MultiSelect` ↔ `MultiPickerField`; `walletIds` en `list_transactions`/`sum_transactions`) | `ui/transactions` + `components/Pickers` | ✅ (FIN-8) |
 | Total de lo filtrado (`sumTransactions`) | `ui/transactions` | ✅ con conteo y desglose por moneda |
 | Aviso de lista truncada a 100 | `ui/transactions` + `WalletDetailScreen` | ✅ |
 | «Sin resultados» distinto de «sin movimientos» | `ui/transactions` | ✅ |

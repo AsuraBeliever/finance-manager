@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { inputClass } from "../../components/Field";
+import { MultiSelect } from "../../components/MultiSelect";
 import { PeriodPicker } from "../../components/PeriodPicker";
 import { listFilterCategories, listWallets } from "../../lib/api";
 import { es } from "../../i18n/es";
@@ -15,9 +16,10 @@ interface TransactionFiltersProps {
   /** Date window; null = every date, the default here. */
   period: Period | null;
   onPeriodChange: (p: Period | null) => void;
-  /** Wallet picker — pass both to show it; omit when the wallet is fixed. */
-  walletId?: number | "";
-  onWalletChange?: (walletId: number | "") => void;
+  /** Wallet picker — pass both to show it; omit when the wallet is fixed.
+   *  Several can be picked; empty = every wallet. */
+  walletIds?: number[];
+  onWalletsChange?: (walletIds: number[]) => void;
 }
 
 /** Filter bar shared by the transactions tab and the wallet detail: type,
@@ -28,13 +30,13 @@ export function TransactionFilters({
   onChange,
   period,
   onPeriodChange,
-  walletId,
-  onWalletChange,
+  walletIds,
+  onWalletsChange,
 }: TransactionFiltersProps) {
   const wallets = useQuery({
     queryKey: ["wallets", {}],
     queryFn: () => listWallets(),
-    enabled: onWalletChange !== undefined,
+    enabled: onWalletsChange !== undefined,
   });
   const categories = useQuery({
     queryKey: ["filterCategories"],
@@ -43,22 +45,16 @@ export function TransactionFilters({
 
   return (
     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-      {onWalletChange && (
+      {onWalletsChange && (
         <div className="w-full sm:w-56">
-          <select
-            className={inputClass}
-            value={walletId ?? ""}
-            onChange={(e) =>
-              onWalletChange(e.target.value === "" ? "" : Number(e.target.value))
-            }
-          >
-            <option value="">{es.transactions.allWallets}</option>
-            {wallets.data?.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
+          <MultiSelect
+            aria-label={es.transactions.walletsFilter}
+            values={walletIds ?? []}
+            onChange={onWalletsChange}
+            options={(wallets.data ?? []).map((w) => ({ value: w.id, label: w.name }))}
+            allLabel={es.transactions.allWallets}
+            manyLabel={es.transactions.nWallets}
+          />
         </div>
       )}
       {/* Type as segmented buttons; picking a kind also resets the category. */}

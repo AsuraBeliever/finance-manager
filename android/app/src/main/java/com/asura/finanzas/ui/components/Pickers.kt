@@ -174,6 +174,105 @@ fun <T> PickerField(
 }
 
 /**
+ * [PickerField] with check marks, the web's `MultiSelect`: the menu stays open
+ * while you tick several options, and its first row ([allLabel]) clears the
+ * selection. Nothing picked means "all".
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun <T> MultiPickerField(
+    options: List<T>,
+    selected: List<T>,
+    optionLabel: @Composable (T) -> String,
+    onChange: (List<T>) -> Unit,
+    allLabel: String,
+    /** Closed-box text for two or more picks, already holding the count. */
+    manyLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val colors = Broke.colors
+    val shown = when (selected.size) {
+        0 -> allLabel
+        1 -> optionLabel(selected.first())
+        else -> manyLabel
+    }
+
+    @Composable
+    fun OptionRow(label: String, checked: Boolean, onClick: () -> Unit) {
+        DropdownMenuItem(
+            leadingIcon = {
+                Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                    if (checked) {
+                        Icon(
+                            Lucide.Check,
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+            },
+            text = {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                    color = if (checked) colors.fg else colors.fgMuted,
+                )
+            },
+            onClick = onClick,
+        )
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier
+                .menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.surface)
+                .border(1.dp, colors.borderMuted, RoundedCornerShape(8.dp))
+                .padding(horizontal = 13.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = shown,
+                style = MaterialTheme.typography.bodyMedium
+                    .copy(fontSize = ControlFontSize, lineHeight = ControlLineHeight),
+                color = colors.fg,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                Lucide.ChevronDown,
+                contentDescription = null,
+                tint = colors.fgSubtle,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = colors.surfaceOverlay,
+        ) {
+            OptionRow(allLabel, selected.isEmpty()) { onChange(emptyList()) }
+            options.forEach { option ->
+                val checked = option in selected
+                OptionRow(optionLabel(option), checked) {
+                    onChange(if (checked) selected - option else selected + option)
+                }
+            }
+        }
+    }
+}
+
+/**
  * The web's `DateInput`, not Material's date dialog: a box with the date
  * spelled out and a calendar glyph, and under it the app's own calendar card
  * (w-72, Monday first, a month/year grid behind the title, "Hoy · 26 sep").

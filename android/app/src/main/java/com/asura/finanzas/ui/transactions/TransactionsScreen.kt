@@ -65,6 +65,7 @@ import com.asura.finanzas.ui.components.Load
 import com.asura.finanzas.ui.components.PageHeader
 import com.asura.finanzas.ui.components.Period
 import com.asura.finanzas.ui.components.PeriodPicker
+import com.asura.finanzas.ui.components.MultiPickerField
 import com.asura.finanzas.ui.components.PickerField
 import com.asura.finanzas.ui.components.PrimaryButton
 import com.asura.finanzas.ui.components.PrivacyToggle
@@ -157,7 +158,8 @@ fun TransactionsScreen(
 ) {
     val (key, reload) = rememberReloadKey()
     var filter by remember { mutableStateOf(KindFilter.All) }
-    var wallet by remember { mutableStateOf<Wallet?>(null) }
+    // Several wallets can be picked; empty = every wallet (web: MultiSelect).
+    var walletIds by remember { mutableStateOf<List<Long>>(emptyList()) }
     // Category only applies to income/expense and is scoped to the chosen kind,
     // so switching kind clears it (web: TransactionFilters).
     var category by remember { mutableStateOf<TransactionCategory?>(null) }
@@ -178,11 +180,11 @@ fun TransactionsScreen(
     val periodFilter = period.takeIf { it != Period.AllTime }?.toJson()
 
     val state by loadSynced(
-        listOf("transactions", filter, wallet?.id, category?.id, period),
+        listOf("transactions", filter, walletIds.sorted(), category?.id, period),
         refetch = key,
     ) {
         repository.transactions(
-            walletId = wallet?.id,
+            walletIds = walletIds.sorted(),
             kind = filter.wire,
             categoryId = category?.id,
             period = periodFilter,
@@ -200,13 +202,20 @@ fun TransactionsScreen(
 
     // Totals only exist for a single-sided kind; the API rejects them otherwise.
     val totals = loadCached<TxTotals?>(
-        listOf("txTotals", filter, wallet?.id, category?.id, period),
+        listOf("txTotals", filter, walletIds.sorted(), category?.id, period),
         refetch = key,
         fallback = null,
     ) {
         filter.wire
             ?.takeIf { filter.hasTotal }
-            ?.let { repository.transactionTotals(it, wallet?.id, category?.id, periodFilter) }
+            ?.let { repository.transactionTotals(
+                    it,
+                    walletId = null,
+                    categoryId = category?.id,
+                    period = periodFilter,
+                    walletIds = walletIds.sorted(),
+                )
+            }
     }
     val scope = rememberCoroutineScope()
 
@@ -224,8 +233,8 @@ fun TransactionsScreen(
                 filter = filter,
                 onFilter = { filter = it; category = null },
                 wallets = wallets,
-                wallet = wallet,
-                onWallet = { wallet = it },
+                walletIds = walletIds,
+                onWallets = { walletIds = it },
                 categories = filterCategories,
                 category = category,
                 onCategory = { category = it },
@@ -317,8 +326,8 @@ private fun TransactionList(
     filter: KindFilter,
     onFilter: (KindFilter) -> Unit,
     wallets: List<Wallet>,
-    wallet: Wallet?,
-    onWallet: (Wallet?) -> Unit,
+    walletIds: List<Long>,
+    onWallets: (List<Long>) -> Unit,
     categories: List<TransactionCategory>,
     category: TransactionCategory?,
     onCategory: (TransactionCategory?) -> Unit,
@@ -370,14 +379,16 @@ private fun TransactionList(
         }
 
         item {
-            PickerField(
-                // The web's filter bar shows the select bare, with no label.
-                label = "",
-                options = listOf<Wallet?>(null) + wallets.filter { !it.isArchived },
-                selected = wallet,
-                optionLabel = { it?.name ?: allWalletsLabel() },
-                onSelect = onWallet,
-                emptyLabel = stringResource(R.string.transactions_all_wallets),
+            val options = wallets.filter { !it.isArchived }
+            // In the order the menu lists them, whatever order they were ticked in.
+            val picked = options.filter { it.id in walletIds }
+            MultiPickerField(
+                options = options,
+                selected = picked,
+                optionLabel = { it.name },
+                onChange = { picked -> onWallets(picked.map { it.id }) },
+                allLabel = allWalletsLabel(),
+                manyLabel = text(R.string.transactions_n_wallets, "n" to picked.size),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             )
         }
@@ -442,7 +453,7 @@ private fun TransactionList(
             // "Nothing matches" is a different message from "nothing here yet",
             // and telling them apart is the whole point: with a filter on, an
             // empty list is about the filter, not the account.
-            val filtered = wallet != null || filter.wire != null ||
+            val filtered = walletIds.isNotEmpty() || filter.wire != null ||
                 category != null || period != Period.AllTime
             item {
                 EmptyState(

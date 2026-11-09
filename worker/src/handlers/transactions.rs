@@ -603,7 +603,11 @@ pub async fn update_transfer(db: &D1Database, uid: i64, a: UpdateTransferArgs) -
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TxFilter {
+    /// One wallet. Kept for the APKs released before `wallet_ids` existed;
+    /// both may come together and then add up.
     pub wallet_id: Option<i64>,
+    /// Any of these wallets. Empty or absent = every wallet.
+    pub wallet_ids: Option<Vec<i64>>,
     pub kind: Option<String>,
     pub category_id: Option<i64>,
     pub from: Option<String>,
@@ -617,6 +621,27 @@ pub struct TxFilter {
 }
 
 impl TxFilter {
+    /// The wallets the filter is limited to, or `None` for every wallet.
+    fn wallets(&self) -> Option<Vec<i64>> {
+        let mut ids: Vec<i64> = self.wallet_ids.clone().unwrap_or_default();
+        ids.extend(self.wallet_id);
+        ids.sort_unstable();
+        ids.dedup();
+        (!ids.is_empty()).then_some(ids)
+    }
+
+    /// `AND <column> IN (?, …)` for the selected wallets; nothing when the
+    /// filter covers every wallet. Ids are bound, never interpolated, and the
+    /// caller's `user_id` scope still applies, so another user's id matches
+    /// nothing.
+    fn push_wallets(&self, sql: &mut String, params: &mut Vec<JsValue>, column: &str) {
+        if let Some(ids) = self.wallets() {
+            let marks = vec!["?"; ids.len()].join(", ");
+            sql.push_str(&format!(" AND {column} IN ({marks})"));
+            params.extend(ids.iter().map(|id| id.to_js()));
+        }
+    }
+
     /// Inclusive start / exclusive end of the selected period, as SQL date
     /// literals. Bound as parameters, never interpolated.
     fn period_bounds(&self) -> Option<(String, String)> {
@@ -632,10 +657,7 @@ impl TxFilter {
 /// The caller has already opened the query with the `wallets w` join and the
 /// `w.user_id = ?` scope.
 fn push_tx_filter(sql: &mut String, params: &mut Vec<JsValue>, f: &TxFilter) {
-    if let Some(wid) = f.wallet_id {
-        sql.push_str(" AND t.wallet_id = ?");
-        params.push(wid.to_js());
-    }
+    f.push_wallets(sql, params, "t.wallet_id");
     if let Some(kind) = &f.kind {
         if kind == "transfer" {
             // A single "transfer" filter covers both directions.
@@ -776,10 +798,7 @@ pub async fn list_transactions(
              WHERE g.user_id = ? AND g.linked_wallet_id IS NOT NULL",
         );
         params.push(uid.to_js());
-        if let Some(wid) = f.wallet_id {
-            sql.push_str(" AND g.linked_wallet_id = ?");
-            params.push(wid.to_js());
-        }
+        f.push_wallets(&mut sql, &mut params, "g.linked_wallet_id");
         if let Some(from) = &f.from {
             sql.push_str(" AND gc.occurred_at >= ?");
             params.push(from.to_js());
