@@ -271,6 +271,19 @@ class BrokeRepository(
             rpc.call("get_investment_detail", buildJsonObject { put("id", id) }),
         )
 
+    /** What an investment earned per month and per day (the [limit] newest days). */
+    suspend fun investmentYield(id: Long, limit: Int): InvestmentYield =
+        rpc.json.decodeFromJsonElement(
+            InvestmentYield.serializer(),
+            rpc.call(
+                "get_investment_yield",
+                buildJsonObject {
+                    put("investmentId", id)
+                    put("limit", limit)
+                },
+            ),
+        )
+
     /**
      * Edit an existing investment. The calculator and its params travel too,
      * because changing the rate of a CETES is a legitimate edit — the server
