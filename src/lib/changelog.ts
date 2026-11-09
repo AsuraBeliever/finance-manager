@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.51.0",
+    date: "2026-11-09",
+    es: [
+      "Tus inversiones ahora muestran lo que generan cada día: en el detalle de cada una (CETES, BONDDIA, tasa fija, cajita, manual o cripto) aparece «Rendimiento diario» con lo ganado por mes y por día. Ese rendimiento cuenta como ingreso del mes en Inicio y en Análisis —dentro de «Intereses»— aunque no retires el dinero, y aparece en Transacciones como «Rendimiento» (solo lectura). No cambia el saldo de tus carteras. En cripto se registra desde hoy, porque su precio sólo se conoce día a día. En la web y en la app de Android.",
+    ],
+    en: [
+      "Your investments now show what they earn every day: each one's detail (CETES, BONDDIA, fixed rate, cajita, manual or crypto) has a \"Daily yield\" section with what it earned per month and per day. That yield counts as income for the month on Home and in Analytics —under \"Interest\"— even if you don't withdraw it, and it shows in Transactions as \"Yield\" (read-only). Your wallet balances don't change. For crypto it's recorded from today on, since its price is only known day by day. On the web and in the Android app.",
+    ],
+  },
+  {
     version: "2.50.0",
     date: "2026-11-09",
     es: [
