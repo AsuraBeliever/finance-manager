@@ -430,7 +430,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Filtros (cartera, tipo, categoría, periodo) | `ui/transactions` | ✅ |
 | Total de lo filtrado (`sumTransactions`) | `ui/transactions` | ✅ con conteo y desglose por moneda |
 | Aviso de lista truncada a 100 | `ui/transactions` + `WalletDetailScreen` | ✅ |
-| «Mostrar más»: cada toque pide 100 movimientos más (relee desde arriba con `limit` creciente; un filtro nuevo vuelve a la primera página) | `ui/transactions` | ✅ (FIN-7) |
+| «Mostrar más»: cada toque pide 100 movimientos más (relee desde arriba con `limit` creciente; un filtro nuevo vuelve a la primera página) | `ui/transactions` | ✅ (2.49.0) |
 | «Sin resultados» distinto de «sin movimientos» | `ui/transactions` | ✅ |
 | Alta de ingreso | `TransactionFormSheet` | ✅ |
 | Alta de gasto | `TransactionFormSheet` | ✅ |

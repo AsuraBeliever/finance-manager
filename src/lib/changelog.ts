@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.49.0",
+    date: "2026-11-08",
+    es: [
+      "Al final de Transacciones ahora hay un botón «Mostrar más»: cada vez que lo tocas aparecen los 100 movimientos anteriores, hasta llegar al primero, así puedes revisar todo tu historial. Respeta los filtros que tengas puestos y, al cambiar de filtro, la lista vuelve a empezar desde los más recientes. En la web y en la app de Android.",
+    ],
+    en: [
+      "Transactions now has a \"Show more\" button at the bottom: each tap brings in the previous 100 transactions, all the way back to the first one, so you can go through your whole history. It respects the filters you have on, and changing a filter starts the list again from the most recent. On the web and in the Android app.",
+    ],
+  },
+  {
     version: "2.48.0",
     date: "2026-10-16",
     es: [
