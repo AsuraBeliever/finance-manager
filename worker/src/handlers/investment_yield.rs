@@ -20,6 +20,7 @@ use finanzas_core::investments::daily_yield::{
 };
 use finanzas_core::investments::{find, parse_start_date, CalcContext, InvestmentCalculator};
 use finanzas_core::models::Investment;
+use finanzas_core::period::{resolve_period, Period};
 use serde::{Deserialize, Serialize};
 use worker::console_error;
 use worker::D1Database;
@@ -290,5 +291,129 @@ pub async fn get_investment_yield(
         days,
         has_more,
         observed,
+    })
+}
+
+// ---- the detail page's combined table (FIN-12) ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvestmentActivityArgs {
+    pub investment_id: i64,
+    /// Date window, resolved like the transactions list's. Absent = every date.
+    #[serde(default)]
+    pub period: Option<Period>,
+    /// `false` leaves the daily yield out of the rows and the totals.
+    #[serde(default)]
+    pub include_yield: Option<bool>,
+    /// Newest rows to return; the page grows it with «Mostrar más».
+    #[serde(default)]
+    pub limit: Option<i64>,
+}
+
+/// One line of the table: a deposit or withdrawal (with its movement id, so
+/// it can be edited or deleted) or one day's yield (read-only, no id).
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityRow {
+    #[serde(alias = "movement_id")]
+    pub movement_id: Option<i64>,
+    /// 'deposit' | 'withdrawal' | 'yield'
+    pub kind: String,
+    #[serde(alias = "amount_cents")]
+    pub amount_cents: i64,
+    #[serde(alias = "occurred_at")]
+    pub occurred_at: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvestmentActivity {
+    /// In the investment's currency, like every amount here.
+    pub currency_code: String,
+    /// Everything the filter selects, not just the rows returned.
+    pub yield_cents: i64,
+    pub deposit_cents: i64,
+    pub withdrawal_cents: i64,
+    /// How many rows the filter selects in all.
+    pub count: i64,
+    pub rows: Vec<ActivityRow>,
+    /// More rows exist beyond `limit`.
+    pub has_more: bool,
+}
+
+#[derive(Deserialize)]
+struct ActivityTotalsRow {
+    kind: String,
+    sum_cents: i64,
+    n: i64,
+}
+
+/// Deposits, withdrawals and daily yield of one investment in one table,
+/// newest first, with the totals of the whole filtered window. Yield rows are
+/// the stored daily history (days that earned nothing are skipped, as in the
+/// transactions list); scoped to the caller through `fetch_investment`.
+pub async fn list_investment_activity(
+    db: &D1Database,
+    uid: i64,
+    a: InvestmentActivityArgs,
+) -> AppResult<InvestmentActivity> {
+    let inv = fetch_investment(db, uid, a.investment_id).await?;
+    let (start, end) = match &a.period {
+        Some(p) => {
+            let r = resolve_period(p, today_mx());
+            (r.start.to_string(), r.end.to_string())
+        }
+        // Every date: a window wide enough for any business date.
+        None => ("0000-01-01".to_string(), "9999-12-31".to_string()),
+    };
+    let with_yield = a.include_yield.unwrap_or(true);
+    let limit = a.limit.unwrap_or(100).clamp(1, 10_000);
+    // ?1 investment, ?2/?3 window, ?4 whether yield rows count.
+    let source = "SELECT id AS movement_id, kind, amount_cents, occurred_at, 0 AS ord
+         FROM investment_movements
+         WHERE investment_id = ?1 AND occurred_at >= ?2 AND occurred_at < ?3
+         UNION ALL
+         SELECT NULL, 'yield', gain_cents, day, 1
+         FROM investment_yield_days
+         WHERE investment_id = ?1 AND ?4 = 1 AND gain_cents <> 0
+           AND day >= ?2 AND day < ?3";
+    let totals: Vec<ActivityTotalsRow> = all(
+        db,
+        &format!(
+            "SELECT kind, SUM(amount_cents) AS sum_cents, COUNT(*) AS n
+             FROM ({source}) GROUP BY kind"
+        ),
+        jsv![inv.id, start.clone(), end.clone(), with_yield as i64],
+    )
+    .await?;
+    // A movement sorts above that day's yield; one past the limit to learn
+    // whether there is more.
+    let mut rows: Vec<ActivityRow> = all(
+        db,
+        &format!(
+            "SELECT movement_id, kind, amount_cents, occurred_at FROM ({source})
+             ORDER BY occurred_at DESC, ord, movement_id DESC LIMIT ?5"
+        ),
+        jsv![inv.id, start, end, with_yield as i64, limit + 1],
+    )
+    .await?;
+    let has_more = rows.len() as i64 > limit;
+    rows.truncate(limit as usize);
+    let total = |k: &str| {
+        totals
+            .iter()
+            .filter(|t| t.kind == k)
+            .map(|t| t.sum_cents)
+            .sum()
+    };
+    Ok(InvestmentActivity {
+        currency_code: inv.currency_code,
+        yield_cents: total("yield"),
+        deposit_cents: total("deposit"),
+        withdrawal_cents: total("withdrawal"),
+        count: totals.iter().map(|t| t.n).sum(),
+        rows,
+        has_more,
     })
 }

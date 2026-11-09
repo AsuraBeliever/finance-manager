@@ -187,6 +187,9 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "get_investment_yield" => {
             out(investment_yield::get_investment_yield(db, uid, args(body)?).await?)
         }
+        "list_investment_activity" => {
+            out(investment_yield::list_investment_activity(db, uid, args(body)?).await?)
+        }
         "add_investment_movement" => {
             out(investments::add_investment_movement(db, uid, args(body)?).await?)
         }
