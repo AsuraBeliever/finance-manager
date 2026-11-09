@@ -1,7 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
   Lock,
   LockOpen,
   Pencil,
@@ -47,7 +45,7 @@ import { POSITIVE, useChartTokens } from "../../lib/palette";
 import type { SimCadence } from "../../lib/types";
 import { es } from "../../i18n/es";
 import { InvestmentFormModal } from "./InvestmentFormModal";
-import { YieldHistory } from "./YieldHistory";
+import { InvestmentActivity } from "./InvestmentActivity";
 import { MovementEditModal } from "./MovementEditModal";
 
 const SIM_GOLD = "#c9a14a";
@@ -455,76 +453,13 @@ export function InvestmentDetailPage() {
       </section>
       )}
 
-      <YieldHistory investmentId={invId} />
-
-      {d.calculator !== "manual" && (
-        <section className="mb-4 rounded-xl border border-border-muted bg-surface-raised p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-medium">{es.investments.movements}</h3>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => openMovement("deposit")}>
-                <span className="flex items-center gap-2 text-accent">
-                  <ArrowDownLeft size={15} /> {es.investments.deposit}
-                </span>
-              </Button>
-              <Button variant="ghost" onClick={() => openMovement("withdrawal")}>
-                <span className="flex items-center gap-2 text-danger">
-                  <ArrowUpRight size={15} /> {es.investments.withdrawal}
-                </span>
-              </Button>
-            </div>
-          </div>
-          {d.movements.length === 0 ? (
-            <p className="py-2 text-sm text-fg-subtle">{es.investments.movementsEmpty}</p>
-          ) : (
-            <ul className="divide-y divide-border-muted">
-              {d.movements.map((m) => (
-                <li key={m.id} className="group flex items-center gap-3 py-2 text-sm">
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-overlay ${
-                      m.kind === "deposit" ? "text-accent" : "text-danger"
-                    }`}
-                  >
-                    {m.kind === "deposit" ? (
-                      <ArrowDownLeft size={13} />
-                    ) : (
-                      <ArrowUpRight size={13} />
-                    )}
-                  </span>
-                  <span className="text-fg">
-                    {m.kind === "deposit"
-                      ? es.investments.depositNoun
-                      : es.investments.withdrawalNoun}
-                  </span>
-                  <span className="text-fg-subtle">{m.occurredAt}</span>
-                  <span
-                    className={`ml-auto tabular-nums ${
-                      m.kind === "deposit" ? "text-accent" : "text-danger"
-                    }`}
-                  >
-                    {m.kind === "deposit" ? "+" : "−"}
-                    {money(m.amountCents, d.currencyCode)}
-                  </span>
-                  <button
-                    onClick={() => setMovementToEdit(m.id)}
-                    aria-label={es.common.edit}
-                    className="touch-action-reveal rounded-md p-1 text-fg-subtle transition-all hover:bg-surface-overlay hover:text-fg"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <button
-                    onClick={() => setMovementToDelete(m.id)}
-                    aria-label={es.common.delete}
-                    className="touch-action-reveal rounded-md p-1 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
+      <InvestmentActivity
+        investmentId={invId}
+        canMove={d.calculator !== "manual"}
+        onAdd={openMovement}
+        onEdit={setMovementToEdit}
+        onDelete={setMovementToDelete}
+      />
 
       {d.calculator === "manual" && (
         <section className="rounded-xl border border-border-muted bg-surface-raised p-5">
