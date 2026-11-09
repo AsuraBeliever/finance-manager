@@ -356,23 +356,28 @@ data class MovementDetail(
     val startDate: String = "",
 )
 
-/** `get_investment_yield`: what an investment earned per month and per day,
- *  newest first (FIN-9). */
+/** `list_investment_activity`: deposits, withdrawals and daily yield of one
+ *  investment, newest first, plus what the whole filter adds up to (FIN-12). */
 @Serializable
-data class InvestmentYield(
+data class InvestmentActivity(
     val currencyCode: String = "MXN",
-    val months: List<YieldMonth> = emptyList(),
-    val days: List<YieldDay> = emptyList(),
+    val yieldCents: Long = 0,
+    val depositCents: Long = 0,
+    val withdrawalCents: Long = 0,
+    val count: Long = 0,
+    val rows: List<ActivityRow> = emptyList(),
     val hasMore: Boolean = false,
-    /** Recorded as the days go by (no price history): nothing before the first. */
-    val observed: Boolean = false,
 )
 
 @Serializable
-data class YieldMonth(val month: String, val gainCents: Long)
-
-@Serializable
-data class YieldDay(val day: String, val gainCents: Long)
+data class ActivityRow(
+    /** Set on deposits/withdrawals (editable); null on a yield day. */
+    val movementId: Long? = null,
+    /** "deposit" | "withdrawal" | "yield". */
+    val kind: String,
+    val amountCents: Long,
+    val occurredAt: String,
+)
 
 /** `get_investment_detail`: the investment plus its history and projection. */
 @Serializable
