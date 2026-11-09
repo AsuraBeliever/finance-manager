@@ -429,6 +429,7 @@
     <string name="transactions_register_refund">Register refund</string>
     <string name="transactions_total_converted">Converted to MXN</string>
     <string name="transactions_list_capped">Showing the {n} most recent transactions; the total counts them all.</string>
+    <string name="transactions_show_more">Show more</string>
     <string name="transactions_delete_confirm_title">Delete transaction</string>
     <string name="transactions_delete_confirm">Delete this transaction? If it\'s a transfer, both legs are removed.</string>
     <string name="transactions_delete_investment_leg_confirm">This transfer is an investment move: deleting it also deletes the deposit or withdrawal on the investment. Continue?</string>

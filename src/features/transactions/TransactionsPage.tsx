@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ArrowLeftRight, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../components/Button";
@@ -55,10 +55,28 @@ export function TransactionsPage() {
     ...(categoryId !== "" && { categoryId }),
     ...(period !== null && { period }),
   };
+  // "Mostrar más" grows the request by one page at a time and refetches from
+  // the top, rather than appending offset pages: a movement captured while
+  // browsing then can't shift a row into a gap or show it twice, and both
+  // legs of a transfer always arrive together for the list to fold. The page
+  // count belongs to the filter it was raised under, so a new filter starts
+  // back at the first page.
+  const filterKey = JSON.stringify(filter);
+  const [paging, setPaging] = useState({ filterKey, pages: 1 });
+  const pages = paging.filterKey === filterKey ? paging.pages : 1;
+  const limit = pages * TX_LIST_LIMIT;
   const transactions = useQuery({
-    queryKey: ["transactions", filter],
-    queryFn: () => listTransactions(filter),
+    // "list" keeps this entry apart from the wallet page's ["transactions", filter].
+    queryKey: ["transactions", "list", filter, limit],
+    queryFn: () => listTransactions({ ...filter, limit }),
+    // Keep the rows on screen while the next page loads — but only for the
+    // same filter; a different filter shows nothing until its own rows arrive.
+    placeholderData: (prev, prevQuery) =>
+      prevQuery && JSON.stringify(prevQuery.queryKey[2]) === filterKey
+        ? keepPreviousData(prev)
+        : undefined,
   });
+  const loadingMore = transactions.isPlaceholderData;
   const filtered = walletId !== "" || kind !== "" || categoryId !== "" || period !== null;
 
   const currencyByWallet = useMemo(
@@ -119,10 +137,21 @@ export function TransactionsPage() {
               currencyByWallet={currencyByWallet}
               onEdit={setEditing}
             />
-            {transactions.data.length >= TX_LIST_LIMIT && (
-              <p className="mt-3 text-center text-xs text-fg-subtle">
-                {es.transactions.listCapped.replace("{n}", String(TX_LIST_LIMIT))}
-              </p>
+            {/* A full page means there are probably more. Counted on the raw
+                rows: the server capped those, and a transfer costs two. */}
+            {transactions.data.length >= limit && (
+              <div className="mt-3 flex flex-col items-center gap-2">
+                <p className="text-center text-xs text-fg-subtle">
+                  {es.transactions.listCapped.replace("{n}", String(limit))}
+                </p>
+                <Button
+                  variant="ghost"
+                  disabled={loadingMore}
+                  onClick={() => setPaging({ filterKey, pages: pages + 1 })}
+                >
+                  {loadingMore ? es.common.loading : es.transactions.showMore}
+                </Button>
+              </div>
             )}
           </>
         )

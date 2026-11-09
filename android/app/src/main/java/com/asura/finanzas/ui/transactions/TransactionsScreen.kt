@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -177,16 +178,36 @@ fun TransactionsScreen(
     // unfiltered list hit the offline cache, which keys on period == null.
     val periodFilter = period.takeIf { it != Period.AllTime }?.toJson()
 
+    // "Mostrar más" grows the request by one page and refetches from the top
+    // (web: TransactionsPage), so a capture made while browsing can't open a
+    // gap or a duplicate and both legs of a transfer arrive together. The page
+    // count belongs to the filter it was raised under: a new filter starts
+    // back at the first page.
+    val filterKey = listOf(filter, wallet?.id, category?.id, period)
+    var paging by remember { mutableStateOf(filterKey to 1) }
+    val pages = if (paging.first == filterKey) paging.second else 1
+    val limit = pages * TX_LIST_LIMIT
+    // The page that has actually arrived, so the button can say it is loading.
+    var loadedLimit by remember { mutableStateOf(0) }
+
+    // The limit stays out of the key: the rows already shown stay up while
+    // the longer list loads, instead of the list blanking.
     val state by loadSynced(
-        listOf("transactions", filter, wallet?.id, category?.id, period),
-        refetch = key,
+        listOf("transactions") + filterKey,
+        refetch = key to limit,
     ) {
-        repository.transactions(
-            walletId = wallet?.id,
-            kind = filter.wire,
-            categoryId = category?.id,
-            period = periodFilter,
-        )
+        // Settled even when the read fails, or the button would stay stuck.
+        try {
+            repository.transactions(
+                limit = limit,
+                walletId = wallet?.id,
+                kind = filter.wire,
+                categoryId = category?.id,
+                period = periodFilter,
+            )
+        } finally {
+            loadedLimit = limit
+        }
     }
     // Shares the wallets tab's entry, so the picker is filled the moment the
     // screen appears.
@@ -236,6 +257,9 @@ fun TransactionsScreen(
                 totals = totals,
                 onEdit = { if (it.isApartado) editingApartado = it else editing = it },
                 onDelete = { pendingDelete = it },
+                limit = limit,
+                loadingMore = loadedLimit != limit,
+                onShowMore = { paging = filterKey to pages + 1 },
             )
     }
 
@@ -329,6 +353,10 @@ private fun TransactionList(
     totals: TxTotals?,
     onEdit: (Transaction) -> Unit,
     onDelete: (Transaction) -> Unit,
+    /** How many rows were asked for; a list this long probably has more. */
+    limit: Int,
+    loadingMore: Boolean,
+    onShowMore: () -> Unit,
 ) {
     val colors = Broke.colors
     val hide = LocalAppSettings.current.hideBalances
@@ -468,15 +496,32 @@ private fun TransactionList(
             }
             // Counted on the raw list, not the folded one: the server capped
             // rows, and a transfer costs two of them.
-            if (transactions.size >= TX_LIST_LIMIT) {
+            if (transactions.size >= limit) {
                 item {
-                    Text(
-                        text(R.string.transactions_list_capped, "n" to TX_LIST_LIMIT),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                        color = colors.fgSubtle,
-                        textAlign = TextAlign.Center,
+                    Column(
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    )
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text(R.string.transactions_list_capped, "n" to limit),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                            color = colors.fgSubtle,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        // The web's ghost button: plain text, no fill.
+                        TextButton(onClick = onShowMore, enabled = !loadingMore) {
+                            Text(
+                                stringResource(
+                                    if (loadingMore) R.string.common_loading
+                                    else R.string.transactions_show_more,
+                                ),
+                                style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+                                color = colors.fg,
+                            )
+                        }
+                    }
                 }
             }
         }
