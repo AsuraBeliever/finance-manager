@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.50.0",
+    "date": "2026-11-09",
+    "es": [
+      "En Transacciones ya puedes filtrar por varias carteras a la vez: marca las que quieras en el filtro de carteras y la lista y el total muestran solo sus movimientos. Sin ninguna marcada se ven todas. En la web y en la app de Android."
+    ],
+    "en": [
+      "Transactions can now be filtered by several wallets at once: tick the ones you want in the wallet filter and the list and the total show only their transactions. With none ticked you see them all. On the web and in the Android app."
+    ]
+  },
+  {
     "version": "2.49.0",
     "date": "2026-11-08",
     "es": [
