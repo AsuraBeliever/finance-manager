@@ -431,6 +431,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Varias carteras a la vez (`MultiSelect` ↔ `MultiPickerField`; `walletIds` en `list_transactions`/`sum_transactions`) | `ui/transactions` + `components/Pickers` | ✅ (FIN-8) |
 | Total de lo filtrado (`sumTransactions`) | `ui/transactions` | ✅ con conteo y desglose por moneda |
 | Aviso de lista truncada a 100 | `ui/transactions` + `WalletDetailScreen` | ✅ |
+| «Mostrar más»: cada toque pide 100 movimientos más (relee desde arriba con `limit` creciente; un filtro nuevo vuelve a la primera página) | `ui/transactions` | ✅ (2.49.0) |
 | «Sin resultados» distinto de «sin movimientos» | `ui/transactions` | ✅ |
 | Alta de ingreso | `TransactionFormSheet` | ✅ |
 | Alta de gasto | `TransactionFormSheet` | ✅ |
