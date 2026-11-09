@@ -221,6 +221,11 @@ fun <T> MultiPickerField(
                 )
             },
             onClick = onClick,
+            // The web's ticked row: `bg-surface-raised` behind it.
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .then(if (checked) Modifier.background(colors.surfaceRaised) else Modifier),
         )
     }
 
