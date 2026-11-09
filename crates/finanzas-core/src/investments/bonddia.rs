@@ -106,6 +106,17 @@ impl InvestmentCalculator for Bonddia {
         None // daily liquidity fund
     }
 
+    /// The estimated mode is a rate model over the Banxico history and can
+    /// value any day; the títulos ("exact") mode rides the official NAV, of
+    /// which only the latest is cached.
+    fn values_past_days(&self, inv: &Investment) -> bool {
+        let titulos = parse_params(inv)
+            .ok()
+            .and_then(|p| p.get("titulos").and_then(|v| v.as_i64()))
+            .unwrap_or(0);
+        titulos <= 0
+    }
+
     fn effective_annual_rate_bps(
         &self,
         inv: &Investment,

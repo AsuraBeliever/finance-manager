@@ -202,7 +202,38 @@ CREATE TABLE investment_movements (   -- aportaciones y retiros posteriores al i
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_inv_mov ON investment_movements(investment_id, occurred_at);
+
+CREATE TABLE investment_yield_days (  -- 0043: rendimiento diario de cada inversión (derivado)
+  investment_id INTEGER NOT NULL REFERENCES investments(id) ON DELETE CASCADE,
+  day TEXT NOT NULL,                  -- 'YYYY-MM-DD'
+  gain_cents INTEGER NOT NULL,        -- lo que generó ese día, en la moneda de la inversión (puede ser < 0)
+  total_gain_cents INTEGER NOT NULL,  -- ganancia acumulada (valor − capital neto) ese día
+  PRIMARY KEY (investment_id, day)
+);
+CREATE INDEX idx_inv_yield_day ON investment_yield_days(day);
 ```
+
+## Rendimiento diario de inversiones (0043, FIN-9)
+
+`investment_yield_days` es **dato derivado**: lo calcula
+`finanzas_core::investments::daily_yield` y lo mantiene
+`handlers::investment_yield`. Rendimiento del día = cambio de
+`valor − capital neto` respecto al día anterior, así que aportaciones y retiros
+nunca cuentan; la suma del historial = la ganancia de la inversión, al centavo.
+
+- **Modelado** (CETES, tasa fija, cajita, BONDDIA estimado, manual): se rehace
+  completo tras cada escritura a la inversión (alta, edición, cerrar/reabrir,
+  movimientos, snapshots, borrar la pata de un movimiento desde Transacciones) y
+  el cron diario lo extiende hasta hoy (o el vencimiento). Los días en cero no
+  se guardan.
+- **Observado** (cripto, BONDDIA en títulos): sin precio histórico; el cron
+  graba un renglón por día, y el primero es una base de 0 (la ganancia previa
+  no tiene fecha a la que asignarse).
+- No toca ninguna cartera ni `transactions`. Se muestra en Transacciones como
+  filas `kind = 'yield'` de solo lectura (categoría semilla *Intereses*, id
+  negativo `-(10^12 + rowid)`, `currencyCode` de la inversión) y suma a los
+  ingresos (`sum_transactions` con `kind = income`, `get_spending_trends`, la
+  rebanada *Intereses* de `get_category_breakdown` y su detalle).
 
 ## Semántica de movimientos de inversión
 

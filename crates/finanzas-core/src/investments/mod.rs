@@ -1,6 +1,7 @@
 pub mod bonddia;
 pub mod cetes;
 pub mod crypto;
+pub mod daily_yield;
 pub mod fixed_rate;
 pub mod manual;
 pub mod nu_cajita;
@@ -36,6 +37,16 @@ pub trait InvestmentCalculator: Send + Sync {
         _ctx: &CalcContext,
     ) -> AppResult<Option<i64>> {
         Ok(None)
+    }
+
+    /// Whether `value_at` can value a PAST day as it really was. True for the
+    /// model-driven calculators (a rate, or the user's own snapshots). False
+    /// when the value hangs on a market price of which only the latest is
+    /// kept (crypto, BONDDIA in títulos mode): asking such a calculator about
+    /// last month just reprices last month at today's price, so its daily
+    /// yield can only be recorded as the days go by (see `daily_yield`).
+    fn values_past_days(&self, _inv: &Investment) -> bool {
+        true
     }
 }
 
@@ -110,7 +121,7 @@ pub(crate) fn param_i64_or(params: &Value, key: &str, default: i64) -> i64 {
     params.get(key).and_then(Value::as_i64).unwrap_or(default)
 }
 
-pub(crate) fn parse_start_date(inv: &Investment) -> AppResult<NaiveDate> {
+pub fn parse_start_date(inv: &Investment) -> AppResult<NaiveDate> {
     NaiveDate::parse_from_str(&inv.start_date, "%Y-%m-%d")
         .map_err(|_| AppError::InvalidInput("fecha de inicio inválida".into()))
 }

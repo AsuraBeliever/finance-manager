@@ -86,6 +86,8 @@ pub struct Transaction {
     pub wallet_name: String,
     /// 'income' | 'expense' | 'refund' | 'transfer_in' | 'transfer_out'.
     /// 'refund' is stored as income with `is_refund = 1` (migration 0040).
+    /// Read-only rows the list adds: 'reserve'/'release' (apartados) and
+    /// 'yield' (an investment's daily yield, `investment_yield_days`).
     pub kind: String,
     pub amount_cents: i64,
     pub category_id: Option<i64>,
@@ -107,6 +109,10 @@ pub struct Transaction {
     /// 0 on every other kind.
     #[serde(default)]
     pub refundable_cents: i64,
+    /// Set only where the wallet does not say the currency: a 'yield' row is
+    /// an investment's daily yield (FIN-9), in the investment's currency.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currency_code: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

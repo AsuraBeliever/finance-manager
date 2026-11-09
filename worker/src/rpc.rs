@@ -10,8 +10,8 @@ use worker::{D1Database, Request, Response, RouteContext};
 
 use crate::error::{db_err, error_response};
 use crate::handlers::{
-    analytics, budgets, credit, dashboard, goals, investments, settings, subscriptions,
-    transactions, wallets,
+    analytics, budgets, credit, dashboard, goals, investment_yield, investments, settings,
+    subscriptions, transactions, wallets,
 };
 use crate::market;
 
@@ -183,6 +183,9 @@ async fn dispatch(name: &str, body: Value, db: &D1Database, uid: i64) -> AppResu
         "add_snapshot" => out(investments::add_snapshot(db, uid, args(body)?).await?),
         "get_investment_detail" => {
             out(investments::get_investment_detail(db, uid, args(body)?).await?)
+        }
+        "get_investment_yield" => {
+            out(investment_yield::get_investment_yield(db, uid, args(body)?).await?)
         }
         "add_investment_movement" => {
             out(investments::add_investment_movement(db, uid, args(body)?).await?)

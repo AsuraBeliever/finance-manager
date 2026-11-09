@@ -59,6 +59,11 @@ impl InvestmentCalculator for Crypto {
         Ok(((quantity_e8 as i128 * price_cents as i128) / 100_000_000i128) as i64)
     }
 
+    /// Only the latest price is cached: there is no past to value.
+    fn values_past_days(&self, _inv: &Investment) -> bool {
+        false
+    }
+
     fn maturity_date(&self, _inv: &Investment) -> Option<NaiveDate> {
         None
     }
