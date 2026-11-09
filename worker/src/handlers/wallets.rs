@@ -416,6 +416,21 @@ pub async fn reorder_wallets(db: &D1Database, uid: i64, a: ReorderWalletsArgs) -
 pub async fn delete_wallet(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<()> {
     // ownership / existence check up front: a batch can't return NotFound
     fetch_wallet(db, uid, a.id).await?;
+    // Investment movements whose wallet leg goes with the wallet are deleted
+    // by cascade (linked_transaction_id); their investments' daily yield has
+    // to follow, so note them before they disappear.
+    #[derive(Deserialize)]
+    struct InvRow {
+        investment_id: i64,
+    }
+    let touched: Vec<InvRow> = all(
+        db,
+        "SELECT DISTINCT m.investment_id FROM investment_movements m
+         JOIN transactions t ON t.id = m.linked_transaction_id
+         WHERE t.wallet_id = ?1",
+        jsv![a.id],
+    )
+    .await?;
     let stmts = vec![
         stmt(
             db,
@@ -442,5 +457,8 @@ pub async fn delete_wallet(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<()
         )?,
     ];
     batch(db, stmts).await?;
+    for inv in touched {
+        super::investments::refresh_yield(db, uid, inv.investment_id).await;
+    }
     Ok(())
 }

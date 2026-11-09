@@ -28,6 +28,12 @@ use super::investments::{fetch_investment, load_calc_context, open_investments_a
 use crate::db::{all, batch, first, stmt, today_mx};
 use crate::jsv;
 
+/// Most days one cron run adds to one history. The first run after deploying
+/// 0043 builds every history from scratch; capped like this it spreads over a
+/// few runs (three a day) instead of risking the CPU limit in one, and what
+/// each run computed is stored before the next investment starts.
+const MAX_DAYS_PER_RUN: i64 = 370;
+
 /// Rows per INSERT. Each goes as one JSON parameter unpacked by `json_each`,
 /// so a long history is a handful of statements, not one per day.
 const ROWS_PER_INSERT: usize = 400;
@@ -67,7 +73,19 @@ pub async fn refresh(db: &D1Database, inv: &Investment) -> AppResult<()> {
     if !calc.values_past_days(inv) {
         return record_observed(db, calc, inv, &ctx, today).await;
     }
-    let days = full_history(calc, inv, &ctx, today)?;
+    rebuild(db, calc, inv, &ctx, today).await
+}
+
+/// Replace a modeled history whole, in one batch (a reader never sees it half
+/// gone).
+async fn rebuild(
+    db: &D1Database,
+    calc: &dyn InvestmentCalculator,
+    inv: &Investment,
+    ctx: &CalcContext,
+    today: NaiveDate,
+) -> AppResult<()> {
+    let days = full_history(calc, inv, ctx, today)?;
     let mut stmts = vec![stmt(
         db,
         "DELETE FROM investment_yield_days WHERE investment_id = ?1",
@@ -79,7 +97,8 @@ pub async fn refresh(db: &D1Database, inv: &Investment) -> AppResult<()> {
 }
 
 /// `refresh`, logging instead of failing: the write the user asked for has
-/// already happened, and the history is derived data the next cron repairs.
+/// already happened, and the history is derived data — the cron rebuilds a
+/// modeled history whose last total no longer matches the gain.
 pub async fn refresh_quietly(db: &D1Database, inv: &Investment) {
     if let Err(e) = refresh(db, inv).await {
         console_error!("yield history refresh of investment {} failed: {e}", inv.id);
@@ -114,7 +133,11 @@ async fn record_observed(
     Ok(())
 }
 
-/// Extend a modeled history from its last stored day up to `history_end`.
+/// Extend a modeled history from its last stored day towards `history_end`
+/// (at most `MAX_DAYS_PER_RUN`). A history whose last stored total no longer
+/// equals the gain on that day was left stale by a write that didn't refresh
+/// it — a wallet deleted with its movement legs, a failed refresh — and is
+/// rebuilt from scratch instead.
 async fn extend_modeled(
     db: &D1Database,
     calc: &dyn InvestmentCalculator,
@@ -132,10 +155,16 @@ async fn extend_modeled(
     // Nothing stored yet (a new deploy, or an investment from before 0043):
     // this builds the whole history once.
     let after = match last {
-        Some(row) => NaiveDate::parse_from_str(&row.day, "%Y-%m-%d").unwrap_or(today),
+        Some(row) => {
+            let day = NaiveDate::parse_from_str(&row.day, "%Y-%m-%d").unwrap_or(today);
+            if gain_at(calc, inv, ctx, day)? != row.total_gain_cents {
+                return rebuild(db, calc, inv, ctx, today).await;
+            }
+            day
+        }
         None => parse_start_date(inv)? - Duration::days(1),
     };
-    let through = history_end(calc, inv, today);
+    let through = history_end(calc, inv, today).min(after + Duration::days(MAX_DAYS_PER_RUN));
     if after >= through {
         return Ok(());
     }
