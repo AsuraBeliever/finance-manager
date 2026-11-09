@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.52.0",
+    date: "2026-11-09",
+    es: [
+      "Nuevo interruptor «Rendimientos» en los filtros de Transacciones: apágalo para que la lista no se llene de los rendimientos diarios de tus inversiones ni de los intereses automáticos de tus cuentas con rendimiento. Solo cambia lo que ves —no se borra nada y tus ingresos del mes siguen igual— y la elección se recuerda en tu dispositivo. En la web y en la app de Android.",
+    ],
+    en: [
+      "New \"Yield\" switch in the Transactions filters: turn it off so the list doesn't fill up with your investments' daily yield or the automatic interest of your yield-bearing accounts. It only changes what you see —nothing is deleted and your monthly income stays the same— and your choice is remembered on your device. On the web and in the Android app.",
+    ],
+  },
+  {
     version: "2.51.0",
     date: "2026-11-09",
     es: [
