@@ -1,5 +1,15 @@
 [
   {
+    "version": "2.53.0",
+    "date": "2026-11-09",
+    "es": [
+      "En el detalle de cada inversión, tus aportaciones, retiros y el rendimiento de cada día ahora están en una sola tabla, «Movimientos y rendimientos». Puedes filtrarla por periodo (por ejemplo, septiembre de 2026) y mostrar u ocultar los rendimientos, igual que en Transacciones; arriba aparece el total generado, lo aportado y lo retirado en ese periodo, y abajo cada movimiento y cada rendimiento. En la web y en la app de Android."
+    ],
+    "en": [
+      "In each investment's detail, your contributions, withdrawals and each day's yield are now in a single table, \"Movements and yield\". You can filter it by period (for example, September 2026) and show or hide the yield, just like in Transactions; the top shows the total earned, contributed and withdrawn in that period, and below it every movement and every yield. On the web and in the Android app."
+    ]
+  },
+  {
     "version": "2.52.0",
     "date": "2026-11-09",
     "es": [
