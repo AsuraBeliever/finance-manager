@@ -271,14 +271,24 @@ class BrokeRepository(
             rpc.call("get_investment_detail", buildJsonObject { put("id", id) }),
         )
 
-    /** What an investment earned per month and per day (the [limit] newest days). */
-    suspend fun investmentYield(id: Long, limit: Int): InvestmentYield =
+    /**
+     * Deposits, withdrawals and daily yield of one investment with the totals
+     * of the filter (web: `listInvestmentActivity`). [period] null = every date.
+     */
+    suspend fun investmentActivity(
+        id: Long,
+        period: JsonObject?,
+        includeYield: Boolean,
+        limit: Int,
+    ): InvestmentActivity =
         rpc.json.decodeFromJsonElement(
-            InvestmentYield.serializer(),
+            InvestmentActivity.serializer(),
             rpc.call(
-                "get_investment_yield",
+                "list_investment_activity",
                 buildJsonObject {
                     put("investmentId", id)
+                    period?.let { put("period", it) }
+                    if (!includeYield) put("includeYield", false)
                     put("limit", limit)
                 },
             ),

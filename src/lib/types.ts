@@ -158,13 +158,24 @@ export interface Transaction {
   currencyCode?: string;
 }
 
-/** One investment's yield history (`get_investment_yield`), newest first. */
-export interface InvestmentYield {
+/** The investment detail's combined table (`list_investment_activity`):
+ *  deposits, withdrawals and daily yield, newest first, plus what the whole
+ *  filter adds up to (not just the rows returned). */
+export interface InvestmentActivity {
   currencyCode: string;
-  months: { month: string; gainCents: number }[];
-  days: { day: string; gainCents: number }[];
+  yieldCents: number;
+  depositCents: number;
+  withdrawalCents: number;
+  count: number;
+  rows: {
+    /** Set on deposits/withdrawals (editable); null on a yield day. */
+    movementId: number | null;
+    kind: "deposit" | "withdrawal" | "yield";
+    amountCents: number;
+    occurredAt: string;
+  }[];
   hasMore: boolean;
-  /** Recorded as the days go by (no price history): nothing before the first day. */
+  /** Yield recorded day by day (no price history): nothing before the first day. */
   observed: boolean;
 }
 

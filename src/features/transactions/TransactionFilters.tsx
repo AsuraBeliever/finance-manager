@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { Check, TrendingUp } from "lucide-react";
 import { inputClass } from "../../components/Field";
 import { MultiSelect } from "../../components/MultiSelect";
 import { PeriodPicker } from "../../components/PeriodPicker";
+import { YieldToggle } from "../../components/YieldToggle";
 import { listFilterCategories, listWallets } from "../../lib/api";
 import { es } from "../../i18n/es";
 import { seedName } from "../../i18n/seed";
@@ -123,21 +123,7 @@ export function TransactionFilters({
         onChange={(p) => onPeriodChange(p.kind === "allTime" ? null : p)}
         allowAll
       />
-      {onShowYieldChange && (
-        <button
-          type="button"
-          aria-pressed={showYield}
-          onClick={() => onShowYieldChange(!showYield)}
-          className={`flex items-center gap-2 self-start rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-            showYield
-              ? "border-accent/40 bg-accent/15 text-fg"
-              : "border-border-muted bg-surface text-fg-subtle hover:border-accent"
-          }`}
-        >
-          {showYield ? <Check size={15} className="text-accent" /> : <TrendingUp size={15} />}
-          {es.transactions.yieldToggle}
-        </button>
-      )}
+      {onShowYieldChange && <YieldToggle on={showYield ?? true} onChange={onShowYieldChange} />}
     </div>
   );
 }

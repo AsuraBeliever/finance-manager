@@ -541,65 +541,20 @@ private fun DetailContent(
             }
         }
 
-        // What it earned per month and per day (web: YieldHistory).
+        // Deposits, withdrawals and daily yield in one filtered table
+        // (web: InvestmentActivity), on every calculator: a manual position
+        // has yield too, it just logs no movements.
         item {
-            YieldHistorySection(
+            InvestmentActivitySection(
                 repository = repository,
                 investmentId = detail.id,
                 reloadKey = reloadKey,
+                canMove = detail.calculator != "manual",
+                onAddMovement = onAddMovement,
+                onEditMovement = onEditMovement,
+                onDeleteMovement = onDeleteMovement,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             )
-        }
-
-        // Contributions and withdrawals, on every calculator but the manual one
-        // — and always, empty or not: hiding it hid the only way in to log the
-        // first one. The web's `movements` section, empty line and all.
-        if (detail.calculator != "manual") {
-            item {
-                // `mb-4 rounded-xl border p-5`: a panel, not a glass card.
-                PanelCard(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                    // `mb-3 flex items-center justify-between`: heading and
-                    // buttons shrink together, so a long heading wraps.
-                    FlexShrinkRow(
-                        gap = 0.dp,
-                        spaceBetween = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.investments_movements),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.fg,
-                        )
-                        FlexShrinkRow(gap = 8.dp) {
-                            GhostButton(
-                                stringResource(R.string.investments_deposit),
-                                onClick = { onAddMovement("deposit") },
-                                leadingIcon = Lucide.ArrowDownLeft,
-                                tint = colors.accent,
-                            )
-                            GhostButton(
-                                stringResource(R.string.investments_withdrawal),
-                                onClick = { onAddMovement("withdrawal") },
-                                leadingIcon = Lucide.ArrowUpRight,
-                                tint = colors.danger,
-                            )
-                        }
-                    }
-                    if (detail.movements.isEmpty()) {
-                        Text(
-                            stringResource(R.string.investments_movements_empty),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.fgSubtle,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    } else {
-                        detail.movements.forEachIndexed { index, movement ->
-                            if (index > 0) HairLine()
-                            MovementRow(movement, detail.currencyCode, hide, onEditMovement, onDeleteMovement)
-                        }
-                    }
-                }
-            }
         }
 
         // Snapshots are the manual calculator's whole story, exactly as on the
@@ -643,69 +598,6 @@ private fun DetailContent(
     }
 }
 
-@Composable
-private fun MovementRow(
-    movement: InvestmentMovement,
-    currencyCode: String,
-    hide: Boolean,
-    onEdit: (InvestmentMovement) -> Unit,
-    onDelete: (InvestmentMovement) -> Unit,
-) {
-    val colors = Broke.colors
-    val deposit = movement.kind == "deposit"
-    val tint = if (deposit) colors.accent else colors.danger
-    // `flex items-center gap-3 py-2 text-sm`: badge, noun, date, the amount
-    // pushed to the end, then edit and delete — which a touch screen shows
-    // always (`touch-action-reveal`), there being no hover to reveal them.
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.size(28.dp).clip(CircleShape).background(colors.surfaceOverlay),
-        ) {
-            Icon(
-                if (deposit) Lucide.ArrowDownLeft else Lucide.ArrowUpRight,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(13.dp),
-            )
-        }
-        Text(
-            stringResource(
-                if (deposit) R.string.investments_deposit_noun
-                else R.string.investments_withdrawal_noun,
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.fg,
-        )
-        Text(
-            movement.occurredAt,
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.fgSubtle,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            (if (deposit) "+" else "−") + maskIfHidden(formatMoney(movement.amountCents, currencyCode), hide),
-            style = MaterialTheme.typography.bodyMedium.tabular(),
-            color = tint,
-        )
-        Icon(
-            Lucide.Pencil,
-            contentDescription = stringResource(R.string.common_edit),
-            tint = colors.fgSubtle,
-            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onEdit(movement) }.padding(4.dp).size(14.dp),
-        )
-        Icon(
-            Lucide.Trash,
-            contentDescription = stringResource(R.string.common_delete),
-            tint = colors.fgSubtle,
-            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onDelete(movement) }.padding(4.dp).size(14.dp),
-        )
-    }
-}
 
 @Composable
 private fun Line(label: String, value: String, valueColor: androidx.compose.ui.graphics.Color? = null) {
