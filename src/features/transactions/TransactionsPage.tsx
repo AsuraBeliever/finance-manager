@@ -63,6 +63,11 @@ export function TransactionsPage() {
   // back at the first page.
   const filterKey = JSON.stringify(filter);
   const [paging, setPaging] = useState({ filterKey, pages: 1 });
+  // Any filter change drops back to the first page — including returning to
+  // a filter that had been paged before. Adjusted during render (React's
+  // "storing information from previous renders"), so no frame shows the old
+  // count under the new filter.
+  if (paging.filterKey !== filterKey) setPaging({ filterKey, pages: 1 });
   const pages = paging.filterKey === filterKey ? paging.pages : 1;
   const limit = pages * TX_LIST_LIMIT;
   const transactions = useQuery({
@@ -142,7 +147,7 @@ export function TransactionsPage() {
             {transactions.data.length >= limit && (
               <div className="mt-3 flex flex-col items-center gap-2">
                 <p className="text-center text-xs text-fg-subtle">
-                  {es.transactions.listCapped.replace("{n}", String(limit))}
+                  {es.transactions.listCapped.replace("{n}", String(transactions.data.length))}
                 </p>
                 <Button
                   variant="ghost"

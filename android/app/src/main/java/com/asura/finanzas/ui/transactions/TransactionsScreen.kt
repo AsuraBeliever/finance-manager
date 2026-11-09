@@ -183,9 +183,10 @@ fun TransactionsScreen(
     // gap or a duplicate and both legs of a transfer arrive together. The page
     // count belongs to the filter it was raised under: a new filter starts
     // back at the first page.
+    // Keyed on the filter, so any change — returning to one paged before
+    // included — drops back to the first page.
     val filterKey = listOf(filter, wallet?.id, category?.id, period)
-    var paging by remember { mutableStateOf(filterKey to 1) }
-    val pages = if (paging.first == filterKey) paging.second else 1
+    var pages by remember(filterKey) { mutableStateOf(1) }
     val limit = pages * TX_LIST_LIMIT
     // The page that has actually arrived, so the button can say it is loading.
     var loadedLimit by remember { mutableStateOf(0) }
@@ -259,7 +260,7 @@ fun TransactionsScreen(
                 onDelete = { pendingDelete = it },
                 limit = limit,
                 loadingMore = loadedLimit != limit,
-                onShowMore = { paging = filterKey to pages + 1 },
+                onShowMore = { pages += 1 },
             )
     }
 
@@ -504,7 +505,9 @@ private fun TransactionList(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text(R.string.transactions_list_capped, "n" to limit),
+                            // The rows actually shown: a cached copy can hold
+                            // more than this visit has asked for so far.
+                            text(R.string.transactions_list_capped, "n" to transactions.size),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                             color = colors.fgSubtle,
                             textAlign = TextAlign.Center,
