@@ -144,7 +144,9 @@ export function TransactionsPage() {
             />
             {/* A full page means there are probably more. Counted on the raw
                 rows: the server capped those, and a transfer costs two. */}
-            {transactions.data.length >= limit && (
+            {/* While the next page loads the old, shorter list is still on
+                screen, so keep the footer up and show it loading. */}
+            {(loadingMore || transactions.data.length >= limit) && (
               <div className="mt-3 flex flex-col items-center gap-2">
                 <p className="text-center text-xs text-fg-subtle">
                   {es.transactions.listCapped.replace("{n}", String(transactions.data.length))}

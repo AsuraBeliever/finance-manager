@@ -259,7 +259,9 @@ fun TransactionsScreen(
                 onEdit = { if (it.isApartado) editingApartado = it else editing = it },
                 onDelete = { pendingDelete = it },
                 limit = limit,
-                loadingMore = loadedLimit != limit,
+                // Only a page past the first counts: the first load has no
+                // footer to keep up.
+                loadingMore = pages > 1 && loadedLimit != limit,
                 onShowMore = { pages += 1 },
             )
     }
@@ -497,7 +499,9 @@ private fun TransactionList(
             }
             // Counted on the raw list, not the folded one: the server capped
             // rows, and a transfer costs two of them.
-            if (transactions.size >= limit) {
+            // While the next page loads the shorter list is still up, so the
+            // footer stays and says it is loading.
+            if (loadingMore || transactions.size >= limit) {
                 item {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
