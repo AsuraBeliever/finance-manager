@@ -1,5 +1,35 @@
 [
   {
+    "version": "2.51.0",
+    "date": "2026-11-09",
+    "es": [
+      "Tus inversiones ahora muestran lo que generan cada día: en el detalle de cada una (CETES, BONDDIA, tasa fija, cajita, manual o cripto) aparece «Rendimiento diario» con lo ganado por mes y por día. Ese rendimiento cuenta como ingreso del mes en Inicio y en Análisis —dentro de «Intereses»— aunque no retires el dinero, y aparece en Transacciones como «Rendimiento» (solo lectura). No cambia el saldo de tus carteras. En cripto se registra desde hoy, porque su precio sólo se conoce día a día. En la web y en la app de Android."
+    ],
+    "en": [
+      "Your investments now show what they earn every day: each one's detail (CETES, BONDDIA, fixed rate, cajita, manual or crypto) has a \"Daily yield\" section with what it earned per month and per day. That yield counts as income for the month on Home and in Analytics —under \"Interest\"— even if you don't withdraw it, and it shows in Transactions as \"Yield\" (read-only). Your wallet balances don't change. For crypto it's recorded from today on, since its price is only known day by day. On the web and in the Android app."
+    ]
+  },
+  {
+    "version": "2.50.0",
+    "date": "2026-11-09",
+    "es": [
+      "En Transacciones ya puedes filtrar por varias carteras a la vez: marca las que quieras en el filtro de carteras y la lista y el total muestran solo sus movimientos. Sin ninguna marcada se ven todas. En la web y en la app de Android."
+    ],
+    "en": [
+      "Transactions can now be filtered by several wallets at once: tick the ones you want in the wallet filter and the list and the total show only their transactions. With none ticked you see them all. On the web and in the Android app."
+    ]
+  },
+  {
+    "version": "2.49.0",
+    "date": "2026-11-08",
+    "es": [
+      "Al final de Transacciones ahora hay un botón «Mostrar más»: cada vez que lo tocas aparecen los 100 movimientos anteriores, hasta llegar al primero, así puedes revisar todo tu historial. Respeta los filtros que tengas puestos y, al cambiar de filtro, la lista vuelve a empezar desde los más recientes. En la web y en la app de Android."
+    ],
+    "en": [
+      "Transactions now has a \"Show more\" button at the bottom: each tap brings in the previous 100 transactions, all the way back to the first one, so you can go through your whole history. It respects the filters you have on, and changing a filter starts the list again from the most recent. On the web and in the Android app."
+    ]
+  },
+  {
     "version": "2.48.0",
     "date": "2026-10-16",
     "es": [

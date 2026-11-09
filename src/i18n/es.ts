@@ -477,6 +477,8 @@ export const esDict = {
     date: "Fecha",
     time: "Hora",
     allWallets: "Todas las carteras",
+    nWallets: "{n} carteras",
+    walletsFilter: "Carteras",
     allKinds: "Todos los tipos",
     typeAll: "Todos",
     allCategories: "Todas las categorías",
@@ -499,6 +501,7 @@ export const esDict = {
     registerRefund: "Registrar reembolso",
     totalConverted: "Convertido a MXN",
     listCapped: "Se muestran los {n} movimientos más recientes; el total los considera todos.",
+    showMore: "Mostrar más",
     deleteConfirmTitle: "Eliminar transacción",
     deleteConfirm:
       "¿Eliminar esta transacción? Si es una transferencia se eliminan ambas partes.",

@@ -411,6 +411,8 @@
     <string name="transactions_date">Fecha</string>
     <string name="transactions_time">Hora</string>
     <string name="transactions_all_wallets">Todas las carteras</string>
+    <string name="transactions_n_wallets">{n} carteras</string>
+    <string name="transactions_wallets_filter">Carteras</string>
     <string name="transactions_all_kinds">Todos los tipos</string>
     <string name="transactions_type_all">Todos</string>
     <string name="transactions_all_categories">Todas las categorías</string>
@@ -431,6 +433,7 @@
     <string name="transactions_register_refund">Registrar reembolso</string>
     <string name="transactions_total_converted">Convertido a MXN</string>
     <string name="transactions_list_capped">Se muestran los {n} movimientos más recientes; el total los considera todos.</string>
+    <string name="transactions_show_more">Mostrar más</string>
     <string name="transactions_delete_confirm_title">Eliminar transacción</string>
     <string name="transactions_delete_confirm">¿Eliminar esta transacción? Si es una transferencia se eliminan ambas partes.</string>
     <string name="transactions_delete_investment_leg_confirm">Esta transferencia es el movimiento de una inversión: al eliminarla también se elimina la aportación o el retiro en la inversión. ¿Continuar?</string>

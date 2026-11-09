@@ -230,6 +230,11 @@ export function InvestmentFormModal({ open, onClose, investment }: InvestmentFor
       }
       queryClient.invalidateQueries({ queryKey: ["investments"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // Its daily yield is rebuilt with it (FIN-9): the ledger and the
+      // month's income move too.
+      for (const key of ["transactions", "spendingTrends", "breakdown"]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
       onClose();
     },
     onError: (e) => setError(e instanceof Error ? e.message : String(e)),

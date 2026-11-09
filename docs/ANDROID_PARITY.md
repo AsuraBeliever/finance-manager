@@ -428,9 +428,11 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 |---|---|---|
 | Lista (con las dos patas de una transferencia plegadas en un renglón) | `ui/transactions` | ✅ |
 | Filtros (cartera, tipo, categoría, periodo) | `ui/transactions` | ✅ |
+| Varias carteras a la vez (`MultiSelect` ↔ `MultiPickerField`; `walletIds` en `list_transactions`/`sum_transactions`) | `ui/transactions` + `components/Pickers` | ✅ (2.50.0) |
 | Interruptor «Rendimientos» (oculta rendimiento de inversiones e intereses automáticos; se recuerda en el dispositivo: `localStorage` ↔ DataStore `tx_show_yield`) | `ui/transactions` + `data/AppPreferences` | ✅ (FIN-10) |
 | Total de lo filtrado (`sumTransactions`) | `ui/transactions` | ✅ con conteo y desglose por moneda |
 | Aviso de lista truncada a 100 | `ui/transactions` + `WalletDetailScreen` | ✅ |
+| «Mostrar más»: cada toque pide 100 movimientos más (relee desde arriba con `limit` creciente; un filtro nuevo vuelve a la primera página) | `ui/transactions` | ✅ (2.49.0) |
 | «Sin resultados» distinto de «sin movimientos» | `ui/transactions` | ✅ |
 | Alta de ingreso | `TransactionFormSheet` | ✅ |
 | Alta de gasto | `TransactionFormSheet` | ✅ |
@@ -459,8 +461,8 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Cerrar / **reabrir** / eliminar (con confirmación) | `ui/investments` | ✅ un solo botón que alterna, como la web |
 | Movimientos: alta, edición y borrado | `InvestmentSheets` | ✅ |
 | Snapshots manuales | `InvestmentSheets` | ✅ |
-| Rendimiento diario: por mes y por día con «Ver más días» (`get_investment_yield`) | `investments/YieldHistory.kt` | ✅ (FIN-9) |
-| Filas «Rendimiento» de solo lectura en Transacciones y en el detalle de «Intereses»; suman a ingresos del mes | `ui/transactions` + `dashboard/CategoryDetailDialog` | ✅ (FIN-9) |
+| Rendimiento diario: por mes y por día con «Ver más días» (`get_investment_yield`) | `investments/YieldHistory.kt` | ✅ (2.51.0) |
+| Filas «Rendimiento» de solo lectura en Transacciones y en el detalle de «Intereses»; suman a ingresos del mes | `ui/transactions` + `dashboard/CategoryDetailDialog` | ✅ (2.51.0) |
 | Simulador (proyección · meta · comparar) | `SimulatorScreen` | ✅ los tres modos con sus mismos campos, cifras y gráficas |
 | Gráfica de crecimiento (aportado + intereses apilados) | `components/SimCharts` (`StackedAreaChart`) | ✅ |
 | Gráfica de comparación (una línea por instrumento) | `components/SimCharts` (`MultiLineChart`) | ✅ tasas de CETES y BONDDIA precargadas del catálogo |

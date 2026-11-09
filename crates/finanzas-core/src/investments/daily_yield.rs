@@ -68,10 +68,16 @@ pub fn daily_gains(
     through: NaiveDate,
 ) -> AppResult<Vec<YieldDay>> {
     let mut out = Vec::new();
-    let mut prev = gain_at(calc, inv, ctx, after)?;
-    let mut day = after + Duration::days(1);
-    while day <= through {
-        let total = gain_at(calc, inv, ctx, day)?;
+    if through <= after {
+        return Ok(out);
+    }
+    // One pass over the values (see `values_over`), then gain = value − capital.
+    let values = calc.values_over(inv, ctx, after, through)?;
+    let mut day = after;
+    let mut prev = values[0] - net_invested(inv, ctx, after);
+    for value in &values[1..] {
+        day += Duration::days(1);
+        let total = value - net_invested(inv, ctx, day);
         if total != prev {
             out.push(YieldDay {
                 day,
@@ -80,7 +86,6 @@ pub fn daily_gains(
             });
         }
         prev = total;
-        day += Duration::days(1);
     }
     Ok(out)
 }

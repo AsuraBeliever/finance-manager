@@ -15,7 +15,9 @@
 
 use chrono::{Duration, NaiveDate};
 
-use super::{param_i64_or, parse_params, position_value, CalcContext, InvestmentCalculator};
+use super::{
+    param_i64_or, parse_params, parse_start_date, position_value, CalcContext, InvestmentCalculator,
+};
 use crate::error::AppResult;
 use crate::models::Investment;
 
@@ -58,6 +60,26 @@ fn factor_over_history(
         }
     }
     factor
+}
+
+/// Spread of an estimated-mode position, as `value_at` reads it.
+fn spread_bps(inv: &Investment) -> AppResult<f64> {
+    Ok(parse_params(inv)?
+        .get("spread_bps")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0))
+}
+
+/// Growth of the single day `[day, day + 1)` — the one-day step of
+/// `factor_over_history`, with the same rate lookup.
+fn day_growth(history: &[(NaiveDate, i64)], spread_bps: f64, day: NaiveDate) -> f64 {
+    let idx = match history.binary_search_by_key(&day, |(d, _)| *d) {
+        Ok(i) => i,
+        Err(0) => 0,
+        Err(i) => i - 1,
+    };
+    let rate_bps = (history[idx].1 as f64 - spread_bps).max(0.0);
+    1.0 + rate_bps / 10_000.0 / 365.0
 }
 
 impl InvestmentCalculator for Bonddia {
@@ -106,6 +128,87 @@ impl InvestmentCalculator for Bonddia {
         None // daily liquidity fund
     }
 
+    /// Estimated mode over a rate history, in ONE pass: yesterday's value
+    /// grown by one day, plus whatever enters today. Valuing each day from
+    /// scratch walks every past day per movement — days² × movements, ~0.4 s
+    /// for a 3-year position with 40 deposits. Same lots, dates and rates as
+    /// `value_at` (checked against it to the cent in the tests).
+    fn values_over(
+        &self,
+        inv: &Investment,
+        ctx: &CalcContext,
+        from: NaiveDate,
+        to: NaiveDate,
+    ) -> AppResult<Vec<i64>> {
+        let history = &ctx.rate_history;
+        let exact = !self.values_past_days(inv) && ctx.bonddia_price_micros.is_some();
+        if history.is_empty() || exact || to < from {
+            // Flat fallback or títulos: no daily walk to save.
+            let mut out = Vec::new();
+            let mut day = from;
+            while day <= to {
+                out.push(self.value_at(inv, ctx, day)?);
+                day += Duration::days(1);
+            }
+            return Ok(out);
+        }
+        let spread = spread_bps(inv)?;
+        let start = parse_start_date(inv)?;
+        // Every amount that starts accruing on a day, as value_at counts it:
+        // the principal on the start date, a movement on its own date (or the
+        // start, if dated before it), a withdrawal negative.
+        let entering = |day: NaiveDate| -> f64 {
+            let mut v = if day == start {
+                inv.principal_cents as f64
+            } else {
+                0.0
+            };
+            for m in &ctx.movements {
+                if m.occurred_at.max(start) == day {
+                    let sign = if m.kind == "withdrawal" { -1.0 } else { 1.0 };
+                    v += sign * m.amount_cents as f64;
+                }
+            }
+            v
+        };
+        let mut out = Vec::new();
+        // Before the start value_at is the bare principal (no growth yet).
+        let mut day = from;
+        while day < start && day <= to {
+            out.push(self.value_at(inv, ctx, day)?);
+            day += Duration::days(1);
+        }
+        if day > to {
+            return Ok(out);
+        }
+        let mut walk = start;
+        let mut value = entering(start);
+        while walk < day {
+            value = value * day_growth(history, spread, walk) + entering(walk + Duration::days(1));
+            walk += Duration::days(1);
+        }
+        loop {
+            out.push(value.round() as i64);
+            if walk >= to {
+                break;
+            }
+            value = value * day_growth(history, spread, walk) + entering(walk + Duration::days(1));
+            walk += Duration::days(1);
+        }
+        // The walk multiplies day by day where value_at raises whole steps to
+        // a power: the same number up to float noise, which can still tip a
+        // half cent. The ends come from value_at itself, so a history built
+        // from these values adds up to exactly the gain value_at reports, and
+        // the next run continues from the very total this one stored.
+        if let Some(first) = out.first_mut() {
+            *first = self.value_at(inv, ctx, from)?;
+        }
+        if let Some(last) = out.last_mut() {
+            *last = self.value_at(inv, ctx, to)?;
+        }
+        Ok(out)
+    }
+
     /// The estimated mode is a rate model over the Banxico history and can
     /// value any day; the títulos ("exact") mode rides the official NAV, of
     /// which only the latest is cached.
@@ -146,6 +249,48 @@ mod tests {
         rows.iter()
             .map(|(date, bps)| (NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap(), *bps))
             .collect()
+    }
+
+    /// A daily series like the real 'objetivo' cache (one row per day, the
+    /// rate stepping down over time) from 2023-01-01 for `days` days.
+    fn daily_series(days: i64) -> Vec<(NaiveDate, i64)> {
+        let start = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+        (0..days)
+            .map(|i| (start + Duration::days(i), 1125 - (i / 90) * 25))
+            .collect()
+    }
+
+    #[test]
+    fn values_over_matches_value_at_every_day() {
+        // Estimated mode, 3 years of daily rates, a fractional spread, a
+        // movement before the start and 30 later deposits/withdrawals: the
+        // one-pass walk must land on value_at's cent every single day.
+        let ctx_movements: Vec<(&str, i64, String)> = (0..30)
+            .map(|k| {
+                let kind = if k % 4 == 3 { "withdrawal" } else { "deposit" };
+                let date = NaiveDate::from_ymd_opt(2023, 3, 1).unwrap() + Duration::days(k * 31);
+                (kind, 123_457 + k * 1_001, date.to_string())
+            })
+            .collect();
+        let mut rows: Vec<(&str, i64, &str)> = ctx_movements
+            .iter()
+            .map(|(k, a, d)| (*k, *a, d.as_str()))
+            .collect();
+        rows.push(("deposit", 50_000, "2022-12-15"));
+        let mut ctx = test_ctx(&rows);
+        ctx.movements.sort_by_key(|m| m.occurred_at);
+        ctx.rate_history = daily_series(1_100);
+        let mut inv = test_investment("bonddia", 2_500_000, r#"{"spread_bps": 53.06}"#);
+        inv.start_date = "2023-01-10".into();
+        let from = NaiveDate::from_ymd_opt(2023, 1, 5).unwrap(); // before the start too
+        let to = NaiveDate::from_ymd_opt(2025, 12, 31).unwrap();
+        let walked = Bonddia.values_over(&inv, &ctx, from, to).unwrap();
+        let mut day = from;
+        for v in walked {
+            assert_eq!(v, Bonddia.value_at(&inv, &ctx, day).unwrap(), "on {day}");
+            day += Duration::days(1);
+        }
+        assert_eq!(day, to + Duration::days(1));
     }
 
     #[test]

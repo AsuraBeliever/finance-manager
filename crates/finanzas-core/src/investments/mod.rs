@@ -48,6 +48,27 @@ pub trait InvestmentCalculator: Send + Sync {
     fn values_past_days(&self, _inv: &Investment) -> bool {
         true
     }
+
+    /// `value_at` for every day of `[from, to]`, in order (empty when
+    /// `to < from`). The default asks `value_at` day by day; a calculator whose
+    /// `value_at` walks every past day (BONDDIA over its daily rate series)
+    /// overrides it with one incremental pass, or a long history turns
+    /// quadratic and blows the worker's CPU limit.
+    fn values_over(
+        &self,
+        inv: &Investment,
+        ctx: &CalcContext,
+        from: NaiveDate,
+        to: NaiveDate,
+    ) -> AppResult<Vec<i64>> {
+        let mut out = Vec::new();
+        let mut day = from;
+        while day <= to {
+            out.push(self.value_at(inv, ctx, day)?);
+            day += chrono::Duration::days(1);
+        }
+        Ok(out)
+    }
 }
 
 /// Stored data backing one investment's valuation, preloaded by the storage
