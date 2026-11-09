@@ -88,7 +88,26 @@ const INVESTMENT_SELECT: &str = "
            params_json, linked_wallet_id, is_closed, notes, created_at
     FROM investments";
 
-async fn fetch_investment(db: &D1Database, uid: i64, id: i64) -> AppResult<Investment> {
+/// Rebuild an investment's daily yield after a write to it (see
+/// `investment_yield`). Never fails the write: the history is derived data.
+pub(crate) async fn refresh_yield(db: &D1Database, uid: i64, id: i64) {
+    match fetch_investment(db, uid, id).await {
+        Ok(inv) => super::investment_yield::refresh_quietly(db, &inv).await,
+        Err(e) => worker::console_error!("yield refresh: investment {id} not readable: {e}"),
+    }
+}
+
+/// Every open investment of every user — the daily cron's yield pass.
+pub(crate) async fn open_investments_all(db: &D1Database) -> AppResult<Vec<Investment>> {
+    let sql = format!("{INVESTMENT_SELECT} WHERE is_closed = 0 ORDER BY id");
+    Ok(all::<InvestmentRow>(db, &sql, vec![])
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect())
+}
+
+pub(crate) async fn fetch_investment(db: &D1Database, uid: i64, id: i64) -> AppResult<Investment> {
     let sql = format!("{INVESTMENT_SELECT} WHERE id = ?1 AND user_id = ?2");
     first::<InvestmentRow>(db, &sql, jsv![id, uid])
         .await?
@@ -128,7 +147,7 @@ fn parse_date(s: &str, what: &str) -> AppResult<NaiveDate> {
 /// Preload the stored data this investment's calculator reads into the
 /// storage-agnostic context consumed by finanzas-core. Mirrors the desktop
 /// loader (src-tauri/src/commands/investments.rs::load_calc_context).
-async fn load_calc_context(db: &D1Database, inv: &Investment) -> AppResult<CalcContext> {
+pub(crate) async fn load_calc_context(db: &D1Database, inv: &Investment) -> AppResult<CalcContext> {
     let rows: Vec<MovementRow> = all(
         db,
         "SELECT kind, amount_cents, occurred_at FROM investment_movements
@@ -442,6 +461,7 @@ pub async fn create_investment(
     )
     .await?;
     let inv = fetch_investment(db, uid, last_row_id(&res)?).await?;
+    super::investment_yield::refresh_quietly(db, &inv).await;
     with_value(db, inv, today_mx()).await
 }
 
@@ -493,6 +513,7 @@ pub async fn update_investment(
     )
     .await?;
     let inv = fetch_investment(db, uid, a.id).await?;
+    super::investment_yield::refresh_quietly(db, &inv).await;
     with_value(db, inv, today_mx()).await
 }
 
@@ -513,6 +534,8 @@ pub async fn close_investment(db: &D1Database, uid: i64, a: CloseInvestmentArgs)
     if changes(&res) == 0 {
         return Err(AppError::NotFound("inversión"));
     }
+    // Reopening resumes the history; closing keeps it (the cron skips it).
+    refresh_yield(db, uid, a.id).await;
     Ok(())
 }
 
@@ -558,6 +581,7 @@ pub async fn add_snapshot(db: &D1Database, uid: i64, a: AddSnapshotArgs) -> AppR
         jsv![a.investment_id, a.value_cents, a.as_of],
     )
     .await?;
+    refresh_yield(db, uid, a.investment_id).await;
     Ok(())
 }
 
@@ -788,6 +812,7 @@ pub async fn add_investment_movement(
             )?);
         }
         batch(db, stmts).await?;
+        refresh_yield(db, uid, a.investment_id).await;
         return Ok(());
     };
 
@@ -863,6 +888,7 @@ pub async fn add_investment_movement(
         )?);
     }
     batch(db, stmts).await?;
+    refresh_yield(db, uid, a.investment_id).await;
     Ok(())
 }
 
@@ -1117,6 +1143,7 @@ pub async fn update_investment_movement(
         )?);
     }
     batch(db, stmts).await?;
+    refresh_yield(db, uid, old.investment_id).await;
     Ok(())
 }
 
@@ -1184,6 +1211,7 @@ pub async fn delete_investment_movement(db: &D1Database, uid: i64, a: IdArgs) ->
         )?);
     }
     batch(db, stmts).await?;
+    refresh_yield(db, uid, row.investment_id).await;
     Ok(())
 }
 

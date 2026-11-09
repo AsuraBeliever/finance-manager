@@ -330,6 +330,11 @@ struct GroupRow {
 }
 
 /// Deleting any leg of a transfer removes both legs.
+#[derive(Deserialize)]
+struct InvestmentIdRow {
+    investment_id: i64,
+}
+
 pub async fn delete_transaction(db: &D1Database, uid: i64, a: IdArgs) -> AppResult<()> {
     let row: Option<GroupRow> = first(
         db,
@@ -355,7 +360,18 @@ pub async fn delete_transaction(db: &D1Database, uid: i64, a: IdArgs) -> AppResu
         Some(GroupRow {
             transfer_group_id: None,
         }) => {
+            // The wallet leg of an investment movement takes the movement with
+            // it (ON DELETE CASCADE), so that investment's yield must follow.
+            let leg_of: Option<InvestmentIdRow> = first(
+                db,
+                "SELECT investment_id FROM investment_movements WHERE linked_transaction_id = ?1",
+                jsv![a.id],
+            )
+            .await?;
             exec(db, "DELETE FROM transactions WHERE id = ?1", jsv![a.id]).await?;
+            if let Some(leg) = leg_of {
+                super::investments::refresh_yield(db, uid, leg.investment_id).await;
+            }
             Ok(())
         }
     }
@@ -702,6 +718,63 @@ fn push_tx_filter(sql: &mut String, params: &mut Vec<JsValue>, f: &TxFilter) {
     }
 }
 
+/// The seed income category «Intereses», which an investment's daily yield
+/// is filed under — the same one the yield-bearing wallets' interest uses.
+pub(crate) const INTERESES_CATEGORY: &str = "(SELECT id FROM transaction_categories
+     WHERE name = 'Intereses' AND kind = 'income' AND user_id IS NULL)";
+
+/// Whether investment yield rows belong under this filter: they are income
+/// filed under «Intereses», tied to the investment's linked wallet. A kind
+/// other than income, or another category, leaves them out.
+fn yield_applies(f: &TxFilter) -> bool {
+    matches!(f.kind.as_deref(), None | Some("income"))
+}
+
+/// The WHERE tail for `investment_yield_days y JOIN investments i`, mirroring
+/// `push_tx_filter` for the yield rows. The caller has scoped `i.user_id`.
+fn push_yield_filter(sql: &mut String, params: &mut Vec<JsValue>, f: &TxFilter) {
+    sql.push_str(" AND y.gain_cents <> 0");
+    // Tied to the investment's linked wallet, so a wallet filter keeps the
+    // yield of the investments fed from those wallets (like apartados).
+    f.push_wallets(sql, params, "i.linked_wallet_id");
+    if let Some(cid) = f.category_id {
+        sql.push_str(&format!(" AND ? = {INTERESES_CATEGORY}"));
+        params.push(cid.to_js());
+    }
+    if let Some(from) = &f.from {
+        sql.push_str(" AND y.day >= ?");
+        params.push(from.to_js());
+    }
+    if let Some(to) = &f.to {
+        sql.push_str(" AND y.day <= ?");
+        params.push(to.to_js());
+    }
+    if let Some((start, end)) = f.period_bounds() {
+        sql.push_str(" AND y.day >= ? AND y.day < ?");
+        params.push(start.to_js());
+        params.push(end.to_js());
+    }
+}
+
+/// `UNION ALL` of the yield rows in `list_transactions`' column layout.
+fn push_yield_union(sql: &mut String, params: &mut Vec<JsValue>, f: &TxFilter, uid: i64) {
+    if !yield_applies(f) {
+        return;
+    }
+    sql.push_str(&format!(
+        " UNION ALL
+         SELECT -(1000000000000 + y.rowid), COALESCE(i.linked_wallet_id, 0), i.name,
+                'yield', y.gain_cents, ic.id, ic.name, NULL, NULL, y.day, NULL, '',
+                '00:00', NULL, 0, i.currency_code
+         FROM investment_yield_days y
+         JOIN investments i ON i.id = y.investment_id
+         LEFT JOIN transaction_categories ic ON ic.id = {INTERESES_CATEGORY}
+         WHERE i.user_id = ?"
+    ));
+    params.push(uid.to_js());
+    push_yield_filter(sql, params, f);
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTransactionsArgs {
@@ -726,6 +799,8 @@ struct TxRow {
     created_at: String,
     refund_of_id: Option<i64>,
     refunded_cents: i64,
+    #[serde(default)]
+    currency_code: Option<String>,
 }
 
 impl From<TxRow> for Transaction {
@@ -746,6 +821,7 @@ impl From<TxRow> for Transaction {
             created_at: r.created_at,
             refund_of_id: r.refund_of_id,
             refunded_cents: r.refunded_cents,
+            currency_code: r.currency_code,
         }
     }
 }
@@ -783,7 +859,8 @@ pub async fn list_transactions(
                 CASE WHEN t.kind = 'expense'
                      THEN COALESCE((SELECT SUM(r.amount_cents) FROM transactions r
                                     WHERE r.refund_of_id = t.id), 0)
-                     ELSE 0 END AS refunded_cents
+                     ELSE 0 END AS refunded_cents,
+                NULL AS currency_code
          FROM transactions t
          JOIN wallets w ON w.id = t.wallet_id
          LEFT JOIN transaction_categories tc ON tc.id = t.category_id
@@ -802,7 +879,7 @@ pub async fn list_transactions(
              SELECT -gc.id, g.linked_wallet_id, w2.name,
                     CASE WHEN gc.amount_cents >= 0 THEN 'reserve' ELSE 'release' END,
                     ABS(gc.amount_cents), NULL, NULL, NULL, g.name, gc.occurred_at, NULL, gc.created_at,
-                    strftime('%H:%M', datetime(gc.created_at, '-6 hours')), NULL, 0
+                    strftime('%H:%M', datetime(gc.created_at, '-6 hours')), NULL, 0, NULL
              FROM goal_contributions gc
              JOIN savings_goals g ON g.id = gc.goal_id
              JOIN wallets w2 ON w2.id = g.linked_wallet_id
@@ -824,6 +901,13 @@ pub async fn list_transactions(
             params.push(end.to_js());
         }
     }
+
+    // Each investment's daily yield (FIN-9), as read-only income rows. They
+    // carry no time of day (empty created_at, shown-time 00:00: they sort
+    // under the day's real movements) and the investment's own currency.
+    // Their id is negative and far below any apartado's (-goal_contributions
+    // id) so the two read-only kinds never collide.
+    push_yield_union(&mut sql, &mut params, &f, uid);
 
     // Order by column position (occurred_at = 10, shown-time = 13,
     // created_at = 12, id = 1): names are ambiguous across a compound UNION in
@@ -900,9 +984,36 @@ pub async fn sum_transactions(
     );
     let mut params: Vec<JsValue> = vec![uid.to_js()];
     push_tx_filter(&mut sql, &mut params, &f);
-    sql.push_str(" GROUP BY w.currency_code ORDER BY w.currency_code");
+    sql.push_str(" GROUP BY w.currency_code");
+    // Income also counts the investments' daily yield, as the list shows it.
+    if yield_applies(&f) {
+        sql.push_str(
+            " UNION ALL
+             SELECT i.currency_code, SUM(y.gain_cents), COUNT(*)
+             FROM investment_yield_days y
+             JOIN investments i ON i.id = y.investment_id
+             WHERE i.user_id = ?",
+        );
+        params.push(uid.to_js());
+        push_yield_filter(&mut sql, &mut params, &f);
+        sql.push_str(" GROUP BY i.currency_code");
+    }
 
-    let rows: Vec<TotalRow> = all(db, &sql, params).await?;
+    // Two parts can name the same currency: merged here, in currency order.
+    let mut merged: std::collections::BTreeMap<String, (i64, i64)> = Default::default();
+    for r in all::<TotalRow>(db, &sql, params).await? {
+        let e = merged.entry(r.currency_code).or_default();
+        e.0 += r.sum_cents;
+        e.1 += r.n;
+    }
+    let rows: Vec<TotalRow> = merged
+        .into_iter()
+        .map(|(currency_code, (sum_cents, n))| TotalRow {
+            currency_code,
+            sum_cents,
+            n,
+        })
+        .collect();
     let rates = load_rates(db, uid).await?;
     let mut total_mxn_cents = 0i64;
     let mut count = 0i64;

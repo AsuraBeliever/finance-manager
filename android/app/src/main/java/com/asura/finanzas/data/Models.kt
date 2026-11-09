@@ -356,6 +356,24 @@ data class MovementDetail(
     val startDate: String = "",
 )
 
+/** `get_investment_yield`: what an investment earned per month and per day,
+ *  newest first (FIN-9). */
+@Serializable
+data class InvestmentYield(
+    val currencyCode: String = "MXN",
+    val months: List<YieldMonth> = emptyList(),
+    val days: List<YieldDay> = emptyList(),
+    val hasMore: Boolean = false,
+    /** Recorded as the days go by (no price history): nothing before the first. */
+    val observed: Boolean = false,
+)
+
+@Serializable
+data class YieldMonth(val month: String, val gainCents: Long)
+
+@Serializable
+data class YieldDay(val day: String, val gainCents: Long)
+
 /** `get_investment_detail`: the investment plus its history and projection. */
 @Serializable
 data class InvestmentDetail(
@@ -453,7 +471,9 @@ data class Transaction(
     val walletId: Long,
     val walletName: String = "",
     /** "income" | "expense" | "refund" | "transfer_in" | "transfer_out". A
-     *  refund is money back for an expense: it is not income. */
+     *  refund is money back for an expense: it is not income. The list also
+     *  carries read-only rows: "reserve"/"release" (apartados) and "yield" —
+     *  what an investment earned that day, possibly negative (FIN-9). */
     val kind: String,
     val amountCents: Long,
     val categoryId: Long? = null,
@@ -470,6 +490,8 @@ data class Transaction(
     val refundedCents: Long = 0,
     /** On an expense: what can still be refunded (computed by the worker). */
     val refundableCents: Long = 0,
+    /** Only on "yield" rows: the investment's currency (no wallet says it). */
+    val currencyCode: String? = null,
 )
 
 /**

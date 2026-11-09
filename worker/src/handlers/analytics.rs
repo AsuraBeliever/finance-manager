@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
 use super::dashboard::{load_rates, to_mxn};
-use crate::db::{all, today_mx, ToJs};
+use super::transactions::INTERESES_CATEGORY;
+use crate::db::{all, first, today_mx, ToJs};
 use crate::jsv;
 
 /// SQL date literals (`YYYY-MM-DD`) for a resolved window. Bound as parameters,
@@ -30,6 +31,65 @@ fn window_bounds(r: &ResolvedPeriod) -> (String, String, String, String) {
         r.prev_start.to_string(),
         r.prev_end.to_string(),
     )
+}
+
+// ---- investments' daily yield (FIN-9) ----
+//
+// Income also counts what the investments earned day by day
+// (`investment_yield_days`), filed under the seed «Intereses» category like
+// the yield-bearing wallets' interest. It never touched a wallet, so it is
+// read from its own table and added to the transaction figures here.
+
+#[derive(Deserialize)]
+struct YieldSumRow {
+    currency_code: String,
+    sum_cents: i64,
+}
+
+/// Yield earned in `[start, end)` per investment currency.
+async fn yield_sums(
+    db: &D1Database,
+    uid: i64,
+    start: &str,
+    end: &str,
+) -> AppResult<Vec<YieldSumRow>> {
+    all(
+        db,
+        "SELECT i.currency_code AS currency_code, SUM(y.gain_cents) AS sum_cents
+         FROM investment_yield_days y JOIN investments i ON i.id = y.investment_id
+         WHERE i.user_id = ?1 AND y.day >= ?2 AND y.day < ?3
+         GROUP BY i.currency_code",
+        jsv![uid, start, end],
+    )
+    .await
+}
+
+/// `yield_sums` converted to MXN and added up.
+async fn yield_mxn(
+    db: &D1Database,
+    uid: i64,
+    rates: &HashMap<String, i64>,
+    start: &str,
+    end: &str,
+) -> AppResult<i64> {
+    Ok(yield_sums(db, uid, start, end)
+        .await?
+        .iter()
+        .map(|r| {
+            to_mxn(
+                r.sum_cents,
+                rates.get(&r.currency_code).copied().unwrap_or(0),
+            )
+        })
+        .sum())
+}
+
+#[derive(Deserialize)]
+struct CategoryInfoRow {
+    id: i64,
+    name: String,
+    color: Option<String>,
+    icon: Option<String>,
 }
 
 // ---- category breakdown ----
@@ -131,6 +191,31 @@ pub async fn get_category_breakdown(
         entry.0.mxn_cents += mxn;
         entry.1 += refund_mxn;
     }
+    // Income: the investments' yield joins the «Intereses» slice.
+    if a.kind == "income" {
+        let earned = yield_mxn(db, uid, &rates, &start, &end).await?;
+        let cat: Option<CategoryInfoRow> = first(
+            db,
+            &format!("SELECT id, name, color, icon FROM transaction_categories WHERE id = {INTERESES_CATEGORY}"),
+            vec![],
+        )
+        .await?;
+        if let (true, Some(cat)) = (earned != 0, cat) {
+            let entry = by_cat.entry(Some(cat.id)).or_insert_with(|| {
+                (
+                    CategorySlice {
+                        category_id: Some(cat.id),
+                        name: cat.name,
+                        color: cat.color,
+                        icon: cat.icon,
+                        mxn_cents: 0,
+                    },
+                    0,
+                )
+            });
+            entry.0.mxn_cents += earned;
+        }
+    }
     // A category whose refunds cover all its spending in the window has no
     // slice to draw.
     let by_cat: Vec<CategorySlice> = by_cat
@@ -182,6 +267,8 @@ struct CatTxRow {
     created_at: String,
     refund_of_id: Option<i64>,
     refunded_cents: i64,
+    #[serde(default)]
+    currency_code: Option<String>,
 }
 
 pub async fn get_category_transactions(
@@ -200,6 +287,26 @@ pub async fn get_category_transactions(
         }
         None => "t.category_id IS NULL",
     };
+    // The «Intereses» slice of the income breakdown also holds the
+    // investments' daily yield (see `yield_sums`), so its drill-down lists it.
+    let yield_rows = if a.kind == "income" && a.category_id.is_some() {
+        format!(
+            " UNION ALL
+             SELECT -(1000000000000 + y.rowid), COALESCE(i.linked_wallet_id, 0), i.name,
+                    'yield', y.gain_cents, ?4, c.name, NULL, y.day, NULL, '', NULL, 0,
+                    '00:00', i.currency_code
+             FROM investment_yield_days y
+             JOIN investments i ON i.id = y.investment_id
+             JOIN transaction_categories c ON c.id = ?4
+             WHERE i.user_id = ?1 AND y.gain_cents <> 0
+               AND y.day >= ?2 AND y.day < ?3
+               AND ?4 = {INTERESES_CATEGORY}"
+        )
+    } else {
+        String::new()
+    };
+    // Ordered by position (occurred_at = 9, shown-time = 14, id = 1): names
+    // are ambiguous across a UNION.
     let sql = format!(
         "SELECT t.id, t.wallet_id, w.name AS wallet_name,
                 CASE WHEN t.is_refund = 1 THEN 'refund' ELSE t.kind END AS kind,
@@ -209,17 +316,17 @@ pub async fn get_category_transactions(
                 CASE WHEN t.kind = 'expense'
                      THEN COALESCE((SELECT SUM(r.amount_cents) FROM transactions r
                                     WHERE r.refund_of_id = t.id), 0)
-                     ELSE 0 END AS refunded_cents
+                     ELSE 0 END AS refunded_cents,
+                COALESCE(t.occurred_time,
+                         strftime('%H:%M', datetime(t.created_at, '-6 hours'))) AS sort_time,
+                NULL AS currency_code
          FROM transactions t
          JOIN wallets w ON w.id = t.wallet_id
          LEFT JOIN transaction_categories c ON c.id = t.category_id
          WHERE w.user_id = ?1 AND {clause}
            AND t.occurred_at >= ?2 AND t.occurred_at < ?3
-           AND {cat_clause}
-         ORDER BY t.occurred_at DESC,
-                  COALESCE(t.occurred_time,
-                           strftime('%H:%M', datetime(t.created_at, '-6 hours'))) DESC,
-                  t.id DESC"
+           AND {cat_clause}{yield_rows}
+         ORDER BY 9 DESC, 14 DESC, 1 DESC"
     );
     let rows: Vec<CatTxRow> = all(db, &sql, params).await?;
     Ok(rows
@@ -244,6 +351,7 @@ pub async fn get_category_transactions(
             created_at: r.created_at,
             refund_of_id: r.refund_of_id,
             refunded_cents: r.refunded_cents,
+            currency_code: r.currency_code,
         })
         .collect())
 }
@@ -304,6 +412,13 @@ struct TotalsRow {
     kind: String,
     cur: i64,
     prev: i64,
+}
+
+#[derive(Deserialize)]
+struct YieldBucketRow {
+    bucket: String,
+    currency_code: String,
+    sum_cents: i64,
 }
 
 #[derive(Deserialize)]
@@ -372,6 +487,8 @@ pub async fn get_spending_trends(
     }
     let expense = net_spending_total(cur_by_cat.into_values());
     let expense_prev = net_spending_total(prev_by_cat.into_values());
+    income += yield_mxn(db, uid, &rates, &start, &end).await?;
+    income_prev += yield_mxn(db, uid, &rates, &prev_start, &prev_end).await?;
 
     // Flow series over the selected window, bucketed by day or month.
     let fmt = match resolved.bucket {
@@ -411,6 +528,33 @@ pub async fn get_spending_trends(
             expense_mxn_cents: net_spending_total(by_cat.into_values()),
         })
         .collect();
+    // The investments' yield of each bucket, on the income side.
+    let yield_buckets: Vec<YieldBucketRow> = all(
+        db,
+        &format!(
+            "SELECT strftime('{fmt}', y.day) AS bucket, i.currency_code AS currency_code,
+                    SUM(y.gain_cents) AS sum_cents
+             FROM investment_yield_days y JOIN investments i ON i.id = y.investment_id
+             WHERE i.user_id = ?1 AND y.day >= ?2 AND y.day < ?3
+             GROUP BY bucket, i.currency_code"
+        ),
+        jsv![uid, start, end],
+    )
+    .await?;
+    for r in yield_buckets {
+        let mxn = to_mxn(
+            r.sum_cents,
+            rates.get(&r.currency_code).copied().unwrap_or(0),
+        );
+        match buckets.iter_mut().find(|b| b.key == r.bucket) {
+            Some(b) => b.income_mxn_cents += mxn,
+            None => buckets.push(FlowBucket {
+                key: r.bucket,
+                income_mxn_cents: mxn,
+                expense_mxn_cents: 0,
+            }),
+        }
+    }
     buckets.sort_by(|a, b| a.key.cmp(&b.key));
 
     Ok(SpendingTrends {

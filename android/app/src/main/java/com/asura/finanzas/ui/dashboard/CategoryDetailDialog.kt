@@ -141,7 +141,7 @@ fun CategoryDetailDialog(
                         tx = tx,
                         kind = kind,
                         fallbackName = title,
-                        currency = currencyByWallet[tx.walletId] ?: "MXN",
+                        currency = tx.currencyCode ?: currencyByWallet[tx.walletId] ?: "MXN",
                         hide = hide,
                     )
                 }
@@ -162,7 +162,10 @@ private fun CategoryDetailRow(
     // An expense slice also lists the refunds that netted against it; those
     // read like money in.
     val refund = tx.kind == "refund"
-    val income = kind == "income" || refund
+    // An investment's daily yield, filed under «Intereses»; a losing day
+    // (crypto) reads as a loss.
+    val yieldRow = tx.kind == "yield"
+    val income = (kind == "income" || refund) && !(yieldRow && tx.amountCents < 0)
     val tint = if (income) colors.accent else colors.danger
     val time = transactionTimeLabel(tx)
     val refundLabel = stringResource(R.string.transactions_refund)
@@ -191,7 +194,8 @@ private fun CategoryDetailRow(
         }
         Column(Modifier.weight(1f)) {
             Text(
-                tx.description?.takeIf { it.isNotBlank() } ?: fallbackName,
+                if (yieldRow) stringResource(R.string.transactions_yield_row)
+                else tx.description?.takeIf { it.isNotBlank() } ?: fallbackName,
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.fg,
                 maxLines = 1,
@@ -212,7 +216,7 @@ private fun CategoryDetailRow(
         // `text-sm font-medium tabular-nums`
         Text(
             (if (income) "+" else "−") +
-                maskIfHidden(formatMoney(tx.amountCents, currency), hide),
+                maskIfHidden(formatMoney(kotlin.math.abs(tx.amountCents), currency), hide),
             style = MaterialTheme.typography.labelLarge.tabular(),
             color = tint,
         )

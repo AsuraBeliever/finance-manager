@@ -6,6 +6,7 @@ import {
   PiggyBank,
   Pencil,
   Trash2,
+  TrendingUp,
   Undo2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -44,7 +45,16 @@ const kindMeta: Record<
   // the wallet — they're earmarks shown for tracking.
   reserve: { icon: PiggyBank, sign: "→", color: "text-fg-muted" },
   release: { icon: PiggyBank, sign: "←", color: "text-fg-muted" },
+  // What an investment earned that day: income that never touched a wallet.
+  // Its sign comes from the amount (a crypto day can lose) — see `rowMeta`.
+  yield: { icon: TrendingUp, sign: "+", color: "text-accent" },
 };
+
+/** `kindMeta` for a row, with a losing yield day drawn as a loss. */
+const rowMeta = (t: Transaction) =>
+  t.kind === "yield" && t.amountCents < 0
+    ? { ...kindMeta.yield, sign: "−", color: "text-danger" }
+    : kindMeta[t.kind];
 
 const apartadoKinds = new Set<Transaction["kind"]>(["reserve", "release"]);
 
@@ -172,9 +182,9 @@ export function TransactionList({
     <>
     <ul className="divide-y divide-border-muted rounded-xl border border-border-muted bg-surface-raised">
       {rows.map(({ tx: t, toLeg }) => {
-        const meta = kindMeta[t.kind];
+        const meta = rowMeta(t);
         const Icon = meta.icon;
-        const currency = currencyByWallet?.get(t.walletId) ?? "MXN";
+        const currency = t.currencyCode ?? currencyByWallet?.get(t.walletId) ?? "MXN";
         const toCurrency = toLeg && (currencyByWallet?.get(toLeg.walletId) ?? "MXN");
         // A folded transfer names both wallets and shows the amount once, with
         // no sign: the money didn't leave, it moved. Across currencies (or if
@@ -184,9 +194,12 @@ export function TransactionList({
           (toLeg.amountCents !== t.amountCents || toCurrency !== currency);
         const isApartado = apartadoKinds.has(t.kind);
         const isInvestment = isInvestmentLeg(t);
+        // Derived from the investment: nothing to edit or delete here (it
+        // changes when the investment does).
+        const readOnly = t.kind === "yield";
         // Investment legs always offer their own editor, even where the page
         // passes no onEdit — a wrong amount has to be fixable from here too.
-        const canEdit = isApartado || isInvestment || onEdit !== undefined;
+        const canEdit = !readOnly && (isApartado || isInvestment || onEdit !== undefined);
         return (
           <li key={t.id} className="group flex items-center gap-3 px-4 py-3">
             <span
@@ -198,7 +211,9 @@ export function TransactionList({
               <p className="truncate text-sm">
                 {isApartado
                   ? `${es.transactions[t.kind === "reserve" ? "reserved" : "released"]} · ${t.description ?? ""}`
-                  : t.description ||
+                  : readOnly
+                    ? es.transactions.yieldRow
+                    : t.description ||
                     (t.categoryName && seedName(t.categoryName)) ||
                     es.transactions[
                       t.kind === "income" || t.kind === "expense" || t.kind === "refund"
@@ -212,7 +227,8 @@ export function TransactionList({
                   const time = transactionTime(t.occurredTime, t.createdAt, tz, clock);
                   return time && <> · {time}</>;
                 })()}
-                {showWallet && (
+                {/* A yield row names its investment even on a wallet's page. */}
+                {(showWallet || readOnly) && (
                   <> · {toLeg ? `${t.walletName} → ${toLeg.walletName}` : t.walletName}</>
                 )}
                 {t.categoryName && t.description && <> · {seedName(t.categoryName)}</>}
@@ -245,7 +261,7 @@ export function TransactionList({
               ) : (
                 <>
                   {meta.sign}
-                  {money(t.amountCents, currency)}
+                  {money(Math.abs(t.amountCents), currency)}
                 </>
               )}
             </span>
@@ -267,13 +283,15 @@ export function TransactionList({
                   <Pencil size={15} />
                 </button>
               )}
-              <button
-                onClick={() => (isApartado ? setApartadoToDelete(t) : setToDelete(t.id))}
-                aria-label={es.common.delete}
-                className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
-              >
-                <Trash2 size={15} />
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => (isApartado ? setApartadoToDelete(t) : setToDelete(t.id))}
+                  aria-label={es.common.delete}
+                  className="touch-action-reveal rounded-md p-1.5 text-fg-subtle transition-all hover:bg-danger/10 hover:text-danger"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
             </div>
           </li>
         );

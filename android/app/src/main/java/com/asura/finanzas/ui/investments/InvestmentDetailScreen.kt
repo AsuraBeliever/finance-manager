@@ -114,6 +114,7 @@ fun InvestmentDetailScreen(
     DetailContent(
         repository = repository,
         detail = current,
+        reloadKey = reloadKey,
         onBack = onBack,
         onAddMovement = { addingMovement = it },
         onAddSnapshot = { addingSnapshot = true },
@@ -204,6 +205,8 @@ fun InvestmentDetailScreen(
 private fun DetailContent(
     repository: BrokeRepository,
     detail: InvestmentDetail,
+    /** Bumped after every write here, so the yield history reads again. */
+    reloadKey: Int,
     onBack: () -> Unit,
     /** "deposit" or "withdrawal": the sheet opens on the one that was asked for. */
     onAddMovement: (String) -> Unit,
@@ -536,6 +539,16 @@ private fun DetailContent(
                     )
                 }
             }
+        }
+
+        // What it earned per month and per day (web: YieldHistory).
+        item {
+            YieldHistorySection(
+                repository = repository,
+                investmentId = detail.id,
+                reloadKey = reloadKey,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            )
         }
 
         // Contributions and withdrawals, on every calculator but the manual one

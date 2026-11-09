@@ -12,6 +12,7 @@ import type {
   GoalCadence,
   GoalInput,
   InvestmentDetail,
+  InvestmentYield,
   InvestmentProjection,
   InvestmentWithValue,
   MovementDetail,
@@ -436,6 +437,10 @@ export const addSnapshot = (investmentId: number, valueCents: number, asOf: stri
 
 export const getInvestmentDetail = (id: number) =>
   rpc<InvestmentDetail>("get_investment_detail", { id });
+
+/** What an investment earned per month and per day (the `limit` newest days). */
+export const getInvestmentYield = (investmentId: number, limit: number) =>
+  rpc<InvestmentYield>("get_investment_yield", { investmentId, limit });
 
 export const simulateInvestment = (input: SimulateInput) =>
   rpc<SimResult>("simulate_investment", { ...input });

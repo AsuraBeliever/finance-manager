@@ -291,3 +291,31 @@ original (reembolsos parciales, tope = lo gastado).
 Se guarda como `income` + `is_refund = 1` en lugar de un `kind` nuevo: reconstruir
 `transactions` para cambiar el CHECK borraría `investment_movements` por cascada en
 D1. Detalle en DATA_MODEL «Reembolsos».
+
+## 2026-11-08 — El rendimiento diario de las inversiones se guarda, no se calcula al leer
+
+El cliente pidió ver lo que cada inversión genera día a día y que cuente como
+ingreso del mes (FIN-9). Calcularlo al leer obligaba a valuar cada inversión
+por cada día del rango en cada lectura de Transacciones y de Análisis (miles de
+`value_at` con el tope de 10 ms de CPU), y a mezclar filas calculadas con la
+paginación SQL de la lista. Se guarda en `investment_yield_days` (migración
+0043): la lista lo une con `UNION ALL`, los totales lo suman en SQL.
+
+Al ser derivado puede quedar viejo, así que una escritura a la inversión lo
+rehace entero y el cron sólo lo extiende (incremental, barato). Cripto y
+BONDDIA en títulos no tienen precio histórico: no se pueden reconstruir y se
+graban día a día desde una base en cero — volcar toda la ganancia previa en el
+primer día inflaría un mes con un «ingreso» que no ocurrió.
+
+No se crean filas en `transactions`: el rendimiento no entra a ninguna cartera
+(el valor de la inversión ya lo incluye) y crearlas movería saldos. Se archiva
+bajo la categoría semilla *Intereses*, la misma de las carteras con rendimiento.
+
+Mantenerlo vigente (revisión del PR #5): el cron extiende cada historial como
+mucho 370 días por corrida y deja un punto de control en cero al final de una
+ventana recortada, para que el primer relleno tras el deploy se reparta en
+varias corridas sin atorarse; reconstruye cualquier historial cuyo último
+total ya no cuadra con la ganancia (lo que repara escrituras que no lo
+recalcularon), y borrar una cartera recalcula las inversiones cuyos
+movimientos se van con ella. BONDDIA estimado valúa el historial en una sola
+pasada (`values_over`): día por día desde cero era cuadrático.

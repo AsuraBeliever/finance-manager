@@ -129,6 +129,13 @@ private fun foldTransfers(transactions: List<Transaction>): List<TxRow> {
 val Transaction.isApartado: Boolean
     get() = kind == "reserve" || kind == "release"
 
+/**
+ * An investment's daily yield (FIN-9): derived from the investment, so there
+ * is nothing to edit or delete on it here.
+ */
+val Transaction.isYield: Boolean
+    get() = kind == "yield"
+
 /** The kind filter tabs the web shows above the list. */
 enum class KindFilter(val labelRes: Int, val wire: String?) {
     All(R.string.transactions_type_all, null),
@@ -570,9 +577,12 @@ private fun TransactionRow(
         // Apartado moves are information only: no money leaves the wallet, so
         // they read neutral with an arrow instead of a signed amount.
         "reserve", "release" -> Lucide.PiggyBank to colors.fgMuted
+        // A losing day (crypto) reads as a loss.
+        "yield" -> Lucide.TrendingUp to if (tx.amountCents < 0) colors.danger else colors.accent
         else -> Lucide.ArrowUpRight to colors.danger
     }
     val sign = when (tx.kind) {
+        "yield" -> if (tx.amountCents < 0) "−" else "+"
         "income", "refund", "transfer_in" -> "+"
         "transfer_out" -> ""
         "reserve" -> "→"
@@ -601,7 +611,9 @@ private fun TransactionRow(
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = if (tx.isApartado) {
+                text = if (tx.isYield) {
+                    stringResource(R.string.transactions_yield_row)
+                } else if (tx.isApartado) {
                     stringResource(
                         if (tx.kind == "reserve") R.string.transactions_reserved
                         else R.string.transactions_released,
@@ -625,7 +637,8 @@ private fun TransactionRow(
                     transactionTimeLabel(tx),
                     // A folded transfer names both ends instead of one wallet.
                     when {
-                        !showWallet -> null
+                        // A yield row names its investment even on a wallet's page.
+                        !showWallet && !tx.isYield -> null
                         toLeg != null -> "${tx.walletName} → ${toLeg.walletName}"
                         else -> tx.walletName.takeIf { it.isNotBlank() }
                     },
@@ -659,7 +672,10 @@ private fun TransactionRow(
             // books. Both amounts show only when the legs differ, which happens
             // across currencies.
             text = when {
-                toLeg == null -> sign + maskIfHidden(formatMoney(tx.amountCents), hide)
+                toLeg == null -> sign + maskIfHidden(
+                    formatMoney(kotlin.math.abs(tx.amountCents), tx.currencyCode ?: "MXN"),
+                    hide,
+                )
                 toLeg.amountCents != tx.amountCents -> maskIfHidden(
                     formatMoney(tx.amountCents),
                     hide,
@@ -681,28 +697,31 @@ private fun TransactionRow(
             horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            run {
+            // Read-only rows keep the slot (amounts stay aligned) but empty.
+            if (!tx.isYield) {
+                run {
+                    Icon(
+                        Lucide.Pencil,
+                        contentDescription = stringResource(R.string.common_edit),
+                        tint = colors.fgSubtle,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onEdit(tx) }
+                            .padding(6.dp)
+                            .size(15.dp),
+                    )
+                }
                 Icon(
-                    Lucide.Pencil,
-                    contentDescription = stringResource(R.string.common_edit),
+                    Lucide.Trash,
+                    contentDescription = stringResource(R.string.common_delete),
                     tint = colors.fgSubtle,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .clickable { onEdit(tx) }
+                        .clickable { onDelete(tx) }
                         .padding(6.dp)
                         .size(15.dp),
                 )
             }
-            Icon(
-                Lucide.Trash,
-                contentDescription = stringResource(R.string.common_delete),
-                tint = colors.fgSubtle,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable { onDelete(tx) }
-                    .padding(6.dp)
-                    .size(15.dp),
-            )
         }
     }
 }

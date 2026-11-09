@@ -96,6 +96,23 @@ Params: `{}`. `value_at` regresa el último `investment_snapshots.value_cents` c
 
 Todas las calculadoras excepto `manual` soportan movimientos posteriores al inicio (tabla `investment_movements`). La valuación es **por posición**: el helper `position_value` en `src-tauri/src/investments/mod.rs` suma cada monto multiplicado por el factor de crecimiento de la calculadora desde la fecha del movimiento — las aportaciones suman, los retiros restan (incluido el rendimiento que ese dinero habría generado). El rendimiento mostrado es `valor actual − aportado neto`, que captura lo realizado y lo no realizado. Caso de uso típico: cajita o CETES con depósitos mensuales y retiros esporádicos.
 
+## Rendimiento diario (FIN-9)
+
+`daily_yield.rs`: lo que una inversión genera cada día, para que cuente como
+ingreso de su mes aunque no se retire. `gain_at(d) = value_at(d) − net_invested(d)`
+y el rendimiento del día es `gain_at(d) − gain_at(d − 1)`: como cada `gain_at`
+ya es un entero de centavos, la suma del historial telescopea exacto a la
+ganancia. Una calculadora nueva solo tiene que decidir `values_past_days`:
+`true` (por defecto) si `value_at` puede valuar un día pasado tal como fue;
+`false` si depende de un precio del que solo se guarda el último (cripto,
+BONDDIA en títulos) — entonces el historial se graba día a día desde una base
+en cero. Si `value_at` no es una fórmula directa sino que recorre los días
+pasados (BONDDIA estimado sobre la serie diaria de tasas), la calculadora debe
+implementar también `values_over`: el historial pide un valor por día y, día
+por día desde cero, se vuelve cuadrático (408 ms frente a 0.86 ms en una
+BONDDIA de 3 años con 40 aportaciones; el tope de CPU es 10 ms). Detalle de
+almacenamiento en DATA_MODEL «Rendimiento diario».
+
 ## Proyecciones
 
 `get_investment_detail(id)` regresa valor actual, ganancia (valor − principal) y una serie `[{date, value_cents}]` con puntos semanales hasta el vencimiento (o +1 año si no hay vencimiento) para la gráfica de línea en Recharts.

@@ -3,6 +3,7 @@ pub mod budgets;
 pub mod credit;
 pub mod dashboard;
 pub mod goals;
+pub mod investment_yield;
 pub mod investments;
 pub mod settings;
 pub mod subscriptions;

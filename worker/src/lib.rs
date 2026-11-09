@@ -100,4 +100,11 @@ pub async fn scheduled(event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
     {
         console_error!("auth_attempts cleanup failed: {e}");
     }
+    // Last on purpose: the first run after deploying migration 0043 builds
+    // every history from scratch, the heaviest step of the cron. Placed here
+    // it can't starve the steps above. After the market refresh, so crypto
+    // and BONDDIA días use today's prices.
+    if let Err(e) = handlers::investment_yield::accrue_all(&db).await {
+        console_error!("investment yield accrual failed: {e}");
+    }
 }

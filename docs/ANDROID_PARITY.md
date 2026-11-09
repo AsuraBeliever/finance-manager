@@ -460,6 +460,8 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Cerrar / **reabrir** / eliminar (con confirmación) | `ui/investments` | ✅ un solo botón que alterna, como la web |
 | Movimientos: alta, edición y borrado | `InvestmentSheets` | ✅ |
 | Snapshots manuales | `InvestmentSheets` | ✅ |
+| Rendimiento diario: por mes y por día con «Ver más días» (`get_investment_yield`) | `investments/YieldHistory.kt` | ✅ (2.51.0) |
+| Filas «Rendimiento» de solo lectura en Transacciones y en el detalle de «Intereses»; suman a ingresos del mes | `ui/transactions` + `dashboard/CategoryDetailDialog` | ✅ (2.51.0) |
 | Simulador (proyección · meta · comparar) | `SimulatorScreen` | ✅ los tres modos con sus mismos campos, cifras y gráficas |
 | Gráfica de crecimiento (aportado + intereses apilados) | `components/SimCharts` (`StackedAreaChart`) | ✅ |
 | Gráfica de comparación (una línea por instrumento) | `components/SimCharts` (`MultiLineChart`) | ✅ tasas de CETES y BONDDIA precargadas del catálogo |

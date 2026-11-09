@@ -405,6 +405,7 @@
     <string name="transactions_amount_received">Monto recibido</string>
     <string name="transactions_category">Categoría</string>
     <string name="transactions_no_category">Sin categoría</string>
+    <string name="transactions_yield_row">Rendimiento</string>
     <string name="transactions_description">Descripción</string>
     <string name="transactions_date">Fecha</string>
     <string name="transactions_time">Hora</string>
@@ -440,6 +441,13 @@
     <string name="transactions_apartado_delete_confirm">¿Eliminar este movimiento? Lo apartado en la meta se ajustará como si nunca hubiera pasado.</string>
     <string name="transactions_invalid_amount">Monto inválido</string>
     <string name="transactions_transfer_hint">Si las carteras usan monedas distintas, captura ambos montos.</string>
+    <string name="investments_yield_history">Rendimiento diario</string>
+    <string name="investments_yield_history_hint">Lo que genera cada día aunque no lo retires; cuenta como ingreso de su mes.</string>
+    <string name="investments_yield_observed_hint">El precio de esta inversión sólo se conoce día a día: su rendimiento se registra desde que la app empezó a seguirla.</string>
+    <string name="investments_yield_by_month">Por mes</string>
+    <string name="investments_yield_by_day">Por día</string>
+    <string name="investments_yield_empty">Todavía no hay rendimiento registrado.</string>
+    <string name="investments_yield_show_more">Ver más días</string>
     <string name="investments_title">Inversiones</string>
     <string name="investments_detail_title">Detalle de inversión</string>
     <string name="investments_new_investment">Nueva inversión</string>

@@ -102,3 +102,9 @@ export function formatDayMonth(iso: string): string {
   if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
   return d.toLocaleDateString(intlLocale(), opts);
 }
+
+/** Month label like "noviembre de 2026" from a 'YYYY-MM' key. */
+export function formatMonthYear(key: string): string {
+  const d = new Date(`${key}-01T00:00:00`);
+  return d.toLocaleDateString(intlLocale(), { month: "long", year: "numeric" });
+}

@@ -141,6 +141,7 @@ fn tx_from_row(r: &Row) -> rusqlite::Result<Transaction> {
         refund_of_id: None,
         refunded_cents: 0,
         refundable_cents: 0,
+        currency_code: None,
     })
 }
 
