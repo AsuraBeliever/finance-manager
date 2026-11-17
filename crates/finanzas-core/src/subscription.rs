@@ -143,9 +143,8 @@ pub enum ManualPayment {
 ///
 /// The previous period (`next_charge - cadence`) is owed when it is already due
 /// (`<= today`), began after the subscription did (`> started_at`, so a fresh
-/// subscription isn't billed for before it existed), and no charge covers it.
-/// A charge covers it when its tag names that period, or — untagged older
-/// charges — when its date falls in `[previous, next_charge)`.
+/// subscription isn't billed for before it existed), and no charge covers it
+/// (see [`previous_period_covered`]).
 pub fn plan_manual_payment(
     next_charge: NaiveDate,
     cadence_months: i32,
@@ -156,11 +155,9 @@ pub fn plan_manual_payment(
 ) -> ManualPayment {
     let step = cadence_months.max(1);
     let previous = add_months(next_charge, -step);
-    let covered = charges.iter().any(|c| match c.period {
-        Some(p) => p == previous,
-        None => c.date >= previous && c.date < next_charge,
-    });
-    let owed = previous <= today && started_at.is_none_or(|s| previous > s) && !covered;
+    let owed = previous <= today
+        && started_at.is_none_or(|s| previous > s)
+        && !previous_period_covered(next_charge, step, charges);
     if owed {
         ManualPayment::FillPrevious { period: previous }
     } else if auto_charge {
@@ -171,6 +168,71 @@ pub fn plan_manual_payment(
             next: next_after(next_charge, step),
         }
     }
+}
+
+/// Most past periods laid out when matching charges (a century of monthly).
+const MAX_PERIODS: usize = 1200;
+
+/// Whether some charge pays the period right before `next_charge`.
+///
+/// Periods are laid out backwards from `next_charge` (index 0 = the upcoming
+/// one, 1 = the previous, …; period k spans `[next − k·step, next − (k−1)·step)`)
+/// and every charge is matched to one of them:
+///
+/// * A tagged charge belongs to the period whose span contains its tag. Not
+///   "equals": an anchor on the 31st clamps (Jan 31 → next Feb 28, previous
+///   start Jan 28), and the next date can be edited after charges were tagged.
+/// * An untagged (older) charge goes, in date order, to the nearer of the two
+///   periods that start around its date — a manual payment a couple of days
+///   early still pays its own period — or the other one if that is taken. Never
+///   to the upcoming period: the old "register payment" always moved the date
+///   past the period it paid, so every untagged charge paid an earlier one.
+fn previous_period_covered(next_charge: NaiveDate, step: i32, charges: &[BookedCharge]) -> bool {
+    let Some(earliest) = charges
+        .iter()
+        .map(|c| c.period.map_or(c.date, |p| p.min(c.date)))
+        .min()
+    else {
+        return false;
+    };
+    // Descending starts, down to one at or before the earliest charge.
+    let mut starts = vec![next_charge];
+    while starts.last().is_some_and(|s| *s > earliest) && starts.len() < MAX_PERIODS {
+        starts.push(add_months(next_charge, -(starts.len() as i32) * step));
+    }
+    let containing = |day: NaiveDate| starts.iter().position(|s| *s <= day);
+    let mut taken = vec![false; starts.len()];
+
+    for p in charges.iter().filter_map(|c| c.period) {
+        if let Some(k) = containing(p) {
+            taken[k] = true;
+        }
+    }
+    let mut untagged: Vec<NaiveDate> = charges
+        .iter()
+        .filter(|c| c.period.is_none())
+        .map(|c| c.date)
+        .collect();
+    untagged.sort();
+    for day in untagged {
+        let Some(k) = containing(day) else { continue };
+        // The period starting at/before the day (k) and the one after (k − 1),
+        // nearer first; index 0 (upcoming) is never a candidate.
+        let mut candidates: Vec<usize> = vec![k];
+        if k >= 2 {
+            let before = (day - starts[k]).num_days();
+            let after = (starts[k - 1] - day).num_days();
+            if after < before {
+                candidates.insert(0, k - 1);
+            } else {
+                candidates.push(k - 1);
+            }
+        }
+        if let Some(&slot) = candidates.iter().find(|&&i| i >= 1 && !taken[i]) {
+            taken[slot] = true;
+        }
+    }
+    taken.get(1).copied().unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -615,6 +677,165 @@ mod tests {
             ),
             ManualPayment::FillPrevious {
                 period: d(2026, 1, 28)
+            }
+        );
+    }
+
+    // ---- review of PR #8: charges matched to periods, not to exact dates ----
+
+    #[test]
+    fn auto_31st_clamped_period_is_covered_by_its_tag() {
+        // Cron charged Jan 31 (tag Jan 31) and moved next to Feb 28. Previous
+        // start = Feb 28 − 1 month = Jan 28; the tag lies in [Jan 28, Feb 28)
+        // → covered → nothing owed, not a second January charge.
+        let charges = [tagged(d(2026, 1, 31), d(2026, 1, 31))];
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 2, 28),
+                1,
+                Some(d(2025, 12, 1)),
+                true,
+                &charges,
+                d(2026, 2, 10)
+            ),
+            ManualPayment::AlreadyCharged {
+                next: d(2026, 2, 28)
+            }
+        );
+        // Same history, manual, paying on Feb 28 → Feb 28 + 1 month = Mar 28.
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 2, 28),
+                1,
+                Some(d(2025, 12, 1)),
+                false,
+                &charges,
+                d(2026, 2, 28)
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 2, 28),
+                next: d(2026, 3, 28)
+            }
+        );
+    }
+
+    #[test]
+    fn auto_mar31_to_apr30_is_covered() {
+        // Tag Mar 31, next Apr 30 → previous start Mar 30 ≤ Mar 31 < Apr 30.
+        let charges = [tagged(d(2026, 3, 31), d(2026, 3, 31))];
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 4, 30),
+                1,
+                Some(d(2025, 12, 1)),
+                true,
+                &charges,
+                d(2026, 4, 10)
+            ),
+            ManualPayment::AlreadyCharged {
+                next: d(2026, 4, 30)
+            }
+        );
+    }
+
+    #[test]
+    fn edited_next_date_keeps_the_tagged_charge_in_its_period() {
+        // Cron charged Nov 17 (tag), then the next date was edited from Dec 17
+        // to Dec 5. Previous start Nov 5 ≤ Nov 17 < Dec 5 → covered.
+        let charges = [tagged(d(2026, 11, 17), d(2026, 11, 17))];
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 12, 5),
+                1,
+                Some(d(2026, 6, 17)),
+                true,
+                &charges,
+                d(2026, 11, 20)
+            ),
+            ManualPayment::AlreadyCharged {
+                next: d(2026, 12, 5)
+            }
+        );
+    }
+
+    #[test]
+    fn untagged_early_payment_pays_its_own_period() {
+        // Old code: next Nov 17, paid two days early on Nov 15 (untagged) →
+        // next Dec 17. Nov 15 sits between the Oct 17 and Nov 17 starts; Nov 17
+        // is nearer (2 days vs 29) → it covers November → manual advances.
+        let charges = [legacy(d(2026, 11, 15))];
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 12, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                false,
+                &charges,
+                d(2026, 12, 17)
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 12, 17),
+                next: d(2027, 1, 17)
+            }
+        );
+        // With October paid on time too, Oct 17 takes October and Nov 15 still
+        // takes November.
+        let charges = [legacy(d(2026, 10, 17)), legacy(d(2026, 11, 15))];
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 12, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                false,
+                &charges,
+                d(2026, 12, 17)
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 12, 17),
+                next: d(2027, 1, 17)
+            }
+        );
+    }
+
+    #[test]
+    fn untagged_late_payment_never_counts_for_the_upcoming_period() {
+        // Old code: October (Oct 17) paid three weeks late on Nov 6 → next
+        // Nov 17. Nov 17 is nearer (11 days vs 20) but it's the upcoming period,
+        // which an old charge never paid → Nov 6 covers October → advance.
+        let charges = [legacy(d(2026, 9, 17)), legacy(d(2026, 11, 6))];
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 11, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                false,
+                &charges,
+                d(2026, 11, 17)
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 11, 17),
+                next: d(2026, 12, 17)
+            }
+        );
+    }
+
+    #[test]
+    fn untagged_double_charge_spills_into_the_next_period() {
+        // Old code pressed twice on Oct 17: two charges, next moved to Dec 17.
+        // The first takes October, the second spills into November → covered.
+        let charges = [legacy(d(2026, 10, 17)), legacy(d(2026, 10, 17))];
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 12, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                false,
+                &charges,
+                d(2026, 12, 17)
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 12, 17),
+                next: d(2027, 1, 17)
             }
         );
     }

@@ -319,3 +319,35 @@ total ya no cuadra con la ganancia (lo que repara escrituras que no lo
 recalcularon), y borrar una cartera recalcula las inversiones cuyos
 movimientos se van con ella. BONDDIA estimado valúa el historial en una sola
 pasada (`values_over`): día por día desde cero era cuadrático.
+
+## 2026-11-17 — «Registrar pago» paga el periodo pendiente; cada cargo se etiqueta con su periodo
+
+El 17-nov no se registró el cobro automático de Claude: en octubre el cargo
+automático se borró y «Registrar pago» volvió a adelantar la fecha, así que la
+fecha avanzó dos meses con un solo cargo y noviembre quedó saltado (FIN-13).
+
+«Registrar pago» ya no adelanta siempre
+(`finanzas_core::subscription::plan_manual_payment`). Si el periodo anterior al
+próximo cobro venció, empezó después del alta y nadie lo paga, lo rellena sin
+mover la fecha. Una suscripción automática sin nada pendiente se rechaza
+(`subscription_already_charged:<fecha>`, que los clientes traducen). Si no, paga
+el periodo siguiente y avanza, como antes.
+
+Para saber qué periodo paga cada cargo, los manuales llevan desde ahora el mismo
+`client_id 'sub:<id>:<periodo>'` que siempre usó el cron. Fecharlos dentro de su
+ventana no bastaba: un pago adelantado o atrasado cae fuera, y la ventana lo
+volvería a pedir. Los periodos se arman hacia atrás desde el próximo cobro y cada
+cargo se asigna a uno (revisión del PR #8):
+
+- Un cargo etiquetado cuenta para el periodo cuyo tramo contiene su etiqueta. No
+  basta con «etiqueta igual a la fecha»: un ancla en el día 31 se recorta (31-ene
+  → 28-feb) y la fecha de cobro se puede editar después.
+- Un cargo viejo sin etiqueta va, en orden de fecha, al más cercano de los dos
+  periodos que lo rodean (o al otro si ya está ocupado), y nunca al periodo que
+  viene: el código anterior siempre movía la fecha más allá del periodo que
+  pagaba.
+
+Borrar un cargo no mueve la fecha. Si la regresara, el cron volvería a crear el
+cargo automático que el usuario acaba de borrar; el hueco se repara con
+«Registrar pago». Un periodo relleno se fecha hoy (es cuando se registra el pago)
+y, por tanto, cuenta en el mes en curso; la etiqueta lo liga a su periodo.
