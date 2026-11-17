@@ -94,7 +94,14 @@ vencida (fechada en esa fecha, no en la del cron; hasta 12 de rezago). El cargo
 de hoy espera a su `charge_time` (CDMX), así que sale a lo más 5 min después de
 la hora elegida. `client_id = 'sub:<id>:<fecha>'` + guarda sobre
 `next_charge_date` para que corridas traslapadas no dupliquen. Las suscripciones manuales sólo se cobran con
-«Registrar pago», que fecha el gasto el día en que se presiona.
+«Registrar pago», que fecha el gasto el día en que se presiona y lo etiqueta con
+el periodo que paga (mismo `client_id 'sub:<id>:<periodo>'`). La decisión es
+`finanzas_core::subscription::plan_manual_payment` (FIN-13): si el periodo
+anterior a `next_charge_date` ya venció y no tiene cargo (p. ej. se borró),
+lo rellena **sin** mover la fecha; una suscripción automática sin nada
+pendiente se rechaza con `subscription_already_charged:<fecha>` (los clientes lo
+traducen); si no, paga el periodo siguiente y avanza un paso. Antes siempre
+avanzaba, y borrar un cargo automático y registrarlo a mano saltaba un mes.
 
 ## Offline (PWA)
 
