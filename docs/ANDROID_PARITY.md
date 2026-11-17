@@ -476,6 +476,7 @@ Leyenda: ✅ portado · 🟡 parcial · ⬜ pendiente
 | Suscripciones: lista, crear, editar, pagar, pausar, borrar | `ui/subscriptions` | ✅ borrar confirma |
 | Suscripciones: check «Cobro automático» + insignia «Automático» | `ui/subscriptions` | ✅ |
 | Suscripciones: «Hora del cobro» editable (sólo con cobro automático) + hora junto al próximo cargo («Próximo cargo: 2026-11-02 9:30 a.m.») | `ui/subscriptions` | ✅ `TimeField` = `TimeInput`, respeta reloj 12/24 h |
+| Suscripciones: «Registrar pago» paga el periodo pendiente (rellena uno borrado sin mover la fecha) y, si se rechaza, el motivo sale en rojo bajo la tarjeta («Este periodo ya está cobrado. El siguiente cargo (17 dic) se registrará solo.») — FIN-13 | `ui/subscriptions` | ✅ regla en el backend; el aviso traduce el código `subscription_already_charged:<fecha>` igual que la web (`paymentErrorText`) |
 | Categorías: lista, crear, renombrar, borrar/ocultar, restaurar, reordenar | `ui/categories` | ✅ ocultar/borrar confirma, con el mensaje que toca |
 
 ## Ajustes

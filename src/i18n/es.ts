@@ -202,6 +202,9 @@ export const esDict = {
     autoBadge: "Automático",
     chargeTime: "Hora del cobro",
     chargeTimeHint: "Hora de Ciudad de México. Vacía = al iniciar el día.",
+    // "Register payment" on an auto-charging subscription with nothing owed.
+    // {date} gets replaced with the next charge date.
+    alreadyCharged: "Este periodo ya está cobrado. El siguiente cargo ({date}) se registrará solo.",
   },
   common: {
     comingSoon: "Próximamente",

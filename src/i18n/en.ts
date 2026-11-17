@@ -193,6 +193,7 @@ export const en: Dict = {
     autoBadge: "Automatic",
     chargeTime: "Charge time",
     chargeTimeHint: "Mexico City time. Empty = at the start of the day.",
+    alreadyCharged: "This period is already charged. The next charge ({date}) will be logged automatically.",
   },
   common: {
     comingSoon: "Coming soon",
