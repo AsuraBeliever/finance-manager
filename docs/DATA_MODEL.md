@@ -357,7 +357,9 @@ CREATE TABLE subscriptions (     -- pagos recurrentes; "registrar pago" inserta 
   (fechado en la fecha de cargo, `client_id 'sub:<id>:<YYYY-MM-DD>'`,
   `subscription_id` ligado) y avanza `next_charge_date` desde el ancla
   (`finanzas_core::subscription::due_charges`, sin deriva de fin de mes). Con 0
-  sólo se cobra con «Registrar pago» (gasto fechado hoy).
+  sólo se cobra con «Registrar pago» (gasto fechado hoy, también etiquetado
+  `client_id 'sub:<id>:<periodo que paga>'` desde FIN-13; los cargos manuales
+  anteriores no tienen etiqueta y cuentan por fecha dentro de su periodo).
 - **subscriptions.charge_time** (0041): hora editable del cobro automático
   (hora de Ciudad de México). El cargo de la fecha de hoy no sale hasta esa hora
   (`finanzas_core::subscription::charge_cutoff`) y el gasto lleva esa hora como

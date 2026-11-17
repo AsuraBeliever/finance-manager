@@ -43,6 +43,9 @@ import com.asura.finanzas.ui.components.Lucide
 import com.asura.finanzas.ui.components.chartColor
 import com.asura.finanzas.R
 import com.asura.finanzas.data.BrokeRepository
+import com.asura.finanzas.data.NetworkException
+import com.asura.finanzas.ui.text
+import com.asura.finanzas.ui.wallets.formatDayMonth
 import com.asura.finanzas.data.Subscription
 import com.asura.finanzas.data.SubscriptionList
 import com.asura.finanzas.ui.LocalAppSettings
@@ -79,6 +82,9 @@ fun SubscriptionsScreen(
     var editing by remember { mutableStateOf<Subscription?>(null) }
     // Deleting asks first, as it does in the browser.
     var deleting by remember { mutableStateOf<Subscription?>(null) }
+    // Why "register payment" was refused, shown under that card (the web's
+    // `payError`): the subscription it was for and the failure.
+    var payError by remember { mutableStateOf<Pair<Long, Throwable>?>(null) }
 
     when (val current = state) {
         is Load.Loading -> LoadingBox(modifier)
@@ -88,9 +94,12 @@ fun SubscriptionsScreen(
             fromCache = current.fromCache,
             onBack = onBack,
             onNew = { creating = true },
+            payError = payError,
             onPay = { target ->
+                payError = null
                 scope.launch {
                     runCatching { repository.registerSubscriptionPayment(target.id) }
+                        .onFailure { payError = target.id to it }
                     reload()
                 }
             },
@@ -136,6 +145,7 @@ fun SubscriptionsScreen(
 private fun SubscriptionContent(
     data: SubscriptionList,
     fromCache: Boolean,
+    payError: Pair<Long, Throwable>?,
     onBack: () -> Unit,
     onNew: () -> Unit,
     onPay: (Subscription) -> Unit,
@@ -203,6 +213,7 @@ private fun SubscriptionContent(
         itemsIndexed(data.subscriptions, key = { _, it -> it.id }) { index, subscription ->
             SubscriptionCard(
                 subscription, hide, index,
+                payError = payError?.takeIf { it.first == subscription.id }?.second,
                 onPay = onPay,
                 onToggle = onToggle,
                 onEdit = onEdit,
@@ -218,6 +229,7 @@ private fun SubscriptionCard(
     subscription: Subscription,
     hide: Boolean,
     index: Int,
+    payError: Throwable?,
     onPay: (Subscription) -> Unit,
     onToggle: (Subscription) -> Unit,
     onEdit: (Subscription) -> Unit,
@@ -340,7 +352,34 @@ private fun SubscriptionCard(
                 RowAction(Lucide.Pencil) { onEdit(subscription) }
                 RowAction(Lucide.Trash) { onDelete(subscription) }
             }
+            // The web's `basis-full text-sm text-danger` line under the row.
+            if (payError != null) {
+                Text(
+                    paymentErrorText(payError),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.danger,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
+    }
+}
+
+/** Backend code for "nothing owed" (worker ALREADY_CHARGED), `<code>:<next date>`. */
+private const val ALREADY_CHARGED = "subscription_already_charged:"
+
+/** User-facing text for a failed "register payment" — the web's `paymentErrorText`. */
+@Composable
+private fun paymentErrorText(error: Throwable): String {
+    val message = error.message.orEmpty()
+    return when {
+        error is NetworkException -> stringResource(R.string.offline_banner)
+        message.startsWith(ALREADY_CHARGED) -> text(
+            R.string.subscriptions_already_charged,
+            "date" to formatDayMonth(message.removePrefix(ALREADY_CHARGED)),
+        )
+        message.isNotBlank() -> message
+        else -> stringResource(R.string.common_error)
     }
 }
 

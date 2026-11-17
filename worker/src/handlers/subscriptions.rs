@@ -6,7 +6,10 @@
 
 use finanzas_core::error::{AppError, AppResult};
 use finanzas_core::period::{resolve_period, Period};
-use finanzas_core::subscription::{charge_cutoff, due_charges, next_after};
+use finanzas_core::subscription::{
+    charge_client_id, charge_cutoff, charge_period, due_charges, plan_manual_payment, BookedCharge,
+    ManualPayment,
+};
 use serde::{Deserialize, Serialize};
 use worker::D1Database;
 
@@ -333,8 +336,16 @@ pub async fn delete_subscription(db: &D1Database, uid: i64, a: IdArgs) -> AppRes
     Ok(())
 }
 
-/// Book this period's charge as an expense in the linked wallet, then move the
-/// next charge date forward by the cadence.
+/// Error code `register_subscription_payment` returns (as `<code>:<next date>`)
+/// for an auto-charging subscription with nothing owed. The clients match it to
+/// show their own translated notice instead of the raw message.
+pub const ALREADY_CHARGED: &str = "subscription_already_charged";
+
+/// Book a charge as an expense in the linked wallet. Normally that pays the
+/// upcoming period and moves the next charge date forward; if the period
+/// before it went unpaid (its charge was deleted) it fills that one instead and
+/// leaves the date alone, and an auto-charging subscription with nothing owed
+/// is refused — see `finanzas_core::subscription::plan_manual_payment`.
 pub async fn register_subscription_payment(
     db: &D1Database,
     uid: i64,
@@ -344,6 +355,61 @@ pub async fn register_subscription_payment(
     let wallet_id = sub
         .wallet_id
         .ok_or_else(|| AppError::InvalidInput("la suscripción no tiene cartera asignada".into()))?;
+
+    #[derive(Deserialize)]
+    struct StartRow {
+        started_at: Option<String>,
+    }
+    let started_at = first::<StartRow>(
+        db,
+        "SELECT started_at FROM subscriptions WHERE id = ?1 AND user_id = ?2",
+        jsv![a.id, uid],
+    )
+    .await?
+    .and_then(|r| r.started_at)
+    .and_then(|s| chrono::NaiveDate::parse_from_str(s.get(..10)?, "%Y-%m-%d").ok());
+
+    #[derive(Deserialize)]
+    struct ChargeRow {
+        occurred_at: String,
+        client_id: Option<String>,
+    }
+    let rows: Vec<ChargeRow> = all(
+        db,
+        "SELECT t.occurred_at AS occurred_at, t.client_id AS client_id
+         FROM transactions t
+         JOIN wallets w ON w.id = t.wallet_id
+         WHERE w.user_id = ?1 AND t.subscription_id = ?2
+           AND t.kind = 'expense' AND t.is_refund = 0",
+        jsv![uid, a.id],
+    )
+    .await?;
+    let charges: Vec<BookedCharge> = rows
+        .iter()
+        .filter_map(|r| {
+            Some(BookedCharge {
+                date: parse_day(&r.occurred_at).ok()?,
+                period: charge_period(r.client_id.as_deref(), a.id),
+            })
+        })
+        .collect();
+
+    let today = today_mx();
+    let current = parse_day(&sub.next_charge_date)?;
+    let (period, new_next) = match plan_manual_payment(
+        current,
+        cadence_months(&sub.cadence),
+        started_at,
+        sub.auto_charge,
+        &charges,
+        today,
+    ) {
+        ManualPayment::AlreadyCharged { next } => {
+            return Err(AppError::InvalidInput(format!("{ALREADY_CHARGED}:{next}")));
+        }
+        ManualPayment::FillPrevious { period } => (period, None),
+        ManualPayment::Advance { period, next } => (period, Some(next)),
+    };
 
     // Transactions are stored in the wallet's currency, so a USD subscription
     // charged to an MXN wallet must be converted first.
@@ -374,26 +440,28 @@ pub async fn register_subscription_payment(
             amount_cents,
             category_id: sub.category_id,
             description: Some(sub.name.clone()),
-            occurred_at: today_mx().format("%Y-%m-%d").to_string(),
-            // Auto-posted subscription charge: no meaningful wall-clock time.
+            occurred_at: today.format("%Y-%m-%d").to_string(),
+            // Registered by hand: no meaningful wall-clock time.
             occurred_time: None,
-            client_id: None,
+            // Tags the period it pays (and makes a double tap idempotent).
+            client_id: Some(charge_client_id(sub.id, period)),
             subscription_id: Some(sub.id),
             refund_of_id: None,
         },
     )
     .await?;
 
-    let next = next_after(
-        parse_day(&sub.next_charge_date)?,
-        cadence_months(&sub.cadence),
-    );
-    exec(
-        db,
-        "UPDATE subscriptions SET next_charge_date = ?3 WHERE id = ?1 AND user_id = ?2",
-        jsv![a.id, uid, next.to_string()],
-    )
-    .await?;
+    if let Some(next) = new_next {
+        // Guarded on the date we planned from, so a concurrent cron run can't
+        // be stepped over twice.
+        exec(
+            db,
+            "UPDATE subscriptions SET next_charge_date = ?3
+             WHERE id = ?1 AND user_id = ?2 AND next_charge_date = ?4",
+            jsv![a.id, uid, next.to_string(), sub.next_charge_date.clone()],
+        )
+        .await?;
+    }
     fetch_sub(db, uid, a.id).await
 }
 
@@ -474,8 +542,8 @@ pub async fn post_due_subscriptions(db: &D1Database) -> AppResult<()> {
             let amount_cents =
                 convert(r.amount_cents, &r.currency_code, &r.wallet_currency, rates)?;
             let mut stmts = Vec::with_capacity(due.len() + 1);
-            for date in &due {
-                let date = date.to_string();
+            for day in &due {
+                let date = day.to_string();
                 stmts.push(stmt(
                     db,
                     "INSERT OR IGNORE INTO transactions
@@ -488,7 +556,7 @@ pub async fn post_due_subscriptions(db: &D1Database) -> AppResult<()> {
                         r.name.clone(),
                         date.clone(),
                         r.charge_time.clone(),
-                        format!("sub:{}:{}", r.id, date),
+                        charge_client_id(r.id, *day),
                         r.id
                     ],
                 )?);

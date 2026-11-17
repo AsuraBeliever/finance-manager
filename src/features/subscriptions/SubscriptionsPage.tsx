@@ -26,7 +26,7 @@ import {
 } from "../../lib/api";
 import { useMoney } from "../../lib/hideBalance";
 import { parseToCents } from "../../lib/money";
-import { formatTime, todayIso } from "../../lib/date";
+import { formatDayMonth, formatTime, todayIso } from "../../lib/date";
 import { useClock } from "../../lib/timeFormat";
 import { CHART_COLORS } from "../../lib/palette";
 import { PrivacyToggle } from "../../components/PrivacyToggle";
@@ -55,6 +55,9 @@ export function SubscriptionsPage() {
     onSuccess: invalidate,
   });
   const pay = useMutation({ mutationFn: registerSubscriptionPayment, onSuccess: invalidate });
+  // Why "register payment" was refused, shown under that subscription's card.
+  const payError = (id: number): string | null =>
+    pay.isError && pay.variables === id ? paymentErrorText(pay.error) : null;
 
   const data = subs.data;
   const list = data?.subscriptions ?? [];
@@ -167,6 +170,11 @@ export function SubscriptionsPage() {
                   <Trash2 size={16} />
                 </button>
               </div>
+              {payError(sub.id) && (
+                <p role="alert" className="basis-full text-sm text-danger">
+                  {payError(sub.id)}
+                </p>
+              )}
             </section>
           );
         })}
@@ -191,6 +199,18 @@ export function SubscriptionsPage() {
       />
     </>
   );
+}
+
+/** Backend error code for "nothing owed" (worker ALREADY_CHARGED), `<code>:<next date>`. */
+const ALREADY_CHARGED = "subscription_already_charged:";
+
+/** User-facing text for a failed "register payment". */
+function paymentErrorText(error: Error): string {
+  if (error.message.startsWith(ALREADY_CHARGED)) {
+    const next = error.message.slice(ALREADY_CHARGED.length);
+    return es.subscriptions.alreadyCharged.replace("{date}", formatDayMonth(next));
+  }
+  return error.message || es.common.error;
 }
 
 function SubscriptionFormModal({

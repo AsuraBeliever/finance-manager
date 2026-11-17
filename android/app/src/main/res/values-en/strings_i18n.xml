@@ -179,6 +179,7 @@
     <string name="subscriptions_auto_badge">Automatic</string>
     <string name="subscriptions_charge_time">Charge time</string>
     <string name="subscriptions_charge_time_hint">Mexico City time. Empty = at the start of the day.</string>
+    <string name="subscriptions_already_charged">This period is already charged. The next charge ({date}) will be logged automatically.</string>
     <string name="common_coming_soon">Coming soon</string>
     <string name="common_loading">Loading…</string>
     <string name="common_error">Something went wrong</string>
