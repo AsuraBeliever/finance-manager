@@ -99,6 +99,80 @@ pub fn next_after(current: NaiveDate, cadence_months: i32) -> NaiveDate {
     add_months(current, cadence_months.max(1))
 }
 
+/// `client_id` that tags a subscription charge with the billing period it
+/// pays: 'sub:<subscription id>:<period date>'. The cron has always used it
+/// (it doubles as its idempotency key); manual payments use it too, so a
+/// charge belongs to its period no matter which day it was booked.
+pub fn charge_client_id(subscription_id: i64, period: NaiveDate) -> String {
+    format!("sub:{subscription_id}:{period}")
+}
+
+/// The period a charge's `client_id` tags for this subscription, if any —
+/// the inverse of [`charge_client_id`]. Older manual charges carry no tag.
+pub fn charge_period(client_id: Option<&str>, subscription_id: i64) -> Option<NaiveDate> {
+    let rest = client_id?.strip_prefix(&format!("sub:{subscription_id}:"))?;
+    NaiveDate::parse_from_str(rest, "%Y-%m-%d").ok()
+}
+
+/// One expense already booked for a subscription.
+#[derive(Debug, Clone, Copy)]
+pub struct BookedCharge {
+    pub date: NaiveDate,
+    /// Period tagged in its `client_id`; None for untagged (older) charges.
+    pub period: Option<NaiveDate>,
+}
+
+/// What "register payment" does for a subscription.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ManualPayment {
+    /// The period before `next_charge_date` is due but has no charge (e.g. it
+    /// was deleted): book it for `period` and leave the next date alone.
+    FillPrevious { period: NaiveDate },
+    /// Pay the upcoming period `period` (= the current next date) and move the
+    /// next date to `next`.
+    Advance { period: NaiveDate, next: NaiveDate },
+    /// Auto-charging subscription with nothing owed: its next charge (`next`)
+    /// is booked by the cron, so a manual one would only skip a period.
+    AlreadyCharged { next: NaiveDate },
+}
+
+/// Decides what a manual "register payment" books. Before this, it always
+/// booked today and stepped the next date — so an auto charge deleted and then
+/// re-registered by hand moved the date twice in one period and silently
+/// skipped the next one.
+///
+/// The previous period (`next_charge - cadence`) is owed when it is already due
+/// (`<= today`), began after the subscription did (`> started_at`, so a fresh
+/// subscription isn't billed for before it existed), and no charge covers it.
+/// A charge covers it when its tag names that period, or — untagged older
+/// charges — when its date falls in `[previous, next_charge)`.
+pub fn plan_manual_payment(
+    next_charge: NaiveDate,
+    cadence_months: i32,
+    started_at: Option<NaiveDate>,
+    auto_charge: bool,
+    charges: &[BookedCharge],
+    today: NaiveDate,
+) -> ManualPayment {
+    let step = cadence_months.max(1);
+    let previous = add_months(next_charge, -step);
+    let covered = charges.iter().any(|c| match c.period {
+        Some(p) => p == previous,
+        None => c.date >= previous && c.date < next_charge,
+    });
+    let owed = previous <= today && started_at.is_none_or(|s| previous > s) && !covered;
+    if owed {
+        ManualPayment::FillPrevious { period: previous }
+    } else if auto_charge {
+        ManualPayment::AlreadyCharged { next: next_charge }
+    } else {
+        ManualPayment::Advance {
+            period: next_charge,
+            next: next_after(next_charge, step),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,5 +341,281 @@ mod tests {
         assert_eq!(next_after(d(2026, 10, 16), 1), d(2026, 11, 16));
         assert_eq!(next_after(d(2026, 1, 31), 1), d(2026, 2, 28));
         assert_eq!(next_after(d(2026, 3, 1), 12), d(2027, 3, 1));
+    }
+
+    // ---- plan_manual_payment ----
+
+    /// An untagged (older) charge booked on `date`.
+    fn legacy(date: NaiveDate) -> BookedCharge {
+        BookedCharge { date, period: None }
+    }
+
+    /// A charge tagged with the period it pays, booked on `date`.
+    fn tagged(date: NaiveDate, period: NaiveDate) -> BookedCharge {
+        BookedCharge {
+            date,
+            period: Some(period),
+        }
+    }
+
+    /// Claude's history before Oct 17: monthly on the 17th since Jun 17.
+    fn claude_history() -> Vec<BookedCharge> {
+        vec![
+            legacy(d(2026, 6, 16)),
+            legacy(d(2026, 7, 17)),
+            legacy(d(2026, 8, 17)),
+            legacy(d(2026, 9, 17)),
+        ]
+    }
+
+    #[test]
+    fn charge_tag_round_trips() {
+        assert_eq!(charge_client_id(2, d(2026, 11, 17)), "sub:2:2026-11-17");
+        assert_eq!(
+            charge_period(Some("sub:2:2026-11-17"), 2),
+            Some(d(2026, 11, 17))
+        );
+        // Another subscription's tag, a different prefix, no tag at all.
+        assert_eq!(charge_period(Some("sub:21:2026-11-17"), 2), None);
+        assert_eq!(charge_period(Some("yield:2:2026-11-17"), 2), None);
+        assert_eq!(charge_period(Some("a7624e6a-9f2a"), 2), None);
+        assert_eq!(charge_period(None, 2), None);
+    }
+
+    #[test]
+    fn deleted_auto_charge_is_refilled_without_moving_the_date() {
+        // The Oct 17 bug: the cron booked Oct 17 and moved next to Nov 17, the
+        // charge was deleted, then "register payment" ran at 16:31. Previous
+        // period = Nov 17 − 1 month = Oct 17: due (≤ Oct 17), after the Jun 17
+        // start, and nothing covers [Oct 17, Nov 17) → fill it, next stays Nov 17.
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 11, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                true,
+                &claude_history(),
+                d(2026, 10, 17),
+            ),
+            ManualPayment::FillPrevious {
+                period: d(2026, 10, 17)
+            }
+        );
+    }
+
+    #[test]
+    fn auto_subscription_already_charged_is_rejected() {
+        // Same, but the cron's Oct 17 charge is still there → nothing owed; the
+        // Nov 17 charge belongs to the cron.
+        let mut charges = claude_history();
+        charges.push(tagged(d(2026, 10, 17), d(2026, 10, 17)));
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 11, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                true,
+                &charges,
+                d(2026, 10, 17),
+            ),
+            ManualPayment::AlreadyCharged {
+                next: d(2026, 11, 17)
+            }
+        );
+    }
+
+    #[test]
+    fn manual_subscription_paid_up_advances_one_period() {
+        // Manual, Oct paid on Oct 18 (untagged, inside [Oct 17, Nov 17)), paying
+        // on Nov 17 → books period Nov 17, next = Nov 17 + 1 month = Dec 17.
+        let mut charges = claude_history();
+        charges.push(legacy(d(2026, 10, 18)));
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 11, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                false,
+                &charges,
+                d(2026, 11, 17),
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 11, 17),
+                next: d(2026, 12, 17)
+            }
+        );
+    }
+
+    #[test]
+    fn tagged_early_payment_covers_its_own_period() {
+        // Nov paid early on Nov 15 (tagged Nov 17), so next is Dec 17. On Dec 20
+        // the previous period Nov 17 is covered by the tag even though Nov 15 is
+        // outside [Nov 17, Dec 17) → advance to Jan 17, never re-fill November.
+        let charges = vec![
+            tagged(d(2026, 10, 17), d(2026, 10, 17)),
+            tagged(d(2026, 11, 15), d(2026, 11, 17)),
+        ];
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 12, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                false,
+                &charges,
+                d(2026, 12, 20),
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 12, 17),
+                next: d(2027, 1, 17)
+            }
+        );
+    }
+
+    #[test]
+    fn new_subscription_is_not_billed_for_before_it_existed() {
+        // Created Nov 10 with the first charge on Nov 25: previous period
+        // Oct 25 is before the start → manual advances to Dec 25…
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 11, 25),
+                1,
+                Some(d(2026, 11, 10)),
+                false,
+                &[],
+                d(2026, 11, 25)
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 11, 25),
+                next: d(2026, 12, 25)
+            }
+        );
+        // …and an automatic one leaves Nov 25 to the cron.
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 11, 25),
+                1,
+                Some(d(2026, 11, 10)),
+                true,
+                &[],
+                d(2026, 11, 20)
+            ),
+            ManualPayment::AlreadyCharged {
+                next: d(2026, 11, 25)
+            }
+        );
+    }
+
+    #[test]
+    fn previous_period_not_due_yet_is_not_owed() {
+        // Next Dec 17 on Nov 10: previous period Nov 17 hasn't arrived, so it
+        // isn't owed even without a charge → manual pays Dec 17 → Jan 17 2027.
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 12, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                false,
+                &claude_history(),
+                d(2026, 11, 10),
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 12, 17),
+                next: d(2027, 1, 17)
+            }
+        );
+    }
+
+    #[test]
+    fn late_by_more_than_a_period_fills_then_advances() {
+        // Manual, next Nov 17, nothing for Oct, paying on Dec 20: first fill
+        // the Oct 17 period (next stays Nov 17)…
+        let history = claude_history();
+        let first = plan_manual_payment(
+            d(2026, 11, 17),
+            1,
+            Some(d(2026, 6, 17)),
+            false,
+            &history,
+            d(2026, 12, 20),
+        );
+        assert_eq!(
+            first,
+            ManualPayment::FillPrevious {
+                period: d(2026, 10, 17)
+            }
+        );
+        // …then, with that charge booked on Dec 20 but tagged Oct 17, the next
+        // press pays Nov 17 and steps to Dec 17.
+        let mut charges = history;
+        charges.push(tagged(d(2026, 12, 20), d(2026, 10, 17)));
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 11, 17),
+                1,
+                Some(d(2026, 6, 17)),
+                false,
+                &charges,
+                d(2026, 12, 20),
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 11, 17),
+                next: d(2026, 12, 17)
+            }
+        );
+    }
+
+    #[test]
+    fn yearly_missing_period_is_filled() {
+        // Yearly on Mar 1 since Jan 1 2025, paid Mar 1 2025, next Mar 1 2027.
+        // Previous period = Mar 1 2026 ≤ Mar 5 2026, nothing in
+        // [Mar 1 2026, Mar 1 2027) → fill Mar 1 2026.
+        assert_eq!(
+            plan_manual_payment(
+                d(2027, 3, 1),
+                12,
+                Some(d(2025, 1, 1)),
+                false,
+                &[legacy(d(2025, 3, 1))],
+                d(2026, 3, 5),
+            ),
+            ManualPayment::FillPrevious {
+                period: d(2026, 3, 1)
+            }
+        );
+    }
+
+    #[test]
+    fn end_of_month_anchor_window() {
+        // Anchored Jan 31 → next Feb 28; previous = Feb 28 − 1 month = Jan 28.
+        // A Jan 31 charge lies in [Jan 28, Feb 28) → covered → manual pays
+        // Feb 28 and steps to Mar 28 (one clamp, as next_after always did).
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 2, 28),
+                1,
+                Some(d(2025, 12, 1)),
+                false,
+                &[legacy(d(2026, 1, 31))],
+                d(2026, 2, 10),
+            ),
+            ManualPayment::Advance {
+                period: d(2026, 2, 28),
+                next: d(2026, 3, 28)
+            }
+        );
+        // Without it, the Jan 28 period is owed.
+        assert_eq!(
+            plan_manual_payment(
+                d(2026, 2, 28),
+                1,
+                Some(d(2025, 12, 1)),
+                false,
+                &[],
+                d(2026, 2, 10)
+            ),
+            ManualPayment::FillPrevious {
+                period: d(2026, 1, 28)
+            }
+        );
     }
 }
