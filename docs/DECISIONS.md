@@ -339,13 +339,17 @@ ventana no bastaba: un pago adelantado o atrasado cae fuera, y la ventana lo
 volvería a pedir. Los periodos se arman hacia atrás desde el próximo cobro y cada
 cargo se asigna a uno (revisión del PR #8):
 
-- Un cargo etiquetado cuenta para el periodo cuyo tramo contiene su etiqueta. No
-  basta con «etiqueta igual a la fecha»: un ancla en el día 31 se recorta (31-ene
-  → 28-feb) y la fecha de cobro se puede editar después.
-- Un cargo viejo sin etiqueta va, en orden de fecha, al más cercano de los dos
-  periodos que lo rodean (o al otro si ya está ocupado), y nunca al periodo que
-  viene: el código anterior siempre movía la fecha más allá del periodo que
-  pagaba.
+- Primero los cargos etiquetados (por su etiqueta) y luego los viejos sin
+  etiqueta (por su fecha), cada grupo en orden: cada uno toma el más cercano de
+  los dos periodos que lo rodean, o el otro si ya está ocupado. Si los dos están
+  ocupados, pasa a los periodos siguientes hasta el anterior al próximo cobro: el
+  código viejo podía pagar varios meses el mismo día. «El más cercano» y no
+  «igual a la fecha», porque un ancla en el día 31 se recorta (31-ene → 28-feb) y
+  la fecha de cobro se puede editar hacia cualquier lado después de cobrar.
+- Ningún cargo anterior al próximo cobro cuenta para el periodo que viene: el
+  cron y «Registrar pago» siempre movieron la fecha más allá del periodo que
+  pagaban. Una etiqueta igual o posterior al próximo cobro sí es del periodo que
+  viene.
 
 Borrar un cargo no mueve la fecha. Si la regresara, el cron volvería a crear el
 cargo automático que el usuario acaba de borrar; el hueco se repara con
